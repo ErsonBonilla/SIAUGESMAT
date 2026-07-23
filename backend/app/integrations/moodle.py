@@ -40,8 +40,6 @@ class MoodleIntegration:
             "categoryidnumber": category_idnumber,
             "format": "onetopic",
             "visible": visible,
-            "enrolment_1": "self",
-            "enrolment_1_role": "student",
         }
         if template_shortname:
             course_data["templatecourse"] = template_shortname

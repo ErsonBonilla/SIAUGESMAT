@@ -100,12 +100,11 @@ class TestMoodle3Adapter:
         assert params["criteria[0][value]"] == "TEST101"
 
     def test_build_create_course_enrolment_params(self, adapter):
-        """3.x: formato legacy enrolment_N."""
+        """3.x: no agrega params de enrolment (no son parametros API estandar)."""
         params = {}
         course = {"enrolment_1": "self", "enrolment_1_role": "student"}
         adapter.build_create_course_enrolment_params(params, course, 0)
-        assert params["courses[0][enrolment_1]"] == "self"
-        assert params["courses[0][enrolment_1_roleid]"] == 5
+        assert params == {}  # no-op en Moodle 3.x real
 
     def test_build_create_course_enrolment_params_skips_when_missing(self, adapter):
         params = {}
