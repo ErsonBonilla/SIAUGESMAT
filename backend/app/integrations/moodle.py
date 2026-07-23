@@ -233,7 +233,7 @@ class MoodleIntegration:
                 "username": username,
                 "reason": "enrolled",
             }
-        except MoodleAPIError as e:
+        except Exception as e:
             logger.exception(
                 f"Error matriculando {username} en {course_shortname}: {e}"
             )
