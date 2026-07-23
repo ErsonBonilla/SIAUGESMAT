@@ -149,7 +149,7 @@ class MoodleService:
         response.raise_for_status()
         data = response.json()
 
-        if not isinstance(data, (dict, list)):
+        if data is not None and not isinstance(data, (dict, list)):
             raise MoodleAPIError(
                 f"Respuesta inesperada de {wsfunction}: {str(data)[:300]}"
             )
