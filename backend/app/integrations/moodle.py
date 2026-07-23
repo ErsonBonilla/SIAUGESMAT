@@ -51,7 +51,7 @@ class MoodleIntegration:
             return True
         except Exception as e:
             logger.exception(f"Error al crear curso {shortname}: {e}")
-            self.last_error = str(e)
+            self.last_error = getattr(e, 'spanish_message', str(e))
             return False
 
     async def delete_course(self, shortname: str) -> bool:
@@ -62,7 +62,7 @@ class MoodleIntegration:
             return True
         except Exception as e:
             logger.exception(f"Error al eliminar curso {shortname}: {e}")
-            self.last_error = str(e)
+            self.last_error = getattr(e, 'spanish_message', str(e))
             return False
 
     async def activate_course(self, shortname: str) -> bool:
@@ -76,7 +76,7 @@ class MoodleIntegration:
             return True
         except Exception as e:
             logger.exception(f"Error al activar curso {shortname}: {e}")
-            self.last_error = str(e)
+            self.last_error = getattr(e, 'spanish_message', str(e))
             return False
 
     async def hide_course(self, shortname: str) -> bool:
@@ -90,7 +90,7 @@ class MoodleIntegration:
             return True
         except Exception as e:
             logger.exception(f"Error al ocultar curso {shortname}: {e}")
-            self.last_error = str(e)
+            self.last_error = getattr(e, 'spanish_message', str(e))
             return False
 
     async def rename_course(
@@ -112,7 +112,7 @@ class MoodleIntegration:
             return True
         except Exception as e:
             logger.exception(f"Error al renombrar curso {old_shortname}: {e}")
-            self.last_error = str(e)
+            self.last_error = getattr(e, 'spanish_message', str(e))
             return False
 
     # ------------------------------------------------------------------
