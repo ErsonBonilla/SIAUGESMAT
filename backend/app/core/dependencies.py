@@ -1,0 +1,81 @@
+"""
+Dependencias inyectables para los endpoints de SIAUGESMAT.
+
+Centraliza:
+- La sesión de base de datos (importada de app.db.session).
+- La validación del usuario actual mediante JWT.
+"""
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.security import decode_access_token
+from app.db.session import get_db
+from app.schemas.user import UserInToken
+
+# Esquema de autenticación HTTP Bearer para Swagger y dependencias
+bearer_scheme = HTTPBearer()
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> UserInToken:
+    """
+    Valida el token JWT de la cabecera Authorization y devuelve los
+    datos del usuario autenticado.
+
+    Args:
+        credentials: Credenciales extraídas del header Authorization.
+        db: Sesión de base de datos (no usada actualmente pero disponible
+            para futuras ampliaciones, como consultar permisos adicionales).
+
+    Returns:
+        UserInToken con los campos user_id y username.
+
+    Raises:
+        HTTPException 401: Token inválido, expirado o con datos insuficientes.
+    """
+    token = credentials.credentials
+    try:
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+        username = payload.get("username")
+        modalidad = payload.get("modalidad")
+
+        if user_id is None or username is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token inválido: datos insuficientes.",
+            )
+
+        if not modalidad:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token inválido: modalidad no especificada. Inicie sesión nuevamente.",
+            )
+
+        if modalidad == "PRESENCIAL":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Modalidad PRESENCIAL no disponible actualmente. Use DISTANCIA.",
+            )
+
+        # El ID de usuario se guardó como string en el JWT; lo convertimos.
+        user_id_int = int(user_id)
+
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido o expirado.",
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token inválido: ID de usuario no numérico.",
+        )
+
+    return UserInToken(user_id=user_id_int, username=username, modalidad=modalidad)

@@ -1,0 +1,7 @@
+_fresh/
+node_modules/
+.git/
+*.md
+tests/
+*.test.ts
+*.test.tsx

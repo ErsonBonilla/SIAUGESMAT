@@ -1,0 +1,106 @@
+"""
+Endpoints de subida de archivos Excel (carga académica).
+"""
+
+import logging
+import os
+import uuid
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.dependencies import get_current_user, get_db
+from app.repositories.execution_repo import create_execution
+from app.schemas.upload import UploadResponse, SemesterResponse
+from app.schemas.user import UserInToken
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+MAX_FILE_SIZE_MB = 50
+ALLOWED_EXTENSIONS = {".xlsx"}
+ALLOWED_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+ALLOWED_MODES = {"courses", "users", "both"}
+
+
+@router.get("/current", response_model=SemesterResponse,
+            summary="Obtener el semestre actual según la fecha del servidor")
+def get_current_semester():
+    from datetime import datetime
+    now = datetime.now()
+    period = "A" if now.month <= 6 else "B"
+    return SemesterResponse(semester=f"{now.year}{period}")
+
+
+@router.post("", response_model=UploadResponse, summary="Subir archivo Excel",
+             status_code=status.HTTP_201_CREATED)
+async def upload_excel(
+    file: UploadFile = File(...),
+    semester: str = Form(...),
+    mode: str = Form("both"),
+    modalidad: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: UserInToken = Depends(get_current_user),
+):
+    semester = semester.strip().upper()
+    if len(semester) != 5 or semester[-1] not in ("A", "B") or not semester[:4].isdigit():
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            detail=f"Formato de semestre inválido: '{semester}'.")
+
+    if mode not in ALLOWED_MODES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            detail=f"Modo inválido: '{mode}'.")
+
+    modalidad = modalidad.strip().upper()
+    if modalidad not in {"DISTANCIA"}:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            detail="Modalidad inválida. Solo DISTANCIA está disponible.")
+
+    if not file.filename:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            detail="El archivo debe tener un nombre.")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            detail=f"Extensión no permitida: '{ext}'.")
+
+    if file.content_type != ALLOWED_CONTENT_TYPE:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST,
+                            detail="Tipo de contenido no permitido.")
+
+    file_bytes = await file.read()
+    file_size_mb = len(file_bytes) / (1024 * 1024)
+    if file_size_mb > MAX_FILE_SIZE_MB:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            detail=f"El archivo excede {MAX_FILE_SIZE_MB} MB.")
+
+    upload_dir = settings.UPLOAD_DIR
+    os.makedirs(upload_dir, exist_ok=True)
+
+    safe_filename = os.path.basename(file.filename)
+    unique_name = f"{uuid.uuid4().hex[:8]}_{safe_filename}"
+    file_path = os.path.join(upload_dir, unique_name)
+
+    try:
+        with open(file_path, "wb") as f:
+            f.write(file_bytes)
+    except OSError:
+        logger.exception("Error al guardar el archivo")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="No se pudo guardar el archivo.")
+
+    moodle_config = settings.get_moodle_config(modalidad)
+    execution = create_execution(db, unique_name, semester, mode,
+                                 modalidad, moodle_config["version"])
+
+    logger.info(f"Archivo '{unique_name}' subido por {current_user.username} "
+                f"(execution_id={execution.id}, mode={mode})")
+
+    return UploadResponse(
+        execution_id=execution.id, filename=unique_name,
+        semester=semester, mode=mode, status=execution.status,
+        message="Archivo subido correctamente. Pendiente de procesamiento.",
+    )

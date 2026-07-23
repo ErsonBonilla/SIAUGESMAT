@@ -1,0 +1,29 @@
+{
+  "lock": false,
+  "tasks": {
+    "check": "deno fmt --check && deno lint && deno check **/*.ts && deno check **/*.tsx",
+    "start": "deno run -A --no-check --watch=static/,routes/ dev.ts",
+    "build": "deno run -A --no-check dev.ts build",
+    "preview": "deno run -A main.ts",
+    "update": "deno run -A -r https://fresh.deno.dev/update .",
+    "test": "deno test --no-check -A tests/"
+  },
+  "imports": {
+    "$fresh/": "https://deno.land/x/fresh@1.7.2/",
+    "preact": "npm:preact",
+    "preact/hooks": "npm:preact/hooks",
+    "preact/jsx-runtime": "npm:preact/jsx-runtime",
+    "preact/jsx-dev-runtime": "npm:preact/jsx-dev-runtime",
+    "@preact/signals": "npm:@preact/signals",
+    "@preact/signals-core": "npm:@preact/signals-core",
+    "chart.js": "https://esm.sh/chart.js@4.4.1",
+    "date-fns": "npm:date-fns",
+    "preact-render-to-string": "npm:preact-render-to-string",
+    "tailwindcss": "npm:tailwindcss@3.4.1"
+  },
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
+  },
+  "nodeModulesDir": "auto"
+}
