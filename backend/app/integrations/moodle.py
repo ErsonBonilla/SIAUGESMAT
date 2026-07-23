@@ -152,8 +152,8 @@ class MoodleIntegration:
         # 1. Buscar por email institucional
         try:
             existing = await self.find_user_by_email(email)
-        except MoodleAPIError as e:
-            logger.exception(f"Error al buscar usuario por email {email}: {e.spanish_message}")
+        except Exception as e:
+            logger.exception(f"Error al buscar usuario por email {email}: {getattr(e, 'spanish_message', str(e))}")
             return None, False
         if existing:
             return existing.get("username", username_esperado), False
@@ -162,8 +162,8 @@ class MoodleIntegration:
         if email_personal:
             try:
                 existing_by_personal = await self.find_user_by_email(email_personal)
-            except MoodleAPIError as e:
-                logger.exception(f"Error al buscar usuario por email personal {email_personal}: {e.spanish_message}")
+            except Exception as e:
+                logger.exception(f"Error al buscar usuario por email personal {email_personal}: {getattr(e, 'spanish_message', str(e))}")
                 return None, False
             if existing_by_personal:
                 return existing_by_personal.get("username", username_esperado), False
@@ -183,8 +183,8 @@ class MoodleIntegration:
             }])
             logger.info(f"Usuario creado: {username_esperado}")
             return username_esperado, True
-        except MoodleAPIError as e:
-            logger.exception(f"Error al crear usuario {username_esperado}: {e.spanish_message}")
+        except Exception as e:
+            logger.exception(f"Error al crear usuario {username_esperado}: {getattr(e, 'spanish_message', str(e))}")
             return None, False
 
     async def enrol_teacher(self, username: str, course_shortname: str,
