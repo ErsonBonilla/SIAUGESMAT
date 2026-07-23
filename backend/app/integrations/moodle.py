@@ -20,6 +20,7 @@ class MoodleIntegration:
 
     def __init__(self, service: MoodleService):
         self.service = service
+        self.last_error = ""
 
     # ------------------------------------------------------------------
     # Cursos
@@ -48,8 +49,9 @@ class MoodleIntegration:
             await self.service.create_courses([course_data])
             logger.info(f"Curso creado: {shortname}")
             return True
-        except MoodleAPIError as e:
+        except Exception as e:
             logger.exception(f"Error al crear curso {shortname}: {e}")
+            self.last_error = str(e)
             return False
 
     async def delete_course(self, shortname: str) -> bool:
@@ -58,8 +60,9 @@ class MoodleIntegration:
             await self.service.delete_courses([shortname])
             logger.info(f"Curso eliminado: {shortname}")
             return True
-        except MoodleAPIError as e:
+        except Exception as e:
             logger.exception(f"Error al eliminar curso {shortname}: {e}")
+            self.last_error = str(e)
             return False
 
     async def activate_course(self, shortname: str) -> bool:
@@ -71,8 +74,9 @@ class MoodleIntegration:
             }])
             logger.info(f"Curso activado: {shortname}")
             return True
-        except MoodleAPIError as e:
+        except Exception as e:
             logger.exception(f"Error al activar curso {shortname}: {e}")
+            self.last_error = str(e)
             return False
 
     async def hide_course(self, shortname: str) -> bool:
@@ -84,8 +88,9 @@ class MoodleIntegration:
             }])
             logger.info(f"Curso oculto: {shortname}")
             return True
-        except MoodleAPIError as e:
+        except Exception as e:
             logger.exception(f"Error al ocultar curso {shortname}: {e}")
+            self.last_error = str(e)
             return False
 
     async def rename_course(
@@ -105,8 +110,9 @@ class MoodleIntegration:
             }])
             logger.info(f"Curso renombrado: {old_shortname} → {new_shortname}")
             return True
-        except MoodleAPIError as e:
+        except Exception as e:
             logger.exception(f"Error al renombrar curso {old_shortname}: {e}")
+            self.last_error = str(e)
             return False
 
     # ------------------------------------------------------------------
