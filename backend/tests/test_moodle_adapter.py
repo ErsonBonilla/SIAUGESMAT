@@ -81,13 +81,12 @@ class TestMoodle3Adapter:
             return []
 
         await adapter.get_courses(None, call_ws)
-        ws, params = recorded[0]
+        ws, _ = recorded[0]
         assert ws == "core_course_get_courses"
-        assert "criteria[0][key]" not in params
 
     @pytest.mark.asyncio
     async def test_get_courses_with_shortname(self, adapter):
-        """3.x: agrega criteria cuando hay shortname."""
+        """3.x: usa core_course_get_courses_by_field cuando hay shortname."""
         recorded = []
 
         async def call_ws(wsfunction, params):
@@ -95,9 +94,10 @@ class TestMoodle3Adapter:
             return []
 
         await adapter.get_courses("TEST101", call_ws)
-        _, params = recorded[0]
-        assert params["criteria[0][key]"] == "shortname"
-        assert params["criteria[0][value]"] == "TEST101"
+        ws, params = recorded[0]
+        assert ws == "core_course_get_courses_by_field"
+        assert params["field"] == "shortname"
+        assert params["value"] == "TEST101"
 
     def test_build_create_course_enrolment_params(self, adapter):
         """3.x: no agrega params de enrolment (no son parametros API estandar)."""

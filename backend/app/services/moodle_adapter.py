@@ -91,11 +91,13 @@ class Moodle3Adapter(MoodleAdapter):
     async def get_courses(
         self, shortname: Optional[str], call_ws: WSFunc
     ) -> List[Dict]:
-        params: Dict[str, str] = {}
         if shortname:
-            params["criteria[0][key]"] = "shortname"
-            params["criteria[0][value]"] = shortname
-        result = await call_ws("core_course_get_courses", params)
+            result = await call_ws("core_course_get_courses_by_field", {
+                "field": "shortname",
+                "value": shortname,
+            })
+        else:
+            result = await call_ws("core_course_get_courses", {})
         if isinstance(result, dict):
             return result.get("courses", [])
         return result
