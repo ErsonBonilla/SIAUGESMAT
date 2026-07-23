@@ -42,7 +42,6 @@ const NAV_SECTIONS = [
 
 const navBase = "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium no-underline text-inherit transition-all duration-150";
 const navIdle = "bg-transparent hover:bg-brand-red-100 dark:bg-transparent dark:hover:bg-[var(--bg-tertiary)]";
-const navShadow = "";
 const navMove = "hover:translate-x-0.5 active:translate-x-0 active:scale-[0.98]";
 const navActive = "font-semibold border border-brand-red-200 bg-brand-red-100 dark:bg-[var(--bg-tertiary)] dark:border-[var(--border-secondary)] text-brand-red-900 dark:text-[var(--text-primary)]";
 
@@ -103,7 +102,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
                   key={href}
                   href={href}
                   onClick={closeMobile}
-                  class={`${navBase} ${isActive(href) ? navActive : `${navIdle} ${navShadow} ${navMove}`}`}
+                  class={`${navBase} ${isActive(href) ? navActive : `${navIdle} ${navMove}`}`}
                 >
                   <Icon class="w-4 h-4 shrink-0" />
                   <span>{label}</span>
