@@ -231,8 +231,7 @@ class MoodleService:
             params[f"courses[{i}][shortname]"] = course["shortname"]
             params[f"courses[{i}][fullname]"] = course["fullname"]
             cat_id = cat_map.get(course.get("categoryidnumber", ""))
-            if cat_id:
-                params[f"courses[{i}][categoryid]"] = cat_id
+            params[f"courses[{i}][categoryid]"] = cat_id or 0
             if "format" in course:
                 params[f"courses[{i}][format]"] = course["format"]
             if "templatecourse" in course and course["templatecourse"]:
