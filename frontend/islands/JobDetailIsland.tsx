@@ -10,6 +10,13 @@ import { formatDateTime, formatDuration } from "../utils/date.ts";
 import { toast } from "../utils/toast.ts";
 import { STATUS_COLORS, STATUS_LABELS, MODE_LABELS } from "../utils/constants.ts";
 
+const ERROR_TYPE_LABELS: Record<string, string> = {
+  "1": "FASE 1 — Consulta",
+  "2": "FASE 2 — Análisis",
+  "3": "FASE 3 — Ejecución",
+  "critical": "Error crítico",
+};
+
 const THRESHOLD_YELLOW = 1.0;
 const THRESHOLD_RED = 5.0;
 
@@ -142,7 +149,7 @@ export default function JobDetailIsland({ executionId }: Props) {
           <ul class="divide-y divide-[var(--border-primary)]">
             {errors.value.map((err) => (
               <li key={err.id} class="py-2">
-                <p class="text-sm font-medium text-[var(--brand-red)]">{err.type}</p>
+                <p class="text-sm font-medium text-[var(--brand-red)]">{ERROR_TYPE_LABELS[err.type] || err.type}</p>
                 {err.identifier && <p class="text-xs text-[var(--text-secondary)]">ID: {err.identifier}</p>}
                 <p class="text-sm text-[var(--text-secondary)]">{err.message}</p>
                 <p class="text-xs text-[var(--text-muted)]">{formatDateTime(err.created_at)}</p>
