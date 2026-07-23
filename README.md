@@ -2,7 +2,7 @@
 
 **Sistema de Integración y Automatización para la Gestión de Matrículas en Moodle**
 
-Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 4 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, reportes CSV, gráficos Plotly, dashboard de analítica y semáforos de estado en tiempo real.
+Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 4 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 14 reportes CSV con información detallada, 5 gráficos Plotly profesionales, dashboard de analítica y semáforos de estado en tiempo real.
 
 ---
 
@@ -72,7 +72,7 @@ Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y m
 | **FASE 1** | `ConsultPhase` | Consulta categorías, cursos y usuarios en Moodle. Resuelve docentes por email. |
 | **FASE 2** | `AnalyzePhase` | Compara cursos contra Moodle. Determina crear, eliminar, activar, ocultar o renombrar. Detecta usuarios nuevos. |
 | **FASE 3** | `ExecutePhase` | Ejecuta cambios en Moodle: categorías → cursos → usuarios → matrículas. Maneja errores por ítem. |
-| **FASE 4** | `ReportService` | Genera 12 CSVs + 8 gráficos Plotly + ZIP con todo. |
+| **FASE 4** | `ReportService` | Genera 14 CSVs + 5 gráficos Plotly + ZIP con todo. |
 
 **Algoritmo de partición de nombres:** `_split_name()` en `parsers/base.py` usa un diccionario de ~200 nombres propios colombianos + partículas de apellidos compuestos (`DE`, `LA`, `DEL`) para separar `"LEZAMA DE LA HOZ KAREN AUXILIADORA"` → `firstname="KAREN AUXILIADORA"`, `lastname="LEZAMA DE LA HOZ"`.
 
@@ -134,7 +134,7 @@ Procesado por `query_tasks.py` (Celery).
 | `/operaciones/ejecuciones` | Tabs (Crear/Eliminar Cursos/Usuarios/Categorías) con ExecutionList + OperationList |
 | `/operaciones/historico` | Tabs con gráficos Plotly theme-aware + tabla de datos |
 | `/jobs/{id}` | Detalle de ejecución con progreso en vivo, métricas, errores paginados |
-| `/reportes?execution_id={id}` | Descarga de CSVs + 8 gráficos Plotly |
+| `/reportes?execution_id={id}` | Descarga de 14 CSVs + 5 gráficos Plotly |
 | `/consultas/{entity}` | QueryTable con búsqueda y descarga CSV |
 
 ### Islas principales
@@ -211,7 +211,7 @@ SIAUGESMAT/
 │   ├── static/styles.css       # Estilos globales, animaciones, responsive
 │   ├── deno.json               # Configuración Fresh + dependencias
 │   └── fresh.gen.ts            # Manifest de rutas (generado por build)
-├── docker-compose.yml          # 6 servicios: db, redis, backend, worker, beat, frontend
+├── docker-compose.yml          # 7 servicios: db, redis, backend, worker, beat, frontend, nginx
 ├── .env.example                # Variables de entorno de ejemplo
 └── README.md
 ```
