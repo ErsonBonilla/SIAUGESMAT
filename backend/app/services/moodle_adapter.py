@@ -103,11 +103,7 @@ class Moodle3Adapter(MoodleAdapter):
     def build_create_course_enrolment_params(
         self, params: Dict, course: Dict, index: int
     ) -> None:
-        if "enrolment_1" in course:
-            params[f"courses[{index}][enrolment_1]"] = course["enrolment_1"]
-        if "enrolment_1_role" in course:
-            role_id = role_shortname_to_id(course["enrolment_1_role"])
-            params[f"courses[{index}][enrolment_1_roleid]"] = role_id
+        pass  # Moodle 3.9 no acepta enrolment_1 como parametro de core_course_create_courses
 
 
 # ---------------------------------------------------------------------------

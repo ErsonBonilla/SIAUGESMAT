@@ -154,35 +154,43 @@ class ExecutePhase(BasePhase):
                         item.get("template_shortname")
                         or course_data.get("templatecourse")
                     )
+                    template_id = None
                     if template and template.startswith("PORTAFOLIO_"):
                         if template not in _template_cache:
                             try:
                                 existing = await moodle_service.get_courses(
                                     shortname=template
                                 )
-                                _template_cache[template] = len(existing) > 0
+                                _template_cache[template] = existing[0]["id"] if existing else None
                             except Exception as exc:
                                 logger.warning(
                                     f"Error al verificar template '{template}': {exc}"
                                 )
-                                _template_cache[template] = False
-                        if not _template_cache[template]:
+                                _template_cache[template] = None
+                        template_id = _template_cache.get(template)
+                        if not template_id:
                             original = template
+                            fallback_sn = settings.DEFAULT_COURSE_TEMPLATE
+                            if fallback_sn not in _template_cache:
+                                try:
+                                    fb = await moodle_service.get_courses(shortname=fallback_sn)
+                                    _template_cache[fallback_sn] = fb[0]["id"] if fb else None
+                                except Exception:
+                                    _template_cache[fallback_sn] = None
+                            template_id = _template_cache.get(fallback_sn)
                             logger.info(
-                                f"Template '{template}' no encontrado en Moodle, "
-                                f"usando plantilla genérica "
-                                f"'{settings.DEFAULT_COURSE_TEMPLATE}'"
+                                f"Template '{original}' no encontrado, "
+                                f"usando fallback '{fallback_sn}' (ID={template_id})"
                             )
-                            template = settings.DEFAULT_COURSE_TEMPLATE
                             log_repo.save_log(db, eid, "3", "template_not_found", sn, {
                                 "template_shortname": original,
-                                "fallback": settings.DEFAULT_COURSE_TEMPLATE,
+                                "fallback": fallback_sn,
                             })
                     success = await integration.create_course(
                         shortname=sn,
                         fullname=course_data["fullname"],
                         category_idnumber=course_data["category_idnumber"],
-                        template_shortname=template,
+                        template_shortname=str(template_id) if template_id else None,
                     )
                     if success:
                         metrics["courses_created"] += 1
