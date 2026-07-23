@@ -1,0 +1,177 @@
+/* static/styles.css */
+
+:root {
+  --brand-red: #ED3237;
+  --brand-green: #00A859;
+  --brand-white: #FEFEFE;
+  --brand-red-50: #fcf1f2;
+  --brand-red-100: #fbdfe0;
+  --brand-red-300: #f6a2a4;
+  --brand-red-800: #b12529;
+  --brand-red-900: #821b1e;
+  --brand-red-200: #f9bcbe;
+  --brand-green-dark: #008647;
+  --brand-red-rgb: 237, 50, 55;
+  --brand-green-rgb: 0, 168, 89;
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(237, 50, 55, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(237, 50, 55, 0.7); }
+}
+
+.progress-bar-shimmer {
+  background: linear-gradient(90deg, #ED3237 0%, #ff6b6b 25%, #ED3237 50%, #ff6b6b 75%, #ED3237 100%);
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite, glow-pulse 2s ease-in-out infinite;
+}
+
+.progress-bar {
+  background: linear-gradient(to right, var(--brand-red), var(--brand-green));
+  transition: width 0.6s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+@keyframes phasePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.phase-active {
+  animation: phasePulse 1.2s ease-in-out infinite;
+  background: linear-gradient(to right, var(--brand-red), var(--brand-green));
+}
+
+.report-row:hover {
+  filter: brightness(0.9);
+}
+
+/* --- Transición login --- */
+@keyframes loginFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.login-fadeIn {
+  animation: loginFadeIn 0.3s var(--ease-spring);
+}
+
+/* --- Theme toggle --- */
+@keyframes scaleIn {
+  from { transform: scale(0.85); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.animate-scaleIn {
+  animation: scaleIn 0.15s var(--ease-spring);
+}
+
+.gradient-text {
+  background: linear-gradient(to right, var(--brand-red), var(--brand-green));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Reset básico */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: pageIn 0.3s var(--ease-spring);
+}
+
+@keyframes staggerIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.stagger-list > * {
+  opacity: 0;
+  animation: staggerIn 0.3s var(--ease-spring) forwards;
+}
+.stagger-list > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-list > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-list > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-list > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-list > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-list > *:nth-child(6) { animation-delay: 250ms; }
+.stagger-list > *:nth-child(7) { animation-delay: 300ms; }
+.stagger-list > *:nth-child(8) { animation-delay: 350ms; }
+.stagger-list > *:nth-child(9) { animation-delay: 400ms; }
+.stagger-list > *:nth-child(10) { animation-delay: 450ms; }
+.stagger-list > *:nth-child(11) { animation-delay: 500ms; }
+.stagger-list > *:nth-child(12) { animation-delay: 550ms; }
+
+html.dark, html.dark body {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+html.light, html.light body {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Estados de badge (colores fijos institucionales adaptados al tema) */
+.status-green { background-color: #bbf7d0; color: #166534; }
+.status-blue { background-color: #bfdbfe; color: #1e40af; }
+.status-yellow { background-color: #fef08a; color: #854d0e; }
+.status-red { background-color: #fecaca; color: #991b1b; }
+html.dark .status-green { background-color: #14532d; color: #bbf7d0; }
+html.dark .status-blue { background-color: #1e3a5f; color: #bfdbfe; }
+html.dark .status-yellow { background-color: #713f12; color: #fef08a; }
+html.dark .status-red { background-color: #7f1d1d; color: #fecaca; }
+.status-gray { background-color: #f3f4f6; color: #374151; }
+html.dark .status-gray { background-color: #374151; color: #f3f4f6; }
+
+.error-msg {
+  font-size: 0.8125rem;
+  color: var(--brand-red);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.error-msg svg {
+  width: 0.75rem;
+  height: 0.75rem;
+  flex-shrink: 0;
+}
+.error-msg--center {
+  justify-content: center;
+  text-align: center;
+}
+
+/* Ocultar ojo nativo del navegador en inputs password */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  display: none !important;
+}
+input[type="password"]::-webkit-inner-spin-button {
+  display: none;
+}
+input[type="password"]::-webkit-outer-spin-button {
+  display: none;
+}

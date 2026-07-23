@@ -1,0 +1,44 @@
+# Archivos de entorno (credenciales)
+.env
+*.env
+!.env.example
+
+# Entorno virtual de Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Directorios de dependencias (si usas Node/Deno con node_modules)
+node_modules/
+
+# Archivos de subida de usuarios (cargas académicas)
+uploads/
+*.xlsx
+*.xls
+
+# Reportes generados por el backend (CSVs y ZIPs)
+reports/
+*.zip
+
+# Certificados SSL para producción (no se comitean)
+certs/
+
+# Archivos de configuración de IDE y sistema operativo
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Base de datos SQLite (si se usa para desarrollo local)
+*.db
+*.sqlite3
+
+# Archivos de construcción de Fresh (si se generan)
+_fresh/
+_fresh/*.gen.ts
+
+# Archivos de caché de Deno
+deno.lock

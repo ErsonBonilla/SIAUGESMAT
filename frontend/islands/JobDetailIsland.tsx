@@ -1,0 +1,165 @@
+// islands/JobDetailIsland.tsx
+import { useSignal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
+import ProgressBar from "../components/ProgressBar.tsx";
+import ReportsSection from "../components/ReportsSection.tsx";
+import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
+import ErrorBox from "../components/ErrorBox.tsx";
+import { getExecution, getExecutionErrors, type Execution, type ErrorLog } from "../services/api.ts";
+import { formatDateTime, formatDuration } from "../utils/date.ts";
+import { toast } from "../utils/toast.ts";
+import { STATUS_COLORS, STATUS_LABELS, MODE_LABELS } from "../utils/constants.ts";
+
+const THRESHOLD_YELLOW = 1.0;
+const THRESHOLD_RED = 5.0;
+
+function computeSemaphore(execution: Execution): { color: string; text: string } {
+  if (execution.status !== "completed") return { color: "gray", text: "Sin finalizar" };
+  const total = (execution.metrics?.total_operations) ||
+    ((execution.metrics?.courses_created || 0) + (execution.metrics?.users_created || 0) + (execution.metrics?.enrollments || 0)) || 1;
+  const errorRate = ((execution.errors_count || 0) / total) * 100;
+  if (errorRate >= THRESHOLD_RED || (execution.duration_seconds || 0) >= 7200) return { color: "red", text: "Crítico" };
+  if (errorRate >= THRESHOLD_YELLOW || (execution.duration_seconds || 0) >= 3600) return { color: "yellow", text: "Advertencia" };
+  return { color: "green", text: "Exitoso" };
+}
+
+interface Props {
+  executionId: number;
+}
+
+export default function JobDetailIsland({ executionId }: Props) {
+  const execution = useSignal<Execution | null>(null);
+  const errors = useSignal<ErrorLog[]>([]);
+  const errorTotal = useSignal(0);
+  const loading = useSignal(true);
+  const errorMsg = useSignal("");
+  const errorPage = useSignal(0);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const [exec, errorList] = await Promise.all([
+          getExecution(executionId),
+          getExecutionErrors(executionId, 100, 0),
+        ]);
+        execution.value = exec;
+        errors.value = errorList;
+        errorTotal.value = errorList.length;
+      } catch (e) {
+        errorMsg.value = e instanceof Error ? e.message : "Error al cargar.";
+      } finally {
+        loading.value = false;
+      }
+    })();
+  }, [executionId]);
+
+  useEffect(() => {
+    const runningStatuses = ["queued", "running"];
+    if (!execution.value || !runningStatuses.includes(execution.value.status)) return;
+    const interval = setInterval(async () => {
+      try {
+        const exec = await getExecution(executionId);
+        execution.value = exec;
+        if (!runningStatuses.includes(exec.status)) clearInterval(interval);
+        if (exec.errors_count > errors.value.length) {
+          const more = await getExecutionErrors(executionId, exec.errors_count, 0);
+          if (more.length > 0) { errors.value = more; errorTotal.value = more.length; }
+        }
+      } catch { toast("Error al actualizar estado", "error"); }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [executionId, execution.value?.status]);
+
+  const loadMoreErrors = async () => {
+    const nextPage = errorPage.value + 1;
+    try {
+      const more = await getExecutionErrors(executionId, 100, nextPage * 100);
+      if (more.length > 0) { errors.value = [...errors.value, ...more]; errorTotal.value += more.length; errorPage.value = nextPage; }
+    } catch { toast("Error al cargar más errores", "error"); }
+  };
+
+  if (loading.value) return <LoadingSkeleton variant="chart" />;
+  if (errorMsg.value) return <ErrorBox message={errorMsg.value} />;
+
+  const exec = execution.value!;
+  if (!exec) return <p class="text-[var(--text-secondary)]">La ejecución no existe.</p>;
+
+  const semaphore = computeSemaphore(exec);
+
+  return (
+    <>
+      <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 mb-6">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 class="text-lg font-semibold text-[var(--text-primary)] truncate max-w-[400px]" title={exec.filename}>{exec.filename}</h2>
+            <p class="text-sm text-[var(--text-secondary)]">Semestre {exec.semester} · Modo {MODE_LABELS[exec.mode] || exec.mode}</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class={`inline-block w-3 h-3 rounded-full ${
+              semaphore.color === "green" ? "bg-[var(--brand-green)]" :
+              semaphore.color === "yellow" ? "bg-[#F59E0B]" :
+              semaphore.color === "red" ? "bg-[var(--brand-red)]" : "bg-[var(--text-muted)]"
+            }`} />
+            <span class="text-sm font-medium">{semaphore.text}</span>
+          </div>
+        </div>
+        <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div><span class="text-[var(--text-secondary)]">Estado</span><p class="font-medium">{STATUS_LABELS[exec.status] || exec.status}</p></div>
+          <div><span class="text-[var(--text-secondary)]">Inicio</span><p>{formatDateTime(exec.started_at)}</p></div>
+          <div><span class="text-[var(--text-secondary)]">Fin</span><p>{formatDateTime(exec.completed_at)}</p></div>
+          <div><span class="text-[var(--text-secondary)]">Duración</span><p>{formatDuration(exec.duration_seconds)}</p></div>
+        </div>
+      </div>
+
+      {["queued", "running"].includes(exec.status) && (
+        <ProgressBar currentPhase={exec.current_phase ?? null} currentStep={exec.current_step ?? null} progressPct={exec.progress_pct ?? 0} />
+      )}
+
+      {exec.status === "completed" && (
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: "Cursos creados", value: exec.metrics?.courses_created, color: "text-[var(--brand-green)]" },
+            { label: "Cursos actualizados", value: exec.metrics?.courses_updated, color: "text-[var(--accent)]" },
+            { label: "Cursos eliminados", value: exec.metrics?.courses_deleted, color: "text-[var(--brand-red)]" },
+            { label: "Usuarios creados", value: exec.metrics?.users_created, color: "text-[var(--accent)]" },
+            { label: "Matrículas", value: exec.metrics?.enrollments, color: "text-[#F59E0B]" },
+            { label: "Errores", value: exec.errors_count, color: "text-[var(--brand-red)]" },
+            { label: "Categorías creadas", value: exec.metrics?.categories_created, color: "text-[var(--text-secondary)]" },
+          ].map((m) => (
+            <div key={m.label} class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-4 text-center">
+              <div class={`text-2xl font-bold ${m.color}`}>{m.value ?? "—"}</div>
+              <div class="text-xs text-[var(--text-secondary)] mt-1">{m.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {exec.status === "completed" && <ReportsSection executionId={exec.id} />}
+
+      {errors.value.length > 0 && (
+        <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 mb-6">
+          <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-4">Errores registrados ({errors.value.length})</h3>
+          <ul class="divide-y divide-[var(--border-primary)]">
+            {errors.value.map((err) => (
+              <li key={err.id} class="py-2">
+                <p class="text-sm font-medium text-[var(--brand-red)]">{err.type}</p>
+                {err.identifier && <p class="text-xs text-[var(--text-secondary)]">ID: {err.identifier}</p>}
+                <p class="text-sm text-[var(--text-secondary)]">{err.message}</p>
+                <p class="text-xs text-[var(--text-muted)]">{formatDateTime(err.created_at)}</p>
+              </li>
+            ))}
+          </ul>
+          {errors.value.length < errorTotal.value && (
+            <button onClick={loadMoreErrors} class="mt-4 gradient-text hover:underline text-sm">Cargar más errores</button>
+          )}
+        </div>
+      )}
+
+      <div class="mt-6 flex gap-4">
+        <a href="/dashboard" class="gradient-text hover:underline text-sm">← Volver al dashboard</a>
+        <a href="/operaciones/ejecuciones" class="gradient-text hover:underline text-sm">← Volver a ejecuciones</a>
+        <a href="/operaciones/historico" class="gradient-text hover:underline text-sm">Ver histórico</a>
+      </div>
+    </>
+  );
+}

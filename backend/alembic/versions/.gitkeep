@@ -1,0 +1,32 @@
+# Archivos de entorno con contraseñas y tokens
+.env
+*.env
+!.env.example
+
+# Entorno virtual de Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Dependencias de Node/Deno (opcional, según tu frontend)
+node_modules/
+
+# Archivos subidos por usuarios
+uploads/
+*.xlsx
+*.xls
+
+# Archivos de configuración de IDE
+.vscode/
+.idea/
+
+# Base de datos SQLite (si la usaras en desarrollo)
+*.db
+
+# Archivos de backup y logs
+*.log
+*.bak
+
+# Directorio de migraciones de Alembic (las migraciones sí se suben, pero no la configuración local)
+alembic.ini  # (a menos que hayas personalizado la ruta de BD, en cuyo caso mejor usa variable de entorno)

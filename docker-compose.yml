@@ -1,0 +1,255 @@
+# ============================================================================
+# SIAUGESMAT – Sistema de Integración y Automatización para la Gestión
+#               de Matrículas en Moodle
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # 1. Base de datos PostgreSQL
+  # --------------------------------------------------------------------------
+  db:
+    image: postgres:17.9
+    container_name: siaugesmat-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-siaugesmat}
+      POSTGRES_USER: ${POSTGRES_USER:-siaugesmat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      # Ajustes de rendimiento recomendados para cargas semestrales
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - siaugesmat-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-siaugesmat}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --------------------------------------------------------------------------
+  # 2. Redis (cola de tareas Celery)
+  # --------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: siaugesmat-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    networks:
+      - siaugesmat-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --------------------------------------------------------------------------
+  # 3. API Backend (FastAPI)
+  # --------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: siaugesmat-backend:latest
+    container_name: siaugesmat-backend
+    restart: unless-stopped
+    environment:
+      # FastAPI / Proyecto
+      PROJECT_NAME: SIAUGESMAT
+      DEBUG: "false"
+
+      # Moodle
+      MOODLE_URL: ${MOODLE_URL:-}
+      MOODLE_ADMIN_TOKEN: ${MOODLE_ADMIN_TOKEN:-}
+      MOODLE_VERSION: ${MOODLE_VERSION:-3.9}
+
+      # Moodle - Configuración por modalidad (lee de .env raíz)
+      # Si la var específica no está definida, se usa el fallback genérico
+      MOODLE_URL__PRESENCIAL: ${MOODLE_URL__PRESENCIAL:-}
+      MOODLE_TOKEN__PRESENCIAL: ${MOODLE_TOKEN__PRESENCIAL:-}
+      MOODLE_VERSION__PRESENCIAL: ${MOODLE_VERSION__PRESENCIAL:-}
+      MOODLE_URL__DISTANCIA: ${MOODLE_URL__DISTANCIA:-}
+      MOODLE_TOKEN__DISTANCIA: ${MOODLE_TOKEN__DISTANCIA:-}
+      MOODLE_VERSION__DISTANCIA: ${MOODLE_VERSION__DISTANCIA:-}
+
+      # Base de datos
+      DATABASE_URL: postgresql://${POSTGRES_USER:-siaugesmat}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-siaugesmat}
+
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+
+      # Rate limiting contra Moodle
+      MOODLE_MAX_REQUESTS_PER_SECOND: ${MOODLE_MAX_REQUESTS_PER_SECOND:-5}
+      MOODLE_BURST_SIZE: ${MOODLE_BURST_SIZE:-10}
+
+      # Seguridad JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+
+      # Umbrales del semáforo de analítica
+      ANALYTICS_ERROR_THRESHOLD_YELLOW: ${ANALYTICS_ERROR_THRESHOLD_YELLOW:-1.0}
+      ANALYTICS_ERROR_THRESHOLD_RED: ${ANALYTICS_ERROR_THRESHOLD_RED:-5.0}
+      ANALYTICS_MAX_DURATION_YELLOW: ${ANALYTICS_MAX_DURATION_YELLOW:-3600}
+      ANALYTICS_MAX_DURATION_RED: ${ANALYTICS_MAX_DURATION_RED:-7200}
+
+      # Subida de archivos
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-50}
+
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
+
+      # Job timeout (segundos)
+      JOB_TIMEOUT: ${JOB_TIMEOUT:-7200}
+
+      # Plantilla de curso para ETL
+      DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE}
+
+      # Directorio de reportes
+      REPORT_DIR: /app/reports
+
+    volumes:
+      - uploads:/app/uploads
+      - reports:/app/reports
+    networks:
+      - siaugesmat-net
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # --------------------------------------------------------------------------
+  # 4. Worker Celery (procesamiento ETL)
+  # --------------------------------------------------------------------------
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: siaugesmat-backend:latest
+    container_name: siaugesmat-worker
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=1
+    environment:
+      # Mismas variables que el backend para que el worker pueda operar
+      MOODLE_URL: ${MOODLE_URL:-}
+      MOODLE_ADMIN_TOKEN: ${MOODLE_ADMIN_TOKEN:-}
+      MOODLE_VERSION: ${MOODLE_VERSION:-3.9}
+
+      # Moodle - Configuración por modalidad (lee de .env raíz)
+      MOODLE_URL__PRESENCIAL: ${MOODLE_URL__PRESENCIAL:-}
+      MOODLE_TOKEN__PRESENCIAL: ${MOODLE_TOKEN__PRESENCIAL:-}
+      MOODLE_VERSION__PRESENCIAL: ${MOODLE_VERSION__PRESENCIAL:-}
+      MOODLE_URL__DISTANCIA: ${MOODLE_URL__DISTANCIA:-}
+      MOODLE_TOKEN__DISTANCIA: ${MOODLE_TOKEN__DISTANCIA:-}
+      MOODLE_VERSION__DISTANCIA: ${MOODLE_VERSION__DISTANCIA:-}
+
+      DATABASE_URL: postgresql://${POSTGRES_USER:-siaugesmat}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-siaugesmat}
+      REDIS_URL: redis://redis:6379/0
+
+      MOODLE_MAX_REQUESTS_PER_SECOND: ${MOODLE_MAX_REQUESTS_PER_SECOND:-5}
+      MOODLE_BURST_SIZE: ${MOODLE_BURST_SIZE:-10}
+
+      UPLOAD_DIR: /app/uploads
+      JOB_TIMEOUT: ${JOB_TIMEOUT:-7200}
+
+      DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE}
+
+      DEBUG: ${DEBUG:-false}
+
+      REPORT_DIR: /app/reports
+
+    volumes:
+      - uploads:/app/uploads
+      - reports:/app/reports
+    networks:
+      - siaugesmat-net
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # --------------------------------------------------------------------------
+  # 5. Celery Beat (tareas periódicas)
+  # --------------------------------------------------------------------------
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: siaugesmat-backend:latest
+    container_name: siaugesmat-beat
+    restart: unless-stopped
+    command: celery -A app.celery_app beat --loglevel=info
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-siaugesmat}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-siaugesmat}
+      REDIS_URL: redis://redis:6379/0
+      DEBUG: ${DEBUG:-false}
+    networks:
+      - siaugesmat-net
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # --------------------------------------------------------------------------
+  # 6. Frontend (Fresh / Deno)
+  # --------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: siaugesmat-frontend:latest
+    container_name: siaugesmat-frontend
+    restart: unless-stopped
+    environment:
+      # El frontend apunta internamente al backend
+      BACKEND_URL: http://backend:8000/api/v1
+      DOCKER_ENV: "1"
+    networks:
+      - siaugesmat-net
+    depends_on:
+      - backend
+
+  # --------------------------------------------------------------------------
+  # 7. Nginx (reverse proxy HTTPS)
+  # --------------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: siaugesmat-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    networks:
+      - siaugesmat-net
+    depends_on:
+      - backend
+      - frontend
+
+# ============================================================================
+# Volúmenes persistentes
+# ============================================================================
+volumes:
+  pgdata:
+    name: siaugesmat_pgdata
+  redisdata:
+    name: siaugesmat_redisdata
+  uploads:
+    name: siaugesmat_uploads
+  reports:
+    name: siaugesmat_reports
+
+# ============================================================================
+# Red común para todos los servicios
+# ============================================================================
+networks:
+  siaugesmat-net:
+    name: siaugesmat-net
+    driver: bridge
