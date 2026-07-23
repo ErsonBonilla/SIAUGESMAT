@@ -93,7 +93,7 @@ class ExecutePhase(BasePhase):
                     else:
                         metrics["total_errors"] += 1
                         log_repo.save_error(db, eid, "3", sn,
-                                            f"Error al eliminar el curso '{sn}' en Moodle.")
+                                            f"Error al eliminar curso: {integration.last_error or sn}")
                     _maybe_checkpoint()
 
                 update_progress(db, eid, 34, "Activando cursos…")
@@ -105,7 +105,7 @@ class ExecutePhase(BasePhase):
                     else:
                         metrics["total_errors"] += 1
                         log_repo.save_error(db, eid, "3", sn,
-                                            f"Error al activar el curso '{sn}' en Moodle.")
+                                            f"Error al activar curso: {integration.last_error or sn}")
                     _maybe_checkpoint()
 
                 update_progress(db, eid, 38, "Ocultando cursos…")
@@ -117,7 +117,7 @@ class ExecutePhase(BasePhase):
                     else:
                         metrics["total_errors"] += 1
                         log_repo.save_error(db, eid, "3", sn,
-                                            f"Error al ocultar el curso '{sn}' en Moodle.")
+                                            f"Error al ocultar curso: {integration.last_error or sn}")
                     _maybe_checkpoint()
 
                 update_progress(db, eid, 42, "Renombrando cursos…")
@@ -141,8 +141,7 @@ class ExecutePhase(BasePhase):
                         metrics["total_errors"] += 1
                         log_repo.save_error(
                             db, eid, "3", sn,
-                            f"Error al renombrar curso: "
-                            f"{item['old_shortname']} -> {sn}"
+                            f"Error al renombrar curso: {integration.last_error or item['old_shortname']} -> {sn}"
                         )
 
                 update_progress(db, eid, 46, "Creando cursos…")
@@ -190,7 +189,7 @@ class ExecutePhase(BasePhase):
                     else:
                         metrics["total_errors"] += 1
                         log_repo.save_error(db, eid, "3", sn,
-                                            f"Error al crear el curso '{sn}' en Moodle.")
+                                            f"Error al crear curso: {integration.last_error or sn}")
                     _maybe_checkpoint()
 
             update_progress(db, eid, 66, "Creando usuarios…")
