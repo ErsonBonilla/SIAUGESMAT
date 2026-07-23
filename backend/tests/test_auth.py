@@ -21,11 +21,13 @@ from app.schemas.user import LoginRequest
 def test_login_success(client):
     """Unas credenciales correctas deben retornar 200 y un JWT válido."""
     # Mockeamos las funciones internas de auth para evitar llamadas reales a Moodle
-    with patch("app.api.v1.endpoints.auth._get_moodle_token") as mock_token, \
+    with patch("app.core.config.settings.get_moodle_config") as mock_cfg, \
+         patch("app.api.v1.endpoints.auth._get_moodle_token") as mock_token, \
          patch("app.api.v1.endpoints.auth._check_moodle_permissions") as mock_perm:
 
+        mock_cfg.return_value = {"url": "http://fake.moodle.com", "token": "fake", "version": "3.9"}
         mock_token.return_value = "fake_moodle_token"
-        mock_perm.return_value = 42  # ID del usuario en Moodle
+        mock_perm.return_value = 42
 
         response = client.post(
             "/api/v1/auth/login",
@@ -39,7 +41,6 @@ def test_login_success(client):
         assert data["user_id"] == 42
         assert data["username"] == "profesor"
 
-        # Verificar que el token JWT local contiene los claims esperados
         payload = jwt.decode(
             data["access_token"],
             settings.JWT_SECRET_KEY,
@@ -56,7 +57,9 @@ def test_login_success(client):
 # ---------------------------------------------------------------------------
 def test_login_invalid_credentials(client):
     """Si Moodle rechaza las credenciales, debe retornar 401."""
-    with patch("app.api.v1.endpoints.auth._get_moodle_token") as mock_token:
+    with patch("app.core.config.settings.get_moodle_config") as mock_cfg, \
+         patch("app.api.v1.endpoints.auth._get_moodle_token") as mock_token:
+        mock_cfg.return_value = {"url": "http://fake.moodle.com", "token": "fake", "version": "3.9"}
         # Simulamos la excepción que lanza _get_moodle_token al fallar
         from fastapi import HTTPException
         mock_token.side_effect = HTTPException(
@@ -78,7 +81,9 @@ def test_login_invalid_credentials(client):
 # ---------------------------------------------------------------------------
 def test_login_moodle_unavailable(client):
     """Si no se puede contactar a Moodle, debe retornar 503."""
-    with patch("app.api.v1.endpoints.auth._get_moodle_token") as mock_token:
+    with patch("app.core.config.settings.get_moodle_config") as mock_cfg, \
+         patch("app.api.v1.endpoints.auth._get_moodle_token") as mock_token:
+        mock_cfg.return_value = {"url": "http://fake.moodle.com", "token": "fake", "version": "3.9"}
         from fastapi import HTTPException
         mock_token.side_effect = HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -98,8 +103,10 @@ def test_login_moodle_unavailable(client):
 # ---------------------------------------------------------------------------
 def test_login_insufficient_permissions(client):
     """Si el usuario no tiene los permisos necesarios, debe retornar 403."""
-    with patch("app.api.v1.endpoints.auth._get_moodle_token") as mock_token, \
+    with patch("app.core.config.settings.get_moodle_config") as mock_cfg, \
+         patch("app.api.v1.endpoints.auth._get_moodle_token") as mock_token, \
          patch("app.api.v1.endpoints.auth._check_moodle_permissions") as mock_perm:
+        mock_cfg.return_value = {"url": "http://fake.moodle.com", "token": "fake", "version": "3.9"}
 
         mock_token.return_value = "token_valido"
         from fastapi import HTTPException

@@ -314,7 +314,7 @@ class TestChartsEndpoint:
         test_db.commit()
 
         response = client.get(
-            f"{self.CHARTS_URL}/{exec.id}/charts/resumen_operaciones",
+            f"{self.CHARTS_URL}/{exec.id}/charts/resumen_ejecutivo",
             headers=auth_headers,
         )
         assert response.status_code == status.HTTP_200_OK

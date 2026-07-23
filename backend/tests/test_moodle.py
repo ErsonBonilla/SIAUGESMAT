@@ -166,7 +166,7 @@ async def test_update_courses(moodle_service):
     fake_upd = MagicMock()
     fake_upd.json.return_value = None
     fake_upd.raise_for_status.return_value = None
-    service._client.get.side_effect = [MagicMock(), fake_upd]
+    service._client.get.return_value = fake_upd
 
     await service.update_courses([{"shortname": "OLD", "visible": 0}])
     last_call = service._client.get.call_args_list[-1][1]["params"]
@@ -183,7 +183,7 @@ async def test_delete_courses(moodle_service):
         [{"id": 2}],
     ]
     fake_del = MagicMock(json=lambda: None, raise_for_status=lambda: None)
-    service._client.get.side_effect = [MagicMock(), MagicMock(), fake_del]
+    service._client.get.return_value = fake_del
 
     await service.delete_courses(["DEL1", "DEL2"])
     last_call = service._client.get.call_args_list[-1][1]["params"]
