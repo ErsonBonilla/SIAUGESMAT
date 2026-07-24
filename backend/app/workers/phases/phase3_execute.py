@@ -87,19 +87,24 @@ class ExecutePhase(BasePhase):
 
                 # Batch delete: resolver IDs con 1 sola llamada y eliminar en lotes
                 to_delete = ctx.comparison.get("to_delete", [])
+                total_del = len(to_delete)
                 if to_delete:
                     all_courses = await moodle_service.get_courses()
                     sn_to_id = {c.get("shortname"): int(c["id"]) for c in all_courses if c.get("shortname") and c.get("id")}
                     batch_ids = []
+                    del_count = 0
                     for sn in to_delete:
                         cid = sn_to_id.get(sn)
                         if cid:
                             batch_ids.append(cid)
                             log_repo.save_log(db, eid, "3", "course_deleted", sn, _course_detail(sn))
-                            metrics["courses_deleted"] += 1
                         else:
                             logger.info(f"Curso a eliminar ya no existe en Moodle: {sn}")
-                            metrics["courses_deleted"] += 1
+                        del_count += 1
+                        metrics["courses_deleted"] += 1
+                        if del_count % 500 == 0:
+                            update_progress(db, eid, 30 + int(del_count / total_del * 4),
+                                            f"Eliminando cursos… ({del_count}/{total_del})", step=3)
                         _maybe_checkpoint()
 
                     # Eliminar en lotes de 100 via la API de Moodle
@@ -164,6 +169,8 @@ class ExecutePhase(BasePhase):
                         )
 
                 update_progress(db, eid, 46, "Creando cursos…")
+                total_create = len(ctx.comparison.get("to_create", []))
+                create_count = 0
                 for item in ctx.comparison.get("to_create", []):
                     sn = item["shortname"]
                     course_data = courses_by_sn.get(sn)
@@ -217,6 +224,10 @@ class ExecutePhase(BasePhase):
                         metrics["total_errors"] += 1
                         log_repo.save_error(db, eid, "3", sn,
                                             f"Error al crear curso: {integration.last_error or sn}")
+                    create_count += 1
+                    if create_count % 500 == 0:
+                        update_progress(db, eid, 46 + int(create_count / total_create * 20),
+                                        f"Creando cursos… ({create_count}/{total_create})", step=3)
                     _maybe_checkpoint()
 
             update_progress(db, eid, 66, "Creando usuarios…")
@@ -245,6 +256,8 @@ class ExecutePhase(BasePhase):
             if _do_courses():
                 # Refrescar lista de cursos (incluye los recién creados) para resolver IDs
                 all_courses = await moodle_service.get_courses()
+                total_enrol = len(ctx.resolved_enrolments)
+                enrol_count = 0
                 for enrol in ctx.resolved_enrolments:
                     result = await integration.enrol_teacher(
                         enrol["username"], enrol["course_shortname"],
@@ -266,6 +279,10 @@ class ExecutePhase(BasePhase):
                                            "reason": result["reason"],
                                            **_course_detail(enrol["course_shortname"]),
                                            **_user_detail(enrol["username"])})
+                    enrol_count += 1
+                    if enrol_count % 500 == 0:
+                        update_progress(db, eid, 80 + int(enrol_count / total_enrol * 14),
+                                        f"Matriculando docentes… ({enrol_count}/{total_enrol})", step=3)
                     _maybe_checkpoint()
 
         except Exception as e:
