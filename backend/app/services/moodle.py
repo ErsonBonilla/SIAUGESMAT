@@ -235,7 +235,7 @@ class MoodleService:
             if "format" in course:
                 params[f"courses[{i}][format]"] = course["format"]
             if "templatecourse" in course and course["templatecourse"]:
-                params[f"courses[{i}][templatecourse]"] = course["templatecourse"]
+                params[f"courses[{i}][templatecourse]"] = int(course["templatecourse"])
             if "visible" in course:
                 params[f"courses[{i}][visible]"] = course["visible"]
             self._adapter.build_create_course_enrolment_params(params, course, i)
