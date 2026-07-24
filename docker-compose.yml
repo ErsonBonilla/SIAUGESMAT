@@ -102,7 +102,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
 
       # Job timeout (segundos)
-      JOB_TIMEOUT: ${JOB_TIMEOUT:-7200}
+      JOB_TIMEOUT: ${JOB_TIMEOUT:-28800}
 
       # Plantilla de curso para ETL
       DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE}
@@ -153,7 +153,7 @@ services:
       MOODLE_BURST_SIZE: ${MOODLE_BURST_SIZE:-10}
 
       UPLOAD_DIR: /app/uploads
-      JOB_TIMEOUT: ${JOB_TIMEOUT:-7200}
+      JOB_TIMEOUT: ${JOB_TIMEOUT:-28800}
 
       DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE}
 
