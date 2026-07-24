@@ -85,16 +85,34 @@ class ExecutePhase(BasePhase):
                     )
                 _template_cache: Dict[str, bool] = {}
 
-                for sn in ctx.comparison.get("to_delete", []):
-                    success = await integration.delete_course(sn)
-                    if success:
-                        metrics["courses_deleted"] += 1
-                        log_repo.save_log(db, eid, "3", "course_deleted", sn, _course_detail(sn))
-                    else:
-                        metrics["total_errors"] += 1
-                        log_repo.save_error(db, eid, "3", sn,
-                                            f"Error al eliminar curso: {integration.last_error or sn}")
-                    _maybe_checkpoint()
+                # Batch delete: resolver IDs con 1 sola llamada y eliminar en lotes
+                to_delete = ctx.comparison.get("to_delete", [])
+                if to_delete:
+                    all_courses = await moodle_service.get_courses()
+                    sn_to_id = {c.get("shortname"): int(c["id"]) for c in all_courses if c.get("shortname") and c.get("id")}
+                    batch_ids = []
+                    for sn in to_delete:
+                        cid = sn_to_id.get(sn)
+                        if cid:
+                            batch_ids.append(cid)
+                            log_repo.save_log(db, eid, "3", "course_deleted", sn, _course_detail(sn))
+                            metrics["courses_deleted"] += 1
+                        else:
+                            metrics["total_errors"] += 1
+                            log_repo.save_error(db, eid, "3", sn, f"Curso no encontrado en Moodle: {sn}")
+                        _maybe_checkpoint()
+
+                    # Eliminar en lotes de 100 via la API de Moodle
+                    BATCH_SIZE = 100
+                    for i in range(0, len(batch_ids), BATCH_SIZE):
+                        chunk = batch_ids[i:i + BATCH_SIZE]
+                        params = {}
+                        for j, cid in enumerate(chunk):
+                            params[f"courseids[{j}]"] = cid
+                        try:
+                            await moodle_service._request("core_course_delete_courses", params)
+                        except MoodleAPIError as e:
+                            logger.exception(f"Error en batch delete (lote {i//BATCH_SIZE}): {e}")
 
                 update_progress(db, eid, 34, "Activando cursos…")
                 for sn in ctx.comparison.get("to_activate", []):

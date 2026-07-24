@@ -42,15 +42,11 @@ class TestPipelineIntegration:
             {"id": 1, "idnumber": "IDE", "name": "IDEAD"},
         ]
         mock.get_courses.side_effect = [
-            [
-                {"id": 10, "shortname": "IDE_0001_sI_101_G-01", "fullname": "CURSO"},
-            ],
-            [
-                {"id": 99, "shortname": "PORTAFOLIO_0001_sI_101"},
-            ],
-            [
-                {"id": 10, "shortname": "IDE_0001_sI_101_G-01", "fullname": "CURSO"},
-            ],
+            [{"id": 10, "shortname": "IDE_0001_sI_101_G-01"}],
+            [{"id": 10, "shortname": "IDE_0001_sI_101_G-01"}],
+            [{"id": 99, "shortname": "PORTAFOLIO_0001_sI_101"}],
+            [{"id": 10, "shortname": "IDE_0001_sI_101_G-01"}],
+            [{"id": 10, "shortname": "IDE_0001_sI_101_G-01"}],
         ]
         mock.get_user_by_username.return_value = {"username": "doc1", "suspended": "0"}
         mock.get_enrolled_teachers.return_value = [{"username": "doc1"}]

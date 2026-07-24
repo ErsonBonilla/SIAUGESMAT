@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     # Trabajos ETL
     # ------------------------------------------------------------------
     # Tiempo máximo de ejecución de un trabajo (segundos)
-    JOB_TIMEOUT: int = 7200                          # 2 horas por defecto
+    JOB_TIMEOUT: int = 28800                         # 8 horas
 
     # ------------------------------------------------------------------
     # Umbrales del semáforo de analítica
