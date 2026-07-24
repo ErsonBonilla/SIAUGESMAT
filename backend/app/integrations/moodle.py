@@ -30,22 +30,30 @@ class MoodleIntegration:
         shortname: str,
         fullname: str,
         category_idnumber: str,
-        template_shortname: Optional[str] = None,
+        template_id: Optional[int] = None,
         visible: int = 1,
     ) -> bool:
-        """Crea un curso en Moodle vía REST API."""
-        course_data = {
-            "shortname": shortname,
-            "fullname": fullname,
-            "categoryidnumber": category_idnumber,
-            "format": "onetopic",
-            "visible": visible,
-        }
-        if template_shortname:
-            course_data["templatecourse"] = template_shortname
+        """Crea un curso en Moodle. Si hay template_id, usa core_course_duplicate_course."""
         try:
-            await self.service.create_courses([course_data])
-            logger.info(f"Curso creado: {shortname}")
+            if template_id:
+                cat_id = await self.service._get_category_id_by_idnumber(category_idnumber)
+                await self.service.duplicate_course(
+                    from_id=template_id,
+                    fullname=fullname,
+                    shortname=shortname,
+                    categoryid=cat_id or 0,
+                    visible=visible,
+                )
+                logger.info(f"Curso creado desde plantilla {template_id}: {shortname}")
+            else:
+                await self.service.create_courses([{
+                    "shortname": shortname,
+                    "fullname": fullname,
+                    "categoryidnumber": category_idnumber,
+                    "format": "onetopic",
+                    "visible": visible,
+                }])
+                logger.info(f"Curso creado (vacío): {shortname}")
             return True
         except Exception as e:
             logger.exception(f"Error al crear curso {shortname}: {e}")
@@ -98,7 +106,8 @@ class MoodleIntegration:
         try:
             existing = await self.service.get_courses(shortname=old_shortname)
             if not existing:
-                logger.exception(f"Curso a renombrar no encontrado: {old_shortname}")
+                self.last_error = f"Curso a renombrar no encontrado: {old_shortname}"
+                logger.warning(self.last_error)
                 return False
             course_id = int(existing[0]["id"])
             await self.service.update_courses([{
@@ -125,6 +134,26 @@ class MoodleIntegration:
                 f"{[u.get('username') for u in users]}"
             )
         return users[0] if users else None
+
+    async def find_users_by_emails(self, emails: List[str]) -> Dict[str, Dict]:
+        """
+        Resuelve usuarios por email en lote (una sola llamada API).
+
+        Returns:
+            Dict[email, user_dict] para los emails encontrados en Moodle.
+        """
+        result: Dict[str, Dict] = {}
+        if not emails:
+            return result
+        clean = [e.strip().lower() for e in emails if e and e.strip()]
+        if not clean:
+            return result
+        users = await self.service.get_users("email", clean)
+        for u in users:
+            email = (u.get("email") or "").strip().lower()
+            if email:
+                result[email] = u
+        return result
 
     @staticmethod
     def is_user_active(user: Dict) -> bool:
@@ -192,45 +221,27 @@ class MoodleIntegration:
             return None, False
 
     async def enrol_teacher(self, username: str, course_shortname: str,
-                             courses=None) -> Dict[str, Any]:
+                             course_map=None, courses=None) -> Dict[str, Any]:
         """
         Matricula un profesor en un curso por su username.
-        Si courses se provee, se usa para resolver el course_id
-        sin llamadas extra a la API (optimizacion para ETL).
+        Si course_map (shortname→id) se provee, se reutiliza sin
+        llamadas extra a la API (optimizacion para ETL).
 
         Returns:
             Dict con: success (bool), username (str), reason (str)
         """
-        user = await self.service.get_user_by_username(username)
-        if not user:
-            return {
-                "success": False,
-                "username": username,
-                "reason": "user_not_found",
-            }
-
-        if not self.is_user_active(user):
-            return {
-                "success": False,
-                "username": username,
-                "reason": "user_inactive",
-            }
-
         try:
             result = await self.service.enrol_users([{
                 "username": username,
                 "course_shortname": course_shortname,
                 "role": "editingteacher",
-            }], courses=courses)
+            }], course_map=course_map, courses=courses)
             if not result["success"]:
-                logger.exception(
-                    f"Error matriculando {username} en {course_shortname}: "
-                    f"{result.get('errors', ['error desconocido'])}"
-                )
+                err = result.get("errors", ["error desconocido"])[0]
                 return {
                     "success": False,
                     "username": username,
-                    "reason": result.get("errors", ["error"])[0],
+                    "reason": str(err),
                 }
             return {
                 "success": True,
@@ -238,13 +249,10 @@ class MoodleIntegration:
                 "reason": "enrolled",
             }
         except Exception as e:
-            logger.exception(
-                f"Error matriculando {username} en {course_shortname}: {e}"
-            )
             return {
                 "success": False,
                 "username": username,
-                "reason": "api_error",
+                "reason": getattr(e, 'spanish_message', str(e)),
             }
 
 

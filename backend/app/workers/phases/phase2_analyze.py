@@ -61,7 +61,6 @@ class AnalyzePhase(BasePhase):
                 ]
 
             ctx.metrics["alerts"] = len(ctx.comparison.get("alerts", []))
-            ctx.metrics["total_errors"] += len(ctx.comparison.get("alerts", []))
 
             log_repo.save_log(db, eid, "2", "phase2_complete", detail={
                 "categories_to_create": len(ctx.missing_categories),

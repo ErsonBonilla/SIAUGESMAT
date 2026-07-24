@@ -99,7 +99,7 @@ class CourseComparisonService:
                 existing_prof = cls._get_course_professor(existing)
 
                 if sn not in courses_with_teacher:
-                    action, detail = "recreate", {
+                    action, detail = "alert_orphan", {
                         "reason": "orphan_course",
                         "professor": professor,
                         "old_professor": existing_prof or "",
@@ -336,6 +336,7 @@ class CourseComparisonService:
         age = cls._get_course_age_seconds(existing)
         detail = {
             "reason": "teacher_change",
+            "old_shortname": existing.get("shortname", ""),
             "old_professor": old_prof or "",
             "new_professor": new_prof,
             "age_seconds": age,
@@ -443,6 +444,11 @@ class CourseComparisonService:
             age = cls._get_course_age_seconds(existing)
             if age >= SIX_MONTHS_SECONDS:
                 to_delete.append(sn)
+                alerts.append({
+                    "shortname": sn,
+                    "reason": "disappeared",
+                    "age_seconds": age,
+                })
                 logs.append({
                     "phase": "2",
                     "action": "course_deleted",
@@ -496,14 +502,16 @@ class CourseComparisonService:
                 "identifier": sn, "detail": detail,
             })
         elif action == "recreate":
-            to_delete.append(sn)
+            old_sn = detail.get("old_shortname", sn)
+            to_delete.append(old_sn)
             to_create.append({"shortname": sn, "professor": professor})
             logs.append({
                 "phase": phase, "action": "course_recreated",
                 "identifier": sn, "detail": detail,
             })
         elif action == "hide_and_create":
-            to_hide.append(sn)
+            old_sn = detail.get("old_shortname", sn)
+            to_hide.append(old_sn)
             to_create.append({"shortname": sn, "professor": professor})
             alerts.append({
                 "shortname": sn,
@@ -551,6 +559,17 @@ class CourseComparisonService:
             })
             logs.append({
                 "phase": phase, "action": "alert_teacher_change_recent",
+                "identifier": sn, "detail": detail,
+            })
+        elif action == "alert_orphan":
+            alerts.append({
+                "shortname": sn,
+                "reason": "orphan_course",
+                "old_professor": detail.get("old_professor", ""),
+                "new_professor": detail.get("professor", ""),
+            })
+            logs.append({
+                "phase": phase, "action": "alert_orphan_course",
                 "identifier": sn, "detail": detail,
             })
         elif action == "none":

@@ -18,6 +18,7 @@ Ejecución:
 """
 
 import asyncio
+import logging
 import uuid
 
 import pytest
@@ -26,6 +27,7 @@ from app.core.config import settings
 from app.services.moodle import MoodleService
 
 pytestmark = pytest.mark.integration
+logger = logging.getLogger(__name__)
 
 
 def _get_service():
@@ -199,5 +201,85 @@ class TestRealMoodleFlujoCompleto:
                 await ms.delete_category(int(cats[0]["id"]), recursive=True)
                 cats2 = await ms.get_categories(idnumber=cat_idn)
                 assert not cats2, "6. Eliminar categoría falló"
+        finally:
+            await ms.close()
+
+
+class TestRealMoodleCursoConTemplate:
+    @pytest.mark.asyncio
+    async def test_crear_curso_sin_template(self):
+        """Crea un curso sin templatecourse (el caso base que SI funciona)."""
+        ms = _get_service()
+        uid = uuid.uuid4().hex[:6]
+        cat_idn = f"TEST_INT_NTPL_{uid}"
+        sn = f"TEST_INT_NTPL_{uid}"
+
+        try:
+            await ms.create_categories([{
+                "name": f"CAT NTPL {uid}",
+                "idnumber": cat_idn,
+                "parent": 0,
+            }])
+
+            r = await ms.create_courses([{
+                "shortname": sn,
+                "fullname": f"CURSO NTPL {uid}",
+                "categoryidnumber": cat_idn,
+                "format": "onetopic",
+                "visible": 1,
+            }])
+            assert r and r[0].get("id"), "create_courses sin template falló"
+
+            courses = await ms.get_courses(shortname=sn)
+            assert courses, "get_courses(shortname) no encontró el curso"
+
+            await ms.delete_courses([sn])
+            courses2 = await ms.get_courses(shortname=sn)
+            assert not courses2, "El curso no se eliminó"
+
+            cats = await ms.get_categories(idnumber=cat_idn)
+            if cats:
+                await ms.delete_category(int(cats[0]["id"]), recursive=True)
+        finally:
+            await ms.close()
+
+    @pytest.mark.asyncio
+    async def test_crear_curso_con_duplicate_course(self):
+        """Crea curso con plantilla usando core_course_duplicate_course (1 sola llamada)."""
+        ms = _get_service()
+        uid = uuid.uuid4().hex[:6]
+        cat_idn = f"TEST_INT_DUP_{uid}"
+        sn = f"TEST_INT_DUP_{uid}"
+
+        try:
+            await ms.create_categories([{
+                "name": f"CAT DUP {uid}",
+                "idnumber": cat_idn,
+                "parent": 0,
+            }])
+            cats = await ms.get_categories(idnumber=cat_idn)
+            cat_id = int(cats[0]["id"])
+
+            templates = await ms.get_courses(shortname=settings.DEFAULT_COURSE_TEMPLATE)
+            assert templates, f"Template '{settings.DEFAULT_COURSE_TEMPLATE}' no existe"
+            template_id = int(templates[0]["id"])
+
+            r = await ms.duplicate_course(
+                from_id=template_id,
+                fullname=f"CURSO DUP {uid}",
+                shortname=sn,
+                categoryid=cat_id,
+                visible=1,
+            )
+            assert r and r.get("id"), f"duplicate_course falló: {r}"
+            logger.info(f"Curso duplicado desde template {template_id}: id={r['id']}")
+
+            await ms.delete_courses([sn])
+            courses2 = await ms.get_courses(shortname=sn)
+            assert not courses2, "El curso no se eliminó"
+
+            cats = await ms.get_categories(idnumber=cat_idn)
+            if cats:
+                await ms.delete_category(int(cats[0]["id"]), recursive=True)
         finally:
             await ms.close()

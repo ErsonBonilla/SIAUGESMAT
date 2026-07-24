@@ -231,7 +231,11 @@ def get_latest_execution_data(db: Session, modalidad: Optional[str] = None) -> L
     thresholds = _get_semaphore_thresholds()
     duration = execution.duration_seconds or 0.0
 
-    if error_rate >= thresholds["error_rate_red"] or duration >= thresholds["max_duration_red"]:
+    if execution.status in ("queued", "running", "pending"):
+        semaphore = "yellow"
+    elif execution.status == "review_required":
+        semaphore = "yellow"
+    elif error_rate >= thresholds["error_rate_red"] or duration >= thresholds["max_duration_red"]:
         semaphore = "red"
     elif error_rate >= thresholds["error_rate_yellow"] or duration >= thresholds["max_duration_yellow"]:
         semaphore = "yellow"

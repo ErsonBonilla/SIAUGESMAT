@@ -3,7 +3,7 @@ from typing import Dict
 
 from app.core.config import settings
 from app.repositories import log_repo
-from app.repositories.execution_repo import save_checkpoint, update_progress
+from app.repositories.execution_repo import update_progress
 from app.services.error_messages import translate_error
 from app.services.moodle import MoodleAPIError
 from app.workers.phases.base import BasePhase, PhaseContext
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 CHECKPOINT_INTERVAL = 100
 
 
-class ExecutePhase(BasePhase):
+class StructurePhase(BasePhase):
     phase_name = "3"
 
     async def run(self, ctx: PhaseContext) -> None:
@@ -30,35 +30,18 @@ class ExecutePhase(BasePhase):
             nonlocal ops_count
             ops_count += 1
             if ops_count % CHECKPOINT_INTERVAL == 0:
-                ctx.phase3_progress = {"ops_completed": ops_count}
-                save_checkpoint(db, eid, "3", {
-                    "metrics": dict(metrics),
-                    "username_map": ctx.username_map,
-                    "phase3_progress": ctx.phase3_progress,
-                })
+                ctx.structure_progress = {"ops_completed": ops_count}
 
         def _do_courses() -> bool:
             return mode in ("courses", "both")
 
-        def _do_users() -> bool:
-            return mode in ("users", "both")
-
         courses_by_sn = {c["shortname"]: c for c in etl_data["courses"]}
-        users_dict = {u["username"]: u for u in etl_data["users"]}
 
         def _course_detail(sn: str) -> dict:
             c = courses_by_sn.get(sn, {})
             return {"fullname": c.get("fullname", ""), "category_idnumber": c.get("category_idnumber", "")}
 
-        def _user_detail(username: str) -> dict:
-            u = users_dict.get(username, {})
-            return {
-                "firstname": u.get("firstname", ""),
-                "lastname": u.get("lastname", ""),
-                "email": u.get("email", ""),
-            }
-
-        update_progress(db, eid, 26, "Creando categorías…", step=3)
+        update_progress(db, eid, 40, "Creando categorías…", step=3)
 
         try:
             if _do_courses() and ctx.missing_categories:
@@ -75,7 +58,7 @@ class ExecutePhase(BasePhase):
                         metrics["total_errors"] += 1
                         log_repo.save_error(db, eid, "3", cat["idnumber"], msg)
 
-            update_progress(db, eid, 30, "Eliminando cursos…")
+            update_progress(db, eid, 42, "Eliminando cursos…")
 
             if _do_courses():
                 if not settings.DEFAULT_COURSE_TEMPLATE:
@@ -92,35 +75,61 @@ class ExecutePhase(BasePhase):
                     all_courses = await moodle_service.get_courses()
                     sn_to_id = {c.get("shortname"): int(c["id"]) for c in all_courses if c.get("shortname") and c.get("id")}
                     batch_ids = []
-                    del_count = 0
+                    id_to_sn = {}
+                    missing_count = 0
                     for sn in to_delete:
                         cid = sn_to_id.get(sn)
                         if cid:
                             batch_ids.append(cid)
-                            log_repo.save_log(db, eid, "3", "course_deleted", sn, _course_detail(sn))
+                            id_to_sn[cid] = sn
                         else:
                             logger.info(f"Curso a eliminar ya no existe en Moodle: {sn}")
-                        del_count += 1
-                        metrics["courses_deleted"] += 1
-                        if del_count % 500 == 0:
-                            update_progress(db, eid, 30 + int(del_count / total_del * 4),
-                                            f"Eliminando cursos… ({del_count}/{total_del})", step=3)
-                        _maybe_checkpoint()
+                            missing_count += 1
 
-                    # Eliminar en lotes de 100 via la API de Moodle
                     if batch_ids:
                         BATCH_SIZE = 100
-                        for i in range(0, len(batch_ids), BATCH_SIZE):
-                            chunk = batch_ids[i:i + BATCH_SIZE]
+                        total_batches = (len(batch_ids) + BATCH_SIZE - 1) // BATCH_SIZE
+                        deleted = 0
+                        for bi in range(0, len(batch_ids), BATCH_SIZE):
+                            chunk = batch_ids[bi:bi + BATCH_SIZE]
                             params = {}
                             for j, cid in enumerate(chunk):
                                 params[f"courseids[{j}]"] = cid
                             try:
-                                await moodle_service._request("core_course_delete_courses", params)
+                                result = await moodle_service._request("core_course_delete_courses", params)
+                                failed_ids = set()
+                                if isinstance(result, list):
+                                    for r in result:
+                                        if isinstance(r, dict):
+                                            rcid = r.get("courseid")
+                                            warnings = r.get("warnings", [])
+                                            if warnings or not r.get("status", True):
+                                                failed_ids.add(rcid)
+                                                for w in warnings:
+                                                    msg = w.get("message", str(w)) if isinstance(w, dict) else str(w)
+                                                    logger.error(f"Error eliminando curso id={rcid}: {msg}")
+                                for cid in chunk:
+                                    if cid in failed_ids:
+                                        sn = id_to_sn.get(cid, str(cid))
+                                        metrics["total_errors"] += 1
+                                        log_repo.save_error(db, eid, "3", sn, f"Error al eliminar curso: {sn}")
+                                    else:
+                                        sn = id_to_sn.get(cid, str(cid))
+                                        log_repo.save_log(db, eid, "3", "course_deleted", sn, _course_detail(sn))
+                                        metrics["courses_deleted"] += 1
+                                        deleted += 1
                             except Exception as e:
-                                logger.exception(f"Error en batch delete (lote {i//BATCH_SIZE}): {e}")
+                                logger.exception(f"Error en batch delete (lote {bi//BATCH_SIZE}): {e}")
+                                for cid in chunk:
+                                    sn = id_to_sn.get(cid, str(cid))
+                                    metrics["total_errors"] += 1
+                                    log_repo.save_error(db, eid, "3", sn, f"Error batch delete: {sn}")
+                            if deleted % 500 == 0 or (bi + BATCH_SIZE >= len(batch_ids)):
+                                update_progress(db, eid, 42 + int(deleted / total_del * 2),
+                                                f"Eliminando cursos… ({deleted}/{total_del})", step=3)
+                            _maybe_checkpoint()
 
-                update_progress(db, eid, 34, "Activando cursos…")
+                update_progress(db, eid, 44, "Activando cursos…")
                 for sn in ctx.comparison.get("to_activate", []):
                     success = await integration.activate_course(sn)
                     if success:
@@ -132,7 +141,7 @@ class ExecutePhase(BasePhase):
                                             f"Error al activar curso: {integration.last_error or sn}")
                     _maybe_checkpoint()
 
-                update_progress(db, eid, 38, "Ocultando cursos…")
+                update_progress(db, eid, 46, "Ocultando cursos…")
                 for sn in ctx.comparison.get("to_hide", []):
                     success = await integration.hide_course(sn)
                     if success:
@@ -144,7 +153,7 @@ class ExecutePhase(BasePhase):
                                             f"Error al ocultar curso: {integration.last_error or sn}")
                     _maybe_checkpoint()
 
-                update_progress(db, eid, 42, "Renombrando cursos…")
+                update_progress(db, eid, 48, "Renombrando cursos…")
                 for item in ctx.comparison.get("to_update", []):
                     sn = item["shortname"]
                     course_data = courses_by_sn.get(sn)
@@ -168,7 +177,7 @@ class ExecutePhase(BasePhase):
                             f"Error al renombrar curso: {integration.last_error or item['old_shortname']} -> {sn}"
                         )
 
-                update_progress(db, eid, 46, "Creando cursos…")
+                update_progress(db, eid, 50, "Creando cursos…")
                 total_create = len(ctx.comparison.get("to_create", []))
                 create_count = 0
                 for item in ctx.comparison.get("to_create", []):
@@ -216,7 +225,7 @@ class ExecutePhase(BasePhase):
                         shortname=sn,
                         fullname=course_data["fullname"],
                         category_idnumber=course_data["category_idnumber"],
-                        template_shortname=str(template_id) if template_id else None,
+                        template_id=template_id,
                     )
                     if success:
                         metrics["courses_created"] += 1
@@ -225,68 +234,13 @@ class ExecutePhase(BasePhase):
                         log_repo.save_error(db, eid, "3", sn,
                                             f"Error al crear curso: {integration.last_error or sn}")
                     create_count += 1
-                    if create_count % 500 == 0:
-                        update_progress(db, eid, 46 + int(create_count / total_create * 20),
+                    if create_count % 500 == 0 or create_count == total_create:
+                        update_progress(db, eid, 50 + int(create_count / total_create * 15),
                                         f"Creando cursos… ({create_count}/{total_create})", step=3)
                     _maybe_checkpoint()
 
-            update_progress(db, eid, 66, "Creando usuarios…")
-
-            if _do_users() and ctx.users_to_create:
-                for user in ctx.users_to_create:
-                    username, created = await integration.create_user_if_not_exists(user)
-                    if username:
-                        if created:
-                            metrics["users_created"] += 1
-                            log_repo.save_log(
-                                db, eid, "3",
-                                "user_created_createpassword",
-                                username,
-                                _user_detail(user.get("username", "")),
-                            )
-                        ctx.username_map[user["username"]] = username
-                    else:
-                        metrics["total_errors"] += 1
-                        log_repo.save_error(db, eid, "3", user.get("username", ""),
-                                            f"Error al crear usuario: {user.get('email', '')}")
-                    _maybe_checkpoint()
-
-            update_progress(db, eid, 80, "Matriculando docentes…")
-
-            if _do_courses():
-                # Refrescar lista de cursos (incluye los recién creados) para resolver IDs
-                all_courses = await moodle_service.get_courses()
-                total_enrol = len(ctx.resolved_enrolments)
-                enrol_count = 0
-                for enrol in ctx.resolved_enrolments:
-                    result = await integration.enrol_teacher(
-                        enrol["username"], enrol["course_shortname"],
-                        courses=all_courses,
-                    )
-                    if result["success"]:
-                        metrics["enrolments"] += 1
-                        log_repo.save_log(db, eid, "3", "enrolment_ok",
-                                          result["username"],
-                                          {"course": enrol["course_shortname"],
-                                           **_course_detail(enrol["course_shortname"]),
-                                           **_user_detail(result["username"])})
-                    else:
-                        metrics["enrolment_errors"] += 1
-                        metrics["total_errors"] += 1
-                        log_repo.save_log(db, eid, "3", "enrolment_failed",
-                                          enrol["username"],
-                                          {"course": enrol["course_shortname"],
-                                           "reason": result["reason"],
-                                           **_course_detail(enrol["course_shortname"]),
-                                           **_user_detail(enrol["username"])})
-                    enrol_count += 1
-                    if enrol_count % 500 == 0:
-                        update_progress(db, eid, 80 + int(enrol_count / total_enrol * 14),
-                                        f"Matriculando docentes… ({enrol_count}/{total_enrol})", step=3)
-                    _maybe_checkpoint()
-
         except Exception as e:
-            logger.exception(f"Error en FASE 3 (ejecución): {e}")
+            logger.exception(f"Error en FASE 3 (estructura): {e}")
             log_repo.save_error(db, eid, "3", "", translate_error(e))
             metrics["total_errors"] += 1
             db.commit()

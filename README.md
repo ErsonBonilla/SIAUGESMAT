@@ -2,7 +2,7 @@
 
 **Sistema de Integración y Automatización para la Gestión de Matrículas en Moodle**
 
-Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 4 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 14 reportes CSV con información detallada, 5 gráficos Plotly profesionales, dashboard de analítica y semáforos de estado en tiempo real.
+Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle 3.9)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 5 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 14 reportes CSV con información detallada, 5 gráficos Plotly profesionales, dashboard de analítica y semáforos de estado en tiempo real.
 
 ---
 
@@ -47,7 +47,7 @@ Los colores de la marca se definen en `utils/theme.ts` como `DARK_THEME_VARS` y 
 ┌────────▼─────────┐     ┌──────────────┐                                    │
 │  Celery Worker   │────▶│  Phases      │  Pipeline ETL:                     │
 │  (tasks.py)      │     │  (Consult,   │  ConsultPhase → AnalyzePhase →     │
-│                  │     │   Analyze,   │  ExecutePhase → ReportPhase        │
+│                  │     │   Analyze,   │  StructurePhase → PeoplePhase    │
 │                  │     │   Execute)   │                                    │
 └────────┬─────────┘     └──────┬───────┘                                    │
          │                      │                                            │
@@ -63,22 +63,27 @@ Los colores de la marca se definen en `utils/theme.ts` como `DARK_THEME_VARS` y 
 
 ---
 
-## Módulo de Novedades (ETL — 4 fases)
+## Módulo de Novedades (ETL — 5 fases)
 
 Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y matrículas con Moodle.
 
-| Fase | Clase | Descripción |
-|---|---|---|
-| **FASE 1** | `ConsultPhase` | Consulta categorías, cursos y usuarios en Moodle. Resuelve docentes por email. |
-| **FASE 2** | `AnalyzePhase` | Compara cursos contra Moodle. Determina crear, eliminar, activar, ocultar o renombrar. Detecta usuarios nuevos. |
-| **FASE 3** | `ExecutePhase` | Ejecuta cambios en Moodle: categorías → cursos → usuarios → matrículas. Maneja errores por ítem. |
-| **FASE 4** | `ReportService` | Genera 14 CSVs + 5 gráficos Plotly + ZIP con todo. |
+| Fase | Clase | Descripción | Progreso |
+|---|---|---|---|
+| **FASE 1** | `ConsultPhase` | Parsear Excel + consultar Moodle (categorías, cursos, usuarios). Resuelve docentes por email en batch. | 0% → 20% |
+| **FASE 2** | `AnalyzePhase` | Comparar cursos contra Moodle. Determina crear, eliminar, activar, ocultar o renombrar. | 20% → 40% |
+| **FASE 3** | `StructurePhase` | Ejecutar cambios estructurales: categorías, batch delete, activar, ocultar, renombrar y crear cursos. | 40% → 65% |
+| **FASE 4** | `PeoplePhase` | Crear usuarios nuevos + matricular docentes en sus cursos. | 65% → 85% |
+| **FASE 5** | `ReportService` | Generar 14 CSVs + 5 gráficos Plotly + ZIP con todo. | 85% → 100% |
 
-**Algoritmo de partición de nombres:** `_split_name()` en `parsers/base.py` usa un diccionario de ~200 nombres propios colombianos + partículas de apellidos compuestos (`DE`, `LA`, `DEL`) para separar `"LEZAMA DE LA HOZ KAREN AUXILIADORA"` → `firstname="KAREN AUXILIADORA"`, `lastname="LEZAMA DE LA HOZ"`.
+### Destacados
 
-**Creación de usuarios:** Solo se crean docentes que no existen en Moodle (búsqueda por email institucional y personal). Password inicial = cédula + forcepasswordchange.
+- **Checkpointing por fase:** si Celery crashea en FASE 3, el retry restaura FASE 1–2 desde BD y reanuda desde FASE 3. Sin re-procesar trabajo ya hecho.
+- **Guard de delete masivo:** si el plan incluye >500 eliminaciones, la ejecución se pausa en `review_required` y requiere confirmación explícita vía `POST /api/v1/jobs/{id}/confirm`. Umbral configurable con `MAX_AUTO_DELETE_COURSES`.
+- **Creación de usuarios:** `createpassword=1` — Moodle genera la contraseña y la envía por email. No se almacena la cédula como password.
+- **Resolución batch de docentes:** 1 sola llamada a `core_user_get_users_by_field` con todos los emails, en vez de N llamadas individuales.
+- **Compatibilidad Moodle 3.9:** adapter pattern para diferencias entre versiones (sin `enrolment_1`, `templatecourse` como `int`, `createpassword` en vez de `preferences[]`, `categoryid` con fallback multi-nivel).
 
-**Archivos clave:** `workers/tasks.py` (orquestador), `workers/phases/` (fases), `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle.py` (MoodleService), `services/course_comparison.py`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`.
+**Archivos clave:** `workers/tasks.py` (orquestador), `workers/phases/phase1_consult.py`, `phase2_analyze.py`, `phase3_structure.py`, `phase4_people.py`, `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle.py` (MoodleService), `services/moodle_adapter.py`, `services/course_comparison.py`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`.
 
 ---
 
@@ -180,11 +185,11 @@ SIAUGESMAT/
 │   │   ├── services/           # moodle.py (MoodleService), etl.py, course_comparison.py,
 │   │   │                       # reports.py, charts.py, parsers/ (DistanciaParser, patterns)
 │   │   │                       # moodle_adapter.py, rate_limiter.py
-│   │   ├── workers/            # tasks.py (ETL), phases/ (Consult, Analyze, Execute),
+│   │   ├── workers/            # tasks.py (ETL), phases/ (phase1_consult, phase2_analyze, phase3_structure, phase4_people),
 │   │   │                       # operations_tasks.py, query_tasks.py, cleanup_tasks.py
 │   │   ├── celery_app.py       # Config Celery + beat schedule
 │   │   └── main.py
-│   ├── tests/                  # 174 tests (ETL, repos, phases, pipeline, analytics, API)
+│   ├── tests/                  # 177 tests (ETL, repos, phases, pipeline, analytics, API)
 │   ├── alembic/                # Migraciones de base de datos
 │   ├── reports/                # Reportes generados (CSV, ZIP)
 │   ├── uploads/                # Archivos Excel subidos
@@ -212,6 +217,11 @@ SIAUGESMAT/
 │   ├── deno.json               # Configuración Fresh + dependencias
 │   └── fresh.gen.ts            # Manifest de rutas (generado por build)
 ├── docker-compose.yml          # 7 servicios: db, redis, backend, worker, beat, frontend, nginx
+├── docker-compose.override.yml  # Puertos expuestos + volume mount para desarrollo
+├── e2e/                        # Pruebas end-to-end contra Moodle real
+│   ├── fixtures/               #   .xlsx con datos reales (protegidos por .gitignore)
+│   ├── run_test.py             #   Script unificado (upload + process + verify)
+│   └── README.md
 ├── .env.example                # Variables de entorno de ejemplo
 └── README.md
 ```
@@ -330,7 +340,8 @@ MOODLE_BURST_SIZE=10
 
 # Otros
 DEBUG=false
-JOB_TIMEOUT=7200
+JOB_TIMEOUT=28800
+MAX_AUTO_DELETE_COURSES=500
 ```
 
 Los archivos `.env.example` en la raíz y en `backend/` contienen todas las variables con valores de ejemplo. Copiarlos a `.env` y ajustar credenciales reales.
@@ -339,7 +350,7 @@ Los archivos `.env.example` en la raíz y en `backend/` contienen todas las vari
 
 ## Tests
 
-### Backend (174 tests)
+### Backend (177 tests)
 
 ```bash
 cd backend
@@ -347,7 +358,17 @@ pytest -v
 pytest --cov=app          # con cobertura
 ```
 
-Cubre: parser ETL, repositorios (execution, log, query, operation), fases del pipeline (Consult, Analyze, Execute), integración del pipeline completo, endpoints API, analítica y semáforo.
+Cubre: parser ETL, repositorios (execution, log, query, operation), fases del pipeline (Consult, Analyze, Structure, People), integración del pipeline completo, endpoints API, analítica y semáforo.
+
+### End-to-end (contra Moodle real)
+
+```bash
+# Modo seguro — solo usuarios (no toca cursos)
+python e2e/run_test.py e2e/fixtures/ibague.xlsx
+
+# Modo completo con confirmación de delete masivo
+python e2e/run_test.py e2e/fixtures/uraba.xlsx --mode both --confirm
+```
 
 ---
 

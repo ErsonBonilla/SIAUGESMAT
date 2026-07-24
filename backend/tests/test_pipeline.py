@@ -14,7 +14,8 @@ from app.integrations.moodle import MoodleIntegration
 from app.workers.phases.base import PhaseContext
 from app.workers.phases.phase1_consult import ConsultPhase
 from app.workers.phases.phase2_analyze import AnalyzePhase
-from app.workers.phases.phase3_execute import ExecutePhase
+from app.workers.phases.phase3_structure import StructurePhase
+from app.workers.phases.phase4_people import PeoplePhase
 
 
 @pytest.fixture
@@ -56,14 +57,14 @@ class TestPipelineIntegration:
 
         integration = MoodleIntegration(mock)
 
-        async def fake_find(self, email):
-            return {"username": "doc1", "email": email}
+        async def fake_find(self, emails):
+            return {e: {"username": "doc1", "email": e} for e in emails if e}
 
-        with patch.object(MoodleIntegration, "find_user_by_email", new=fake_find):
+        with patch.object(MoodleIntegration, "find_users_by_emails", new=fake_find):
             async def fake_create(self, user):
                 return "doc1", True
             with patch.object(MoodleIntegration, "create_user_if_not_exists", new=fake_create):
-                async def fake_enrol(self, username, shortname, courses=None):
+                async def fake_enrol(self, username, shortname, course_map=None, courses=None):
                     return {"success": True, "username": username, "reason": "enrolled"}
                 with patch.object(MoodleIntegration, "enrol_teacher", new=fake_enrol):
                     async def fake_create_course(self, *a, **kw):
@@ -109,7 +110,7 @@ class TestPipelineIntegration:
                             integration=integration,
                         )
 
-                        phases = [ConsultPhase(), AnalyzePhase(), ExecutePhase()]
+                        phases = [ConsultPhase(), AnalyzePhase(), StructurePhase(), PeoplePhase()]
                         for phase in phases:
                             await phase.run(ctx)
 

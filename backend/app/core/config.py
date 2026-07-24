@@ -78,6 +78,10 @@ class Settings(BaseSettings):
     # Tiempo máximo de ejecución de un trabajo (segundos)
     JOB_TIMEOUT: int = 28800                         # 8 horas
 
+    # Máximo de cursos a eliminar automáticamente. Si el plan supera
+    # este número, la ejecución se detiene y requiere confirmación manual.
+    MAX_AUTO_DELETE_COURSES: int = 500
+
     # ------------------------------------------------------------------
     # Umbrales del semáforo de analítica
     # ------------------------------------------------------------------

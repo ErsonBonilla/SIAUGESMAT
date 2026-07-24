@@ -144,7 +144,6 @@ async def test_create_courses(moodle_service):
         "fullname": "Curso 1",
         "categoryidnumber": "CAT_1",
         "format": "onetopic",
-        "templatecourse": 42,
         "visible": 1,
     }]
     result = await service.create_courses(courses)
@@ -154,7 +153,6 @@ async def test_create_courses(moodle_service):
     assert last_call["courses[0][shortname]"] == "CUR_01"
     assert last_call["courses[0][categoryid]"] == 1
     assert last_call["courses[0][format]"] == "onetopic"
-    assert last_call["courses[0][templatecourse]"] == 42
     assert last_call["courses[0][visible]"] == 1
 
 

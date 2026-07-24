@@ -37,7 +37,8 @@ class PhaseContext:
         self.users_to_create: List[Dict] = []
         self.resolved_enrolments: List[Dict] = []
 
-        self.phase3_progress: Dict[str, Any] = {}
+        self.structure_progress: Dict[str, Any] = {}
+        self.people_progress: Dict[str, Any] = {}
 
         self.metrics: Dict[str, int] = {
             "categories_created": 0,
@@ -46,7 +47,6 @@ class PhaseContext:
             "courses_activated": 0,
             "courses_hidden": 0,
             "users_created": 0,
-            "user_errors": 0,
             "enrolments": 0,
             "enrolment_errors": 0,
             "alerts": 0,

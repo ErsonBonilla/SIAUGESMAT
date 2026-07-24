@@ -45,12 +45,27 @@ class ConsultPhase(BasePhase):
             update_progress(db, eid, 10, "Consultando usuarios…")
 
             username_map: Dict[str, str] = {}
-            for user in etl_data["users"]:
-                moodle_user = await integration.find_user_by_email(user["email"])
-                if not moodle_user and user.get("email_personal"):
-                    moodle_user = await integration.find_user_by_email(
-                        user["email_personal"]
+            etl_users = etl_data["users"]
+
+            all_institutional = {u["email"] for u in etl_users if u.get("email")}
+            all_personal = {
+                u["email_personal"] for u in etl_users if u.get("email_personal")
+            }
+
+            institutional_map = await integration.find_users_by_emails(
+                list(all_institutional)
+            ) if all_institutional else {}
+            personal_map = await integration.find_users_by_emails(
+                list(all_personal - all_institutional)
+            ) if all_personal else {}
+
+            for user in etl_users:
+                moodle_user = (
+                    institutional_map.get(user.get("email", "").strip().lower())
+                    or personal_map.get(
+                        (user.get("email_personal") or "").strip().lower()
                     )
+                )
                 if moodle_user:
                     username_map[user["username"]] = moodle_user["username"]
                     if mode in ("users", "both"):
@@ -74,23 +89,24 @@ class ConsultPhase(BasePhase):
             update_progress(db, eid, 14, "Análisis de datos completado")
 
             courses_with_teacher: Set[str] = set()
-            teacher_emails_by_course: Dict[str, List[str]] = {}
-            for enr in etl_data["enrolments"]:
-                sn = enr["course_shortname"]
-                user = next(
-                    (u for u in etl_data["users"]
-                     if u["username"] == enr["username"]), None
-                )
-                if user:
-                    emails = [e for e in [user.get("email"), user.get("email_personal")] if e]
-                    teacher_emails_by_course.setdefault(sn, []).extend(emails)
+            if mode in ("courses", "both"):
+                teacher_emails_by_course: Dict[str, List[str]] = {}
+                for enr in etl_data["enrolments"]:
+                    sn = enr["course_shortname"]
+                    user = next(
+                        (u for u in etl_data["users"]
+                         if u["username"] == enr["username"]), None
+                    )
+                    if user:
+                        emails = [e for e in [user.get("email"), user.get("email_personal")] if e]
+                        teacher_emails_by_course.setdefault(sn, []).extend(emails)
 
-            for c in ctx.existing_courses:
-                sn = c.get("shortname", "")
-                emails = teacher_emails_by_course.get(sn, [])
-                teachers = await moodle_service.get_enrolled_teachers(int(c["id"]), emails)
-                if teachers:
-                    courses_with_teacher.add(sn)
+                for c in ctx.existing_courses:
+                    sn = c.get("shortname", "")
+                    emails = teacher_emails_by_course.get(sn, [])
+                    teachers = await moodle_service.get_enrolled_teachers(int(c["id"]), emails)
+                    if teachers:
+                        courses_with_teacher.add(sn)
             ctx.courses_with_teacher = courses_with_teacher
 
             logger.info(

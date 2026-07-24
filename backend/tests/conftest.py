@@ -10,14 +10,31 @@ Proporciona:
 import os
 import tempfile
 
+import pytest
+
+# Cargar variables de entorno del .env para tests de integración real
+try:
+    from dotenv import load_dotenv
+    _env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+    load_dotenv(_env_path)
+except ImportError:
+    pass
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "integration: test de integración real contra Moodle")
+
 # Usar base de datos basada en archivo para que todas las conexiones / hilos
 # compartan los mismos datos. El path se genera una vez al importar el módulo.
+# Solo se usa SQLite si no hay DATABASE_URL configurada (tests de integración
+# usan PostgreSQL real desde .env).
+_is_sqlite = "sqlite" in os.environ.get("DATABASE_URL", "sqlite")
 _test_db_path = os.path.join(tempfile.gettempdir(), f"test_siaugesmat_{os.urandom(4).hex()}.db")
-os.environ.setdefault("DATABASE_URL", f"sqlite:///{_test_db_path}")
+if _is_sqlite:
+    os.environ.setdefault("DATABASE_URL", f"sqlite:///{_test_db_path}")
 os.environ.setdefault("JWT_SECRET_KEY", "clave-secreta-de-prueba")
 os.environ.setdefault("MOODLE_ADMIN_TOKEN", "token-de-prueba")
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -33,13 +50,17 @@ from app.services.moodle import MoodleService
 # ---------------------------------------------------------------------------
 # Configuración de la base de datos basada en archivo para pruebas
 # ---------------------------------------------------------------------------
-engine = create_engine(os.environ["DATABASE_URL"], connect_args={"check_same_thread": False})
+if _is_sqlite:
+    engine = create_engine(os.environ["DATABASE_URL"], connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(os.environ["DATABASE_URL"])
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Crear tablas al importar. Luego cada test_db las dropea y recrea para
 # aislar los datos entre tests, compartiendo siempre el mismo archivo SQLite
 # con la aplicación (que corre en otro hilo via TestClient).
-Base.metadata.create_all(bind=engine)
+if _is_sqlite:
+    Base.metadata.create_all(bind=engine)
 
 
 # ---------------------------------------------------------------------------

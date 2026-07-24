@@ -5,15 +5,20 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Dependencias del sistema solo para Chromium headless (kaleido/Plotly PNG)
+# Dependencias del sistema + Chromium headless (kaleido/Plotly PNG)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
+        chromium \
         libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
         libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
         libxdamage1 libxrandr2 libgbm1 libasound2 \
         libpango-1.0-0 libcairo2 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+ENV CHROME_PATH=/usr/bin/chromium \
+    KALEIDO_CHROMIUM_PATH=/usr/bin/chromium \
+    KALEIDO_CHROMIUM_FLAGS="--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-setuid-sandbox --no-zygote --headless"
 
 # Crear usuario no-root para seguridad
 RUN addgroup --system --gid 1001 app && \
