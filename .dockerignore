@@ -1,0 +1,3 @@
+# e2e — fixtures con datos reales de docentes (protegidos por .gitignore)
+# No deben enviarse al contexto de build de Docker
+e2e/fixtures/

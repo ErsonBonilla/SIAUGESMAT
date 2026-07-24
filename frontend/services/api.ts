@@ -10,6 +10,7 @@ export {
   getCurrentSemester,
   uploadFile,
   startProcess,
+  confirmExecution,
   getExecution,
   listExecutions,
   getExecutionErrors,

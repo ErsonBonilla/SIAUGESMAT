@@ -49,6 +49,7 @@ def mark_running(db, execution_id: int):
     if execution:
         execution.status = "running"
         execution.started_at = datetime.now(timezone.utc)
+        execution.progress_pct = 0
         db.commit()
     return execution
 

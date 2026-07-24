@@ -1,7 +1,7 @@
 // components/ProgressBar.tsx
 
-const PHASE_ICONS = ["🔄", "📊", "⚡", "📋"];
-const PHASE_LABELS = ["Consultar Moodle", "Analizar datos", "Ejecutar cambios", "Generar reportes"];
+const PHASE_ICONS = ["🔄", "📊", "🏗️", "👥", "📋"];
+const PHASE_LABELS = ["Consultar Moodle", "Analizar datos", "Estructura", "Gestionar personas", "Generar reportes"];
 
 interface ProgressBarProps {
   currentPhase: string | null;
@@ -23,7 +23,7 @@ export default function ProgressBar({ currentPhase, currentStep, progressPct }: 
           <span class={`text-2xl ${running ? "animate-spin" : ""}`}>{icon}</span>
           <div>
             <p class="text-sm font-semibold text-[var(--text-primary)]">{currentPhase ?? "Procesando…"}</p>
-            <p class="text-xs text-[var(--text-secondary)]">{phaseLabel} · Fase {step} de 4</p>
+            <p class="text-xs text-[var(--text-secondary)]">{phaseLabel} · Fase {step} de 5</p>
           </div>
         </div>
         <span class="text-2xl font-bold gradient-text">{pct}%</span>

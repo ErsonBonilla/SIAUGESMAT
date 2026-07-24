@@ -5,6 +5,7 @@ import {
   listExecutions,
   downloadReport,
   startProcess,
+  confirmExecution,
   deleteExecution,
   BASE_URL,
   type Execution,
@@ -25,6 +26,7 @@ export default function ExecutionList() {
   const downloading = useSignal<number | null>(null);
   const processing = useSignal<number | null>(null);
   const deleting = useSignal<number | null>(null);
+  const confirming = useSignal<number | null>(null);
 
   const filterSemester = useSignal("");
   const filterStatus = useSignal("");
@@ -112,6 +114,20 @@ export default function ExecutionList() {
     }
   }
 
+  async function handleConfirm(execId: number) {
+    if (!window.confirm("¿Confirmar la eliminación masiva de cursos? Esta acción continuará con el procesamiento.")) return;
+    confirming.value = execId;
+    try {
+      await confirmExecution(execId);
+      toast("Procesamiento reanudado con eliminación masiva confirmada", "success");
+      load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error al confirmar", "error");
+    } finally {
+      confirming.value = null;
+    }
+  }
+
   function clearFilters() {
     filterSemester.value = "";
     filterStatus.value = "";
@@ -150,7 +166,9 @@ export default function ExecutionList() {
             <option value="completed">Completado</option>
             <option value="running">En ejecución</option>
             <option value="pending">Pendiente</option>
+            <option value="queued">Encolado</option>
             <option value="failed">Fallido</option>
+            <option value="review_required">Revisión requerida</option>
           </select>
         </div>
         <div>
@@ -269,7 +287,7 @@ export default function ExecutionList() {
                       >
                         Detalle
                       </a>
-                      {(exec.status === "pending" || exec.status === "queued" || exec.status === "failed") && (
+                      {(exec.status === "pending" || exec.status === "queued" || exec.status === "failed" || exec.status === "review_required") && (
                         <>
                           <span class="text-[var(--text-muted)] mx-1">|</span>
                           <button
@@ -288,7 +306,7 @@ export default function ExecutionList() {
                           </button>
                         </>
                       )}
-                      {(exec.status === "pending" || exec.status === "failed") && (
+                      {(exec.status === "pending" || exec.status === "failed" || exec.status === "review_required") && (
                         <>
                           <span class="text-[var(--text-muted)] mx-1">|</span>
                           <button
@@ -304,6 +322,25 @@ export default function ExecutionList() {
                                 </span>
                               )
                               : "Eliminar"}
+                          </button>
+                        </>
+                      )}
+                      {exec.status === "review_required" && (
+                        <>
+                          <span class="text-[var(--text-muted)] mx-1">|</span>
+                          <button
+                            onClick={() => handleConfirm(exec.id)}
+                            disabled={confirming.value !== null}
+                            class="text-[var(--brand-orange)] hover:text-[var(--brand-orange)] text-sm font-semibold disabled:opacity-50"
+                          >
+                            {confirming.value === exec.id
+                              ? (
+                                <span class="inline-flex items-center gap-1">
+                                  <span class="w-3 h-3 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
+                                  Confirmando
+                                </span>
+                              )
+                              : "Confirmar"}
                           </button>
                         </>
                       )}

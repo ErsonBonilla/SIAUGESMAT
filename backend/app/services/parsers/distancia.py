@@ -82,7 +82,7 @@ class DistanciaParser(BaseExcelParser):
             cat_prefix = cls._build_cat_prefix(nombre_cat)
             cod_prog = cls._build_cod_prog(row)
             semestre_romano = cls._parse_semestre(row)
-            grupo = str(row["grupo"]).strip()
+            grupo = cls._sanitize_group(str(row.get("grupo", "")).strip())
             cedula = str(row.get("doc_docente", "")).strip()
 
             course_data = cls._build_course_data(
@@ -101,6 +101,14 @@ class DistanciaParser(BaseExcelParser):
             )
 
         return categories_map, courses, users, enrolments
+
+    @staticmethod
+    def _sanitize_group(grupo: str) -> str:
+        """Reemplaza caracteres que rompen el patrón SIAUGESMAT (ej. '_' → '-')."""
+        import re
+        if not grupo:
+            return grupo
+        return re.sub(r"_+", "-", grupo)
 
     @staticmethod
     def _build_cat_prefix(nombre_cat: str) -> str:
@@ -132,25 +140,22 @@ class DistanciaParser(BaseExcelParser):
         row, cat_prefix: str, cod_prog: str, semestre_romano: str,
         grupo: str, cedula: str,
     ) -> Dict:
+        cod_curso = str(row.get("cod_curso", "")).strip()
+        nombre_curso = str(row.get("nombre_curso", "")).strip()
         cedula_suffix = f"_{cedula}" if cedula else ""
         shortname = (
-            f"{cat_prefix}_{cod_prog}_s{semestre_romano}_{row['cod_curso']}"
+            f"{cat_prefix}_{cod_prog}_s{semestre_romano}_{cod_curso}"
             f"_G-{grupo}{cedula_suffix}"
         )
-        fullname = f"{row['nombre_curso']} - GRUPO {grupo}".upper()
+        fullname = f"{nombre_curso} - GRUPO {grupo}".upper() if nombre_curso else f"CURSO {cod_curso} - GRUPO {grupo}".upper()
         cat_idnumber = f"{cat_prefix}_{cod_prog}_s{semestre_romano}"
-        try:
-            template = f"PORTAFOLIO_{cod_prog}_s{semestre_romano}_{row['cod_curso']}"
-        except KeyError:
-            template = None
+        template = f"PORTAFOLIO_{cod_prog}_s{semestre_romano}_{cod_curso}" if cod_curso else None
         return {
             "shortname": shortname,
             "fullname": fullname,
             "category_idnumber": cat_idnumber,
             "format": "onetopic",
             "templatecourse": template,
-            "enrolment_1": "self",
-            "enrolment_1_role": "student",
             "visible": 1,
             "delete": False,
         }
@@ -194,9 +199,15 @@ class DistanciaParser(BaseExcelParser):
         users: Dict, enrolments: List,
     ):
         email = str(row.get("email_docente", "")).strip().lower()
-        if email.endswith("@ut.edu.co") and pd.notna(row.get("nombre_docente")):
+        nombre_docente = str(row.get("nombre_docente", "")).strip()
+        if email.endswith("@ut.edu.co") and nombre_docente:
             username = email.split("@")[0]
-            firstname, lastname = cls._split_name(str(row["nombre_docente"]).strip())
+            if not username:
+                return
+            firstname, lastname = cls._split_name(nombre_docente)
+            if not firstname or not lastname:
+                logger.warning("Nombre docente no válido para %s: '%s'", email, nombre_docente)
+                return
             if username not in users:
                 users[username] = {
                     "username": username,
@@ -205,7 +216,7 @@ class DistanciaParser(BaseExcelParser):
                     "email": email,
                     "email_personal": str(row.get("email_personal", "")).strip(),
                     "cedula": cedula,
-                    "password": cedula or username,
+                    "password": "",
                     "city": nombre_cat,
                     "description": str(row.get("docente_perfil", "")).strip(),
                     "delete": False,

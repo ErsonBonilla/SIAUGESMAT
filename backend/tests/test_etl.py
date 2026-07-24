@@ -59,9 +59,6 @@ def test_transform_basic():
     assert c["category_idnumber"] == "IDE_0105_sI"
     assert c["format"] == "onetopic"
     assert c["templatecourse"] == "PORTAFOLIO_0105_sI_202"
-    assert c["enrolment_1"] == "self"
-    assert c["enrolment_1_role"] == "student"
-
     # Usuario
     users = result["users"]
     assert len(users) == 1
@@ -70,7 +67,7 @@ def test_transform_basic():
     assert u["firstname"] == "Juan"
     assert u["lastname"] == "Pérez"
     assert u["email"] == "juan.perez@ut.edu.co"
-    assert u["password"] == "juan.perez"
+    assert u["password"] == ""  # Moodle genera password con createpassword=1
     assert u["city"] == "IDEAD"
     assert u["description"] == ""
 
@@ -361,8 +358,6 @@ def test_new_format_with_program_parse():
     assert course["fullname"] == "MATEMÁTICAS - GRUPO 01"
     assert course["category_idnumber"] == "IDE_0838_sI"
     assert course["templatecourse"] == "PORTAFOLIO_0838_sI_202"
-    assert course["enrolment_1"] == "self"
-    assert course["enrolment_1_role"] == "student"
 
     user = result["users"][0]
     assert user["username"] == "juan.perez"
@@ -456,10 +451,10 @@ class TestRomanNumeral:
 
 
 # ---------------------------------------------------------------------------
-# Escenario 15: campos de enrolment en cursos
+# Escenario 15: estructura mínima de curso
 # ---------------------------------------------------------------------------
-def test_course_enrolment_fields():
-    """Todo curso creado debe incluir enrolment_1 y enrolment_1_role."""
+def test_course_minimal_fields():
+    """Todo curso debe incluir los campos obligatorios para Moodle 3.9."""
     df = _base_dataframe([
         {
             "CAT": "IDEAD",
@@ -474,5 +469,9 @@ def test_course_enrolment_fields():
     ])
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     for course in result["courses"]:
-        assert course["enrolment_1"] == "self"
-        assert course["enrolment_1_role"] == "student"
+        assert "shortname" in course
+        assert "fullname" in course
+        assert "category_idnumber" in course
+        assert "templatecourse" in course
+        assert "enrolment_1" not in course, "enrolment_1 no debe enviarse a Moodle 3.9"
+        assert "enrolment_1_role" not in course, "enrolment_1_role no debe enviarse a Moodle 3.9"

@@ -5,7 +5,7 @@ import ProgressBar from "../components/ProgressBar.tsx";
 import ReportsSection from "../components/ReportsSection.tsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
-import { getExecution, getExecutionErrors, type Execution, type ErrorLog } from "../services/api.ts";
+import { getExecution, getExecutionErrors, confirmExecution, type Execution, type ErrorLog } from "../services/api.ts";
 import { formatDateTime, formatDuration } from "../utils/date.ts";
 import { toast } from "../utils/toast.ts";
 import { STATUS_COLORS, STATUS_LABELS, MODE_LABELS } from "../utils/constants.ts";
@@ -13,9 +13,12 @@ import { STATUS_COLORS, STATUS_LABELS, MODE_LABELS } from "../utils/constants.ts
 const ERROR_TYPE_LABELS: Record<string, string> = {
   "1": "FASE 1 — Consulta",
   "2": "FASE 2 — Análisis",
-  "3": "FASE 3 — Ejecución",
+  "3": "FASE 3 — Estructura",
+  "4": "FASE 4 — Personas",
   "critical": "Error crítico",
 };
+
+const ERRORS_PAGE_SIZE = 30;
 
 const THRESHOLD_YELLOW = 1.0;
 const THRESHOLD_RED = 5.0;
@@ -41,13 +44,14 @@ export default function JobDetailIsland({ executionId }: Props) {
   const loading = useSignal(true);
   const errorMsg = useSignal("");
   const errorPage = useSignal(0);
+  const confirming = useSignal(false);
 
   useEffect(() => {
     (async () => {
       try {
         const [exec, errorList] = await Promise.all([
           getExecution(executionId),
-          getExecutionErrors(executionId, 100, 0),
+          getExecutionErrors(executionId, ERRORS_PAGE_SIZE, 0),
         ]);
         execution.value = exec;
         errors.value = errorList;
@@ -80,7 +84,7 @@ export default function JobDetailIsland({ executionId }: Props) {
   const loadMoreErrors = async () => {
     const nextPage = errorPage.value + 1;
     try {
-      const more = await getExecutionErrors(executionId, 100, nextPage * 100);
+      const more = await getExecutionErrors(executionId, ERRORS_PAGE_SIZE, nextPage * ERRORS_PAGE_SIZE);
       if (more.length > 0) { errors.value = [...errors.value, ...more]; errorTotal.value += more.length; errorPage.value = nextPage; }
     } catch { toast("Error al cargar más errores", "error"); }
   };
@@ -118,6 +122,41 @@ export default function JobDetailIsland({ executionId }: Props) {
         </div>
       </div>
 
+      {exec.status === "review_required" && (
+        <div class="bg-orange-50 border border-orange-300 rounded-2xl p-6 mb-6">
+          <div class="flex items-center gap-3 mb-3">
+            <span class="text-2xl">⚠️</span>
+            <div>
+              <h3 class="text-lg font-bold text-orange-800">Revisión requerida — Eliminación masiva</h3>
+              <p class="text-sm text-orange-700">
+                El plan incluye la eliminación de{" "}
+                <strong>{exec.metrics?.pending_delete_count ?? "varios"}</strong>{" "}
+                cursos. Esta acción requiere confirmación explícita antes de continuar.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              if (!window.confirm("¿Confirmar la eliminación masiva de cursos? Esta acción es irreversible.")) return;
+              confirming.value = true;
+              try {
+                await confirmExecution(exec.id);
+                toast("Procesamiento reanudado", "success");
+                setTimeout(() => globalThis.location.reload(), 1500);
+              } catch (e) {
+                toast(e instanceof Error ? e.message : "Error al confirmar", "error");
+              } finally {
+                confirming.value = false;
+              }
+            }}
+            disabled={confirming.value}
+            class="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-6 py-2.5 rounded-lg text-sm transition-all disabled:opacity-50"
+          >
+            {confirming.value ? "Confirmando…" : "Confirmar eliminación masiva"}
+          </button>
+        </div>
+      )}
+
       {["queued", "running"].includes(exec.status) && (
         <ProgressBar currentPhase={exec.current_phase ?? null} currentStep={exec.current_step ?? null} progressPct={exec.progress_pct ?? 0} />
       )}
@@ -145,7 +184,9 @@ export default function JobDetailIsland({ executionId }: Props) {
 
       {errors.value.length > 0 && (
         <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 mb-6">
-          <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-4">Errores registrados ({errors.value.length})</h3>
+          <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-4">
+            Errores registrados ({errors.value.length}{exec.errors_count && exec.errors_count > errors.value.length ? ` de ${exec.errors_count}` : ""})
+          </h3>
           <ul class="divide-y divide-[var(--border-primary)]">
             {errors.value.map((err) => (
               <li key={err.id} class="py-2">
@@ -156,8 +197,16 @@ export default function JobDetailIsland({ executionId }: Props) {
               </li>
             ))}
           </ul>
-          {errors.value.length < errorTotal.value && (
-            <button onClick={loadMoreErrors} class="mt-4 gradient-text hover:underline text-sm">Cargar más errores</button>
+          {errors.value.length < (exec.errors_count ?? errorTotal.value) && (
+            <button
+              onClick={loadMoreErrors}
+              class="mt-4 w-full flex items-center justify-center gap-2 py-2 text-sm text-[var(--accent)] hover:bg-[var(--bg-secondary)] rounded-lg transition-colors"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+              Mostrar más
+            </button>
           )}
         </div>
       )}

@@ -55,6 +55,9 @@ class MoodleAPIError(Exception):
         "invalidparameter", "missingparam", "invaliduser", "invalidcourse",
         "cannotcreatesitecourse", "invalidtoken", "nopermissions",
         "accessexception", "contextlevelnotsupported", "invalidrecord",
+        "duplicatedshortname", "alreadyenrolled", "enrolmentnotfound",
+        "notenrolled", "cannotdeletecategory", "cannotdeletecourse",
+        "couldnotassignrole", "missingcapability", "duplicateuser",
     })
 
     # Mapa de códigos de error de Moodle a mensajes en español
@@ -134,18 +137,25 @@ class MoodleService:
         wait=wait_exponential(multiplier=1, min=1, max=10),
         before=before_log(logger, logging.WARNING),
     )
-    async def _request(self, wsfunction: str, params: Dict[str, Any]) -> Any:
-        """Realiza una petición GET a la API de Moodle con rate limiting."""
+    async def _request(self, wsfunction: str, params: Dict[str, Any], use_post: bool = False) -> Any:
+        """Realiza una petición a la API de Moodle con rate limiting.
+        Si use_post=True o la URL excede ~7KB, usa POST para evitar limitaciones de longitud."""
         await self._rate_limiter.acquire()
 
         payload = {
             "wstoken": self._token,
             "wsfunction": wsfunction,
             "moodlewsrestformat": "json",
-            **params,
         }
 
-        response = await self._client.get(self._base_url, params=payload)
+        if use_post:
+            response = await self._client.post(
+                self._base_url, data={**payload, **params}
+            )
+        else:
+            response = await self._client.get(
+                self._base_url, params={**payload, **params}
+            )
         response.raise_for_status()
         data = response.json()
 
@@ -214,7 +224,8 @@ class MoodleService:
         return None
 
     async def create_courses(self, courses: List[Dict]) -> List[Dict]:
-        """Crea cursos en Moodle, resolviendo idnumber de categoría a ID numérico."""
+        """Crea cursos en Moodle, resolviendo idnumber de categoría a ID numérico
+        con fallback multi-nivel para compatibilidad con Moodle 3.9."""
         cat_idnumbers = {
             c["categoryidnumber"]
             for c in courses
@@ -223,23 +234,55 @@ class MoodleService:
         cat_map: Dict[str, int] = {}
         for idnumber in cat_idnumbers:
             cat_id = await self._get_category_id_by_idnumber(idnumber)
+            if not cat_id:
+                parts = idnumber.rsplit("_", 1)
+                if len(parts) == 2:
+                    cat_id = await self._get_category_id_by_idnumber(parts[0])
+            if not cat_id:
+                prefix = idnumber.split("_")[0] if "_" in idnumber else idnumber
+                if prefix != idnumber:
+                    cat_id = await self._get_category_id_by_idnumber(prefix)
             if cat_id:
                 cat_map[idnumber] = cat_id
+            else:
+                logger.warning(
+                    f"Categoría '{idnumber}' no encontrada en Moodle. "
+                    f"El curso usará categoryid=0 (raíz)."
+                )
+                cat_map[idnumber] = 0
 
         params = {}
-        for i, course in enumerate(courses):
-            params[f"courses[{i}][shortname]"] = course["shortname"]
-            params[f"courses[{i}][fullname]"] = course["fullname"]
-            cat_id = cat_map.get(course.get("categoryidnumber", ""))
-            params[f"courses[{i}][categoryid]"] = cat_id or 0
+        idx = 0
+        for course in courses:
+            cat_id = cat_map.get(course.get("categoryidnumber", ""), 0)
+            params[f"courses[{idx}][shortname]"] = course["shortname"]
+            params[f"courses[{idx}][fullname]"] = course["fullname"]
+            params[f"courses[{idx}][categoryid]"] = cat_id
             if "format" in course:
-                params[f"courses[{i}][format]"] = course["format"]
-            if "templatecourse" in course and course["templatecourse"]:
-                params[f"courses[{i}][templatecourse]"] = int(course["templatecourse"])
+                params[f"courses[{idx}][format]"] = course["format"]
             if "visible" in course:
-                params[f"courses[{i}][visible]"] = course["visible"]
-            self._adapter.build_create_course_enrolment_params(params, course, i)
+                params[f"courses[{idx}][visible]"] = course["visible"]
+            self._adapter.build_create_course_enrolment_params(params, course, idx)
+            idx += 1
         return await self._request("core_course_create_courses", params)
+
+    async def duplicate_course(
+        self, from_id: int, fullname: str, shortname: str,
+        categoryid: int, visible: int = 1,
+    ) -> Dict:
+        """Crea un curso nuevo copiando contenido de una plantilla en una sola llamada."""
+        params = {
+            "courseid": from_id,
+            "fullname": fullname,
+            "shortname": shortname,
+            "categoryid": categoryid,
+            "visible": visible,
+            "options[0][name]": "activities",
+            "options[0][value]": "1",
+            "options[1][name]": "blocks",
+            "options[1][value]": "1",
+        }
+        return await self._request("core_course_duplicate_course", params)
 
     async def update_courses(self, courses: List[Dict]) -> Optional[Dict]:
         """Actualiza campos de cursos existentes, resolviendo shortname a ID si es necesario."""
@@ -294,9 +337,12 @@ class MoodleService:
         return await self._adapter.get_courses(shortname, self._request)
 
     async def get_courses_by_shortnames(self, shortnames: List[str]) -> List[Dict]:
-        """Obtiene cursos por una lista de shortnames en paralelo."""
-        tasks = [self.get_courses(shortname=sn) for sn in shortnames]
-        results = await asyncio.gather(*tasks)
+        """Obtiene cursos por una lista de shortnames con concurrencia limitada."""
+        sem = asyncio.Semaphore(10)
+        async def _get_one(sn: str):
+            async with sem:
+                return await self.get_courses(shortname=sn)
+        results = await asyncio.gather(*(_get_one(sn) for sn in shortnames))
         return [course for batch in results for course in batch]
 
     # ------------------------------------------------------------------
@@ -322,11 +368,8 @@ class MoodleService:
                 params[f"users[{i}][city]"] = user["city"]
             if user.get("description"):
                 params[f"users[{i}][description]"] = user["description"]
-            if user.get("createpassword"):
+            if user.get("createpassword") or user.get("forcepasswordchange"):
                 params[f"users[{i}][createpassword]"] = "1"
-            elif user.get("forcepasswordchange"):
-                params[f"users[{i}][preferences][0][type]"] = "auth_forcepasswordchange"
-                params[f"users[{i}][preferences][0][value]"] = "1"
         return await self._request("core_user_create_users", params)
 
     async def assign_role(self, user_id: int, role: object, context_id: int = 1) -> Dict:
@@ -373,7 +416,8 @@ class MoodleService:
         params: Dict[str, Any] = {"field": field}
         for i, v in enumerate(values):
             params[f"values[{i}]"] = v
-        return await self._request("core_user_get_users_by_field", params)
+        # Usar POST si hay muchos valores para evitar URL too long (>50 valores ≈ >2KB URL)
+        return await self._request("core_user_get_users_by_field", params, use_post=len(values) > 50)
 
     async def get_user_by_username(self, username: str) -> Optional[Dict]:
         """Obtiene un usuario por su username exacto."""
@@ -381,16 +425,29 @@ class MoodleService:
         return users[0] if users else None
 
     async def update_users(self, users: List[Dict]) -> List[Dict]:
-        """Actualiza usuarios en Moodle vía core_user_update_users."""
+        """Actualiza usuarios en Moodle vía core_user_update_users.
+        Moodle 3.9 requiere id numérico; resuelve username → id si es necesario."""
         params = {}
-        for i, user in enumerate(users):
-            params[f"users[{i}][username]"] = user["username"]
+        idx = 0
+        for user in users:
+            user_id = user.get("id")
+            if not user_id and user.get("username"):
+                resolved = await self.get_user_by_username(user["username"])
+                if resolved:
+                    user_id = int(resolved["id"])
+            if not user_id:
+                logger.warning(f"No se pudo resolver ID para usuario '{user.get('username')}', se omite")
+                continue
+            params[f"users[{idx}][id]"] = user_id
             if "email" in user:
-                params[f"users[{i}][email]"] = user["email"]
+                params[f"users[{idx}][email]"] = user["email"]
             if "firstname" in user:
-                params[f"users[{i}][firstname]"] = user["firstname"]
+                params[f"users[{idx}][firstname]"] = user["firstname"]
             if "lastname" in user:
-                params[f"users[{i}][lastname]"] = user["lastname"]
+                params[f"users[{idx}][lastname]"] = user["lastname"]
+            idx += 1
+        if not params:
+            return []
         return await self._request("core_user_update_users", params)
 
     async def _get_user_ids_by_usernames(self, usernames: List[str]) -> List[int]:
@@ -408,11 +465,11 @@ class MoodleService:
     # ------------------------------------------------------------------
 
     async def get_all_users(self) -> List[Dict]:
-        """Retorna todos los usuarios activos de Moodle vía core_user_get_users."""
-        return await self._request(
-            "core_user_get_users",
-            params={"criteria[0][key]": "confirmed", "criteria[0][value]": "1"},
-        )
+        """Retorna todos los usuarios de Moodle vía core_user_get_users."""
+        result = await self._request("core_user_get_users", {})
+        if isinstance(result, dict):
+            return result.get("users", [])
+        return result
 
     async def get_users_by_role(self, role_shortname: str) -> List[Dict]:
         """Retorna usuarios con un rol específico system-wide (ej. editingteacher)."""
@@ -428,22 +485,28 @@ class MoodleService:
 
     async def get_courses_by_field(self, field: str, value: str) -> List[Dict]:
         """Busca cursos por campo (shortname, id, idnumber, category)."""
-        return await self._request(
+        result = await self._request(
             "core_course_get_courses_by_field",
             params={"field": field, "value": value},
         )
+        if isinstance(result, dict):
+            return result.get("courses", [])
+        return result
 
     # ------------------------------------------------------------------
     # Matriculación
     # ------------------------------------------------------------------
-    async def enrol_users(self, enrolments: List[Dict], courses: List[Dict] = None) -> Dict[str, Any]:
+    async def enrol_users(self, enrolments: List[Dict], course_map: Dict[str, int] = None, courses: List[Dict] = None) -> Dict[str, Any]:
         """
         Matricula usuarios en cursos con un rol específico.
 
         Los enrollements deben contener 'username' y 'course_shortname'.
         Internamente se resuelven los IDs necesarios.
-        Si courses=None, busca cursos uno por uno via API (lento).
-        Pasar ctx.existing_courses para reutilizar los ya obtenidos en FASE 1.
+
+        Parámetros:
+          - course_map: {shortname: course_id} pre-resuelto (más rápido).
+            Si no se provee, se usa courses o se busca via API.
+          - courses: lista de dicts de curso. Solo se usa si course_map=None.
 
         Returns:
             Dict con:
@@ -460,10 +523,11 @@ class MoodleService:
             users_info = await self.get_users("username", usernames)
             user_map = {u["username"]: int(u["id"]) for u in users_info}
 
-        course_map = {}
-        if shortnames:
-            courses_info = courses if courses else await self.get_courses_by_shortnames(shortnames)
-            course_map = {c.get("shortname", ""): int(c["id"]) for c in courses_info if c.get("shortname")}
+        if course_map is None:
+            course_map = {}
+            if shortnames:
+                courses_info = courses if courses else await self.get_courses_by_shortnames(shortnames)
+                course_map = {c.get("shortname", ""): int(c["id"]) for c in courses_info if c.get("shortname")}
 
         params = {}
         idx = 0
@@ -493,7 +557,23 @@ class MoodleService:
                 "errors": errors,
             }
 
-        await self._request("enrol_manual_enrol_users", params)
+        result = await self._request("enrol_manual_enrol_users", params)
+        api_errors = []
+        if isinstance(result, list):
+            for r in result:
+                if isinstance(r, dict) and not r.get("result", True):
+                    warnings = r.get("warnings", [])
+                    for w in warnings:
+                        msg = w.get("message", str(w)) if isinstance(w, dict) else str(w)
+                        api_errors.append(msg)
+                        logger.error(f"Moodle enrol error: {msg}")
+        if api_errors:
+            return {
+                "success": False,
+                "enrolled": idx - len(api_errors),
+                "failed": len(enrolments) - idx + len(api_errors),
+                "errors": errors + api_errors,
+            }
         return {
             "success": True,
             "enrolled": idx,

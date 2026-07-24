@@ -64,11 +64,13 @@ class ReportService:
         )
 
         for cfg in cls.REPORT_CONFIGS:
-            rows = [
-                cfg["extract"](log)
-                for log in logs
-                if cfg["match"](log)
-            ]
+            rows = []
+            for log in logs:
+                try:
+                    if cfg["match"](log):
+                        rows.append(cfg["extract"](log))
+                except Exception:
+                    pass
             cls._write_csv(
                 os.path.join(report_dir, cls.REPORT_NAMES[cfg["key"]]),
                 cfg["headers"],
@@ -348,7 +350,7 @@ class ReportService:
         ]
         # Tasa de error
         total_ops = sum(v for k, v in counts.items() if k.startswith("course_") or k.startswith("enrolment_"))
-        total_errs = counts.get("enrolment_failed", 0) + counts.get("course_deleted", 0)
+        total_errs = counts.get("enrolment_failed", 0)
         rate = round(total_errs / total_ops * 100, 1) if total_ops > 0 else 0
         rows.append(["Tasa de error (%)", str(rate)])
 

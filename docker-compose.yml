@@ -85,7 +85,7 @@ services:
       MOODLE_BURST_SIZE: ${MOODLE_BURST_SIZE:-10}
 
       # Seguridad JWT
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-cambiar-esta-clave-en-produccion}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
 
       # Umbrales del semáforo de analítica

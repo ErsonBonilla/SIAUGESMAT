@@ -3,6 +3,9 @@ import os
 from collections import Counter, defaultdict
 from typing import Any, Dict, List, Optional
 
+os.environ.setdefault("KALEIDO_CHROMIUM_PATH", os.environ.get("CHROME_PATH", "/usr/bin/chromium"))
+os.environ.setdefault("KALEIDO_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-setuid-sandbox --no-zygote")
+
 import plotly.graph_objects as go
 
 from app.db.models import Execution, ExecutionLog
@@ -93,8 +96,11 @@ class ChartService:
                     continue
                 png_path = os.path.join(report_dir, f"{prefix}.png")
                 html_path = os.path.join(report_dir, f"{prefix}.html")
-                fig.write_image(png_path, width=800, height=450, scale=2)
                 fig.write_html(html_path, include_plotlyjs="cdn")
+                try:
+                    fig.write_image(png_path, width=800, height=450, scale=2)
+                except Exception:
+                    logger.warning(f"Gráfico {prefix}: solo HTML (PNG requiere Chrome)")
                 logger.info(f"Gráfico generado: {prefix}")
             except Exception as e:
                 logger.exception(f"Error generando gráfico {key}: {e}")

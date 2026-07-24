@@ -57,3 +57,11 @@ export async function deleteExecution(executionId: number): Promise<void> {
   const response = await fetch(`${BASE_URL}/jobs/${executionId}`, { method: "DELETE", headers: { ...authHeaders() } });
   if (!response.ok) await handleResponse<unknown>(response);
 }
+
+export async function confirmExecution(executionId: number) {
+  const response = await fetch(`${BASE_URL}/jobs/${executionId}/confirm`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<{ execution_id: number; job_id: string; status: string; message: string }>(response);
+}

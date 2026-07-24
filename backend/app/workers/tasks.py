@@ -1,11 +1,12 @@
 """
 Tareas asíncronas (Celery) para el procesamiento ETL.
 
-Pipeline de 4 fases del Módulo de Novedades con checkpointing:
-  FASE 1: ConsultPhase  — consultar Moodle (solo GETs)
-  FASE 2: AnalyzePhase  — analizar en memoria, comparar cursos
-  FASE 3: ExecutePhase  — ejecutar cambios en Moodle
-  FASE 4: generar reportes
+Pipeline de 5 fases del Módulo de Novedades con checkpointing:
+  FASE 1: Extract     — parsear Excel + consultar Moodle (solo GETs)
+  FASE 2: Transform   — analizar en memoria, comparar cursos
+  FASE 3: Structure   — ejecutar cambios estructurales (categorías + cursos)
+  FASE 4: People      — crear usuarios y matricular docentes
+  FASE 5: Reports     — generar CSVs y gráficos
 
 Tras un crash, Celery reintenta la tarea y el checkpoint salta
 las fases ya completadas, reanudando desde la fase fallida.
@@ -39,12 +40,15 @@ from app.services.reports import ReportService
 from app.workers.phases.base import PhaseContext
 from app.workers.phases.phase1_consult import ConsultPhase
 from app.workers.phases.phase2_analyze import AnalyzePhase
-from app.workers.phases.phase3_execute import ExecutePhase
+from app.workers.phases.phase3_structure import StructurePhase
+from app.workers.phases.phase4_people import PeoplePhase
 
 logger = logging.getLogger(__name__)
 
-PHASES = [ConsultPhase(), AnalyzePhase(), ExecutePhase()]
-PHASE_NAMES = ["1", "2", "3"]
+PHASES = [ConsultPhase(), AnalyzePhase(), StructurePhase(), PeoplePhase()]
+PHASE_NAMES = ["1", "2", "3", "4"]
+PROGRESS_START = [0, 20, 40, 65]
+PROGRESS_RESTORE = [12, 30, 52, 74]
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
@@ -97,7 +101,7 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
 
                 if phase_name in checkpoint:
                     _restore_checkpoint(ctx, checkpoint[phase_name], phase_name)
-                    update_progress(db, execution_id, [14, 24, 26][i],
+                    update_progress(db, execution_id, PROGRESS_RESTORE[i],
                                     f"FASE {phase_name} restaurada desde checkpoint")
                     logger.info(f"FASE {phase_name}: restaurada desde checkpoint")
                 else:
@@ -105,32 +109,47 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
                     _save_phase_checkpoint(db, execution_id, ctx, phase_name)
                     logger.info(f"FASE {phase_name}: completada, checkpoint guardado")
 
+                    if phase_name == "2" and ctx.mode in ("courses", "both") and not _is_delete_confirmed(db, execution_id):
+                        to_delete_count = len(ctx.comparison.get("to_delete", []))
+                        if to_delete_count > settings.MAX_AUTO_DELETE_COURSES:
+                            _require_review(db, execution_id, ctx)
+                            return ctx.metrics
+
             return ctx.metrics
 
         metrics = asyncio.run(_run_phases())
-        update_progress(db, execution_id, 92, "Guardando resultados…")
 
+        if _get_execution_status(db, execution_id) == "review_required":
+            logger.info(f"Ejecución {execution_id}: en espera de confirmación de eliminación masiva")
+            return
+
+        update_progress(db, execution_id, 85, "Generando reportes…", step=5)
+        report_ok = True
+        try:
+            report_dir = ReportService.generate_all(execution_id, db)
+            set_report_dir(db, execution_id, report_dir)
+            logger.info(f"Reportes generados en: {report_dir}")
+        except Exception as e:
+            logger.exception(f"Error generando reportes: {e}")
+            save_error(db, execution_id, "critical", "", translate_error(e))
+            report_ok = False
+
+        update_progress(db, execution_id, 95, "Finalizando…")
         mark_completed(
             db, execution_id, metrics,
             errors_count=metrics.get("total_errors", 0),
             duration_seconds=time.monotonic() - start_time,
         )
         clear_checkpoint(db, execution_id)
+        update_progress(db, execution_id, 100, "Ejecución completada")
 
-        update_progress(db, execution_id, 94, "Generando reportes…", step=4)
-        try:
-            report_dir = ReportService.generate_all(execution_id, db)
-            set_report_dir(db, execution_id, report_dir)
-            update_progress(db, execution_id, 99, "Reportes generados")
-            logger.info(f"Reportes generados en: {report_dir}")
-        except Exception as e:
-            logger.exception(f"Error generando reportes: {e}")
-
-        logger.info(f"Ejecución {execution_id} completada exitosamente")
+        status_label = "con reportes" if report_ok else "sin reportes"
+        logger.info(f"Ejecución {execution_id} completada exitosamente ({status_label})")
 
     except Exception as e:
         logger.exception(f"Error crítico en ejecución {execution_id}: {e}")
         try:
+            db.rollback()
             if execution:
                 save_error(db, execution_id, "critical", "", translate_error(e))
                 mark_failed(db, execution_id, time.monotonic() - start_time)
@@ -160,7 +179,13 @@ def _save_phase_checkpoint(db, eid, ctx: PhaseContext, phase_name: str):
         save_checkpoint(db, eid, "3", {
             "metrics": dict(ctx.metrics),
             "username_map": ctx.username_map,
-            "phase3_progress": getattr(ctx, "phase3_progress", {}),
+            "structure_progress": getattr(ctx, "structure_progress", {}),
+        })
+    elif phase_name == "4":
+        save_checkpoint(db, eid, "4", {
+            "metrics": dict(ctx.metrics),
+            "username_map": ctx.username_map,
+            "people_progress": getattr(ctx, "people_progress", {}),
         })
 
 
@@ -179,7 +204,11 @@ def _restore_checkpoint(ctx: PhaseContext, data: dict, phase_name: str):
     elif phase_name == "3":
         ctx.metrics.update(data.get("metrics", {}))
         ctx.username_map.update(data.get("username_map", {}))
-        ctx.phase3_progress = data.get("phase3_progress", {})
+        ctx.structure_progress = data.get("structure_progress", {})
+    elif phase_name == "4":
+        ctx.metrics.update(data.get("metrics", {}))
+        ctx.username_map.update(data.get("username_map", {}))
+        ctx.people_progress = data.get("people_progress", {})
 
 
 def _serialize_comparison(comparison: dict) -> dict:
@@ -195,3 +224,48 @@ def _serialize_comparison(comparison: dict) -> dict:
         else:
             result[k] = v
     return result
+
+
+def _is_delete_confirmed(db, execution_id: int) -> bool:
+    """Verifica si la ejecución ya fue confirmada para eliminación masiva."""
+    from app.db.models import Execution
+    ex = db.query(Execution).filter(Execution.id == execution_id).first()
+    if not ex or not ex.phase_checkpoint:
+        return False
+    return ex.phase_checkpoint.get("delete_confirmed", False)
+
+
+def _get_execution_status(db, execution_id: int) -> str:
+    """Retorna el status actual de una ejecución."""
+    from app.db.models import Execution
+    ex = db.query(Execution).filter(Execution.id == execution_id).first()
+    return ex.status if ex else ""
+
+
+def _require_review(db, execution_id: int, ctx):
+    """Marca la ejecución como pendiente de revisión por eliminación masiva."""
+    from app.db.models import Execution
+    import json
+    ex = db.query(Execution).filter(Execution.id == execution_id).first()
+    if ex:
+        to_delete_count = len(ctx.comparison.get("to_delete", []))
+        ex.status = "review_required"
+        ex.current_phase = f"Revisión requerida: {to_delete_count} cursos a eliminar"
+        ex.progress_pct = 30
+        ex.metrics = {
+            **(ex.metrics or {}),
+            "pending_delete_count": to_delete_count,
+        }
+        if ex.phase_checkpoint is None:
+            ex.phase_checkpoint = {}
+        ex.phase_checkpoint["delete_review"] = {
+            "to_delete_count": to_delete_count,
+            "to_create_count": len(ctx.comparison.get("to_create", [])),
+            "threshold": settings.MAX_AUTO_DELETE_COURSES,
+        }
+        db.commit()
+        logger.warning(
+            f"Ejecución {execution_id}: {to_delete_count} cursos a eliminar "
+            f"(umbral: {settings.MAX_AUTO_DELETE_COURSES}). "
+            f"Requiere confirmación explícita."
+        )

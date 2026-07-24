@@ -138,7 +138,10 @@ class TestComparison:
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "prof1"}]
 
-        result = await CourseComparisonService.compare(existing_courses, new_courses, new_enrolments)
+        result = await CourseComparisonService.compare(
+            existing_courses, new_courses, new_enrolments,
+            courses_with_teacher={sn},
+        )
 
         assert sn in result["to_delete"]
         assert any(c["shortname"] == sn for c in result["to_create"])
@@ -178,18 +181,21 @@ class TestComparison:
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "new_prof"}]
 
-        result = await CourseComparisonService.compare(existing_courses, new_courses, new_enrolments)
+        result = await CourseComparisonService.compare(
+            existing_courses, new_courses, new_enrolments,
+            courses_with_teacher={sn},
+        )
 
         assert sn in result["to_delete"]
         assert any(c["shortname"] == sn for c in result["to_create"])
 
     @pytest.mark.asyncio
-    async def test_case_3_different_professor_recent(self):
-        """Caso 3 (excepción): Curso con distinto profesor pero <18 meses → recreate."""
+    async def test_case_3_different_professor(self):
+        """Caso 3: Curso existe con distinto profesor (antiguo >6 meses)."""
         sn = "IDE_0105_sI_202_G-01"
-        recent_time = int(__import__("time").time()) - 1000  # 1000 segundos atrás
+        old_time = 100000  # más de 6 meses
         existing_courses = [
-            _make_moodle_course(sn, timecreated=recent_time, customfields=[
+            _make_moodle_course(sn, timecreated=old_time, customfields=[
                 {"shortname": "professor", "value": "old_prof"},
             ]),
         ]
@@ -197,7 +203,10 @@ class TestComparison:
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "new_prof"}]
 
-        result = await CourseComparisonService.compare(existing_courses, new_courses, new_enrolments)
+        result = await CourseComparisonService.compare(
+            existing_courses, new_courses, new_enrolments,
+            courses_with_teacher={sn},
+        )
 
         assert sn in result["to_delete"]
         assert any(c["shortname"] == sn for c in result["to_create"])

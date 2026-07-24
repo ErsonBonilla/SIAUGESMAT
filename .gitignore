@@ -42,3 +42,9 @@ _fresh/*.gen.ts
 
 # Archivos de caché de Deno
 deno.lock
+
+# ---------------------------------------------------------------------------
+# e2e — pruebas end-to-end contra Moodle real
+# Los *.xlsx contienen datos reales de docentes (protegidos por regla global).
+# Los scripts .py y README.md se comitean.
+# ---------------------------------------------------------------------------

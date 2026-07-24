@@ -1,10 +1,7 @@
 // services/api/core.ts
 import { getToken, removeToken, removeTokenCookie } from "../../utils/auth.ts";
 
-const port = typeof window !== "undefined" ? window.location.port : "3000";
-export const BASE_URL = (!port || port === "80" || port === "443")
-  ? "/api/v1"
-  : "http://localhost:8000/api/v1";
+export const BASE_URL = "/api/v1";
 
 export function authHeaders(): Record<string, string> {
   const token = getToken();

@@ -123,8 +123,16 @@ class MoodleAdapterFactory:
 
     @classmethod
     def create(cls, version: str) -> MoodleAdapter:
-        adapter_cls = cls._adapters.get(version)
-        if adapter_cls is None:
-            raise ValueError(f"Unsupported Moodle version: {version}")
+        if version in cls._adapters:
+            adapter_cls = cls._adapters[version]
+        else:
+            # Normalizar: "3.9.3" → "3.9", "3.9+" → "3.9"
+            import re
+            match = re.match(r"^(\d+\.\d+)", version.replace("+", ""))
+            normalized = match.group(1) if match else version
+            adapter_cls = cls._adapters.get(normalized)
+            if adapter_cls is None:
+                raise ValueError(f"Unsupported Moodle version: {version}")
+            logger.debug("Normalized version '%s' -> '%s'", version, normalized)
         logger.debug("Using adapter %s for Moodle %s", adapter_cls.__name__, version)
         return adapter_cls()

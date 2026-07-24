@@ -21,6 +21,7 @@ export const STATUS_COLORS: Record<string, string> = {
   queued: "status-yellow",
   pending: "status-yellow",
   failed: "status-red",
+  review_required: "status-orange",
 };
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -29,6 +30,7 @@ export const STATUS_LABELS: Record<string, string> = {
   queued: "Encolado",
   pending: "Pendiente",
   failed: "Fallido",
+  review_required: "Revisión requerida",
 };
 
 export const MODE_LABELS: Record<string, string> = {

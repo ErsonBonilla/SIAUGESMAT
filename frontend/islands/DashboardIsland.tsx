@@ -152,10 +152,12 @@ export default function DashboardIsland() {
                     </div>
                     <div>
                       <p class="font-semibold text-sm text-[var(--text-primary)]">
-                        {latestExec.value.semaphore === "green" && "Exitosa"}
-                        {latestExec.value.semaphore === "yellow" && "Advertencias"}
-                        {latestExec.value.semaphore === "red" && "Errores críticos"}
-                        {latestExec.value.semaphore === "gray" && "Sin datos"}
+                        {latestExec.value.status === "completed"
+                          ? (latestExec.value.semaphore === "green" ? "Exitosa"
+                            : latestExec.value.semaphore === "yellow" ? "Advertencias"
+                            : latestExec.value.semaphore === "red" ? "Errores críticos"
+                            : "Sin datos")
+                          : STATUS_LABELS[latestExec.value.status] || latestExec.value.status}
                       </p>
                       <p class="text-xs text-[var(--text-secondary)]">
                         {latestExec.value.semester}

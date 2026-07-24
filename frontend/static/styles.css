@@ -143,6 +143,8 @@ html.dark .status-yellow { background-color: #713f12; color: #fef08a; }
 html.dark .status-red { background-color: #7f1d1d; color: #fecaca; }
 .status-gray { background-color: #f3f4f6; color: #374151; }
 html.dark .status-gray { background-color: #374151; color: #f3f4f6; }
+.status-orange { background-color: #fed7aa; color: #9a3412; }
+html.dark .status-orange { background-color: #7c2d12; color: #fed7aa; }
 
 .error-msg {
   font-size: 0.8125rem;

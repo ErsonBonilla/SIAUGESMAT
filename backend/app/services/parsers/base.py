@@ -89,11 +89,13 @@ class BaseExcelParser(ABC):
         if "cod_programa" not in df.columns and "nombre_programa" in df.columns:
             mask = df["nombre_programa"].str.contains(r"^\d+\s*-\s*", na=False)
             if mask.any():
-                parts = df["nombre_programa"].str.split(r"\s*-\s*", n=1, expand=True)
-                df["cod_programa"] = parts[0].str.strip()
-                df["nombre_programa"] = parts[1].str.strip()
-            else:
+                parts = df.loc[mask, "nombre_programa"].str.split(r"\s*-\s*", n=1, expand=True)
+                df.loc[mask, "cod_programa"] = parts[0].str.strip()
+                df.loc[mask, "nombre_programa"] = parts[1].str.strip()
+            if "cod_programa" not in df.columns:
                 df["cod_programa"] = ""
+            else:
+                df["cod_programa"] = df["cod_programa"].fillna("")
         return df
 
     @staticmethod
@@ -182,9 +184,12 @@ class BaseExcelParser(ABC):
                 boundary = i
                 break
 
-        if boundary and boundary > 0:
+        if boundary is not None and boundary > 0:
             firstname = " ".join(parts[boundary:])
             lastname = " ".join(parts[:boundary])
+        elif boundary == 0:
+            firstname = " ".join(parts[:1])
+            lastname = " ".join(parts[1:])
         elif n == 2:
             firstname = parts[1]
             lastname = parts[0]
