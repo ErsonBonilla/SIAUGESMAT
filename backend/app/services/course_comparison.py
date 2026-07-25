@@ -80,11 +80,13 @@ class CourseComparisonService:
 
         # Índice de grupos presentes en la nueva carga (por core key)
         new_groups_by_core: Dict[Tuple[str, ...], set] = {}
+        new_program_codes: Set[str] = set()
         for course in new_courses:
             parsed = cls._parse_shortname(course["shortname"])
             if parsed:
                 core_key = (parsed["cod_prog"], parsed["cod_curso"], parsed["semestre"])
                 new_groups_by_core.setdefault(core_key, set()).add(parsed["grupo"])
+                new_program_codes.add(parsed["cod_prog"])
 
         for course in new_courses:
             sn = course["shortname"]
@@ -194,7 +196,7 @@ class CourseComparisonService:
 
         cls._find_disappeared_courses(
             existing_by_shortname, existing_by_base_key, new_shortnames, new_base_keys,
-            to_delete, alerts, logs,
+            new_program_codes, to_delete, alerts, logs,
         )
 
         return {
@@ -417,6 +419,7 @@ class CourseComparisonService:
         existing_by_base_key: Dict[Tuple[str, ...], List[Dict]],
         new_shortnames: set,
         new_base_keys: set,
+        new_program_codes: Set[str],
         to_delete: List[str],
         alerts: List[Dict],
         logs: List[Dict],
@@ -424,21 +427,21 @@ class CourseComparisonService:
         """
         Cursos que desaparecieron del Excel.
 
-        - Si el curso tiene shortname exacto que ya no está en el Excel: evaluar.
+        - Solo se evalúan cursos cuyos programas están en el nuevo Excel.
+          Esto evita eliminar cursos de programas no incluidos en la carga.
         - Si el curso comparte base key con algún nuevo: se considera reemplazado
           (manejado en compare), no se toca.
         """
-        processed_base_keys = set()
-
         for sn, existing in existing_by_shortname.items():
             if sn in new_shortnames:
                 continue
 
             parsed = parse_shortname(sn)
             if parsed:
+                if parsed["cod_prog"] not in new_program_codes:
+                    continue  # No tocar cursos de programas fuera del Excel
                 base_key = cls._build_base_key(parsed)
                 if base_key in new_base_keys:
-                    processed_base_keys.add(base_key)
                     continue  # Este curso comparte base key con uno nuevo
 
             age = cls._get_course_age_seconds(existing)

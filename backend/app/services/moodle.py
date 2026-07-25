@@ -165,6 +165,9 @@ class MoodleService:
             )
 
         if isinstance(data, dict) and ("error" in data or "exception" in data):
+            error_code = data.get("errorcode", "")
+            error_msg = data.get("error") or data.get("exception") or data.get("message", "")
+            logger.error(f"Moodle API error [{wsfunction}]: {error_code} — {error_msg}")
             raise MoodleAPIError(
                 data.get("error") or data.get("exception"),
                 data.get("errorcode"),
@@ -264,7 +267,8 @@ class MoodleService:
                 params[f"courses[{idx}][visible]"] = course["visible"]
             self._adapter.build_create_course_enrolment_params(params, course, idx)
             idx += 1
-        return await self._request("core_course_create_courses", params)
+        use_post = len(courses) > 10
+        return await self._request("core_course_create_courses", params, use_post=use_post)
 
     async def duplicate_course(
         self, from_id: int, fullname: str, shortname: str,
@@ -283,6 +287,19 @@ class MoodleService:
             "options[1][value]": "1",
         }
         return await self._request("core_course_duplicate_course", params)
+
+    async def import_course_content(self, from_id: int, to_id: int) -> Dict:
+        """Copia contenido (activities + blocks) desde un curso plantilla a un curso destino existente."""
+        params = {
+            "importfrom": from_id,
+            "importto": to_id,
+            "deletecontent": 0,
+            "options[0][name]": "activities",
+            "options[0][value]": "1",
+            "options[1][name]": "blocks",
+            "options[1][value]": "1",
+        }
+        return await self._request("core_course_import_course", params)
 
     async def update_courses(self, courses: List[Dict]) -> Optional[Dict]:
         """Actualiza campos de cursos existentes, resolviendo shortname a ID si es necesario."""
@@ -370,7 +387,8 @@ class MoodleService:
                 params[f"users[{i}][description]"] = user["description"]
             if user.get("createpassword") or user.get("forcepasswordchange"):
                 params[f"users[{i}][createpassword]"] = "1"
-        return await self._request("core_user_create_users", params)
+        use_post = len(users) > 10
+        return await self._request("core_user_create_users", params, use_post=use_post)
 
     async def assign_role(self, user_id: int, role: object, context_id: int = 1) -> Dict:
         """Asigna un rol a un usuario en un contexto (default: sistema = 1).
@@ -557,7 +575,8 @@ class MoodleService:
                 "errors": errors,
             }
 
-        result = await self._request("enrol_manual_enrol_users", params)
+        use_post = idx > 50
+        result = await self._request("enrol_manual_enrol_users", params, use_post=use_post)
         api_errors = []
         if isinstance(result, list):
             for r in result:

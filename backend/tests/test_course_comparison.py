@@ -290,6 +290,25 @@ class TestComparison:
             _make_moodle_course(sn, timecreated=old_time),
         ]
 
+        # Excel vacío → no se elimina nada (sin programas en scope)
         result = await CourseComparisonService.compare(existing_courses, [], [])
+        assert sn not in result["to_delete"], "Excel vacío no debe eliminar cursos"
+        assert len(result["alerts"]) == 0
 
-        assert sn in result["to_delete"]
+        # Excel con un curso de OTRO programa → el curso 0105 no se toca
+        other_sn = "IDE_9999_sI_999_G-01"
+        result2 = await CourseComparisonService.compare(
+            existing_courses,
+            [_make_new_course(other_sn)],
+            [],
+        )
+        assert sn not in result2["to_delete"], "Curso de otro programa no debe eliminarse"
+
+        # Excel con cursos del MISMO programa → si desapareció, se elimina
+        same_prog_sn = "IDE_0105_sI_303_G-01"
+        result3 = await CourseComparisonService.compare(
+            existing_courses,
+            [_make_new_course(same_prog_sn)],
+            [{"course_shortname": same_prog_sn, "username": "prof1"}],
+        )
+        assert sn in result3["to_delete"], "Curso desaparecido del mismo programa debe eliminarse"

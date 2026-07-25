@@ -245,7 +245,7 @@ def _get_execution_status(db, execution_id: int) -> str:
 def _require_review(db, execution_id: int, ctx):
     """Marca la ejecución como pendiente de revisión por eliminación masiva."""
     from app.db.models import Execution
-    import json
+    from sqlalchemy.orm.attributes import flag_modified
     ex = db.query(Execution).filter(Execution.id == execution_id).first()
     if ex:
         to_delete_count = len(ctx.comparison.get("to_delete", []))
@@ -263,6 +263,7 @@ def _require_review(db, execution_id: int, ctx):
             "to_create_count": len(ctx.comparison.get("to_create", [])),
             "threshold": settings.MAX_AUTO_DELETE_COURSES,
         }
+        flag_modified(ex, "phase_checkpoint")
         db.commit()
         logger.warning(
             f"Ejecución {execution_id}: {to_delete_count} cursos a eliminar "
