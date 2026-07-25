@@ -52,7 +52,8 @@ PROGRESS_START = [0, 20, 40, 65]
 PROGRESS_RESTORE = [12, 30, 52, 74]
 
 
-@celery_app.task(bind=True, autoretry_for=(MoodleOverloadedError,), max_retries=10, default_retry_delay=60)
+@celery_app.task(bind=True, autoretry_for=(MoodleOverloadedError,), max_retries=10,
+                  default_retry_delay=60, retry_backoff=True, retry_backoff_max=600, retry_jitter=True)
 def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> None:
     db = SessionLocal()
     start_time = time.monotonic()

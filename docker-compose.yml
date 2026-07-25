@@ -131,7 +131,11 @@ services:
     image: siaugesmat-backend:latest
     container_name: siaugesmat-worker
     restart: unless-stopped
-    command: celery -A app.celery_app worker --loglevel=info --concurrency=1
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=1 --max-tasks-per-child=1 --prefetch-multiplier=1
+    deploy:
+      resources:
+        limits:
+          memory: 2g
     environment:
       # Mismas variables que el backend para que el worker pueda operar
       MOODLE_URL: ${MOODLE_URL:-}
