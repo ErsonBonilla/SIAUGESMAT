@@ -88,8 +88,8 @@ class StructurePhase(BasePhase):
 
                     if batch_ids:
                         BATCH_SIZE = 25
-                        total_batches = (len(batch_ids) + BATCH_SIZE - 1) // BATCH_SIZE
                         deleted = 0
+                        processed = 0
                         for bi in range(0, len(batch_ids), BATCH_SIZE):
                             chunk = batch_ids[bi:bi + BATCH_SIZE]
                             params = {}
@@ -118,15 +118,22 @@ class StructurePhase(BasePhase):
                                         log_repo.save_log(db, eid, "3", "course_deleted", sn, _course_detail(sn))
                                         metrics["courses_deleted"] += 1
                                         deleted += 1
+                                    processed += 1
                             except Exception as e:
                                 logger.exception(f"Error en batch delete (lote {bi//BATCH_SIZE}): {e}")
                                 for cid in chunk:
                                     sn = id_to_sn.get(cid, str(cid))
                                     metrics["total_errors"] += 1
                                     log_repo.save_error(db, eid, "3", sn, f"Error batch delete: {sn}")
-                            if deleted % 500 == 0 or (bi + BATCH_SIZE >= len(batch_ids)):
-                                update_progress(db, eid, 42 + int(deleted / total_del * 2),
-                                                f"Eliminando cursos… ({deleted}/{total_del})", step=3)
+                                    processed += 1
+                            if processed % 200 == 0 or (bi + BATCH_SIZE >= len(batch_ids)):
+                                msg = f"Eliminando cursos… ({deleted}/{total_del})"
+                                if processed >= total_del:
+                                    msg = f"Eliminando cursos… ({deleted}/{total_del})"
+                                elif deleted == 0 and processed > 0:
+                                    msg = f"Eliminando cursos… (errores: {processed}, esperando...) "
+                                update_progress(db, eid, 42 + int(processed / total_del * 2),
+                                                msg, step=3)
                             _maybe_checkpoint()
 
                 update_progress(db, eid, 44, "Activando cursos…")
