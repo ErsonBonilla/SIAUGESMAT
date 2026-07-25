@@ -64,28 +64,28 @@ class StructurePhase(BasePhase):
         def _save_progress(data: dict):
             """Guarda progreso parcial sin marcar la fase como completada."""
             ctx.structure_progress = data
-            save_checkpoint(db, eid, "3", {
+            save_checkpoint(db, eid, "3_progress", {
                 "metrics": dict(metrics),
                 "username_map": ctx.username_map,
                 "structure_progress": data,
             })
 
-        def _re_raise_if_overloaded(exception: Exception):
-            """Si el error es transitorio, re-eleva para que Celery reintente."""
-            if _is_moodle_overloaded(exception):
-                _save_progress(ctx.structure_progress or {})
-                raise MoodleOverloadedError(str(exception)[:200])
-
         def _check_pause() -> bool:
             """Retorna True si la ejecución fue pausada (el caller debe salir)."""
             if _should_pause(db, eid):
-                save_checkpoint(db, eid, "3", {
+                save_checkpoint(db, eid, "3_progress", {
                     "metrics": dict(metrics),
                     "username_map": ctx.username_map,
                     "structure_progress": ctx.structure_progress,
                 })
                 return True
             return False
+
+        def _re_raise_if_overloaded(exception: Exception):
+            """Si el error es transitorio, re-eleva para que Celery reintente."""
+            if _is_moodle_overloaded(exception):
+                _save_progress(ctx.structure_progress or {})
+                raise MoodleOverloadedError(str(exception)[:200])
 
         def _do_courses() -> bool:
             return mode in ("courses", "both")
