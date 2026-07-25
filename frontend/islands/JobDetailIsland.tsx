@@ -226,7 +226,7 @@ export default function JobDetailIsland({ executionId }: Props) {
               </button>
             </div>
           )}
-          {["running", "paused", "queued", "pending"].includes(exec.status) && (
+          {["running", "paused", "queued"].includes(exec.status) && (
             <div class="flex justify-end mt-3">
               <button
                 onClick={async () => {

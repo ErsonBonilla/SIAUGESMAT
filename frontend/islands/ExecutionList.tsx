@@ -430,7 +430,7 @@ export default function ExecutionList() {
                           </button>
                         </>
                       )}
-                      {["running", "paused", "queued", "pending"].includes(exec.status) && (
+                      {["running", "paused", "queued"].includes(exec.status) && (
                         <>
                           <span class="text-[var(--text-muted)] mx-1">|</span>
                           <button
