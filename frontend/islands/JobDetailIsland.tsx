@@ -116,7 +116,12 @@ export default function JobDetailIsland({ executionId }: Props) {
           </div>
         </div>
         <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-          <div><span class="text-[var(--text-secondary)]">Estado</span><p class="font-medium">{STATUS_LABELS[exec.status] || exec.status}</p></div>
+          <div><span class="text-[var(--text-secondary)]">Estado</span>
+            <p class="font-medium">
+              {(exec.status === "running" || exec.status === "queued") && (exec.current_phase || "").includes("reintento")
+                ? "Reintentando..."
+                : STATUS_LABELS[exec.status] || exec.status}
+            </p></div>
           <div><span class="text-[var(--text-secondary)]">Inicio</span><p>{formatDateTime(exec.started_at)}</p></div>
           <div><span class="text-[var(--text-secondary)]">Fin</span><p>{formatDateTime(exec.completed_at)}</p></div>
           <div><span class="text-[var(--text-secondary)]">Duración</span><p>{formatDuration(exec.duration_seconds)}</p></div>

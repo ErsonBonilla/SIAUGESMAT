@@ -108,9 +108,11 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
 
                 if phase_name in checkpoint:
                     _restore_checkpoint(ctx, checkpoint[phase_name], phase_name)
+                    retry_count = _inc_retry_count(db, execution_id)
+                    retry_label = f" (reintento {retry_count})" if retry_count > 0 else ""
                     update_progress(db, execution_id, PROGRESS_RESTORE[i],
-                                    f"FASE {phase_name} restaurada desde checkpoint")
-                    logger.info(f"FASE {phase_name}: restaurada desde checkpoint")
+                                    f"FASE {phase_name} restaurada desde checkpoint{retry_label}")
+                    logger.info(f"FASE {phase_name}: restaurada desde checkpoint (reintento {retry_count})")
                 else:
                     await phase.run(ctx)
                     _save_phase_checkpoint(db, execution_id, ctx, phase_name)
@@ -277,3 +279,19 @@ def _require_review(db, execution_id: int, ctx):
             f"(umbral: {settings.MAX_AUTO_DELETE_COURSES}). "
             f"Requiere confirmación explícita."
         )
+
+
+def _inc_retry_count(db, execution_id: int) -> int:
+    """Incrementa y retorna el contador de reintentos almacenado en el checkpoint."""
+    from app.db.models import Execution
+    from sqlalchemy.orm.attributes import flag_modified
+    ex = db.query(Execution).filter(Execution.id == execution_id).first()
+    if not ex:
+        return 0
+    if ex.phase_checkpoint is None:
+        ex.phase_checkpoint = {}
+    count = ex.phase_checkpoint.get("_retry_count", 0) + 1
+    ex.phase_checkpoint["_retry_count"] = count
+    flag_modified(ex, "phase_checkpoint")
+    db.commit()
+    return count
