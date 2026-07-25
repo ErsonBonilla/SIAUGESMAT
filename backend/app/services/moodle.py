@@ -283,6 +283,22 @@ class MoodleService:
         }
         return await self._request("core_course_delete_categories", params)
 
+    async def update_category(self, category_id: int, parent_idnumber: Optional[str] = None,
+                               name: Optional[str] = None, idnumber: Optional[str] = None) -> Dict:
+        """Actualiza campos de una categoría (parent, name, idnumber)."""
+        params: Dict[str, Any] = {"categories[0][id]": category_id}
+        if parent_idnumber is not None:
+            parent_id = await self._get_category_id_by_idnumber(parent_idnumber)
+            if parent_id:
+                params["categories[0][parent]"] = parent_id
+            else:
+                logger.warning(f"Parent idnumber {parent_idnumber} no encontrado en Moodle")
+        if name is not None:
+            params["categories[0][name]"] = name
+        if idnumber is not None:
+            params["categories[0][idnumber]"] = idnumber
+        return await self._request("core_course_update_categories", params)
+
     # ------------------------------------------------------------------
     # Cursos
     # ------------------------------------------------------------------

@@ -25,9 +25,10 @@ class ConsultPhase(BasePhase):
             update_progress(db, eid, 2, "Consultando categorías…", step=1)
 
             all_moodle_cats = await moodle_service.get_categories()
-            ctx.existing_cat_idnumbers = {
-                c.get("idnumber", "") for c in all_moodle_cats if c.get("idnumber")
+            ctx.all_categories_map = {
+                c.get("idnumber", ""): c for c in all_moodle_cats if c.get("idnumber")
             }
+            ctx.existing_cat_idnumbers = set(ctx.all_categories_map.keys())
 
             update_progress(db, eid, 5, "Consultando cursos…")
 
