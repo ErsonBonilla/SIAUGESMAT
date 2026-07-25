@@ -59,7 +59,7 @@ class PeoplePhase(BasePhase):
         def _check_pause() -> bool:
             """Retorna True si la ejecución fue pausada (el caller debe salir)."""
             if _should_pause(db, eid):
-                save_checkpoint(db, eid, "4", {
+                save_checkpoint(db, eid, "4_progress", {
                     "metrics": dict(metrics),
                     "username_map": ctx.username_map,
                     "people_progress": ctx.people_progress,
@@ -70,7 +70,7 @@ class PeoplePhase(BasePhase):
         def _save_progress(data: dict):
             """Guarda progreso parcial sin marcar la fase como completada."""
             ctx.people_progress = data
-            save_checkpoint(db, eid, "4", {
+            save_checkpoint(db, eid, "4_progress", {
                 "metrics": dict(metrics),
                 "username_map": ctx.username_map,
                 "people_progress": data,

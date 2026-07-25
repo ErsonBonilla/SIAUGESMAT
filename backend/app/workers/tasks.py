@@ -115,6 +115,10 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
                                     f"FASE {phase_name} restaurada desde checkpoint{retry_label}")
                     logger.info(f"FASE {phase_name}: restaurada desde checkpoint (reintento {retry_count})")
                 else:
+                    progress_key = f"{phase_name}_progress"
+                    if progress_key in checkpoint:
+                        _restore_progress_checkpoint(ctx, checkpoint[progress_key], phase_name)
+                        logger.info(f"FASE {phase_name}: progreso parcial restaurado")
                     await phase.run(ctx)
                     _save_phase_checkpoint(db, execution_id, ctx, phase_name)
                     logger.info(f"FASE {phase_name}: completada, checkpoint guardado")
@@ -218,6 +222,16 @@ def _restore_checkpoint(ctx: PhaseContext, data: dict, phase_name: str):
     elif phase_name == "4":
         ctx.metrics.update(data.get("metrics", {}))
         ctx.username_map.update(data.get("username_map", {}))
+        ctx.people_progress = data.get("people_progress", {})
+
+
+def _restore_progress_checkpoint(ctx: PhaseContext, data: dict, phase_name: str):
+    """Restaura el progreso parcial de una fase (sin marcarla como completada)."""
+    ctx.metrics.update(data.get("metrics", {}))
+    ctx.username_map.update(data.get("username_map", {}))
+    if phase_name == "3":
+        ctx.structure_progress = data.get("structure_progress", {})
+    elif phase_name == "4":
         ctx.people_progress = data.get("people_progress", {})
 
 
