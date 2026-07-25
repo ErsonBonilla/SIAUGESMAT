@@ -7,6 +7,7 @@ import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
@@ -213,6 +214,7 @@ async def confirm_mass_delete(
     if execution.phase_checkpoint is None:
         execution.phase_checkpoint = {}
     execution.phase_checkpoint["delete_confirmed"] = True
+    flag_modified(execution, "phase_checkpoint")
     execution.status = "pending"
     execution.current_phase = "Eliminación masiva confirmada"
     execution.progress_pct = 30

@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
+from sqlalchemy.orm.attributes import flag_modified
+
 from app.db.models import ErrorLog, Execution
 
 
@@ -154,6 +156,7 @@ def save_checkpoint(db, execution_id: int, phase: str, data: dict):
         if execution.phase_checkpoint is None:
             execution.phase_checkpoint = {}
         execution.phase_checkpoint[phase] = data
+        flag_modified(execution, "phase_checkpoint")
         db.commit()
 
 
@@ -168,4 +171,5 @@ def clear_checkpoint(db, execution_id: int):
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.phase_checkpoint = None
+        flag_modified(execution, "phase_checkpoint")
         db.commit()

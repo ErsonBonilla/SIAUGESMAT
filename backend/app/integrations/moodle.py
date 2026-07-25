@@ -16,6 +16,39 @@ from app.services.moodle import MoodleAPIError, MoodleService
 logger = logging.getLogger(__name__)
 
 
+def _extract_error(e: Exception) -> str:
+    """Extrae el mensaje real de error anidado (ej. MoodleAPIError dentro de RetryError)."""
+    # 1. Si ya tiene spanish_message, usarlo directamente
+    if hasattr(e, 'spanish_message'):
+        return e.spanish_message
+
+    # 2. Desenvolver RetryError de tenacity
+    if hasattr(e, 'last_attempt'):
+        future = e.last_attempt
+        # Intentar exception() primero, luego result() como fallback
+        try:
+            inner = future.exception()
+        except Exception:
+            inner = None
+        if inner is None:
+            try:
+                future.result()
+            except Exception as inner_exc:
+                inner = inner_exc
+        if inner is not None and hasattr(inner, 'spanish_message'):
+            return inner.spanish_message
+        if inner is not None:
+            error_code = getattr(inner, 'error_code', '')
+            msg = str(inner)[:300]
+            return f"{error_code}: {msg}" if error_code else msg
+
+    # 3. Desenvolver __cause__
+    if e.__cause__ and hasattr(e.__cause__, 'spanish_message'):
+        return e.__cause__.spanish_message
+
+    return str(e)[:300]
+
+
 class MoodleIntegration:
 
     def __init__(self, service: MoodleService):
@@ -33,31 +66,28 @@ class MoodleIntegration:
         template_id: Optional[int] = None,
         visible: int = 1,
     ) -> bool:
-        """Crea un curso en Moodle. Si hay template_id, usa core_course_duplicate_course."""
+        """Crea un curso vacío. Si hay template_id, importa contenido después."""
         try:
+            await self.service.create_courses([{
+                "shortname": shortname,
+                "fullname": fullname,
+                "categoryidnumber": category_idnumber,
+                "format": "onetopic",
+                "visible": visible,
+            }])
+            logger.info(f"Curso creado (vacío): {shortname}")
             if template_id:
-                cat_id = await self.service._get_category_id_by_idnumber(category_idnumber)
-                await self.service.duplicate_course(
-                    from_id=template_id,
-                    fullname=fullname,
-                    shortname=shortname,
-                    categoryid=cat_id or 0,
-                    visible=visible,
-                )
-                logger.info(f"Curso creado desde plantilla {template_id}: {shortname}")
-            else:
-                await self.service.create_courses([{
-                    "shortname": shortname,
-                    "fullname": fullname,
-                    "categoryidnumber": category_idnumber,
-                    "format": "onetopic",
-                    "visible": visible,
-                }])
-                logger.info(f"Curso creado (vacío): {shortname}")
+                existing = await self.service.get_courses(shortname=shortname)
+                if existing:
+                    await self.service.import_course_content(
+                        from_id=template_id,
+                        to_id=int(existing[0]["id"]),
+                    )
+                    logger.info(f"Plantilla {template_id} importada a {shortname}")
             return True
         except Exception as e:
             logger.exception(f"Error al crear curso {shortname}: {e}")
-            self.last_error = getattr(e, 'spanish_message', str(e))
+            self.last_error = _extract_error(e)
             return False
 
     async def delete_course(self, shortname: str) -> bool:
@@ -68,7 +98,7 @@ class MoodleIntegration:
             return True
         except Exception as e:
             logger.exception(f"Error al eliminar curso {shortname}: {e}")
-            self.last_error = getattr(e, 'spanish_message', str(e))
+            self.last_error = _extract_error(e)
             return False
 
     async def activate_course(self, shortname: str) -> bool:
@@ -82,7 +112,7 @@ class MoodleIntegration:
             return True
         except Exception as e:
             logger.exception(f"Error al activar curso {shortname}: {e}")
-            self.last_error = getattr(e, 'spanish_message', str(e))
+            self.last_error = _extract_error(e)
             return False
 
     async def hide_course(self, shortname: str) -> bool:
@@ -96,7 +126,7 @@ class MoodleIntegration:
             return True
         except Exception as e:
             logger.exception(f"Error al ocultar curso {shortname}: {e}")
-            self.last_error = getattr(e, 'spanish_message', str(e))
+            self.last_error = _extract_error(e)
             return False
 
     async def rename_course(
@@ -119,7 +149,7 @@ class MoodleIntegration:
             return True
         except Exception as e:
             logger.exception(f"Error al renombrar curso {old_shortname}: {e}")
-            self.last_error = getattr(e, 'spanish_message', str(e))
+            self.last_error = _extract_error(e)
             return False
 
     # ------------------------------------------------------------------
@@ -186,7 +216,8 @@ class MoodleIntegration:
         try:
             existing = await self.find_user_by_email(email)
         except Exception as e:
-            logger.exception(f"Error al buscar usuario por email {email}: {getattr(e, 'spanish_message', str(e))}")
+            self.last_error = _extract_error(e)
+            logger.exception(f"Error al buscar usuario por email {email}: {self.last_error}")
             return None, False
         if existing:
             return existing.get("username", username_esperado), False
@@ -196,7 +227,8 @@ class MoodleIntegration:
             try:
                 existing_by_personal = await self.find_user_by_email(email_personal)
             except Exception as e:
-                logger.exception(f"Error al buscar usuario por email personal {email_personal}: {getattr(e, 'spanish_message', str(e))}")
+                self.last_error = _extract_error(e)
+                logger.exception(f"Error al buscar usuario por email personal {email_personal}: {self.last_error}")
                 return None, False
             if existing_by_personal:
                 return existing_by_personal.get("username", username_esperado), False
@@ -217,7 +249,8 @@ class MoodleIntegration:
             logger.info(f"Usuario creado: {username_esperado}")
             return username_esperado, True
         except Exception as e:
-            logger.exception(f"Error al crear usuario {username_esperado}: {getattr(e, 'spanish_message', str(e))}")
+            self.last_error = _extract_error(e)
+            logger.exception(f"Error al crear usuario {username_esperado}: {self.last_error}")
             return None, False
 
     async def enrol_teacher(self, username: str, course_shortname: str,
@@ -249,10 +282,11 @@ class MoodleIntegration:
                 "reason": "enrolled",
             }
         except Exception as e:
+            self.last_error = _extract_error(e)
             return {
                 "success": False,
                 "username": username,
-                "reason": getattr(e, 'spanish_message', str(e)),
+                "reason": self.last_error,
             }
 
 

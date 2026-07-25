@@ -244,8 +244,52 @@ class TestRealMoodleCursoConTemplate:
             await ms.close()
 
     @pytest.mark.asyncio
-    async def test_crear_curso_con_duplicate_course(self):
-        """Crea curso con plantilla usando core_course_duplicate_course (1 sola llamada)."""
+    async def test_crear_curso_con_import_content(self):
+        """Crea curso vacío + importa contenido con core_course_import_course (activa enrol manual)."""
+        ms = _get_service()
+        uid = uuid.uuid4().hex[:6]
+        cat_idn = f"TEST_INT_IMP_{uid}"
+        sn = f"TEST_INT_IMP_{uid}"
+
+        try:
+            await ms.create_categories([{
+                "name": f"CAT IMP {uid}",
+                "idnumber": cat_idn,
+                "parent": 0,
+            }])
+
+            templates = await ms.get_courses(shortname=settings.DEFAULT_COURSE_TEMPLATE)
+            assert templates, f"Template '{settings.DEFAULT_COURSE_TEMPLATE}' no existe"
+            template_id = int(templates[0]["id"])
+
+            # Paso 1: crear curso vacío (activa instancia enrol manual)
+            r = await ms.create_courses([{
+                "shortname": sn,
+                "fullname": f"CURSO IMP {uid}",
+                "categoryidnumber": cat_idn,
+                "format": "onetopic",
+                "visible": 1,
+            }])
+            assert r and r[0].get("id"), "create_courses sin template falló"
+            course_id = int(r[0]["id"])
+
+            # Paso 2: importar contenido de la plantilla
+            await ms.import_course_content(from_id=template_id, to_id=course_id)
+            logger.info(f"Plantilla {template_id} importada a curso {course_id}")
+
+            await ms.delete_courses([sn])
+            courses2 = await ms.get_courses(shortname=sn)
+            assert not courses2, "El curso no se eliminó"
+
+            cats = await ms.get_categories(idnumber=cat_idn)
+            if cats:
+                await ms.delete_category(int(cats[0]["id"]), recursive=True)
+        finally:
+            await ms.close()
+
+    @pytest.mark.asyncio
+    async def test_duplicate_course_endpoint(self):
+        """Verifica que duplicate_course existe y funciona (aunque no activa enrol manual)."""
         ms = _get_service()
         uid = uuid.uuid4().hex[:6]
         cat_idn = f"TEST_INT_DUP_{uid}"
@@ -261,7 +305,6 @@ class TestRealMoodleCursoConTemplate:
             cat_id = int(cats[0]["id"])
 
             templates = await ms.get_courses(shortname=settings.DEFAULT_COURSE_TEMPLATE)
-            assert templates, f"Template '{settings.DEFAULT_COURSE_TEMPLATE}' no existe"
             template_id = int(templates[0]["id"])
 
             r = await ms.duplicate_course(
@@ -271,13 +314,9 @@ class TestRealMoodleCursoConTemplate:
                 categoryid=cat_id,
                 visible=1,
             )
-            assert r and r.get("id"), f"duplicate_course falló: {r}"
-            logger.info(f"Curso duplicado desde template {template_id}: id={r['id']}")
+            assert r and r.get("id"), f"duplicate_course falló"
 
             await ms.delete_courses([sn])
-            courses2 = await ms.get_courses(shortname=sn)
-            assert not courses2, "El curso no se eliminó"
-
             cats = await ms.get_categories(idnumber=cat_idn)
             if cats:
                 await ms.delete_category(int(cats[0]["id"]), recursive=True)
