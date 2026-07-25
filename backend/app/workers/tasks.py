@@ -221,7 +221,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
             return mode in ("users", "both")
 
         if phase == "3":
-            update_progress(db, execution_id, 34, "Creando categorías…", step=3)
+            update_progress(db, execution_id, 34, "Procesando estructura…", step=3)
 
             # Categories inline (fast)
             if _do_courses() and ctx_data.get("missing_categories"):

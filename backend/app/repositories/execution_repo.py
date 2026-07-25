@@ -51,10 +51,11 @@ def atomic_mark_queued(db, execution_id: int, task_id: str, allowed_statuses: tu
     return result.rowcount > 0
 
 
-def update_progress(db, execution_id: int, pct: float, phase: str, step: int = None):
+def update_progress(db, execution_id: int, pct: float, phase: str = None, step: int = None):
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
-        execution.current_phase = phase
+        if phase is not None:
+            execution.current_phase = phase
         execution.progress_pct = pct
         execution.progress_updated_at = datetime.now(timezone.utc)
         if step is not None:

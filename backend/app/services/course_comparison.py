@@ -196,7 +196,7 @@ class CourseComparisonService:
 
         cls._find_disappeared_courses(
             existing_by_shortname, existing_by_base_key, new_shortnames, new_base_keys,
-            new_program_codes, to_delete, alerts, logs,
+            new_program_codes, to_delete, to_hide, alerts, logs,
         )
 
         return {
@@ -421,6 +421,7 @@ class CourseComparisonService:
         new_base_keys: set,
         new_program_codes: Set[str],
         to_delete: List[str],
+        to_hide: List[str],
         alerts: List[Dict],
         logs: List[Dict],
     ):
