@@ -438,9 +438,8 @@ class MoodleService:
         return await self._adapter.get_courses(shortname, self._request)
 
     async def get_courses_by_shortnames(self, shortnames: List[str]) -> List[Dict]:
-        """Obtiene cursos por una lista de shortnames en UNA sola llamada API.
-        Usa core_course_get_courses (sin filtro) para obtener todos los cursos,
-        luego filtra localmente por shortname. Mucho más eficiente que N llamadas."""
+        """Obtiene cursos por shortname. Trae todos y filtra localmente.
+        TODO: optimizar con core_course_get_courses_by_field en lote."""
         if not shortnames:
             return []
         try:

@@ -243,4 +243,4 @@ def _handle_error(db, execution_id, action, identifier, error_msg):
     metric_key = "enrolment_errors" if action == "enrol" else "total_errors"
     increment_metric(db, execution_id, metric_key)
     if metric_key != "total_errors":
-        increment_metric(db, execution_id, "total_errors")
+        increment_metric(db, execution_id, "total_errors")  # enrol incrementa ambos
