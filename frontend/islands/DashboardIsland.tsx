@@ -20,15 +20,17 @@ export default function DashboardIsland() {
   useEffect(() => {
     loading.value = true;
     error.value = "";
+    const errors: string[] = [];
     Promise.all([
-      getHistory(),
-      getLatest().catch(() => null),
-      listExecutions({ limit: 5 }).catch(() => ({ total: 0, items: [] })),
+      getHistory().catch((e) => { errors.push("Historial: " + (e instanceof Error ? e.message : "error")); return [] as SemesterMetrics[]; }),
+      getLatest().catch((e) => { errors.push("Semáforo: " + (e instanceof Error ? e.message : "error")); return null; }),
+      listExecutions({ limit: 5 }).catch((e) => { errors.push("Ejecuciones: " + (e instanceof Error ? e.message : "error")); return { total: 0, items: [] as Execution[] }; }),
     ])
       .then(([history, latest, execs]) => {
         historyData.value = history;
         latestExec.value = latest;
         recentExecs.value = execs.items;
+        if (errors.length) error.value = errors.join(" | ");
       })
       .catch((e) => {
         error.value = e instanceof Error ? e.message : "Error al cargar datos.";
