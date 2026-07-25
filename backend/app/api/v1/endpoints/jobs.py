@@ -17,6 +17,7 @@ from app.repositories.execution_repo import (
     get_execution_errors,
     list_executions,
     mark_queued,
+    pause_execution,
 )
 from app.schemas.job import (
     ErrorOut,
@@ -48,7 +49,7 @@ async def start_process(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="No se encontró la ejecución solicitada.")
 
-    if execution.status not in ("pending", "failed", "queued", "review_required"):
+    if execution.status not in ("pending", "failed", "queued", "review_required", "paused"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"La ejecución ya está en estado '{execution.status}'"
@@ -248,4 +249,40 @@ async def confirm_mass_delete(
         job_id=job.id,
         status="queued",
         message="Confirmación recibida. Procesamiento reanudado.",
+    )
+
+
+@router.post(
+    "/{execution_id}/pause",
+    response_model=ProcessResponse,
+    summary="Pausar una ejecución en curso",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def pause_execution_endpoint(
+    execution_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserInToken = Depends(get_current_user),
+):
+    execution = get_execution(db, execution_id)
+    if not execution:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Ejecución no encontrada.")
+
+    if execution.status != "running":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"La ejecución está en estado '{execution.status}'. "
+                   f"Solo se puede pausar ejecuciones en 'running'.",
+        )
+
+    if not pause_execution(db, execution_id):
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="No se pudo pausar la ejecución.")
+
+    logger.info(f"Ejecución {execution_id} pausada por {current_user.username}")
+    return ProcessResponse(
+        execution_id=execution_id,
+        job_id="",
+        status="paused",
+        message="Ejecución pausada. Usa /process para continuar.",
     )

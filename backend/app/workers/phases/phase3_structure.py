@@ -3,12 +3,14 @@ from typing import Dict
 
 from app.core.config import settings
 from app.repositories import log_repo
-from app.repositories.execution_repo import update_progress
+from app.repositories.execution_repo import update_progress, save_checkpoint, _should_pause
 from app.services.error_messages import translate_error
 from app.services.moodle import MoodleAPIError
 from app.workers.phases.base import BasePhase, PhaseContext
 
 logger = logging.getLogger(__name__)
+
+CHECKPOINT_INTERVAL = 100
 
 CHECKPOINT_INTERVAL = 100
 
@@ -31,6 +33,17 @@ class StructurePhase(BasePhase):
             ops_count += 1
             if ops_count % CHECKPOINT_INTERVAL == 0:
                 ctx.structure_progress = {"ops_completed": ops_count}
+
+        def _check_pause() -> bool:
+            """Retorna True si la ejecución fue pausada (el caller debe salir)."""
+            if _should_pause(db, eid):
+                save_checkpoint(db, eid, "3", {
+                    "metrics": dict(metrics),
+                    "username_map": ctx.username_map,
+                    "structure_progress": ctx.structure_progress,
+                })
+                return True
+            return False
 
         def _do_courses() -> bool:
             return mode in ("courses", "both")
@@ -131,9 +144,13 @@ class StructurePhase(BasePhase):
                                 update_progress(db, eid, 42 + int(processed / total_del * 2),
                                                 msg, step=3)
                             _maybe_checkpoint()
+                            if _check_pause():
+                                return
 
                 update_progress(db, eid, 44, "Activando cursos…")
                 for sn in ctx.comparison.get("to_activate", []):
+                    if _check_pause():
+                        return
                     success = await integration.activate_course(sn)
                     if success:
                         metrics["courses_activated"] += 1
@@ -146,6 +163,8 @@ class StructurePhase(BasePhase):
 
                 update_progress(db, eid, 46, "Ocultando cursos…")
                 for sn in ctx.comparison.get("to_hide", []):
+                    if _check_pause():
+                        return
                     success = await integration.hide_course(sn)
                     if success:
                         metrics["courses_hidden"] += 1
@@ -158,6 +177,8 @@ class StructurePhase(BasePhase):
 
                 update_progress(db, eid, 48, "Renombrando cursos…")
                 for item in ctx.comparison.get("to_update", []):
+                    if _check_pause():
+                        return
                     sn = item["shortname"]
                     course_data = courses_by_sn.get(sn)
                     if not course_data:
@@ -185,6 +206,8 @@ class StructurePhase(BasePhase):
                 create_count = 0
                 for item in ctx.comparison.get("to_create", []):
                     sn = item["shortname"]
+                    if _check_pause():
+                        return
                     course_data = courses_by_sn.get(sn)
                     if not course_data:
                         continue

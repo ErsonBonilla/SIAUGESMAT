@@ -6,6 +6,7 @@ import {
   downloadReport,
   startProcess,
   confirmExecution,
+  pauseExecution,
   deleteExecution,
   BASE_URL,
   type Execution,
@@ -27,6 +28,7 @@ export default function ExecutionList() {
   const processing = useSignal<number | null>(null);
   const deleting = useSignal<number | null>(null);
   const confirming = useSignal<number | null>(null);
+  const pausing = useSignal<number | null>(null);
 
   const filterSemester = useSignal("");
   const filterStatus = useSignal("");
@@ -125,6 +127,19 @@ export default function ExecutionList() {
       toast(e instanceof Error ? e.message : "Error al confirmar", "error");
     } finally {
       confirming.value = null;
+    }
+  }
+
+  async function handlePause(execId: number) {
+    pausing.value = execId;
+    try {
+      await pauseExecution(execId);
+      toast("Ejecución pausada", "success");
+      load();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Error al pausar", "error");
+    } finally {
+      pausing.value = null;
     }
   }
 
@@ -341,6 +356,20 @@ export default function ExecutionList() {
                                 </span>
                               )
                               : "Confirmar"}
+                          </button>
+                        </>
+                      )}
+                      {exec.status === "running" && (
+                        <>
+                          <span class="text-[var(--text-muted)] mx-1">|</span>
+                          <button
+                            onClick={() => handlePause(exec.id)}
+                            disabled={pausing.value !== null}
+                            class="text-[var(--accent)] hover:text-[var(--accent)] text-sm font-medium disabled:opacity-50"
+                          >
+                            {pausing.value === exec.id
+                              ? "Pausando..."
+                              : "Pausar"}
                           </button>
                         </>
                       )}

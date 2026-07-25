@@ -173,3 +173,20 @@ def clear_checkpoint(db, execution_id: int):
         execution.phase_checkpoint = None
         flag_modified(execution, "phase_checkpoint")
         db.commit()
+
+
+def pause_execution(db, execution_id: int) -> bool:
+    """Pone una ejecución en pausa. El worker la detectará al final de la iteración actual."""
+    execution = db.query(Execution).filter(Execution.id == execution_id).first()
+    if not execution or execution.status != "running":
+        return False
+    execution.status = "paused"
+    execution.current_phase = f"{execution.current_phase or ''} (pausado)"
+    db.commit()
+    return True
+
+
+def _should_pause(db, execution_id: int) -> bool:
+    """Verifica si la ejecución fue puesta en pausa (uso interno en las fases)."""
+    execution = db.query(Execution).filter(Execution.id == execution_id).first()
+    return execution is not None and execution.status == "paused"
