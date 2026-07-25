@@ -27,12 +27,14 @@ class PhaseContext:
         self.integration = integration
 
         self.existing_cat_idnumbers: Set[str] = set()
+        self.all_categories_map: Dict[str, Dict] = {}
         self.existing_courses: List[Dict] = []
         self.username_map: Dict[str, str] = {}
         self.courses_with_teacher: Set[str] = set()
 
         self.re_upload: bool = False
         self.missing_categories: List[Dict] = []
+        self.categories_to_relocate: List[Dict] = []
         self.comparison: Dict[str, Any] = {}
         self.users_to_create: List[Dict] = []
         self.resolved_enrolments: List[Dict] = []

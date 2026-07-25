@@ -186,6 +186,7 @@ def _save_phase_2_data_to_checkpoint(db, eid, etl_data, metrics, phase2_data, mo
         "mode": mode,
         "comparison": phase2_data.get("2", {}).get("comparison", {}),
         "missing_categories": phase2_data.get("2", {}).get("missing_categories", []),
+        "categories_to_relocate": phase2_data.get("2", {}).get("categories_to_relocate", []),
         "users_to_create": phase2_data.get("2", {}).get("users_to_create", []),
         "resolved_enrolments": phase2_data.get("2", {}).get("resolved_enrolments", []),
         "username_map": phase2_data.get("1", {}).get("username_map", {}),
@@ -242,6 +243,31 @@ def process_etl_phase(self, execution_id: int, phase: str):
                     asyncio.run(_create_cats())
                 except Exception as e:
                     logger.exception(f"Error creando categorías: {e}")
+                    save_error(db, execution_id, "3", "", translate_error(e))
+
+            # Relocate categories with wrong parent
+            cats_to_relocate = ctx_data.get("categories_to_relocate", [])
+            if _do_courses() and cats_to_relocate:
+                async def _relocate_cats():
+                    moodle_config = settings.get_moodle_config(modalidad)
+                    ms = MoodleService(token=moodle_config["token"], base_url=moodle_config["url"],
+                                       version=moodle_config["version"])
+                    integ = MoodleIntegration(ms)
+                    try:
+                        for cat in cats_to_relocate:
+                            ok = await integ.relocate_category(
+                                idnumber=cat["idnumber"],
+                                moodle_id=cat["moodle_id"],
+                                target_parent_idn=cat["expected_parent_idn"],
+                            )
+                            if ok:
+                                logger.info(f"Categoría {cat['idnumber']} reubicada correctamente")
+                    finally:
+                        await ms.close()
+                try:
+                    asyncio.run(_relocate_cats())
+                except Exception as e:
+                    logger.exception(f"Error reubicando categorías: {e}")
                     save_error(db, execution_id, "3", "", translate_error(e))
 
             if not comparison:
@@ -695,6 +721,7 @@ def _save_phase_checkpoint(db, eid, ctx: PhaseContext, phase_name: str):
         save_checkpoint(db, eid, "2", {
             "comparison": _serialize_comparison(ctx.comparison),
             "missing_categories": ctx.missing_categories,
+            "categories_to_relocate": ctx.categories_to_relocate,
             "users_to_create": ctx.users_to_create,
             "resolved_enrolments": ctx.resolved_enrolments,
             "re_upload": ctx.re_upload,
@@ -710,6 +737,7 @@ def _restore_checkpoint(ctx: PhaseContext, data: dict, phase_name: str):
     elif phase_name == "2":
         ctx.comparison = data.get("comparison", {})
         ctx.missing_categories = data.get("missing_categories", [])
+        ctx.categories_to_relocate = data.get("categories_to_relocate", [])
         ctx.users_to_create = data.get("users_to_create", [])
         ctx.resolved_enrolments = data.get("resolved_enrolments", [])
         ctx.re_upload = data.get("re_upload", False)

@@ -42,6 +42,21 @@ class MoodleIntegration:
     # ------------------------------------------------------------------
     # Cursos
     # ------------------------------------------------------------------
+    async def relocate_category(self, idnumber: str, moodle_id: int, target_parent_idn: str) -> bool:
+        """Mueve una categoría existente a un parent correcto."""
+        try:
+            await self.service.update_category(
+                category_id=moodle_id,
+                parent_idnumber=target_parent_idn,
+            )
+            logger.info(f"Categoría {idnumber} reubicada bajo {target_parent_idn}")
+            return True
+        except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(_extract_error(e)[:200])
+            logger.warning(f"No se pudo reubicar categoría {idnumber}: {e}")
+            return False
+
     async def create_course(
         self,
         shortname: str,
