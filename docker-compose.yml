@@ -131,7 +131,7 @@ services:
     image: siaugesmat-backend:latest
     container_name: siaugesmat-worker
     restart: unless-stopped
-    command: celery -A app.celery_app worker --loglevel=info --concurrency=1 --max-tasks-per-child=1 --prefetch-multiplier=1
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=4 --max-tasks-per-child=1 --prefetch-multiplier=1
     deploy:
       resources:
         limits:
