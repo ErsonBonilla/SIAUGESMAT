@@ -35,6 +35,7 @@ class Execution(Base):
     duration_seconds = Column(Float, nullable=True)
     current_phase = Column(String(100), nullable=True)
     progress_pct = Column(Float, nullable=True)
+    progress_updated_at = Column(DateTime(timezone=True), nullable=True)
     current_step = Column(Integer, nullable=True)
     moodle_version = Column(String(10), nullable=True)
     modalidad = Column(String(20), nullable=True)

@@ -10,7 +10,9 @@ export interface Execution {
   errors_count: number;
   current_phase?: string | null;
   progress_pct?: number | null;
+  progress_updated_at?: string | null;
   current_step?: number | null;
+  eta_seconds?: number | null;
   started_at: string | null;
   completed_at: string | null;
   duration_seconds: number | null;

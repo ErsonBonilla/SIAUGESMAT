@@ -3,13 +3,16 @@
 const PHASE_ICONS = ["🔄", "📊", "🏗️", "👥", "📋"];
 const PHASE_LABELS = ["Consultar Moodle", "Analizar datos", "Estructura", "Gestionar personas", "Generar reportes"];
 
+import { formatEta } from "../utils/date.ts";
+
 interface ProgressBarProps {
   currentPhase: string | null;
   currentStep: number | null;
   progressPct: number;
+  etaSeconds?: number | null;
 }
 
-export default function ProgressBar({ currentPhase, currentStep, progressPct }: ProgressBarProps) {
+export default function ProgressBar({ currentPhase, currentStep, progressPct, etaSeconds }: ProgressBarProps) {
   const step = currentStep ?? 1;
   const icon = PHASE_ICONS[step - 1] ?? "⏳";
   const phaseLabel = PHASE_LABELS[step - 1] ?? "Procesando";
@@ -56,6 +59,11 @@ export default function ProgressBar({ currentPhase, currentStep, progressPct }: 
           );
         })}
       </div>
+      {etaSeconds != null && etaSeconds > 0 && (
+        <p class="text-xs text-[var(--text-muted)] mt-2 text-right">
+          Tiempo estimado restante: {formatEta(etaSeconds)}
+        </p>
+      )}
     </div>
   );
 }

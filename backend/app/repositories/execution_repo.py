@@ -41,6 +41,7 @@ def update_progress(db, execution_id: int, pct: float, phase: str, step: int = N
     if execution:
         execution.current_phase = phase
         execution.progress_pct = pct
+        execution.progress_updated_at = datetime.now(timezone.utc)
         if step is not None:
             execution.current_step = step
         db.commit()
