@@ -231,6 +231,10 @@ def process_etl_phase(self, execution_id: int, phase: str):
                                        version=moodle_config["version"])
                     try:
                         for cat in ctx_data["missing_categories"]:
+                            existing = await ms.get_categories(idnumber=cat["idnumber"])
+                            if existing:
+                                logger.info(f"Categoría {cat['idnumber']} ya existe, omitiendo")
+                                continue
                             await ms.create_categories([cat])
                     finally:
                         await ms.close()
