@@ -87,7 +87,7 @@ class StructurePhase(BasePhase):
                             missing_count += 1
 
                     if batch_ids:
-                        BATCH_SIZE = 100
+                        BATCH_SIZE = 25
                         total_batches = (len(batch_ids) + BATCH_SIZE - 1) // BATCH_SIZE
                         deleted = 0
                         for bi in range(0, len(batch_ids), BATCH_SIZE):
@@ -96,7 +96,7 @@ class StructurePhase(BasePhase):
                             for j, cid in enumerate(chunk):
                                 params[f"courseids[{j}]"] = cid
                             try:
-                                result = await moodle_service._request("core_course_delete_courses", params)
+                                result = await moodle_service._request("core_course_delete_courses", params, use_post=True)
                                 failed_ids = set()
                                 if isinstance(result, list):
                                     for r in result:
