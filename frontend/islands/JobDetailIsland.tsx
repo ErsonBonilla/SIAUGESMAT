@@ -27,8 +27,9 @@ function computeSemaphore(execution: Execution): { color: string; text: string }
   if (execution.status === "failed") return { color: "red", text: "Fallido" };
   if (execution.status === "cancelled") return { color: "gray", text: "Cancelado" };
   if (execution.status !== "completed") return { color: "gray", text: "Sin finalizar" };
-  const total = (execution.metrics?.total_operations) ||
-    ((execution.metrics?.courses_created || 0) + (execution.metrics?.users_created || 0) + (execution.metrics?.enrollments || 0)) || 1;
+  const total = execution.metrics?.total_operations ??
+    ((execution.metrics?.courses_created || 0) + (execution.metrics?.users_created || 0) + (execution.metrics?.enrollments || 0));
+  if (!total) return { color: "gray", text: "Sin datos" };
   const errorRate = ((execution.errors_count || 0) / total) * 100;
   if (errorRate >= THRESHOLD_RED || (execution.duration_seconds || 0) >= 7200) return { color: "red", text: "Crítico" };
   if (errorRate >= THRESHOLD_YELLOW || (execution.duration_seconds || 0) >= 3600) return { color: "yellow", text: "Advertencia" };
