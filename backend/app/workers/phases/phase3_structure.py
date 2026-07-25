@@ -126,7 +126,7 @@ class StructurePhase(BasePhase):
                                     metrics["total_errors"] += 1
                                     log_repo.save_error(db, eid, "3", sn, f"Error al eliminar curso: {sn}")
                                     processed += 1
-                            if processed % 200 == 0 or (bi + BATCH_SIZE >= len(batch_ids)):
+                            if processed % 50 == 0 or (bi + BATCH_SIZE >= len(batch_ids)):
                                 msg = f"Eliminando cursos… ({deleted}/{total_del})"
                                 update_progress(db, eid, 42 + int(processed / total_del * 2),
                                                 msg, step=3)
