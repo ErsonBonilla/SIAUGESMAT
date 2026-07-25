@@ -5,8 +5,8 @@ from app.core.config import settings
 from app.repositories import log_repo
 from app.repositories.execution_repo import update_progress, save_checkpoint, _should_pause
 from app.services.error_messages import translate_error
-from app.services.moodle import MoodleAPIError
-from app.workers.phases.base import BasePhase, PhaseContext, MoodleOverloadedError, is_moodle_overloaded
+from app.services.moodle import MoodleAPIError, is_moodle_overloaded
+from app.workers.phases.base import BasePhase, PhaseContext, MoodleOverloadedError
 
 logger = logging.getLogger(__name__)
 

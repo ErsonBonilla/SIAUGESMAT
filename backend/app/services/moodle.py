@@ -47,6 +47,31 @@ def _is_retryable_error(exception: BaseException) -> bool:
     return False
 
 
+class MoodleOverloadedError(Exception):
+    """El servidor de Moodle está sobrecargado. Celery reintentará la tarea."""
+
+
+def is_moodle_overloaded(e: BaseException) -> bool:
+    """Retorna True si el error es transitorio (servidor sobrecargado, timeout, o errores DB de Moodle)."""
+    if isinstance(e, httpx.HTTPStatusError):
+        return e.response.status_code in (502, 503, 504)
+    if isinstance(e, httpx.ConnectError):
+        return True
+    if isinstance(e, httpx.ReadTimeout):
+        return True
+    inner = e
+    if hasattr(e, 'last_attempt'):
+        try:
+            inner = e.last_attempt.exception() or inner
+        except Exception:
+            pass
+    if isinstance(inner, MoodleAPIError):
+        if inner.error_code in ("invalidrecord", "storedfilenotcreated", "invalidcoursemodule"):
+            return True
+    msg = str(e).lower()
+    return any(kw in msg for kw in ("gateway time-out", "connect error", "read timeout", "connection refused"))
+
+
 class MoodleAPIError(Exception):
     """Excepción lanzada cuando la API de Moodle devuelve un error."""
 
@@ -141,7 +166,8 @@ class MoodleService:
     )
     async def _request(self, wsfunction: str, params: Dict[str, Any], use_post: bool = False) -> Any:
         """Realiza una petición a la API de Moodle con rate limiting.
-        Si use_post=True o la URL excede ~7KB, usa POST para evitar limitaciones de longitud."""
+        Si use_post=True o la URL excede ~7KB, usa POST para evitar limitaciones de longitud.
+        Los errores de sobrecarga (502/503/504/invalidrecord) se convierten en MoodleOverloadedError."""
         await self._rate_limiter.acquire()
 
         payload = {
@@ -150,15 +176,21 @@ class MoodleService:
             "moodlewsrestformat": "json",
         }
 
-        if use_post:
-            response = await self._client.post(
-                self._base_url, data={**payload, **params}
-            )
-        else:
-            response = await self._client.get(
-                self._base_url, params={**payload, **params}
-            )
-        response.raise_for_status()
+        try:
+            if use_post:
+                response = await self._client.post(
+                    self._base_url, data={**payload, **params}
+                )
+            else:
+                response = await self._client.get(
+                    self._base_url, params={**payload, **params}
+                )
+            response.raise_for_status()
+        except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(str(e)[:200]) from e
+            raise
+
         data = response.json()
 
         if data is not None and not isinstance(data, (dict, list)):
@@ -170,10 +202,13 @@ class MoodleService:
             error_code = data.get("errorcode", "")
             error_msg = data.get("error") or data.get("exception") or data.get("message", "")
             logger.error(f"Moodle API error [{wsfunction}]: {error_code} — {error_msg}")
-            raise MoodleAPIError(
+            exc = MoodleAPIError(
                 data.get("error") or data.get("exception"),
                 data.get("errorcode"),
             )
+            if is_moodle_overloaded(exc):
+                raise MoodleOverloadedError(str(exc)[:200]) from exc
+            raise exc
 
         return data
 
