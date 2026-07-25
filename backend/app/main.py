@@ -36,6 +36,11 @@ async def lifespan(app: FastAPI):
     # Inicio
     logger.info(f"Iniciando {settings.PROJECT_NAME} v{settings.PROJECT_VERSION}")
     try:
+        settings.validate_critical()
+    except ValueError as e:
+        logger.error(f"Error de configuración: {e}")
+        raise
+    try:
         init_db()
         logger.info("Base de datos inicializada correctamente")
     except Exception as e:

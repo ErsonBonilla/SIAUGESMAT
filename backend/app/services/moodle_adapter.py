@@ -17,17 +17,6 @@ logger = logging.getLogger(__name__)
 WSFunc = Callable[[str, Dict[str, Any]], Any]
 
 
-def role_shortname_to_id(shortname: str) -> int:
-    """Convierte el nombre corto de un rol a su ID estándar de Moodle."""
-    mapping = {
-        "student": 5,
-        "editingteacher": 3,
-        "teacher": 4,
-        "manager": 1,
-    }
-    return mapping.get(shortname, 5)
-
-
 def resolve_role(value: str) -> int:
     """Convierte un rol (shortname o roleid numérico) a roleid de Moodle."""
     try:
@@ -37,6 +26,21 @@ def resolve_role(value: str) -> int:
     except ValueError:
         pass
     return role_shortname_to_id(value.strip().lower())
+
+
+def role_shortname_to_id(shortname: str) -> int:
+    """Convierte el nombre corto de un rol a su ID estándar de Moodle."""
+    mapping = {
+        "student": 5,
+        "editingteacher": 3,
+        "teacher": 4,
+        "manager": 1,
+    }
+    role_id = mapping.get(shortname)
+    if role_id is None:
+        logger.warning(f"Rol desconocido '{shortname}', usando 'student' (5)")
+        return 5
+    return role_id
 
 
 # ---------------------------------------------------------------------------
@@ -119,6 +123,12 @@ class MoodleAdapterFactory:
     _adapters: Dict[str, type] = {
         "3.8": Moodle3Adapter,
         "3.9": Moodle3Adapter,
+        "4.0": Moodle3Adapter,
+        "4.1": Moodle3Adapter,
+        "4.2": Moodle3Adapter,
+        "4.3": Moodle3Adapter,
+        "4.4": Moodle3Adapter,
+        "4.5": Moodle3Adapter,
     }
 
     @classmethod

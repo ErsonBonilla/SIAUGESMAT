@@ -54,8 +54,9 @@ export async function getExecutionErrors(executionId: number, limit = 100, offse
 }
 
 export async function deleteExecution(executionId: number): Promise<void> {
-  const response = await fetch(`${BASE_URL}/jobs/${executionId}`, { method: "DELETE", headers: { ...authHeaders() } });
-  if (!response.ok) await handleResponse<unknown>(response);
+  await handleResponse(
+    await fetch(`${BASE_URL}/jobs/${executionId}`, { method: "DELETE", headers: { ...authHeaders() } }),
+  );
 }
 
 export async function confirmExecution(executionId: number) {
@@ -66,8 +67,19 @@ export async function confirmExecution(executionId: number) {
   return handleResponse<{ execution_id: number; job_id: string; status: string; message: string }>(response);
 }
 
+// Reusa /process porque el backend acepta status "paused" y reanuda desde checkpoint
+export const resumeExecution = startProcess;
+
 export async function pauseExecution(executionId: number) {
   const response = await fetch(`${BASE_URL}/jobs/${executionId}/pause`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<{ execution_id: number; job_id: string; status: string; message: string }>(response);
+}
+
+export async function cancelExecution(executionId: number) {
+  const response = await fetch(`${BASE_URL}/jobs/${executionId}/cancel`, {
     method: "POST",
     headers: { ...authHeaders() },
   });

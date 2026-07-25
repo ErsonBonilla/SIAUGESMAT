@@ -7,9 +7,11 @@ export {
 } from "./api/auth.ts";
 
 export {
+  cancelExecution,
   getCurrentSemester,
   uploadFile,
   startProcess,
+  resumeExecution,
   confirmExecution,
   pauseExecution,
   getExecution,

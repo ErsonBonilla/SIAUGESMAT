@@ -1,17 +1,43 @@
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
 
 from app.celery_app import celery_app
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.integrations.moodle import MoodleIntegration
-from app.repositories.execution_repo import increment_metric
+from app.db.models import OperationItem
+from app.repositories.execution_repo import _should_cancel, increment_metric
 from app.repositories.log_repo import save_error, save_log
 from app.repositories.operation_repo import get_item, update_item
 from app.services.error_messages import translate_error
 from app.services.moodle import MoodleOverloadedError, MoodleService, is_moodle_overloaded
 
 logger = logging.getLogger(__name__)
+
+
+# Cleanup items stuck in "processing" on worker start
+def _reset_stuck_items():
+    try:
+        db = SessionLocal()
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+        stuck = db.query(OperationItem).filter(
+            OperationItem.status == "processing",
+            OperationItem.updated_at < cutoff,
+        ).all()
+        for item in stuck:
+            item.status = "pending"
+            item.error_message = "Reintentando tras timeout por crash"
+        db.commit()
+        if stuck:
+            logger.info(f"Reseteados {len(stuck)} items stuck en 'processing'")
+    except Exception:
+        logger.exception("Error reseteando items stuck")
+    finally:
+        db.close()
+
+
+_reset_stuck_items()
 
 
 @celery_app.task(
@@ -43,6 +69,11 @@ def process_etl_item(self, item_id: int):
 
         if not action:
             update_item(db, item.id, "failed", "Falta 'action' en detail")
+            return
+
+        if execution_id and _should_cancel(db, execution_id):
+            update_item(db, item.id, "failed", "Ejecución cancelada")
+            db.commit()
             return
 
         moodle_config = settings.get_moodle_config(modalidad)
@@ -132,7 +163,6 @@ def process_etl_item(self, item_id: int):
             db.commit()
 
     except MoodleOverloadedError:
-        db.close()
         raise
     except Exception as e:
         logger.exception(f"Error crítico en item {item_id}: {e}")

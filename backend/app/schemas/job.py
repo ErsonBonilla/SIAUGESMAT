@@ -5,10 +5,10 @@ Define los modelos de datos utilizados en las respuestas de los endpoints
 de gestión de ejecuciones y errores.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -48,9 +48,23 @@ class ExecutionOut(BaseModel):
     duration_seconds: Optional[float] = None
     moodle_version: Optional[str] = None
     modalidad: Optional[str] = None
+    report_dir: Optional[str] = None
+    celery_task_id: Optional[str] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+    @model_validator(mode="after")
+    def compute_eta(self):
+        if self.status == "running" and self.progress_pct is not None and self.progress_updated_at:
+            pct = self.progress_pct
+            elapsed = (datetime.now(timezone.utc) - self.progress_updated_at).total_seconds()
+            if elapsed > 10 and pct is not None and pct > 0:
+                rate = pct / elapsed
+                if rate > 0:
+                    eta = (100 - pct) / rate
+                    self.eta_seconds = eta if eta < 86400 else None
+        return self
 
 
 class ExecutionList(BaseModel):

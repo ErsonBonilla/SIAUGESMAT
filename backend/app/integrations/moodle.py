@@ -17,35 +17,19 @@ logger = logging.getLogger(__name__)
 
 
 def _extract_error(e: Exception) -> str:
-    """Extrae el mensaje real de error anidado (ej. MoodleAPIError dentro de RetryError)."""
-    # 1. Si ya tiene spanish_message, usarlo directamente
+    """Extrae el mensaje real de error anidado."""
     if hasattr(e, 'spanish_message'):
         return e.spanish_message
-
-    # 2. Desenvolver RetryError de tenacity
     if hasattr(e, 'last_attempt'):
-        future = e.last_attempt
-        # Intentar exception() primero, luego result() como fallback
         try:
-            inner = future.exception()
+            inner = e.last_attempt.exception()
+            if hasattr(inner, 'spanish_message'):
+                return inner.spanish_message
+            return str(inner)[:300]
         except Exception:
-            inner = None
-        if inner is None:
-            try:
-                future.result()
-            except Exception as inner_exc:
-                inner = inner_exc
-        if inner is not None and hasattr(inner, 'spanish_message'):
-            return inner.spanish_message
-        if inner is not None:
-            error_code = getattr(inner, 'error_code', '')
-            msg = str(inner)[:300]
-            return f"{error_code}: {msg}" if error_code else msg
-
-    # 3. Desenvolver __cause__
+            pass
     if e.__cause__ and hasattr(e.__cause__, 'spanish_message'):
         return e.__cause__.spanish_message
-
     return str(e)[:300]
 
 
@@ -66,8 +50,18 @@ class MoodleIntegration:
         template_id: Optional[int] = None,
         visible: int = 1,
     ) -> bool:
-        """Crea un curso vacío. Si hay template_id, importa contenido después."""
+        """Crea un curso vacío. Si ya existe, lo omite (chulo verde)."""
         try:
+            existing = await self.service.get_courses(shortname=shortname)
+            if existing:
+                if template_id:
+                    logger.info(f"Curso {shortname} ya existe, re-importando template {template_id}")
+                    await self.service.import_course_content(
+                        from_id=template_id,
+                        to_id=int(existing[0]["id"]),
+                    )
+                return True
+
             await self.service.create_courses([{
                 "shortname": shortname,
                 "fullname": fullname,
@@ -77,11 +71,11 @@ class MoodleIntegration:
             }])
             logger.info(f"Curso creado (vacío): {shortname}")
             if template_id:
-                existing = await self.service.get_courses(shortname=shortname)
-                if existing:
+                created = await self.service.get_courses(shortname=shortname)
+                if created:
                     await self.service.import_course_content(
                         from_id=template_id,
-                        to_id=int(existing[0]["id"]),
+                        to_id=int(created[0]["id"]),
                     )
                     logger.info(f"Plantilla {template_id} importada a {shortname}")
             return True
@@ -95,7 +89,10 @@ class MoodleIntegration:
     async def delete_course(self, shortname: str) -> bool:
         """Elimina un curso en Moodle vía REST API."""
         try:
-            await self.service.delete_courses([shortname])
+            result = await self.service.delete_courses([shortname])
+            if result is None:
+                logger.warning(f"Curso {shortname} no encontrado, no se eliminó")
+                return True
             logger.info(f"Curso eliminado: {shortname}")
             return True
         except Exception as e:
@@ -108,6 +105,10 @@ class MoodleIntegration:
     async def activate_course(self, shortname: str) -> bool:
         """Activa un curso oculto (visible=0 → 1) vía REST API."""
         try:
+            existing = await self.service.get_courses(shortname=shortname)
+            if not existing:
+                self.last_error = f"Curso no encontrado: {shortname}"
+                return False
             await self.service.update_courses([{
                 "shortname": shortname,
                 "visible": 1,
@@ -124,6 +125,10 @@ class MoodleIntegration:
     async def hide_course(self, shortname: str) -> bool:
         """Oculta un curso (visible=1 → 0) vía REST API."""
         try:
+            existing = await self.service.get_courses(shortname=shortname)
+            if not existing:
+                self.last_error = f"Curso no encontrado: {shortname}"
+                return False
             await self.service.update_courses([{
                 "shortname": shortname,
                 "visible": 0,
@@ -167,7 +172,14 @@ class MoodleIntegration:
     # ------------------------------------------------------------------
     async def find_user_by_email(self, email: str) -> Optional[Dict]:
         """Busca un usuario en Moodle por su email vía REST API."""
-        users = await self.service.get_users("email", [email])
+        try:
+            users = await self.service.get_users("email", [email])
+        except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(_extract_error(e)[:200])
+            self.last_error = _extract_error(e)
+            logger.exception(f"Error al buscar usuario por email {email}: {self.last_error}")
+            return None
         if len(users) > 1:
             logger.warning(
                 f"Múltiples usuarios con el mismo email {email}: "
@@ -188,7 +200,14 @@ class MoodleIntegration:
         clean = [e.strip().lower() for e in emails if e and e.strip()]
         if not clean:
             return result
-        users = await self.service.get_users("email", clean)
+        try:
+            users = await self.service.get_users("email", clean)
+        except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(_extract_error(e)[:200])
+            self.last_error = _extract_error(e)
+            logger.exception(f"Error al buscar usuarios por email en lote: {self.last_error}")
+            return result
         for u in users:
             email = (u.get("email") or "").strip().lower()
             if email:
@@ -271,8 +290,8 @@ class MoodleIntegration:
                     existing = await self.find_user_by_email(email)
                     if existing:
                         return existing.get("username", username_esperado), False
-                except Exception:
-                    pass
+                except Exception as recovery_err:
+                    logger.warning(f"Recovery falló para usuario duplicado {username_esperado}: {recovery_err}")
                 return username_esperado, False
             self.last_error = _extract_error(e)
             logger.exception(f"Error al crear usuario {username_esperado}: {self.last_error}")
@@ -284,6 +303,7 @@ class MoodleIntegration:
         Matricula un profesor en un curso por su username.
         Si course_map (shortname→id) se provee, se reutiliza sin
         llamadas extra a la API (optimizacion para ETL).
+        El parámetro courses solo se usa cuando course_map es None.
 
         Returns:
             Dict con: success (bool), username (str), reason (str)
@@ -295,6 +315,14 @@ class MoodleIntegration:
                 "role": "editingteacher",
             }], course_map=course_map, courses=courses)
             if not result["success"]:
+                error_codes = result.get("error_codes", [])
+                if "alreadyenrolled" in error_codes:
+                    logger.info(f"Usuario {username} ya matriculado en {course_shortname}, omitiendo")
+                    return {
+                        "success": True,
+                        "username": username,
+                        "reason": "already_enrolled",
+                    }
                 err = result.get("errors", ["error desconocido"])[0]
                 return {
                     "success": False,

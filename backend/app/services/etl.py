@@ -10,6 +10,7 @@ import logging
 from typing import Any, Dict
 
 from app.services.parsers.factory import ParserFactory
+from app.services.error_messages import translate_error
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +18,12 @@ logger = logging.getLogger(__name__)
 class ETLService:
     """Fachada que orquesta la lectura y parseo del Excel según la modalidad."""
 
-    @classmethod
-    def process(cls, file_path: str, modalidad: str) -> Dict[str, Any]:
-        parser_cls = ParserFactory.get_parser(modalidad)
-        df = parser_cls.read_excel(file_path)
-        return parser_cls.parse(df, modalidad)
+    @staticmethod
+    def process(file_path: str, modalidad: str) -> Dict[str, Any]:
+        try:
+            parser_cls = ParserFactory.get_parser(modalidad)
+            df = parser_cls.read_excel(file_path)
+            return parser_cls.parse(df, modalidad)
+        except Exception as e:
+            logger.exception(f"Error procesando archivo ETL {file_path}: {translate_error(e)}")
+            raise

@@ -18,6 +18,8 @@ export interface Execution {
   duration_seconds: number | null;
   modalidad: string | null;
   moodle_version?: string | null;
+  report_dir?: string | null;
+  celery_task_id?: string | null;
   created_at: string;
 }
 

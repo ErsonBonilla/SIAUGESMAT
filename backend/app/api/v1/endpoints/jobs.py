@@ -12,12 +12,14 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
+from app.celery_app import celery_app
 from app.repositories.execution_repo import (
+    atomic_mark_queued,
+    cancel_execution,
     delete_execution,
     get_execution,
     get_execution_errors,
     list_executions,
-    mark_queued,
     pause_execution,
 )
 from app.schemas.job import (
@@ -79,11 +81,22 @@ async def start_process(
             detail="No se pudo encolar la tarea de procesamiento.",
         )
 
-    mark_queued(db, execution_id)
+    # Atomic: check status + update + save task_id en un solo UPDATE
+    ALLOWED = ("pending", "failed", "queued", "review_required", "paused")
+    if not atomic_mark_queued(db, execution_id, job.id, ALLOWED):
+        # Otro request ya ganó la carrera — revocar task y responder 409
+        try:
+            celery_app.control.revoke(job.id)
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La ejecución ya fue procesada por otra solicitud concurrente.",
+        )
 
     logger.info(
         f"Tarea encolada para ejecución {execution_id}: task_id={job.id} "
-        f"por {current_user.username} (mode={execution.mode})"
+        f"por {current_user.username} (modo={execution.mode})"
     )
 
     return ProcessResponse(
@@ -108,16 +121,6 @@ async def get_execution_endpoint(
     if not execution:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Ejecución no encontrada.")
-
-    # Calcular ETA si está running y tiene datos suficientes
-    if execution.status == "running" and execution.progress_pct and execution.progress_updated_at:
-        pct = execution.progress_pct
-        elapsed = (datetime.now(timezone.utc) - execution.progress_updated_at).total_seconds()
-        if elapsed > 10 and pct > 0:
-            rate = pct / elapsed
-            if rate > 0:
-                eta = (100 - pct) / rate
-                execution.eta_seconds = eta if eta < 86400 else None
 
     return execution
 
@@ -223,16 +226,7 @@ async def confirm_mass_delete(
             detail="No se puede procesar una ejecución de modalidad PRESENCIAL.",
         )
 
-    # Marcar como confirmado en el checkpoint
-    if execution.phase_checkpoint is None:
-        execution.phase_checkpoint = {}
-    execution.phase_checkpoint["delete_confirmed"] = True
-    flag_modified(execution, "phase_checkpoint")
-    execution.status = "pending"
-    execution.current_phase = "Eliminación masiva confirmada"
-    execution.progress_pct = 30
-    db.commit()
-
+    # 1. Validar archivo PRIMERO
     file_path = os.path.join(settings.UPLOAD_DIR, execution.filename)
     if not os.path.isfile(file_path):
         raise HTTPException(
@@ -240,6 +234,7 @@ async def confirm_mass_delete(
             detail="El archivo asociado a la ejecución no se encuentra en el servidor.",
         )
 
+    # 2. Encolar Celery task
     try:
         job = process_etl_file.delay(execution_id, file_path, execution.semester)
     except Exception:
@@ -249,7 +244,17 @@ async def confirm_mass_delete(
             detail="No se pudo encolar la tarea de procesamiento.",
         )
 
-    mark_queued(db, execution_id)
+    # 3. Actualizar DB en un solo commit atómico
+    if execution.phase_checkpoint is None:
+        execution.phase_checkpoint = {}
+    execution.phase_checkpoint["delete_confirmed"] = True
+    flag_modified(execution, "phase_checkpoint")
+    execution.status = "pending"
+    execution.current_phase = "Eliminación masiva confirmada"
+    execution.progress_pct = 30
+    execution.celery_task_id = job.id
+    execution.started_at = datetime.now(timezone.utc)
+    db.commit()
 
     logger.info(
         f"Eliminación masiva confirmada para ejecución {execution_id} "
@@ -297,4 +302,48 @@ async def pause_execution_endpoint(
         job_id="",
         status="paused",
         message="Ejecución pausada. Usa /process para continuar.",
+    )
+
+
+@router.post(
+    "/{execution_id}/cancel",
+    response_model=ProcessResponse,
+    summary="Cancelar una ejecución",
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def cancel_execution_endpoint(
+    execution_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserInToken = Depends(get_current_user),
+):
+    execution = get_execution(db, execution_id)
+    if not execution:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Ejecución no encontrada.")
+
+    if execution.status not in ("running", "paused", "queued"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"La ejecución está en estado '{execution.status}'. "
+                   f"Solo se puede cancelar ejecuciones en 'running', 'paused' o 'queued'.",
+        )
+
+    success, task_id = cancel_execution(db, execution_id)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="No se pudo cancelar la ejecución.")
+
+    if task_id:
+        try:
+            celery_app.control.revoke(task_id)
+            logger.info(f"Tarea Celery {task_id} revocada para ejecución {execution_id}")
+        except Exception as e:
+            logger.warning(f"No se pudo revocar tarea {task_id}: {e}")
+
+    logger.info(f"Ejecución {execution_id} cancelada por {current_user.username}")
+    return ProcessResponse(
+        execution_id=execution_id,
+        job_id=task_id,
+        status="cancelled",
+        message="Ejecución cancelada.",
     )

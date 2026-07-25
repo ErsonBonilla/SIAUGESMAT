@@ -7,8 +7,9 @@ y proporcionar valores tipados y validados a todos los módulos.
 
 import os
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,9 +31,18 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Moodle
     # ------------------------------------------------------------------
-    # La URL, token y versión se definen por modalidad como variables
-    # de entorno con el formato MOODLE_URL__{MODALIDAD}, MOODLE_TOKEN__{MODALIDAD},
-    # MOODLE_VERSION__{MODALIDAD} (ej. MOODLE_URL__PRESENCIAL).
+    # URL, token y versión base (fallback si no existe por modalidad)
+    MOODLE_URL: str = ""
+    MOODLE_ADMIN_TOKEN: str = ""
+    MOODLE_VERSION: str = "3.9"
+
+    # Configuración por modalidad (opcional, sobreescribe la base)
+    MOODLE_URL__PRESENCIAL: Optional[str] = None
+    MOODLE_TOKEN__PRESENCIAL: Optional[str] = None
+    MOODLE_VERSION__PRESENCIAL: Optional[str] = None
+    MOODLE_URL__DISTANCIA: Optional[str] = None
+    MOODLE_TOKEN__DISTANCIA: Optional[str] = None
+    MOODLE_VERSION__DISTANCIA: Optional[str] = None
 
     # Rate limiting para la API de Moodle
     MOODLE_MAX_REQUESTS_PER_SECOND: int = 5         # llamadas por segundo
@@ -117,37 +127,40 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="allow",
+        extra="forbid",
     )
 
     def get_moodle_config(self, modalidad: str) -> Dict[str, str]:
-        """
-        Resuelve URL, token y versión de Moodle para una modalidad.
-
-        Busca variables de entorno con el formato:
-          MOODLE_URL__{MODALIDAD}
-          MOODLE_TOKEN__{MODALIDAD}
-          MOODLE_VERSION__{MODALIDAD}
-
-        Raises:
-            ValueError: Si alguna variable de entorno no está configurada.
-        """
         suffix = modalidad.strip().upper()
 
-        def _get(key: str) -> str:
-            val = os.environ.get(key)
+        def _get(base_key: str) -> str:
+            modal_key = f"{base_key}__{suffix}"
+            val = getattr(self, modal_key, None) or getattr(self, base_key, None)
             if not val:
                 raise ValueError(
-                    f"{key} no está configurada en el .env para la modalidad '{modalidad}'. "
+                    f"{modal_key} no está configurada para la modalidad '{modalidad}'. "
                     f"Defínela como variable de entorno."
                 )
             return val
 
         return {
-            "url": _get(f"MOODLE_URL__{suffix}"),
-            "token": _get(f"MOODLE_TOKEN__{suffix}"),
-            "version": _get(f"MOODLE_VERSION__{suffix}"),
+            "url": _get("MOODLE_URL"),
+            "token": _get("MOODLE_ADMIN_TOKEN"),
+            "version": _get("MOODLE_VERSION"),
         }
+
+    def validate_critical(self):
+        errors = []
+        if not self.DATABASE_URL:
+            errors.append("DATABASE_URL no está configurada")
+        if not self.REDIS_URL:
+            errors.append("REDIS_URL no está configurada")
+        if not self.JWT_SECRET_KEY:
+            errors.append("JWT_SECRET_KEY no está configurada")
+        if errors:
+            raise ValueError(
+                "Errores de configuración crítica:\n  - " + "\n  - ".join(errors)
+            )
 
 
 # Instancia única de configuración para toda la aplicación

@@ -20,7 +20,14 @@ from app.db.base import Base
 
 # Importar todos los modelos para que se registren en Base.metadata
 # (no eliminar estos imports aunque parezcan no usados)
-from app.db.models import ErrorLog, Execution  # noqa: F401
+from app.db.models import (  # noqa: F401
+    ErrorLog,
+    Execution,
+    ExecutionLog,
+    OperationBatch,
+    OperationItem,
+    QueryResult,
+)
 
 # Obtener la configuración de Alembic
 config = context.config
