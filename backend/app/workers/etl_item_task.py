@@ -2,6 +2,8 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
+from sqlalchemy import func
+
 from app.celery_app import celery_app
 from app.core.config import settings
 from app.db.session import SessionLocal
@@ -148,6 +150,7 @@ def process_etl_item(self, item_id: int):
                 update_item(db, item.id, "failed", error)
                 _handle_error(db, execution_id, action, identifier, error)
             db.commit()
+            _refresh_phase_progress(db, execution_id)
 
         try:
             asyncio.run(_execute())
@@ -161,6 +164,7 @@ def process_etl_item(self, item_id: int):
             update_item(db, item.id, "failed", translate_error(e))
             _handle_error(db, execution_id, action, identifier, translate_error(e))
             db.commit()
+            _refresh_phase_progress(db, execution_id)
 
     except MoodleOverloadedError:
         raise
@@ -172,6 +176,26 @@ def process_etl_item(self, item_id: int):
             pass
     finally:
         db.close()
+
+
+def _refresh_phase_progress(db, execution_id):
+    from app.db.models import Execution, OperationItem
+    total = db.query(func.count(OperationItem.id)).filter(
+        OperationItem.batch_id.like(f"etl_%_{execution_id}")
+    ).scalar()
+    if not total:
+        return
+    done = db.query(func.count(OperationItem.id)).filter(
+        OperationItem.batch_id.like(f"etl_%_{execution_id}"),
+        OperationItem.status.in_(["completed", "failed"]),
+    ).scalar()
+    ratio = done / total
+    pct = round(34.0 + ratio * 28.0, 1)
+    ex = db.query(Execution).filter(Execution.id == execution_id).first()
+    if ex and (ex.progress_pct is None or pct > ex.progress_pct):
+        ex.progress_pct = pct
+        ex.progress_updated_at = datetime.now(timezone.utc)
+        db.commit()
 
 
 def _log_success(db, execution_id, action, identifier, detail):
