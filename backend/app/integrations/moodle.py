@@ -11,7 +11,7 @@ gestión de usuarios y matriculación.
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.services.moodle import MoodleAPIError, MoodleService
+from app.services.moodle import MoodleAPIError, MoodleOverloadedError, MoodleService, is_moodle_overloaded
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +86,8 @@ class MoodleIntegration:
                     logger.info(f"Plantilla {template_id} importada a {shortname}")
             return True
         except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(_extract_error(e)[:200])
             logger.exception(f"Error al crear curso {shortname}: {e}")
             self.last_error = _extract_error(e)
             return False
@@ -97,6 +99,8 @@ class MoodleIntegration:
             logger.info(f"Curso eliminado: {shortname}")
             return True
         except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(_extract_error(e)[:200])
             logger.exception(f"Error al eliminar curso {shortname}: {e}")
             self.last_error = _extract_error(e)
             return False
@@ -111,6 +115,8 @@ class MoodleIntegration:
             logger.info(f"Curso activado: {shortname}")
             return True
         except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(_extract_error(e)[:200])
             logger.exception(f"Error al activar curso {shortname}: {e}")
             self.last_error = _extract_error(e)
             return False
@@ -125,6 +131,8 @@ class MoodleIntegration:
             logger.info(f"Curso oculto: {shortname}")
             return True
         except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(_extract_error(e)[:200])
             logger.exception(f"Error al ocultar curso {shortname}: {e}")
             self.last_error = _extract_error(e)
             return False
@@ -148,6 +156,8 @@ class MoodleIntegration:
             logger.info(f"Curso renombrado: {old_shortname} → {new_shortname}")
             return True
         except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(_extract_error(e)[:200])
             logger.exception(f"Error al renombrar curso {old_shortname}: {e}")
             self.last_error = _extract_error(e)
             return False
@@ -216,6 +226,8 @@ class MoodleIntegration:
         try:
             existing = await self.find_user_by_email(email)
         except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(_extract_error(e)[:200])
             self.last_error = _extract_error(e)
             logger.exception(f"Error al buscar usuario por email {email}: {self.last_error}")
             return None, False
@@ -227,6 +239,8 @@ class MoodleIntegration:
             try:
                 existing_by_personal = await self.find_user_by_email(email_personal)
             except Exception as e:
+                if is_moodle_overloaded(e):
+                    raise MoodleOverloadedError(_extract_error(e)[:200])
                 self.last_error = _extract_error(e)
                 logger.exception(f"Error al buscar usuario por email personal {email_personal}: {self.last_error}")
                 return None, False
@@ -249,6 +263,17 @@ class MoodleIntegration:
             logger.info(f"Usuario creado: {username_esperado}")
             return username_esperado, True
         except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(_extract_error(e)[:200])
+            if getattr(e, 'error_code', None) == "duplicateuser":
+                logger.info(f"Usuario {username_esperado} ya existe (race condition), recuperando ID")
+                try:
+                    existing = await self.find_user_by_email(email)
+                    if existing:
+                        return existing.get("username", username_esperado), False
+                except Exception:
+                    pass
+                return username_esperado, False
             self.last_error = _extract_error(e)
             logger.exception(f"Error al crear usuario {username_esperado}: {self.last_error}")
             return None, False
@@ -282,6 +307,8 @@ class MoodleIntegration:
                 "reason": "enrolled",
             }
         except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(_extract_error(e)[:200])
             self.last_error = _extract_error(e)
             return {
                 "success": False,

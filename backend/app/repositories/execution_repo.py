@@ -186,6 +186,16 @@ def pause_execution(db, execution_id: int) -> bool:
     return True
 
 
+def increment_metric(db, execution_id: int, metric_name: str, delta: int = 1):
+    execution = db.query(Execution).filter(Execution.id == execution_id).first()
+    if execution:
+        metrics = execution.metrics or {}
+        metrics[metric_name] = metrics.get(metric_name, 0) + delta
+        execution.metrics = metrics
+        flag_modified(execution, "metrics")
+        db.commit()
+
+
 def _should_pause(db, execution_id: int) -> bool:
     """Verifica si la ejecución fue puesta en pausa (uso interno en las fases)."""
     execution = db.query(Execution).filter(Execution.id == execution_id).first()

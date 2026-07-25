@@ -21,7 +21,6 @@ router = APIRouter()
 
 MAX_FILE_SIZE_MB = 50
 ALLOWED_EXTENSIONS = {".xlsx"}
-ALLOWED_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 ALLOWED_MODES = {"courses", "users", "both"}
 
 
@@ -66,10 +65,6 @@ async def upload_excel(
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
                             detail=f"Extensión no permitida: '{ext}'.")
-
-    if file.content_type != ALLOWED_CONTENT_TYPE:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                            detail="Tipo de contenido no permitido.")
 
     file_bytes = await file.read()
     file_size_mb = len(file_bytes) / (1024 * 1024)
