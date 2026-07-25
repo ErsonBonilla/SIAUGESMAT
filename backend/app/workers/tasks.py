@@ -38,7 +38,7 @@ from app.services.error_messages import translate_error
 from app.services.etl import ETLService
 from app.services.moodle import MoodleService
 from app.services.reports import ReportService
-from app.workers.phases.base import PhaseContext
+from app.workers.phases.base import PhaseContext, MoodleOverloadedError
 from app.workers.phases.phase1_consult import ConsultPhase
 from app.workers.phases.phase2_analyze import AnalyzePhase
 from app.workers.phases.phase3_structure import StructurePhase
@@ -52,7 +52,7 @@ PROGRESS_START = [0, 20, 40, 65]
 PROGRESS_RESTORE = [12, 30, 52, 74]
 
 
-@celery_app.task(bind=True, max_retries=10, default_retry_delay=60)
+@celery_app.task(bind=True, autoretry_for=(MoodleOverloadedError,), max_retries=10, default_retry_delay=60)
 def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> None:
     db = SessionLocal()
     start_time = time.monotonic()

@@ -8,7 +8,7 @@ from app.repositories import log_repo
 from app.repositories.execution_repo import update_progress, save_checkpoint, _should_pause
 from app.services.error_messages import translate_error
 from app.services.moodle import MoodleAPIError
-from app.workers.phases.base import BasePhase, PhaseContext
+from app.workers.phases.base import BasePhase, PhaseContext, MoodleOverloadedError
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class StructurePhase(BasePhase):
             """Si el error es transitorio, re-eleva para que Celery reintente."""
             if _is_moodle_overloaded(exception):
                 _save_progress(ctx.structure_progress or {})
-                raise
+                raise MoodleOverloadedError(str(exception)[:200])
 
         def _check_pause() -> bool:
             """Retorna True si la ejecución fue pausada (el caller debe salir)."""
@@ -177,8 +177,7 @@ class StructurePhase(BasePhase):
                             except Exception as e:
                                 if _is_moodle_overloaded(e):
                                     _save_progress({"batch_processed": processed, "batch_deleted": deleted})
-                                    raise
-                                logger.exception(f"Error en eliminación por lotes (lote {bi//BATCH_SIZE}): {e}")
+                                    raise MoodleOverloadedError(str(e)[:200])
                                 for cid in chunk:
                                     sn = id_to_sn.get(cid, str(cid))
                                     metrics["total_errors"] += 1
@@ -201,8 +200,7 @@ class StructurePhase(BasePhase):
                     except Exception as e:
                         if _is_moodle_overloaded(e):
                             _save_progress({"stage": "activate", "last_sn": sn})
-                            raise
-                        success = False
+                            raise MoodleOverloadedError(str(e)[:200])
                     if success:
                         metrics["courses_activated"] += 1
                         log_repo.save_log(db, eid, "3", "course_activated", sn, _course_detail(sn))
@@ -221,8 +219,7 @@ class StructurePhase(BasePhase):
                     except Exception as e:
                         if _is_moodle_overloaded(e):
                             _save_progress({"stage": "hide", "last_sn": sn})
-                            raise
-                        success = False
+                            raise MoodleOverloadedError(str(e)[:200])
                     if success:
                         metrics["courses_hidden"] += 1
                         log_repo.save_log(db, eid, "3", "course_hidden", sn, _course_detail(sn))
@@ -249,8 +246,7 @@ class StructurePhase(BasePhase):
                     except Exception as e:
                         if _is_moodle_overloaded(e):
                             _save_progress({"stage": "rename", "last_sn": sn})
-                            raise
-                        success = False
+                            raise MoodleOverloadedError(str(e)[:200])
                     if success:
                         log_repo.save_log(db, eid, "3", "course_renamed", sn, {
                             "old_shortname": item["old_shortname"],
@@ -320,8 +316,7 @@ class StructurePhase(BasePhase):
                     except Exception as e:
                         if _is_moodle_overloaded(e):
                             _save_progress({"stage": "create", "create_count": create_count})
-                            raise
-                        success = False
+                            raise MoodleOverloadedError(str(e)[:200])
                     if success:
                         metrics["courses_created"] += 1
                     else:

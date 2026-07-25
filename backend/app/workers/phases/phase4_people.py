@@ -6,7 +6,7 @@ import httpx
 from app.repositories import log_repo
 from app.repositories.execution_repo import update_progress, save_checkpoint, _should_pause
 from app.services.error_messages import translate_error
-from app.workers.phases.base import BasePhase, PhaseContext
+from app.workers.phases.base import BasePhase, PhaseContext, MoodleOverloadedError
 
 logger = logging.getLogger(__name__)
 
@@ -107,8 +107,7 @@ class PeoplePhase(BasePhase):
                     except Exception as e:
                         if _is_moodle_overloaded(e):
                             _save_progress({"stage": "users", "last_user": user.get("username", "")})
-                            raise
-                        username, created = None, False
+                            raise MoodleOverloadedError(str(e)[:200])
                     if _check_pause():
                         return
                     if username:
@@ -143,8 +142,7 @@ class PeoplePhase(BasePhase):
                     except Exception as e:
                         if _is_moodle_overloaded(e):
                             _save_progress({"stage": "enrol", "enrol_count": enrol_count})
-                            raise
-                        result = {"success": False, "username": enrol["username"], "reason": str(e)}
+                            raise MoodleOverloadedError(str(e)[:200])
                     if _check_pause():
                         return
                     if result["success"]:

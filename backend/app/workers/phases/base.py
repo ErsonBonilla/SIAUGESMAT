@@ -5,6 +5,10 @@ from app.integrations.moodle import MoodleIntegration
 from app.services.moodle import MoodleService
 
 
+class MoodleOverloadedError(Exception):
+    """El servidor de Moodle está sobrecargado. Celery reintentará la tarea."""
+
+
 class PhaseContext:
     def __init__(
         self,
