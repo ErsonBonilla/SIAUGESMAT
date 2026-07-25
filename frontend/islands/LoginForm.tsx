@@ -2,6 +2,7 @@ import { useSignal } from "@preact/signals";
 import { login } from "../services/api.ts";
 import { setToken, setTokenCookie } from "../utils/auth.ts";
 import { BuildingIcon, DeviceIcon, ExclamationCircleIcon } from "../utils/icons.tsx";
+import { MODALIDADES } from "../utils/constants.ts";
 import Button from "../components/Button.tsx";
 import Input from "../components/Input.tsx";
 
@@ -19,7 +20,10 @@ export default function LoginForm({ modalidad, onModalidadChange }: LoginFormPro
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
-    if (modalidad !== "DISTANCIA") return;
+    if (!MODALIDADES.includes(modalidad as typeof MODALIDADES[number])) {
+      error.value = "Modalidad no disponible.";
+      return;
+    }
     if (!username.value.trim() || !password.value.trim()) {
       error.value = "Ingrese su usuario y contraseña.";
       return;
