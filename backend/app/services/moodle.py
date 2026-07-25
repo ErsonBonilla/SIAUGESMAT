@@ -268,12 +268,11 @@ class MoodleService:
         return await self._request("core_course_create_categories", params)
 
     async def get_categories(self, idnumber: Optional[str] = None) -> List[Dict]:
-        """Busca categorías por idnumber (opcional)."""
-        params: Dict[str, str] = {}
+        """Busca categorías. Filtra localmente porque Moodle 3.9 ignora criteria."""
+        result = await self._request("core_course_get_categories", {})
         if idnumber:
-            params["criteria[0][key]"] = "idnumber"
-            params["criteria[0][value]"] = idnumber
-        return await self._request("core_course_get_categories", params)
+            return [c for c in result if c.get("idnumber") == idnumber]
+        return result
 
     async def delete_category(self, category_id: int, recursive: bool = True) -> Dict:
         """Elimina una categoría por ID. Si recursive=True, borra subcategorías y cursos."""
