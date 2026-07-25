@@ -186,10 +186,10 @@ async def delete_execution_endpoint(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Ejecución no encontrada.")
 
-    if execution.status not in ("pending", "failed", "review_required"):
+    if execution.status not in ("pending", "failed", "review_required", "cancelled", "queued"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Solo se pueden eliminar ejecuciones en estado 'pending', 'failed' o 'review_required'.",
+            detail="Solo se pueden eliminar ejecuciones en estado 'pending', 'failed', 'cancelled', 'queued' o 'review_required'.",
         )
 
     delete_execution(db, execution_id)

@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # URL, token y versión base (fallback si no existe por modalidad)
     MOODLE_URL: str = ""
-    MOODLE_ADMIN_TOKEN: str = ""
+    MOODLE_TOKEN: str = ""
+    MOODLE_ADMIN_TOKEN: str = ""  # alias legacy
     MOODLE_VERSION: str = "3.9"
 
     # Configuración por modalidad (opcional, sobreescribe la base)
@@ -133,19 +134,21 @@ class Settings(BaseSettings):
     def get_moodle_config(self, modalidad: str) -> Dict[str, str]:
         suffix = modalidad.strip().upper()
 
-        def _get(base_key: str) -> str:
-            modal_key = f"{base_key}__{suffix}"
-            val = getattr(self, modal_key, None) or getattr(self, base_key, None)
-            if not val:
-                raise ValueError(
-                    f"{modal_key} no está configurada para la modalidad '{modalidad}'. "
-                    f"Defínela como variable de entorno."
-                )
-            return val
+        def _get(*keys: str) -> str:
+            for base_key in keys:
+                modal_key = f"{base_key}__{suffix}"
+                val = getattr(self, modal_key, None) or getattr(self, base_key, None)
+                if val:
+                    return val
+            raise ValueError(
+                f"Ninguna variable configurada para la modalidad '{modalidad}'. "
+                f"Buscó: {[f'{k}__{suffix}' for k in keys]}. "
+                f"Defínela como variable de entorno."
+            )
 
         return {
             "url": _get("MOODLE_URL"),
-            "token": _get("MOODLE_ADMIN_TOKEN"),
+            "token": _get("MOODLE_TOKEN", "MOODLE_ADMIN_TOKEN"),
             "version": _get("MOODLE_VERSION"),
         }
 

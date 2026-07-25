@@ -459,6 +459,7 @@ class CourseComparisonService:
                     "detail": {"reason": "disappeared", "age_seconds": age},
                 })
             else:
+                to_hide.append(sn)
                 alerts.append({
                     "shortname": sn,
                     "reason": "disappeared_recent",
@@ -466,7 +467,7 @@ class CourseComparisonService:
                 })
                 logs.append({
                     "phase": "2",
-                    "action": "alert_disappeared_recent",
+                    "action": "course_disappeared_recent_hidden",
                     "identifier": sn,
                     "detail": {"reason": "disappeared_recent", "age_seconds": age},
                 })
