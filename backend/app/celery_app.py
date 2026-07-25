@@ -29,9 +29,9 @@ celery_app.conf.update(
     timezone="America/Bogota",
     enable_utc=True,
     task_time_limit=settings.JOB_TIMEOUT,
-    task_soft_time_limit=settings.JOB_TIMEOUT,
+    task_soft_time_limit=settings.JOB_TIMEOUT - 3600,  # 1h de aviso antes del hard kill
     task_acks_late=True,
-    broker_transport_options={"visibility_timeout": settings.JOB_TIMEOUT + 300},
+    broker_transport_options={"visibility_timeout": 3600},  # 1h, seguro con task_acks_late=True
     task_ignore_result=True,
     beat_schedule={
         "cleanup-pending-executions": {
