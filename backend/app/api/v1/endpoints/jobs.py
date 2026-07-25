@@ -4,6 +4,7 @@ Endpoints de gestión de ejecuciones (jobs) del proceso ETL.
 
 import logging
 import os
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -107,6 +108,17 @@ async def get_execution_endpoint(
     if not execution:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail="Ejecución no encontrada.")
+
+    # Calcular ETA si está running y tiene datos suficientes
+    if execution.status == "running" and execution.progress_pct and execution.progress_updated_at:
+        pct = execution.progress_pct
+        elapsed = (datetime.now(timezone.utc) - execution.progress_updated_at).total_seconds()
+        if elapsed > 10 and pct > 0:
+            rate = pct / elapsed
+            if rate > 0:
+                eta = (100 - pct) / rate
+                execution.eta_seconds = eta if eta < 86400 else None
+
     return execution
 
 

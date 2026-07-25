@@ -481,8 +481,8 @@ def _get_pending_items(db, execution_id, phase, sub_phase=None):
         OperationItem.status == "pending",
     )
     if sub_phase:
-        from sqlalchemy import text
-        query = query.filter(OperationItem.detail["action"].astext == sub_phase)
+        from sqlalchemy import text as sql_text
+        query = query.filter(sql_text("detail->>'action' = :action")).params(action=sub_phase)
     return query.all()
 
 

@@ -40,7 +40,9 @@ class ExecutionOut(BaseModel):
     errors_count: int = 0
     current_phase: Optional[str] = None
     progress_pct: Optional[float] = None
+    progress_updated_at: Optional[datetime] = None
     current_step: Optional[int] = None
+    eta_seconds: Optional[float] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     duration_seconds: Optional[float] = None

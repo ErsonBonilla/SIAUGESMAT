@@ -165,7 +165,7 @@ export default function JobDetailIsland({ executionId }: Props) {
 
       {["queued", "running", "paused"].includes(exec.status) && (
         <>
-          <ProgressBar currentPhase={exec.current_phase ?? null} currentStep={exec.current_step ?? null} progressPct={exec.progress_pct ?? 0} />
+          <ProgressBar currentPhase={exec.current_phase ?? null} currentStep={exec.current_step ?? null} progressPct={exec.progress_pct ?? 0} etaSeconds={exec.eta_seconds} />
           {exec.status === "running" && (
             <div class="flex justify-end mt-3">
               <button

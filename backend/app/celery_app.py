@@ -10,6 +10,7 @@ eager en el nivel superior.
 import logging
 
 from celery import Celery
+from celery.signals import after_setup_logger, task_failure
 
 from app.core.config import settings
 
@@ -78,8 +79,8 @@ celery_app.conf.update(
 # ---------------------------------------------------------------------------
 # DLQ (Dead Letter Queue): captura tareas que agotaron reintentos
 # ---------------------------------------------------------------------------
-@celery_app.on_setup_logging.connect
-def setup_dlq_handler(**kwargs):
+@after_setup_logger.connect
+def setup_dlq_handler(logger, **kwargs):
     """Agrega un handler que registra tareas fallidas permanentemente."""
     dlq_logger = logging.getLogger("celery.dlq")
     dlq_logger.setLevel(logging.WARNING)
@@ -90,7 +91,7 @@ def setup_dlq_handler(**kwargs):
     dlq_logger.addHandler(handler)
 
 
-@celery_app.task_failure.connect
+@task_failure.connect
 def on_task_failure(sender, task_id, exception, args, kwargs, traceback, einfo, **kw):
     """Callback global cuando una tarea agota todos sus reintentos.
     Registra la tarea, sus argumentos y el error final en el logger DLQ."""
