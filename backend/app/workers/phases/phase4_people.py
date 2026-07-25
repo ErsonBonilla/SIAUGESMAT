@@ -1,12 +1,28 @@
 import logging
 from typing import Dict
 
+import httpx
+
 from app.repositories import log_repo
 from app.repositories.execution_repo import update_progress, save_checkpoint, _should_pause
 from app.services.error_messages import translate_error
 from app.workers.phases.base import BasePhase, PhaseContext
 
 logger = logging.getLogger(__name__)
+
+CHECKPOINT_INTERVAL = 100
+
+
+def _is_moodle_overloaded(e: BaseException) -> bool:
+    """Retorna True si el error es transitorio (servidor sobrecargado o timeout)."""
+    if isinstance(e, httpx.HTTPStatusError):
+        return e.response.status_code in (502, 503, 504)
+    if isinstance(e, httpx.ConnectError):
+        return True
+    if isinstance(e, httpx.ReadTimeout):
+        return True
+    msg = str(e).lower()
+    return any(kw in msg for kw in ("gateway time-out", "connect error", "read timeout", "connection refused"))
 
 CHECKPOINT_INTERVAL = 100
 
@@ -41,6 +57,15 @@ class PeoplePhase(BasePhase):
                 return True
             return False
 
+        def _save_progress(data: dict):
+            """Guarda progreso parcial sin marcar la fase como completada."""
+            ctx.people_progress = data
+            save_checkpoint(db, eid, "4", {
+                "metrics": dict(metrics),
+                "username_map": ctx.username_map,
+                "people_progress": data,
+            })
+
         def _do_courses() -> bool:
             return mode in ("courses", "both")
 
@@ -67,7 +92,13 @@ class PeoplePhase(BasePhase):
         try:
             if _do_users() and ctx.users_to_create:
                 for user in ctx.users_to_create:
-                    username, created = await integration.create_user_if_not_exists(user)
+                    try:
+                        username, created = await integration.create_user_if_not_exists(user)
+                    except Exception as e:
+                        if _is_moodle_overloaded(e):
+                            _save_progress({"stage": "users", "last_user": user.get("username", "")})
+                            raise
+                        username, created = None, False
                     if _check_pause():
                         return
                     if username:
@@ -94,10 +125,16 @@ class PeoplePhase(BasePhase):
                 total_enrol = len(ctx.resolved_enrolments)
                 enrol_count = 0
                 for enrol in ctx.resolved_enrolments:
-                    result = await integration.enrol_teacher(
-                        enrol["username"], enrol["course_shortname"],
-                        course_map=course_map,
-                    )
+                    try:
+                        result = await integration.enrol_teacher(
+                            enrol["username"], enrol["course_shortname"],
+                            course_map=course_map,
+                        )
+                    except Exception as e:
+                        if _is_moodle_overloaded(e):
+                            _save_progress({"stage": "enrol", "enrol_count": enrol_count})
+                            raise
+                        result = {"success": False, "username": enrol["username"], "reason": str(e)}
                     if _check_pause():
                         return
                     if result["success"]:
