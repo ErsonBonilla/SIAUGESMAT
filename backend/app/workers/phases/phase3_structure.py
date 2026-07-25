@@ -120,11 +120,11 @@ class StructurePhase(BasePhase):
                                         deleted += 1
                                     processed += 1
                             except Exception as e:
-                                logger.exception(f"Error en batch delete (lote {bi//BATCH_SIZE}): {e}")
+                                logger.exception(f"Error en eliminación por lotes (lote {bi//BATCH_SIZE}): {e}")
                                 for cid in chunk:
                                     sn = id_to_sn.get(cid, str(cid))
                                     metrics["total_errors"] += 1
-                                    log_repo.save_error(db, eid, "3", sn, f"Error batch delete: {sn}")
+                                    log_repo.save_error(db, eid, "3", sn, f"Error al eliminar curso: {sn}")
                                     processed += 1
                             if processed % 200 == 0 or (bi + BATCH_SIZE >= len(batch_ids)):
                                 msg = f"Eliminando cursos… ({deleted}/{total_del})"
