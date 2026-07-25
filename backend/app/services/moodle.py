@@ -58,6 +58,8 @@ class MoodleAPIError(Exception):
         "duplicatedshortname", "alreadyenrolled", "enrolmentnotfound",
         "notenrolled", "cannotdeletecategory", "cannotdeletecourse",
         "couldnotassignrole", "missingcapability", "duplicateuser",
+        "invalidcoursemodule", "storedfilenotcreated",
+        "valueofparamelementnotset",
     })
 
     # Mapa de códigos de error de Moodle a mensajes en español
