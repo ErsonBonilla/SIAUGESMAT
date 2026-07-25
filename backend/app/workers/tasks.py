@@ -31,6 +31,7 @@ from app.repositories.execution_repo import (
     save_checkpoint,
     set_report_dir,
     update_progress,
+    _should_pause,
 )
 from app.repositories.log_repo import save_error
 from app.services.error_messages import translate_error
@@ -98,6 +99,12 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
 
             for i, phase in enumerate(PHASES):
                 phase_name = PHASE_NAMES[i]
+
+                if _should_pause(db, execution_id):
+                    update_progress(db, execution_id, PROGRESS_RESTORE[i - 1] if i > 0 else 12,
+                                    f"FASE {phase_name} pausada")
+                    logger.info(f"FASE {phase_name}: pausada por el usuario")
+                    return ctx.metrics
 
                 if phase_name in checkpoint:
                     _restore_checkpoint(ctx, checkpoint[phase_name], phase_name)

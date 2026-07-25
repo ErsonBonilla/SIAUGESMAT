@@ -2,7 +2,7 @@ import logging
 from typing import Dict
 
 from app.repositories import log_repo
-from app.repositories.execution_repo import update_progress
+from app.repositories.execution_repo import update_progress, save_checkpoint, _should_pause
 from app.services.error_messages import translate_error
 from app.workers.phases.base import BasePhase, PhaseContext
 
@@ -29,6 +29,17 @@ class PeoplePhase(BasePhase):
             ops_count += 1
             if ops_count % CHECKPOINT_INTERVAL == 0:
                 ctx.people_progress = {"ops_completed": ops_count}
+
+        def _check_pause() -> bool:
+            """Retorna True si la ejecución fue pausada (el caller debe salir)."""
+            if _should_pause(db, eid):
+                save_checkpoint(db, eid, "4", {
+                    "metrics": dict(metrics),
+                    "username_map": ctx.username_map,
+                    "people_progress": ctx.people_progress,
+                })
+                return True
+            return False
 
         def _do_courses() -> bool:
             return mode in ("courses", "both")
@@ -57,6 +68,8 @@ class PeoplePhase(BasePhase):
             if _do_users() and ctx.users_to_create:
                 for user in ctx.users_to_create:
                     username, created = await integration.create_user_if_not_exists(user)
+                    if _check_pause():
+                        return
                     if username:
                         if created:
                             metrics["users_created"] += 1
@@ -85,6 +98,8 @@ class PeoplePhase(BasePhase):
                         enrol["username"], enrol["course_shortname"],
                         course_map=course_map,
                     )
+                    if _check_pause():
+                        return
                     if result["success"]:
                         metrics["enrolments"] += 1
                         log_repo.save_log(db, eid, "4", "enrolment_ok",

@@ -20,6 +20,7 @@ export const STATUS_COLORS: Record<string, string> = {
   running: "status-blue",
   queued: "status-yellow",
   pending: "status-yellow",
+  paused: "status-blue",
   failed: "status-red",
   review_required: "status-orange",
 };
@@ -29,6 +30,7 @@ export const STATUS_LABELS: Record<string, string> = {
   running: "En ejecución",
   queued: "Encolado",
   pending: "Pendiente",
+  paused: "Pausado",
   failed: "Fallido",
   review_required: "Revisión requerida",
 };

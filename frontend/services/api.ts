@@ -11,6 +11,7 @@ export {
   uploadFile,
   startProcess,
   confirmExecution,
+  pauseExecution,
   getExecution,
   listExecutions,
   getExecutionErrors,

@@ -5,7 +5,7 @@ import ProgressBar from "../components/ProgressBar.tsx";
 import ReportsSection from "../components/ReportsSection.tsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
-import { getExecution, getExecutionErrors, confirmExecution, type Execution, type ErrorLog } from "../services/api.ts";
+import { getExecution, getExecutionErrors, confirmExecution, pauseExecution, type Execution, type ErrorLog } from "../services/api.ts";
 import { formatDateTime, formatDuration } from "../utils/date.ts";
 import { toast } from "../utils/toast.ts";
 import { STATUS_COLORS, STATUS_LABELS, MODE_LABELS } from "../utils/constants.ts";
@@ -45,6 +45,7 @@ export default function JobDetailIsland({ executionId }: Props) {
   const errorMsg = useSignal("");
   const errorPage = useSignal(0);
   const confirming = useSignal(false);
+  const pausing = useSignal(false);
 
   useEffect(() => {
     (async () => {
@@ -157,8 +158,43 @@ export default function JobDetailIsland({ executionId }: Props) {
         </div>
       )}
 
-      {["queued", "running"].includes(exec.status) && (
-        <ProgressBar currentPhase={exec.current_phase ?? null} currentStep={exec.current_step ?? null} progressPct={exec.progress_pct ?? 0} />
+      {["queued", "running", "paused"].includes(exec.status) && (
+        <>
+          <ProgressBar currentPhase={exec.current_phase ?? null} currentStep={exec.current_step ?? null} progressPct={exec.progress_pct ?? 0} />
+          {exec.status === "running" && (
+            <div class="flex justify-end mt-3">
+              <button
+                onClick={async () => {
+                  pausing.value = true;
+                  try {
+                    await pauseExecution(exec.id);
+                    toast("Ejecución pausada", "success");
+                    setTimeout(() => globalThis.location.reload(), 1000);
+                  } catch (e) {
+                    toast(e instanceof Error ? e.message : "Error al pausar", "error");
+                  } finally {
+                    pausing.value = false;
+                  }
+                }}
+                disabled={pausing.value}
+                class="px-4 py-1.5 text-sm font-medium text-[var(--accent)] border border-[var(--accent)] rounded-lg hover:bg-[var(--accent)] hover:text-white transition disabled:opacity-50"
+              >
+                {pausing.value ? "Pausando..." : "⏸ Pausar"}
+              </button>
+            </div>
+          )}
+          {exec.status === "paused" && (
+            <div class="bg-blue-50 border border-blue-300 rounded-xl p-4 mt-4 text-center">
+              <p class="text-blue-800 font-medium mb-2">Ejecución pausada</p>
+              <a
+                href={`/operaciones/ejecuciones`}
+                class="text-sm text-[var(--accent)] hover:underline"
+              >
+                Volver a ejecuciones para continuar
+              </a>
+            </div>
+          )}
+        </>
       )}
 
       {exec.status === "completed" && (

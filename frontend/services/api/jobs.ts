@@ -65,3 +65,11 @@ export async function confirmExecution(executionId: number) {
   });
   return handleResponse<{ execution_id: number; job_id: string; status: string; message: string }>(response);
 }
+
+export async function pauseExecution(executionId: number) {
+  const response = await fetch(`${BASE_URL}/jobs/${executionId}/pause`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<{ execution_id: number; job_id: string; status: string; message: string }>(response);
+}
