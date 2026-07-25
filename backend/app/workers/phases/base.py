@@ -1,35 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Set
 
-import httpx
-
 from app.integrations.moodle import MoodleIntegration
-from app.services.moodle import MoodleAPIError, MoodleService
-
-
-class MoodleOverloadedError(Exception):
-    """El servidor de Moodle está sobrecargado. Celery reintentará la tarea."""
-
-
-def is_moodle_overloaded(e: BaseException) -> bool:
-    """Retorna True si el error es transitorio (servidor sobrecargado, timeout, o errores DB de Moodle)."""
-    if isinstance(e, httpx.HTTPStatusError):
-        return e.response.status_code in (502, 503, 504)
-    if isinstance(e, httpx.ConnectError):
-        return True
-    if isinstance(e, httpx.ReadTimeout):
-        return True
-    inner = e
-    if hasattr(e, 'last_attempt'):
-        try:
-            inner = e.last_attempt.exception() or inner
-        except Exception:
-            pass
-    if isinstance(inner, MoodleAPIError):
-        if inner.error_code in ("invalidrecord", "storedfilenotcreated", "invalidcoursemodule"):
-            return True
-    msg = str(e).lower()
-    return any(kw in msg for kw in ("gateway time-out", "connect error", "read timeout", "connection refused"))
+from app.services.moodle import MoodleOverloadedError, MoodleService
 
 
 class PhaseContext:
