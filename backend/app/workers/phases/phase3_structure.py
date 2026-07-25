@@ -1,43 +1,14 @@
 import logging
 from typing import Dict
 
-import httpx
-
 from app.core.config import settings
 from app.repositories import log_repo
 from app.repositories.execution_repo import update_progress, save_checkpoint, _should_pause
 from app.services.error_messages import translate_error
 from app.services.moodle import MoodleAPIError
-from app.workers.phases.base import BasePhase, PhaseContext, MoodleOverloadedError
+from app.workers.phases.base import BasePhase, PhaseContext, MoodleOverloadedError, is_moodle_overloaded
 
 logger = logging.getLogger(__name__)
-
-CHECKPOINT_INTERVAL = 100
-
-
-def _is_moodle_overloaded(e: BaseException) -> bool:
-    """Retorna True si el error es transitorio (servidor sobrecargado, timeout, o errores DB de Moodle)."""
-    # Errores HTTP
-    if isinstance(e, httpx.HTTPStatusError):
-        return e.response.status_code in (502, 503, 504)
-    if isinstance(e, httpx.ConnectError):
-        return True
-    if isinstance(e, httpx.ReadTimeout):
-        return True
-    # MoodleAPIError con códigos que indican inestabilidad del servidor
-    from app.services.moodle import MoodleAPIError
-    inner = e
-    # Extraer MoodleAPIError de RetryError si es necesario
-    if hasattr(e, 'last_attempt'):
-        try:
-            inner = e.last_attempt.exception() or inner
-        except Exception:
-            pass
-    if isinstance(inner, MoodleAPIError):
-        if inner.error_code in ("invalidrecord", "storedfilenotcreated", "invalidcoursemodule"):
-            return True
-    msg = str(e).lower()
-    return any(kw in msg for kw in ("gateway time-out", "connect error", "read timeout", "connection refused"))
 
 CHECKPOINT_INTERVAL = 100
 
@@ -80,12 +51,6 @@ class StructurePhase(BasePhase):
                 })
                 return True
             return False
-
-        def _re_raise_if_overloaded(exception: Exception):
-            """Si el error es transitorio, re-eleva para que Celery reintente."""
-            if _is_moodle_overloaded(exception):
-                _save_progress(ctx.structure_progress or {})
-                raise MoodleOverloadedError(str(exception)[:200])
 
         def _do_courses() -> bool:
             return mode in ("courses", "both")
@@ -175,7 +140,7 @@ class StructurePhase(BasePhase):
                                         deleted += 1
                                     processed += 1
                             except Exception as e:
-                                if _is_moodle_overloaded(e):
+                                if is_moodle_overloaded(e):
                                     _save_progress({"batch_processed": processed, "batch_deleted": deleted})
                                     raise MoodleOverloadedError(str(e)[:200])
                                 for cid in chunk:
@@ -198,7 +163,7 @@ class StructurePhase(BasePhase):
                     try:
                         success = await integration.activate_course(sn)
                     except Exception as e:
-                        if _is_moodle_overloaded(e):
+                        if is_moodle_overloaded(e):
                             _save_progress({"stage": "activate", "last_sn": sn})
                             raise MoodleOverloadedError(str(e)[:200])
                     if success:
@@ -217,7 +182,7 @@ class StructurePhase(BasePhase):
                     try:
                         success = await integration.hide_course(sn)
                     except Exception as e:
-                        if _is_moodle_overloaded(e):
+                        if is_moodle_overloaded(e):
                             _save_progress({"stage": "hide", "last_sn": sn})
                             raise MoodleOverloadedError(str(e)[:200])
                     if success:
@@ -237,16 +202,11 @@ class StructurePhase(BasePhase):
                     course_data = courses_by_sn.get(sn)
                     if not course_data:
                         continue
-                    try:
-                        success = await integration.rename_course(
-                            old_shortname=item["old_shortname"],
-                            new_shortname=sn,
-                            new_fullname=course_data["fullname"],
-                        )
-                    except Exception as e:
-                        if _is_moodle_overloaded(e):
-                            _save_progress({"stage": "rename", "last_sn": sn})
-                            raise MoodleOverloadedError(str(e)[:200])
+                    success = await integration.rename_course(
+                        old_shortname=item["old_shortname"],
+                        new_shortname=sn,
+                        new_fullname=course_data["fullname"],
+                    )
                     if success:
                         log_repo.save_log(db, eid, "3", "course_renamed", sn, {
                             "old_shortname": item["old_shortname"],
@@ -259,6 +219,7 @@ class StructurePhase(BasePhase):
                             db, eid, "3", sn,
                             f"Error al renombrar curso: {integration.last_error or item['old_shortname']} -> {sn}"
                         )
+                    _maybe_checkpoint()
 
                 update_progress(db, eid, 50, "Creando cursos…")
                 total_create = len(ctx.comparison.get("to_create", []))
@@ -314,7 +275,7 @@ class StructurePhase(BasePhase):
                             template_id=template_id,
                         )
                     except Exception as e:
-                        if _is_moodle_overloaded(e):
+                        if is_moodle_overloaded(e):
                             _save_progress({"stage": "create", "create_count": create_count})
                             raise MoodleOverloadedError(str(e)[:200])
                     if success:

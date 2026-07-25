@@ -1,38 +1,12 @@
 import logging
 from typing import Dict
 
-import httpx
-
 from app.repositories import log_repo
 from app.repositories.execution_repo import update_progress, save_checkpoint, _should_pause
 from app.services.error_messages import translate_error
-from app.workers.phases.base import BasePhase, PhaseContext, MoodleOverloadedError
+from app.workers.phases.base import BasePhase, PhaseContext, MoodleOverloadedError, is_moodle_overloaded
 
 logger = logging.getLogger(__name__)
-
-CHECKPOINT_INTERVAL = 100
-
-
-def _is_moodle_overloaded(e: BaseException) -> bool:
-    """Retorna True si el error es transitorio (servidor sobrecargado, timeout, o errores DB de Moodle)."""
-    if isinstance(e, httpx.HTTPStatusError):
-        return e.response.status_code in (502, 503, 504)
-    if isinstance(e, httpx.ConnectError):
-        return True
-    if isinstance(e, httpx.ReadTimeout):
-        return True
-    from app.services.moodle import MoodleAPIError
-    inner = e
-    if hasattr(e, 'last_attempt'):
-        try:
-            inner = e.last_attempt.exception() or inner
-        except Exception:
-            pass
-    if isinstance(inner, MoodleAPIError):
-        if inner.error_code in ("invalidrecord", "storedfilenotcreated", "invalidcoursemodule"):
-            return True
-    msg = str(e).lower()
-    return any(kw in msg for kw in ("gateway time-out", "connect error", "read timeout", "connection refused"))
 
 CHECKPOINT_INTERVAL = 100
 
@@ -105,7 +79,7 @@ class PeoplePhase(BasePhase):
                     try:
                         username, created = await integration.create_user_if_not_exists(user)
                     except Exception as e:
-                        if _is_moodle_overloaded(e):
+                        if is_moodle_overloaded(e):
                             _save_progress({"stage": "users", "last_user": user.get("username", "")})
                             raise MoodleOverloadedError(str(e)[:200])
                     if _check_pause():
@@ -140,7 +114,7 @@ class PeoplePhase(BasePhase):
                             course_map=course_map,
                         )
                     except Exception as e:
-                        if _is_moodle_overloaded(e):
+                        if is_moodle_overloaded(e):
                             _save_progress({"stage": "enrol", "enrol_count": enrol_count})
                             raise MoodleOverloadedError(str(e)[:200])
                     if _check_pause():
