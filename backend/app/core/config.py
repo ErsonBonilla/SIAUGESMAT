@@ -74,12 +74,12 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Archivos subidos
     # ------------------------------------------------------------------
-    UPLOAD_DIR: str = os.path.join(os.getcwd(), "uploads")
+    UPLOAD_DIR: str = str(Path(__file__).resolve().parent.parent.parent / "uploads")
 
     # ------------------------------------------------------------------
     # Reportes
     # ------------------------------------------------------------------
-    REPORT_DIR: str = os.path.join(os.getcwd(), "reports")
+    REPORT_DIR: str = str(Path(__file__).resolve().parent.parent.parent / "reports")
 
     # Tamaño máximo de archivo en megabytes
     MAX_UPLOAD_SIZE_MB: int = 50

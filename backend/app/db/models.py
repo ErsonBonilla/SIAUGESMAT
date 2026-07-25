@@ -77,7 +77,7 @@ class ExecutionLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     execution_id = Column(Integer, ForeignKey("executions.id"), nullable=False, index=True)
-    phase = Column(String(10), nullable=False)
+    phase = Column(String(10), nullable=False)  # valores: "1","2","3","4","critical"
     action = Column(String(50), nullable=False)
     identifier = Column(String(255), nullable=True)
     detail = Column(JSON, nullable=True)
