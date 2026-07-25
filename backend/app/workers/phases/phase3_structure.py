@@ -128,10 +128,6 @@ class StructurePhase(BasePhase):
                                     processed += 1
                             if processed % 200 == 0 or (bi + BATCH_SIZE >= len(batch_ids)):
                                 msg = f"Eliminando cursos… ({deleted}/{total_del})"
-                                if processed >= total_del:
-                                    msg = f"Eliminando cursos… ({deleted}/{total_del})"
-                                elif deleted == 0 and processed > 0:
-                                    msg = f"Eliminando cursos… (errores: {processed}, esperando...) "
                                 update_progress(db, eid, 42 + int(processed / total_del * 2),
                                                 msg, step=3)
                             _maybe_checkpoint()
