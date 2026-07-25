@@ -160,6 +160,8 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
         status_label = "con reportes" if report_ok else "sin reportes"
         logger.info(f"Ejecución {execution_id} completada exitosamente ({status_label})")
 
+    except MoodleOverloadedError:
+        raise
     except Exception as e:
         logger.exception(f"Error crítico en ejecución {execution_id}: {e}")
         try:
