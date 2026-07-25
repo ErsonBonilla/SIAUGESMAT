@@ -15,6 +15,7 @@ export interface Execution {
   completed_at: string | null;
   duration_seconds: number | null;
   modalidad: string | null;
+  moodle_version?: string | null;
   created_at: string;
 }
 

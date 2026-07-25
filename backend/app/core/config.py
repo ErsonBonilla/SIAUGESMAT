@@ -39,7 +39,8 @@ class Settings(BaseSettings):
     MOODLE_BURST_SIZE: int = 10                     # capacidad máxima del bucket
 
     # Tiempo máximo de espera por solicitud (segundos)
-    MOODLE_REQUEST_TIMEOUT: float = 30.0
+    # Operaciones pesadas (import_course) usan 120s por separado.
+    MOODLE_REQUEST_TIMEOUT: float = 60.0
 
     # Reintentos automáticos ante fallos de red
     MOODLE_MAX_RETRIES: int = 3

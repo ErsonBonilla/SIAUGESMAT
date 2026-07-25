@@ -40,6 +40,10 @@ def add_item(db, batch_id: str, identifier: str, detail: dict = None,
     return item
 
 
+def get_item(db, item_id: int) -> Optional[OperationItem]:
+    return db.query(OperationItem).filter(OperationItem.id == item_id).first()
+
+
 def update_item(db, item_id: int, status: str, error_message: str = None):
     item = db.query(OperationItem).filter(OperationItem.id == item_id).first()
     if item:
