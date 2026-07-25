@@ -10,9 +10,10 @@ interface ProgressBarProps {
   currentStep: number | null;
   progressPct: number;
   etaSeconds?: number | null;
+  status?: string;
 }
 
-export default function ProgressBar({ currentPhase, currentStep, progressPct, etaSeconds }: ProgressBarProps) {
+export default function ProgressBar({ currentPhase, currentStep, progressPct, etaSeconds, status }: ProgressBarProps) {
   const step = currentStep ?? 1;
   const icon = PHASE_ICONS[step - 1] ?? "⏳";
   const phaseLabel = PHASE_LABELS[step - 1] ?? "Procesando";
@@ -59,7 +60,7 @@ export default function ProgressBar({ currentPhase, currentStep, progressPct, et
           );
         })}
       </div>
-      {etaSeconds != null && etaSeconds > 0 && (
+      {etaSeconds != null && etaSeconds > 0 && status !== "paused" && status !== "cancelled" && (
         <p class="text-xs text-[var(--text-muted)] mt-2 text-right">
           Tiempo estimado restante: {formatEta(etaSeconds)}
         </p>

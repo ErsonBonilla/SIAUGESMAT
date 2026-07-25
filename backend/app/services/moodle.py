@@ -101,7 +101,7 @@ class MoodleAPIError(Exception):
         "accessexception", "contextlevelnotsupported",
         "duplicatedshortname", "alreadyenrolled", "enrolmentnotfound",
         "notenrolled", "cannotdeletecategory", "cannotdeletecourse",
-        "couldnotassignrole", "missingcapability", "duplicateuser",
+        "couldnotassignrole", "missingcapability", "duplicateuser", "duplicatecourse",
         "valueofparamelementnotset",
     })
 
@@ -223,7 +223,12 @@ class MoodleService:
 
         data = response.json()
 
-        if data is not None and not isinstance(data, (dict, list)):
+        if data is None:
+            raise MoodleAPIError(
+                f"Respuesta nula de {wsfunction}: la API devolvió null"
+            )
+
+        if not isinstance(data, (dict, list)):
             raise MoodleAPIError(
                 f"Respuesta inesperada de {wsfunction}: {str(data)[:300]}"
             )
@@ -309,13 +314,11 @@ class MoodleService:
                 if len(parts) == 2:
                     cat_id = await self._get_category_id_by_idnumber(parts[0])
             if not cat_id:
-                prefix = idnumber.split("_")[0] if "_" in idnumber else idnumber
-                if prefix != idnumber:
-                    cat_id = await self._get_category_id_by_idnumber(prefix)
+                cat_id = None
             if cat_id:
                 cat_map[idnumber] = cat_id
             else:
-                logger.warning(
+                logger.error(
                     f"Categoría '{idnumber}' no encontrada en Moodle. "
                     f"El curso usará categoryid=0 (raíz)."
                 )
@@ -459,7 +462,7 @@ class MoodleService:
             params[f"users[{i}][firstname]"] = user["firstname"]
             params[f"users[{i}][lastname]"] = user["lastname"]
             params[f"users[{i}][email]"] = user["email"]
-            use_createpassword = user.get("createpassword") or user.get("forcepasswordchange")
+            use_createpassword = bool(user.get("createpassword"))
             if use_createpassword:
                 params[f"users[{i}][createpassword]"] = "1"
             else:
@@ -640,6 +643,9 @@ class MoodleService:
               - failed: int (usuarios que no se pudieron resolver)
               - errors: list[str] (detalle de cada fallo)
         """
+        missing_username = [e for e in enrolments if "username" not in e]
+        if missing_username:
+            logger.warning(f"{len(missing_username)} enrolment(s) sin 'username': {missing_username}")
         usernames = [e["username"] for e in enrolments if "username" in e]
         shortnames = [e["course_shortname"] for e in enrolments]
 
@@ -680,25 +686,30 @@ class MoodleService:
                 "enrolled": 0,
                 "failed": len(enrolments),
                 "errors": errors,
+                "error_codes": [],
             }
 
         use_post = idx > 50
         result = await self._request("enrol_manual_enrol_users", params, use_post=use_post)
         api_errors = []
+        api_error_codes = []
         if isinstance(result, list):
             for r in result:
                 if isinstance(r, dict) and not r.get("result", True):
                     warnings = r.get("warnings", [])
                     for w in warnings:
                         msg = w.get("message", str(w)) if isinstance(w, dict) else str(w)
+                        code = w.get("warningcode", "") if isinstance(w, dict) else ""
                         api_errors.append(msg)
-                        logger.error(f"Moodle enrol error: {msg}")
+                        api_error_codes.append(code)
+                        logger.error(f"Moodle enrol error [{code}]: {msg}")
         if api_errors:
             return {
                 "success": False,
                 "enrolled": idx - len(api_errors),
                 "failed": len(enrolments) - idx + len(api_errors),
                 "errors": errors + api_errors,
+                "error_codes": api_error_codes,
             }
         return {
             "success": True,
@@ -713,3 +724,9 @@ class MoodleService:
     async def close(self):
         """Cierra el cliente HTTP subyacente."""
         await self._client.aclose()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        await self.close()

@@ -23,6 +23,7 @@ export const STATUS_COLORS: Record<string, string> = {
   paused: "status-blue",
   failed: "status-red",
   review_required: "status-orange",
+  cancelled: "status-gray",
 };
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -33,6 +34,7 @@ export const STATUS_LABELS: Record<string, string> = {
   paused: "Pausado",
   failed: "Fallido",
   review_required: "Revisión requerida",
+  cancelled: "Cancelado",
 };
 
 export const MODE_LABELS: Record<string, string> = {

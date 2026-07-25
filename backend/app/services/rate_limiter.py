@@ -96,3 +96,8 @@ class RedisRateLimiter:
                 await asyncio.sleep((count - self.rate) * (self.window / self.rate))
         finally:
             await r.aclose()
+
+    async def close(self):
+        if self._pool is not None:
+            await self._pool.disconnect()
+            self._pool = None

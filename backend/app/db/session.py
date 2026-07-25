@@ -8,6 +8,8 @@ de sesiones que se inyecta en los endpoints de FastAPI.
 import logging
 from typing import Generator
 
+from urllib.parse import urlparse
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -19,16 +21,16 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Motor de base de datos (Parámetros comunes)
 # ---------------------------------------------------------------------------
+_is_sqlite = urlparse(settings.DATABASE_URL).scheme.startswith("sqlite")
 engine_kwargs = {
     "pool_pre_ping": True,       # verifica que la conexión siga viva antes de usarla
     "echo": settings.DEBUG,      # imprime las consultas SQL solo en modo DEBUG
 }
 
-# Solo se agregan pool_size / max_overflow si el motor los soporta (PostgreSQL, MySQL, etc.)
-# SQLite no los acepta y lanzaría un error.
-if "sqlite" not in settings.DATABASE_URL:
-    engine_kwargs["pool_size"] = 10       # número de conexiones permanentes en el pool
-    engine_kwargs["max_overflow"] = 20    # conexiones adicionales temporales si el pool se llena
+if not _is_sqlite:
+    engine_kwargs["pool_size"] = 10
+    engine_kwargs["max_overflow"] = 20
+    engine_kwargs["pool_recycle"] = 3600
 
 engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
 
@@ -64,11 +66,9 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
-    """
-    Crea todas las tablas definidas en los modelos que heredan de Base.
-
-    Útil para entornos de desarrollo o pruebas. En producción se recomienda
-    usar Alembic para gestionar las migraciones.
-    """
+    """Crea tablas (solo desarrollo; migraciones vía Alembic en producción)."""
+    if not settings.DEBUG:
+        logger.info("Modo producción — no se crean tablas automáticamente, usar Alembic")
+        return
     Base.metadata.create_all(bind=engine)
     logger.info("Tablas creadas exitosamente.")

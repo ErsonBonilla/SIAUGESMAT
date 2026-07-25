@@ -8,6 +8,7 @@ eager en el nivel superior.
 """
 
 import logging
+import os
 
 from celery import Celery
 from celery.signals import after_setup_logger, task_failure
@@ -46,7 +47,7 @@ celery_app.conf.update(
 
     # Timeouts de tareas
     task_time_limit=settings.JOB_TIMEOUT,
-    task_soft_time_limit=settings.JOB_TIMEOUT - 3600,
+    task_soft_time_limit=max(0, settings.JOB_TIMEOUT - 3600),
 
     # ACK tardío + visibilidad
     task_acks_late=True,
@@ -84,7 +85,7 @@ def setup_dlq_handler(logger, **kwargs):
     """Agrega un handler que registra tareas fallidas permanentemente."""
     dlq_logger = logging.getLogger("celery.dlq")
     dlq_logger.setLevel(logging.WARNING)
-    handler = logging.FileHandler("celery_dlq.log")
+    handler = logging.FileHandler(os.path.join(settings.REPORT_DIR, "celery_dlq.log"))
     handler.setFormatter(logging.Formatter(
         fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     ))

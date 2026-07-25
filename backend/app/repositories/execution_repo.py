@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.db.models import ErrorLog, Execution
@@ -31,9 +32,23 @@ def mark_queued(db, execution_id: int):
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.status = "queued"
-        execution.started_at = datetime.now(timezone.utc)
         db.commit()
     return execution
+
+
+def atomic_mark_queued(db, execution_id: int, task_id: str, allowed_statuses: tuple) -> bool:
+    """Marca como queued y guarda task_id en un solo UPDATE atómico.
+    Retorna True si la fila fue actualizada, False si el status no coincidía."""
+    result = db.execute(
+        sql_text(
+            "UPDATE executions SET status = 'queued', started_at = :now, celery_task_id = :task_id "
+            "WHERE id = :id AND status IN :allowed_statuses"
+        ),
+        {"now": datetime.now(timezone.utc), "task_id": task_id, "id": execution_id,
+         "allowed_statuses": allowed_statuses},
+    )
+    db.commit()
+    return result.rowcount > 0
 
 
 def update_progress(db, execution_id: int, pct: float, phase: str, step: int = None):
@@ -83,7 +98,6 @@ def mark_failed(db, execution_id: int, duration_seconds: float):
 
 
 def delete_execution(db, execution_id: int):
-    db.query(ErrorLog).filter(ErrorLog.execution_id == execution_id).delete()
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         db.delete(execution)
@@ -145,7 +159,6 @@ def delete_old_pending_executions(db, hours: int = 24) -> int:
     if not old:
         return 0
     for ex in old:
-        db.query(ErrorLog).filter(ErrorLog.execution_id == ex.id).delete()
         db.delete(ex)
     db.commit()
     return len(old)
@@ -182,7 +195,8 @@ def pause_execution(db, execution_id: int) -> bool:
     if not execution or execution.status != "running":
         return False
     execution.status = "paused"
-    execution.current_phase = f"{execution.current_phase or ''} (pausado)"
+    if " (pausado)" not in (execution.current_phase or ""):
+        execution.current_phase = f"{execution.current_phase or ''} (pausado)"
     db.commit()
     return True
 
@@ -201,3 +215,32 @@ def _should_pause(db, execution_id: int) -> bool:
     """Verifica si la ejecución fue puesta en pausa (uso interno en las fases)."""
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     return execution is not None and execution.status == "paused"
+
+
+def set_celery_task_id(db, execution_id: int, task_id: str):
+    execution = db.query(Execution).filter(Execution.id == execution_id).first()
+    if execution:
+        execution.celery_task_id = task_id
+        db.commit()
+
+
+def cancel_execution(db, execution_id: int) -> tuple[bool, str]:
+    """Marca una ejecución como cancelada. Retorna (success, celery_task_id)."""
+    execution = db.query(Execution).filter(Execution.id == execution_id).first()
+    if not execution or execution.status not in ("running", "paused", "queued"):
+        return False, ""
+    task_id = execution.celery_task_id or ""
+    execution.status = "cancelled"
+    execution.current_phase = f"{execution.current_phase or ''} (cancelado)"
+    execution.completed_at = datetime.now(timezone.utc)
+    execution.duration_seconds = round(
+        (datetime.now(timezone.utc) - execution.started_at).total_seconds()
+    ) if execution.started_at else 0
+    db.commit()
+    return True, task_id
+
+
+def _should_cancel(db, execution_id: int) -> bool:
+    """Verifica si la ejecución fue cancelada (uso interno en las fases)."""
+    execution = db.query(Execution).filter(Execution.id == execution_id).first()
+    return execution is not None and execution.status == "cancelled"

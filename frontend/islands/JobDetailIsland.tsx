@@ -5,7 +5,7 @@ import ProgressBar from "../components/ProgressBar.tsx";
 import ReportsSection from "../components/ReportsSection.tsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
-import { getExecution, getExecutionErrors, confirmExecution, pauseExecution, type Execution, type ErrorLog } from "../services/api.ts";
+import { getExecution, getExecutionErrors, confirmExecution, pauseExecution, resumeExecution, cancelExecution, type Execution, type ErrorLog } from "../services/api.ts";
 import { formatDateTime, formatDuration } from "../utils/date.ts";
 import { toast } from "../utils/toast.ts";
 import { STATUS_COLORS, STATUS_LABELS, MODE_LABELS } from "../utils/constants.ts";
@@ -24,6 +24,8 @@ const THRESHOLD_YELLOW = 1.0;
 const THRESHOLD_RED = 5.0;
 
 function computeSemaphore(execution: Execution): { color: string; text: string } {
+  if (execution.status === "failed") return { color: "red", text: "Fallido" };
+  if (execution.status === "cancelled") return { color: "gray", text: "Cancelado" };
   if (execution.status !== "completed") return { color: "gray", text: "Sin finalizar" };
   const total = (execution.metrics?.total_operations) ||
     ((execution.metrics?.courses_created || 0) + (execution.metrics?.users_created || 0) + (execution.metrics?.enrollments || 0)) || 1;
@@ -46,6 +48,8 @@ export default function JobDetailIsland({ executionId }: Props) {
   const errorPage = useSignal(0);
   const confirming = useSignal(false);
   const pausing = useSignal(false);
+  const resuming = useSignal(false);
+  const cancelling = useSignal(false);
 
   useEffect(() => {
     (async () => {
@@ -66,7 +70,7 @@ export default function JobDetailIsland({ executionId }: Props) {
   }, [executionId]);
 
   useEffect(() => {
-    const runningStatuses = ["queued", "running"];
+    const runningStatuses = ["pending", "queued", "running"];
     if (!execution.value || !runningStatuses.includes(execution.value.status)) return;
     const interval = setInterval(async () => {
       try {
@@ -128,6 +132,18 @@ export default function JobDetailIsland({ executionId }: Props) {
         </div>
       </div>
 
+      {exec.status === "cancelled" && (
+        <div class="bg-gray-50 border border-gray-300 rounded-2xl p-6 mb-6">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">✕</span>
+            <div>
+              <h3 class="text-lg font-bold text-gray-800">Ejecución cancelada</h3>
+              <p class="text-sm text-gray-600">La ejecución fue cancelada por el usuario y no continuará su procesamiento.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {exec.status === "review_required" && (
         <div class="bg-orange-50 border border-orange-300 rounded-2xl p-6 mb-6">
           <div class="flex items-center gap-3 mb-3">
@@ -165,7 +181,7 @@ export default function JobDetailIsland({ executionId }: Props) {
 
       {["queued", "running", "paused"].includes(exec.status) && (
         <>
-          <ProgressBar currentPhase={exec.current_phase ?? null} currentStep={exec.current_step ?? null} progressPct={exec.progress_pct ?? 0} etaSeconds={exec.eta_seconds} />
+          <ProgressBar currentPhase={exec.current_phase ?? null} currentStep={exec.current_step ?? null} progressPct={exec.progress_pct ?? 0} etaSeconds={exec.eta_seconds} status={exec.status} />
           {exec.status === "running" && (
             <div class="flex justify-end mt-3">
               <button
@@ -189,14 +205,48 @@ export default function JobDetailIsland({ executionId }: Props) {
             </div>
           )}
           {exec.status === "paused" && (
-            <div class="bg-blue-50 border border-blue-300 rounded-xl p-4 mt-4 text-center">
-              <p class="text-blue-800 font-medium mb-2">Ejecución pausada</p>
-              <a
-                href={`/operaciones/ejecuciones`}
-                class="text-sm text-[var(--accent)] hover:underline"
+            <div class="flex justify-end mt-3">
+              <button
+                onClick={async () => {
+                  resuming.value = true;
+                  try {
+                    await resumeExecution(exec.id);
+                    toast("Ejecución reanudada", "success");
+                    setTimeout(() => globalThis.location.reload(), 1000);
+                  } catch (e) {
+                    toast(e instanceof Error ? e.message : "Error al reanudar", "error");
+                  } finally {
+                    resuming.value = false;
+                  }
+                }}
+                disabled={resuming.value}
+                class="px-4 py-1.5 text-sm font-medium text-[var(--accent)] border border-[var(--accent)] rounded-lg hover:bg-[var(--accent)] hover:text-white transition disabled:opacity-50"
               >
-                Volver a ejecuciones para continuar
-              </a>
+                {resuming.value ? "Reanudando..." : "▶ Reanudar"}
+              </button>
+            </div>
+          )}
+          {["running", "paused", "queued", "pending"].includes(exec.status) && (
+            <div class="flex justify-end mt-3">
+              <button
+                onClick={async () => {
+                  if (!window.confirm("¿Cancelar esta ejecución? Se detendrá el procesamiento en curso.")) return;
+                  cancelling.value = true;
+                  try {
+                    await cancelExecution(exec.id);
+                    toast("Ejecución cancelada", "success");
+                    setTimeout(() => globalThis.location.reload(), 1000);
+                  } catch (e) {
+                    toast(e instanceof Error ? e.message : "Error al cancelar", "error");
+                  } finally {
+                    cancelling.value = false;
+                  }
+                }}
+                disabled={cancelling.value}
+                class="px-4 py-1.5 text-sm font-medium text-red-500 border border-red-500 rounded-lg hover:bg-red-500 hover:text-white transition disabled:opacity-50"
+              >
+                {cancelling.value ? "Cancelando..." : "✕ Cancelar"}
+              </button>
             </div>
           )}
         </>

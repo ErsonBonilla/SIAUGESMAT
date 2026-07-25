@@ -24,9 +24,9 @@ class Execution(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String(500), nullable=False)
-    semester = Column(String(10), nullable=False)
+    semester = Column(String(10), nullable=False, index=True)
     mode = Column(String(20), nullable=False, default="both")
-    status = Column(String(20), nullable=False, default="pending")
+    status = Column(String(20), nullable=False, default="pending", index=True)
     metrics = Column(JSON, nullable=True)
     errors_count = Column(Integer, default=0)
     report_dir = Column(String(500), nullable=True)
@@ -38,9 +38,10 @@ class Execution(Base):
     progress_updated_at = Column(DateTime(timezone=True), nullable=True)
     current_step = Column(Integer, nullable=True)
     moodle_version = Column(String(10), nullable=True)
-    modalidad = Column(String(20), nullable=True)
+    modalidad = Column(String(20), nullable=True, index=True)
     phase_checkpoint = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    celery_task_id = Column(String(255), nullable=True, index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
 
     errors = relationship("ErrorLog", back_populates="execution", cascade="all, delete-orphan")
     logs = relationship("ExecutionLog", back_populates="execution", cascade="all, delete-orphan")
@@ -53,7 +54,7 @@ class ErrorLog(Base):
     __tablename__ = "error_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    execution_id = Column(Integer, ForeignKey("executions.id"), nullable=False)
+    execution_id = Column(Integer, ForeignKey("executions.id"), nullable=False, index=True)
     type = Column(String(50), nullable=False)
     identifier = Column(String(255), nullable=True)
     message = Column(Text, nullable=True)
@@ -75,7 +76,7 @@ class ExecutionLog(Base):
     __tablename__ = "execution_logs"
 
     id = Column(Integer, primary_key=True, index=True)
-    execution_id = Column(Integer, ForeignKey("executions.id"), nullable=False)
+    execution_id = Column(Integer, ForeignKey("executions.id"), nullable=False, index=True)
     phase = Column(String(10), nullable=False)
     action = Column(String(50), nullable=False)
     identifier = Column(String(255), nullable=True)
@@ -105,7 +106,7 @@ class OperationBatch(Base):
     completed = Column(Integer, default=0)
     failed = Column(Integer, default=0)
     modalidad = Column(String(20), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     items = relationship("OperationItem", back_populates="batch", cascade="all, delete-orphan")
@@ -125,12 +126,12 @@ class OperationItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     batch_id = Column(String(64), ForeignKey("operation_batches.batch_id"), nullable=False, index=True)
     identifier = Column(String(255), nullable=False)
-    status = Column(String(20), nullable=False, default="pending")
+    status = Column(String(20), nullable=False, default="pending", index=True)
     attempt = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
     detail = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), onupdate=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     batch = relationship("OperationBatch", back_populates="items")
 

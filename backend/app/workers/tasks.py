@@ -20,6 +20,7 @@ from app.repositories.execution_repo import (
     save_checkpoint,
     set_report_dir,
     update_progress,
+    _should_cancel,
     _should_pause,
 )
 from app.repositories.log_repo import save_error
@@ -42,7 +43,8 @@ PROGRESS_RESTORE = [12, 30]
 
 
 @celery_app.task(bind=True, autoretry_for=(MoodleOverloadedError,), max_retries=10,
-                  default_retry_delay=60, retry_backoff=True, retry_backoff_max=600, retry_jitter=True)
+                  default_retry_delay=60, retry_backoff=True, retry_backoff_max=600, retry_jitter=True,
+                  soft_time_limit=25200, time_limit=28800)
 def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> None:
     db = SessionLocal()
     start_time = time.monotonic()
@@ -52,6 +54,10 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
         execution = get_execution(db, execution_id)
         if not execution:
             logger.exception(f"No se encontró la ejecución {execution_id}")
+            return
+
+        if execution.status in ("cancelled", "paused", "review_required"):
+            logger.info(f"Ejecución {execution_id} {execution.status}, no se procesa")
             return
 
         mark_running(db, execution_id)
@@ -74,11 +80,13 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
                 await moodle_service.close()
 
         async def _run_pipeline() -> Dict[str, int]:
+            # Refrescar execution para PhaseContext
+            current_exec = get_execution(db, execution_id) or execution
             ctx = PhaseContext(
                 db=db,
                 execution_id=execution_id,
-                execution=execution,
-                mode=execution.mode,
+                execution=current_exec,
+                mode=current_exec.mode,
                 semester=semester,
                 etl_data=etl_data,
                 moodle_service=moodle_service,
@@ -89,6 +97,12 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
 
             for i, phase in enumerate(PHASES):
                 phase_name = PHASE_NAMES[i]
+
+                if _should_cancel(db, execution_id):
+                    update_progress(db, execution_id, PROGRESS_RESTORE[i - 1] if i > 0 else 12,
+                                    f"FASE {phase_name} cancelada")
+                    logger.info(f"FASE {phase_name}: cancelada por el usuario")
+                    return ctx.metrics
 
                 if _should_pause(db, execution_id):
                     update_progress(db, execution_id, PROGRESS_RESTORE[i - 1] if i > 0 else 12,
@@ -122,17 +136,27 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
 
         metrics = asyncio.run(_run_phases())
 
-        if _get_execution_status(db, execution_id) == "review_required":
+        # Fresco: consultar estado actual de BD
+        current_exec = get_execution(db, execution_id)
+
+        if not current_exec:
+            return
+
+        if current_exec.status in ("cancelled", "paused"):
+            logger.info(f"Ejecución {execution_id}: {current_exec.status} después de fases 1-2, no se lanza Fase 3")
+            return
+
+        if current_exec.status == "review_required":
             logger.info(f"Ejecución {execution_id}: en espera de confirmación de eliminación masiva")
             return
 
-        # Check if Phase 3+ already done (completed from chord callbacks)
-        if execution.status == "completed":
+        if current_exec.status == "completed":
+            logger.info(f"Ejecución {execution_id}: ya completada por chord callbacks, no se relanza")
             return
 
         # Save context for Phase 3 subtask orchestration
         phase2_data = get_checkpoint(db, execution_id) or {}
-        _save_phase_2_data_to_checkpoint(db, execution_id, etl_data, metrics, phase2_data, execution.modalidad, execution.mode)
+        _save_phase_2_data_to_checkpoint(db, execution_id, etl_data, metrics, phase2_data, current_exec.modalidad, current_exec.mode)
 
         update_progress(db, execution_id, 32, "Preparando subtareas…", step=3)
         logger.info(f"Ejecución {execution_id}: lanzando FASE 3 como subtareas")
@@ -180,8 +204,8 @@ def process_etl_phase(self, execution_id: int, phase: str):
         if not execution:
             logger.error(f"Ejecución {execution_id} no encontrada para FASE {phase}")
             return
-        if execution.status == "paused":
-            logger.info(f"FASE {phase}: ejecución pausada, no se lanzan subtareas")
+        if execution.status in ("paused", "cancelled"):
+            logger.info(f"FASE {phase}: ejecución {execution.status}, no se lanzan subtareas")
             return
 
         phase3_ctx = get_checkpoint(db, execution_id) or {}
@@ -213,7 +237,8 @@ def process_etl_phase(self, execution_id: int, phase: str):
                 try:
                     asyncio.run(_create_cats())
                 except Exception as e:
-                    logger.warning(f"Error creando categorías: {e}")
+                    logger.exception(f"Error creando categorías: {e}")
+                    save_error(db, execution_id, "3", "", translate_error(e))
 
             if not comparison:
                 logger.info(f"FASE 3: sin datos de comparación, saltando")
@@ -233,7 +258,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
 
             if delete_items:
                 logger.info(f"FASE 3: lanzando {len(delete_items)} delete(s) + {len(structure_items)} estructura(s)")
-                _launch_delete_chord(execution_id, delete_items, structure_items)
+                _launch_delete_chord(execution_id, delete_items)
             elif structure_items:
                 _launch_structure_chord(execution_id, structure_items)
             else:
@@ -284,9 +309,28 @@ def _items_exist_for_execution(db, execution_id, phase):
     ).first() is not None
 
 
+def _get_pending_counts(db, execution_id: int, phase: str) -> Dict[str, int]:
+    """Retorna counts de items pending agrupados por acción para una ejecución+fase."""
+    from app.db.models import OperationItem
+    from sqlalchemy import text as sql_text
+    items = db.query(OperationItem).filter(
+        OperationItem.batch_id.like(f"etl_{phase}_%_{execution_id}"),
+        OperationItem.status == "pending",
+    ).all()
+    counts: Dict[str, int] = {}
+    for item in items:
+        action = (item.detail or {}).get("action", "unknown")
+        counts[action] = counts.get(action, 0) + 1
+    return counts
+
+
 def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> Dict[str, int]:
     if _items_exist_for_execution(db, execution_id, "3"):
-        logger.info(f"Items FASE 3 ya existen para ejecución {execution_id}, saltando creación")
+        pending = _get_pending_counts(db, execution_id, "3")
+        if pending:
+            logger.info(f"Items FASE 3 ya existen con {sum(pending.values())} pendientes, retomando")
+            return pending
+        logger.info(f"Items FASE 3 ya existen y todos procesados, saltando creación")
         return {}
     if not _acquire_advisory_lock(db, execution_id, "3"):
         logger.info(f"Lock FASE 3 ya tomado para ejecución {execution_id}, otro worker crea los items")
@@ -400,7 +444,11 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> D
 
 def _create_phase4_items(db, execution_id, ctx_data, modalidad) -> Dict[str, int]:
     if _items_exist_for_execution(db, execution_id, "4"):
-        logger.info(f"Items FASE 4 ya existen para ejecución {execution_id}, saltando creación")
+        pending = _get_pending_counts(db, execution_id, "4")
+        if pending:
+            logger.info(f"Items FASE 4 ya existen con {sum(pending.values())} pendientes, retomando")
+            return pending
+        logger.info(f"Items FASE 4 ya existen y todos procesados, saltando creación")
         return {}
     if not _acquire_advisory_lock(db, execution_id, "4"):
         logger.info(f"Lock FASE 4 ya tomado para ejecución {execution_id}, otro worker crea los items")
@@ -486,12 +534,12 @@ def _get_pending_items(db, execution_id, phase, sub_phase=None):
     return query.all()
 
 
-def _launch_delete_chord(execution_id, delete_items, structure_items):
+def _launch_delete_chord(execution_id, delete_items):
     task_ids = [process_etl_item.si(item.id) for item in delete_items]
     chord(task_ids)(on_delete_items_done.s(execution_id=execution_id))
 
 
-@celery_app.task(bind=True, autoretry_for=(Exception,), max_retries=3,
+@celery_app.task(bind=True, autoretry_for=(MoodleOverloadedError,), max_retries=3,
                   default_retry_delay=10, retry_backoff=True, retry_backoff_max=60)
 def on_delete_items_done(self, results, execution_id):
     """Callback cuando todos los deletes de FASE 3 completan.
@@ -499,7 +547,7 @@ def on_delete_items_done(self, results, execution_id):
     db = SessionLocal()
     try:
         execution = get_execution(db, execution_id)
-        if not execution or execution.status == "paused":
+        if not execution or execution.status in ("paused", "cancelled"):
             return
 
         update_progress(db, execution_id, 44, "Deletes completados, lanzando estructura…", step=3)
@@ -523,7 +571,7 @@ def _launch_structure_chord(execution_id, structure_items):
     chord(task_ids)(on_phase_items_done.s(execution_id=execution_id, phase="3"))
 
 
-@celery_app.task(bind=True, autoretry_for=(Exception,), max_retries=3,
+@celery_app.task(bind=True, autoretry_for=(MoodleOverloadedError,), max_retries=3,
                   default_retry_delay=10, retry_backoff=True, retry_backoff_max=60)
 def on_phase_items_done(self, results, execution_id, phase):
     """Callback cuando todos los items de una fase completan."""
@@ -532,7 +580,7 @@ def on_phase_items_done(self, results, execution_id, phase):
     _cb_entered = datetime.now(timezone.utc)
     try:
         execution = get_execution(db, execution_id)
-        if not execution:
+        if not execution or execution.status in ("paused", "cancelled"):
             return
 
         # Update metrics from item results
@@ -560,11 +608,12 @@ def on_phase_items_done(self, results, execution_id, phase):
                 report_ok = False
 
             update_progress(db, execution_id, 95, "Finalizando…")
+            _cb_done = datetime.now(timezone.utc)
             metrics = execution.metrics or {}
             mark_completed(
                 db, execution_id, metrics,
                 errors_count=metrics.get("total_errors", 0),
-                duration_seconds=(execution.started_at and (_cb_entered - execution.started_at).total_seconds()) or 0,
+                duration_seconds=(execution.started_at and (_cb_done - execution.started_at).total_seconds()) or 0,
             )
             clear_checkpoint(db, execution_id)
             update_progress(db, execution_id, 100, "Ejecución completada")
@@ -575,7 +624,7 @@ def on_phase_items_done(self, results, execution_id, phase):
         try:
             db.rollback()
             save_error(db, execution_id, "critical", "", translate_error(e))
-            mark_failed(db, execution_id, (datetime.now(timezone.utc) - _cb_entered).total_seconds())
+            mark_failed(db, execution_id, (datetime.now(timezone.utc) - _cb_entered).total_seconds() if execution.started_at else 0)
         except Exception:
             pass
     finally:
@@ -614,7 +663,9 @@ def _sync_metrics_from_items(db, execution_id):
 
     ex = get_execution(db, execution_id)
     if ex:
-        ex.metrics = metrics
+        existing = ex.metrics or {}
+        existing.update(metrics)
+        ex.metrics = existing
         from sqlalchemy.orm.attributes import flag_modified
         flag_modified(ex, "metrics")
         db.commit()
