@@ -71,13 +71,16 @@ class MoodleIntegration:
             }])
             logger.info(f"Curso creado (vacío): {shortname}")
             if template_id:
-                created = await self.service.get_courses(shortname=shortname)
-                if created:
-                    await self.service.import_course_content(
-                        from_id=template_id,
-                        to_id=int(created[0]["id"]),
-                    )
-                    logger.info(f"Plantilla {template_id} importada a {shortname}")
+                try:
+                    created = await self.service.get_courses(shortname=shortname)
+                    if created:
+                        await self.service.import_course_content(
+                            from_id=template_id,
+                            to_id=int(created[0]["id"]),
+                        )
+                        logger.info(f"Plantilla {template_id} importada a {shortname}")
+                except Exception as imp_e:
+                    logger.warning(f"Template {template_id} no se pudo importar a {shortname}: {imp_e}")
             return True
         except Exception as e:
             if is_moodle_overloaded(e):

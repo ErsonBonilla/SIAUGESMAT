@@ -223,12 +223,7 @@ class MoodleService:
 
         data = response.json()
 
-        if data is None:
-            raise MoodleAPIError(
-                f"Respuesta nula de {wsfunction}: la API devolvió null"
-            )
-
-        if not isinstance(data, (dict, list)):
+        if data is not None and not isinstance(data, (dict, list)):
             raise MoodleAPIError(
                 f"Respuesta inesperada de {wsfunction}: {str(data)[:300]}"
             )
