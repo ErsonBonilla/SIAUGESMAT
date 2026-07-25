@@ -103,7 +103,12 @@ class PeoplePhase(BasePhase):
             update_progress(db, eid, 72, "Matriculando docentes…", step=4)
 
             if _do_courses():
-                all_courses = await moodle_service.get_courses()
+                try:
+                    all_courses = await moodle_service.get_courses()
+                except Exception as e:
+                    if is_moodle_overloaded(e):
+                        raise MoodleOverloadedError(str(e)[:200])
+                    raise
                 course_map = {c["shortname"]: int(c["id"]) for c in all_courses if c.get("shortname")}
                 total_enrol = len(ctx.resolved_enrolments)
                 enrol_count = 0
@@ -142,6 +147,9 @@ class PeoplePhase(BasePhase):
                     _maybe_checkpoint()
 
         except Exception as e:
+            if is_moodle_overloaded(e):
+                _save_progress(ctx.people_progress or {})
+                raise MoodleOverloadedError(str(e)[:200])
             logger.exception(f"Error en FASE 4 (personas): {e}")
             log_repo.save_error(db, eid, "4", "", translate_error(e))
             metrics["total_errors"] += 1
