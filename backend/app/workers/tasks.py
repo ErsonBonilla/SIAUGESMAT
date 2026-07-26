@@ -29,7 +29,7 @@ from app.services.error_messages import translate_error
 from app.services.etl import ETLService
 from app.services.moodle import MoodleService
 from app.services.reports import ReportService
-from app.workers.etl_item_task import process_etl_item
+from app.workers.etl_item_task import process_etl_item, _refresh_phase_progress
 from app.workers.phases.base import PhaseContext, MoodleOverloadedError
 from app.workers.phases.phase1_consult import ConsultPhase
 from app.workers.phases.phase2_analyze import AnalyzePhase
@@ -523,18 +523,75 @@ def _create_phase4_items(db, execution_id, ctx_data, modalidad) -> Dict[str, int
         async def _resolve_course_map():
             moodle_config = settings.get_moodle_config(modalidad)
             ms = MoodleService(token=moodle_config["token"], base_url=moodle_config["url"],
-                               version=moodle_config["version"])
+                                version=moodle_config["version"])
             try:
                 all_courses = await ms.get_courses()
-                return {c["shortname"]: int(c["id"]) for c in all_courses if c.get("shortname")}
+                course_map = {c["shortname"]: int(c["id"]) for c in all_courses if c.get("shortname")}
+                missing = [sn for sn in all_sns if sn and sn not in course_map]
+                if missing:
+                    BATCH = 5
+                    for i in range(0, len(missing), BATCH):
+                        chunk = missing[i:i + BATCH]
+                        try:
+                            resolved = await ms.get_courses_by_shortnames(chunk)
+                            for c in resolved:
+                                if c.get("shortname"):
+                                    course_map[c["shortname"]] = int(c["id"])
+                        except Exception:
+                            for sn in chunk:
+                                try:
+                                    courses = await ms.get_courses_by_field("shortname", sn)
+                                    if courses and courses[0].get("id"):
+                                        course_map[sn] = int(courses[0]["id"])
+                                except Exception:
+                                    pass
+                return course_map
             finally:
                 await ms.close()
 
+        all_sns = list({enrol.get("course_shortname", "") for enrol in resolved_enrolments if enrol.get("course_shortname")})
         try:
             course_map = asyncio.run(_resolve_course_map())
         except Exception as e:
-            logger.warning(f"Error resolviendo course_map para matriculas: {e}")
+            logger.warning(f"Error resolviendo course_map global: {e}, intentando por shortname")
             course_map = {}
+            BATCH = 5
+            for i in range(0, len(all_sns), BATCH):
+                chunk = all_sns[i:i + BATCH]
+                try:
+                    async def _resolve_chunk():
+                        moodle_config = settings.get_moodle_config(modalidad)
+                        ms = MoodleService(token=moodle_config["token"], base_url=moodle_config["url"],
+                                            version=moodle_config["version"])
+                        try:
+                            resolved = await ms.get_courses_by_shortnames(chunk)
+                            chunk_map = {}
+                            for c in resolved:
+                                if c.get("shortname"):
+                                    chunk_map[c["shortname"]] = int(c["id"])
+                            return chunk_map
+                        finally:
+                            await ms.close()
+                    chunk_map = asyncio.run(_resolve_chunk())
+                    course_map.update(chunk_map)
+                except Exception:
+                    for sn in chunk:
+                        try:
+                            async def _resolve_single():
+                                moodle_config = settings.get_moodle_config(modalidad)
+                                ms = MoodleService(token=moodle_config["token"], base_url=moodle_config["url"],
+                                                    version=moodle_config["version"])
+                                try:
+                                    courses = await ms.get_courses_by_field("shortname", sn)
+                                    if courses and courses[0].get("id"):
+                                        return {sn: int(courses[0]["id"])}
+                                finally:
+                                    await ms.close()
+                                return {}
+                            single_map = asyncio.run(_resolve_single())
+                            course_map.update(single_map)
+                        except Exception:
+                            pass
 
         for enrol in resolved_enrolments:
             username = enrol.get("username", "")
@@ -594,7 +651,7 @@ def on_delete_items_done(self, results, execution_id):
             _launch_delete_chord(execution_id, pending_deletes)
             return
 
-        update_progress(db, execution_id, 44, "Deletes completados, lanzando estructura…", step=3)
+        _refresh_phase_progress(execution_id)
         structure_items = _get_pending_items(db, execution_id, "3", "structure")
         if structure_items:
             _launch_structure_chord(execution_id, structure_items)

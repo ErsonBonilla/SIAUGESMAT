@@ -147,6 +147,8 @@ class DistanciaParser(BaseExcelParser):
             f"{cat_prefix}_{cod_prog}_s{semestre_romano}_{cod_curso}"
             f"_G-{grupo}{cedula_suffix}"
         )
+        if len(shortname) > 255:
+            logger.warning(f"Shortname excede 255 caracteres: {shortname[:80]}... (longitud={len(shortname)})")
         fullname = f"{nombre_curso} - GRUPO {grupo}".upper() if nombre_curso else f"CURSO {cod_curso} - GRUPO {grupo}".upper()
         cat_idnumber = f"{cat_prefix}_{cod_prog}_s{semestre_romano}"
         template = f"PORTAFOLIO_{cod_prog}_s{semestre_romano}_{cod_curso}" if cod_curso else None

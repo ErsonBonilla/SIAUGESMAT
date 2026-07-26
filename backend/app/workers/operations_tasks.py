@@ -135,6 +135,15 @@ async def _process_single_item(item, batch, moodle, db):
                 cat_data["visible"] = int(detail["visible"])
             await moodle.create_categories([cat_data])
 
+    elif batch.action == "visibility":
+        if batch.entity_type == "courses":
+            detail = item.detail or {}
+            visible = 1 if detail.get("visibility") == "show" else 0
+            courses = await moodle.get_courses_by_field("shortname", item.identifier)
+            if not courses:
+                raise ValueError(f"Curso no encontrado en Moodle: {item.identifier}")
+            await moodle.update_courses([{"id": int(courses[0]["id"]), "visible": visible}])
+
     update_item(db, item.id, "completed")
     update_batch_counts(db, batch.batch_id, completed=1)
 

@@ -1,4 +1,4 @@
-// routes/crear/cursos.tsx
+// routes/cursos/crear.tsx
 import { requireAuth } from "../../utils/auth-guard.ts";
 import UploadIsland from "../../islands/UploadIsland.tsx";
 

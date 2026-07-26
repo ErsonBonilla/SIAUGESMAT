@@ -210,6 +210,17 @@ async def delete_users_csv(
     return await _handle_upload(file, db, current_user, entity_type="users", action="delete")
 
 
+@router.post("/courses/visibility", response_model=CsvUploadResponse,
+             summary="Cambiar visibilidad de cursos masivamente")
+async def bulk_course_visibility(
+    file: UploadFile = File(...),
+    visibility: str = Query("show", regex="^(show|hide)$"),
+    db: Session = Depends(get_db),
+    current_user: UserInToken = Depends(get_current_user),
+):
+    return await _handle_visibility_upload(file, db, current_user, visibility)
+
+
 @router.post("/users/create-csv", response_model=CsvUploadResponse, summary="Crear usuarios masivamente")
 async def create_users_csv(
     file: UploadFile = File(...),
@@ -395,6 +406,43 @@ def get_operations_history(
     from app.schemas.operations import OperationMonthlyMetrics
     return OperationsAnalyticsResponse(
         history=[OperationMonthlyMetrics(**m) for m in history],
+    )
+
+
+async def _handle_visibility_upload(file, db, current_user, visibility: str):
+    config = ENTITY_CONFIG["courses"]
+
+    if not file.filename or not file.filename.endswith(".csv"):
+        raise HTTPException(400, "Solo se aceptan archivos CSV")
+
+    content = await file.read()
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(400, "El archivo no es un texto UTF-8 válido")
+
+    try:
+        identifiers = _validate_and_parse_csv(text, config["column"], config["label_plural"])
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+    batch_id = str(uuid.uuid4())
+    create_batch(db, batch_id, "courses", "visibility", len(identifiers), current_user.modalidad)
+
+    for identifier in identifiers:
+        add_item(db, batch_id, identifier, detail={"visibility": visibility})
+    db.commit()
+
+    process_operation_batch.delay(batch_id)
+
+    verb_label = "mostrar" if visibility == "show" else "ocultar"
+    logger.info(f"Lote {batch_id} (cambiar visibilidad a {visibility} de {len(identifiers)} cursos) "
+                f"encolado por {current_user.username}")
+
+    return CsvUploadResponse(
+        batch_id=batch_id, entity_type="courses", action="visibility",
+        total=len(identifiers),
+        message=f"Se encolaron {len(identifiers)} cursos para {verb_label}.",
     )
 
 

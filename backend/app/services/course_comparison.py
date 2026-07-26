@@ -101,8 +101,9 @@ class CourseComparisonService:
                 existing_prof = cls._get_course_professor(existing)
 
                 if sn not in courses_with_teacher:
-                    action, detail = "alert_orphan", {
+                    action, detail = "recreate", {
                         "reason": "orphan_course",
+                        "old_shortname": existing.get("shortname", sn),
                         "professor": professor,
                         "old_professor": existing_prof or "",
                     }
@@ -140,7 +141,8 @@ class CourseComparisonService:
                         # No coincide sufijo → buscar por profesor (migración)
                         match = next(
                             (c for c in candidates
-                             if cls._get_course_professor(c) == professor),
+                             if cls._get_course_professor(c) == professor
+                             or c.get("shortname", "") in courses_with_teacher),
                             None,
                         )
                         if match:

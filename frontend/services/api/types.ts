@@ -152,3 +152,10 @@ export interface OperationsHistoryItem {
   courses_deleted: number;
   total_errors: number;
 }
+
+export interface BulkVisibilityResult {
+  updated: number;
+  failed: number;
+  not_found: number;
+  duration_seconds: number;
+}

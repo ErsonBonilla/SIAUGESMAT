@@ -70,9 +70,9 @@ Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y m
 | Fase | Clase | Descripción | Progreso |
 |---|---|---|---|
 | **FASE 1** | `ConsultPhase` | Parsear Excel + consultar Moodle (categorías, cursos, usuarios). Resuelve docentes por email en batch. | 0% → 20% |
-| **FASE 2** | `AnalyzePhase` | Comparar cursos contra Moodle. Determina crear, eliminar, activar, ocultar o renombrar. | 20% → 40% |
-| **FASE 3** | `StructurePhase` | Ejecutar cambios estructurales: categorías, batch delete, activar, ocultar, renombrar y crear cursos. | 40% → 65% |
-| **FASE 4** | `PeoplePhase` | Crear usuarios nuevos + matricular docentes en sus cursos. | 65% → 85% |
+| **FASE 2** | `AnalyzePhase` | Comparar cursos contra Moodle con matching en 3 niveles (exacto → base key → core key). Determina crear, eliminar, activar, ocultar o renombrar. | 20% → 34% |
+| **FASE 3** | `process_etl_phase` | Ejecutar cambios estructurales vía Celery chords en 2 oleadas: (1) delete, (2) activate, hide, rename, create cursos. | 34% → 62% |
+| **FASE 4** | `process_etl_phase` | Crear usuarios nuevos en Moodle + matricular docentes como editingteacher en sus cursos vía Celery chord. | 65% → 85% |
 | **FASE 5** | `ReportService` | Generar 14 CSVs + 5 gráficos Plotly + ZIP con todo. | 85% → 100% |
 
 ### Destacados
@@ -95,6 +95,7 @@ Sube archivos CSV para crear o eliminar entidades en lote.
 
 | Operación | Endpoint | CSV requerido |
 |---|---|---|
+| **Mostrar/Ocultar cursos** | `POST /operations/courses/visibility?visibility=show\|hide` | `shortname` |
 | **Crear usuarios** | `POST /operations/users/create-csv` | `username, firstname, lastname, email, role1, password, forcepasswordchange` |
 | **Crear categorías** | `POST /operations/categories/create-csv` | `name, idnumber, parent, description, visible` |
 | **Eliminar cursos** | `POST /operations/courses/upload-csv` | `shortname` |
@@ -119,28 +120,36 @@ Procesado por `query_tasks.py` (Celery).
 
 ## Interfaz de usuario
 
-### Sidebar con 5 secciones
+### Sidebar con 4 tarjetas principales
 
-| Sección | Items |
-|---|---|
-| **Carga académica** | Crear Cursos, Crear Usuarios, Crear Categorías |
-| **Mantenimiento** | Eliminar Cursos, Eliminar Usuarios, Eliminar Categorías |
-| **Operaciones** | Ejecuciones (unifica ETL + lotes con 6 tabs), Histórico (métricas ETL + operaciones masivas) |
-| **Consultas** | Cursos, Usuarios, Categorías |
+| Tarjeta | Hub page | Sub-opciones |
+|---|---|---|
+| **Usuarios** | `/usuarios` | Consultar, Crear, Eliminar |
+| **Cursos** | `/cursos` | Consultar, Crear, Eliminar, Visibilidad |
+| **Categorías** | `/categorias` | Consultar, Crear, Eliminar |
+| **Operaciones** | `/operaciones` | Ejecuciones, Histórico |
+
+Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic en una sub-opción, navega a la ruta funcional correspondiente.
 
 ### Páginas principales
 
 | Ruta | Contenido |
 |---|---|
 | `/dashboard` | KPI cards, minigráfico SVG, última ejecución, tabla de ejecuciones recientes |
-| `/crear/cursos` | FileUploader — sube Excel y lanza ETL |
-| `/crear/usuarios` | CsvUploader para creación de usuarios |
-| `/crear/categorias` | CsvUploader para creación de categorías |
+| `/cursos/crear` | FileUploader — sube Excel y lanza ETL |
+| `/cursos/consultar` | QueryTable — búsqueda de cursos por shortname con match parcial |
+| `/cursos/eliminar` | CsvUploader — eliminación masiva de cursos vía CSV |
+| `/cursos/visibilidad` | BulkVisibilityIsland — mostrar/ocultar cursos masivamente vía CSV |
+| `/usuarios/crear` | CsvUploader — creación masiva de usuarios |
+| `/usuarios/consultar` | QueryTable — búsqueda de usuarios por username/email |
+| `/usuarios/eliminar` | CsvUploader — eliminación masiva de usuarios |
+| `/categorias/crear` | CsvUploader — creación masiva de categorías |
+| `/categorias/consultar` | QueryTable — búsqueda de categorías por idnumber |
+| `/categorias/eliminar` | CsvUploader — eliminación masiva de categorías |
 | `/operaciones/ejecuciones` | Tabs (Crear/Eliminar Cursos/Usuarios/Categorías) con ExecutionList + OperationList |
 | `/operaciones/historico` | Tabs con gráficos Plotly theme-aware + tabla de datos |
 | `/jobs/{id}` | Detalle de ejecución con progreso en vivo, métricas, errores paginados |
 | `/reportes?execution_id={id}` | Descarga de 14 CSVs + 5 gráficos Plotly |
-| `/consultas/{entity}` | QueryTable con búsqueda y descarga CSV |
 
 ### Islas principales
 
@@ -149,17 +158,19 @@ Procesado por `query_tasks.py` (Celery).
 | `ExecutionList` | Tabla de ejecuciones ETL con filtros, paginación, acciones (Procesar, Eliminar, ZIP, Reportes) |
 | `OperationList` | Tabla de lotes con filtros bloqueables por entidad/acción |
 | `DashboardIsland` | KPI cards, minigráfico, semáforo, ejecuciones recientes |
-| `CsvUploader` | Formulario genérico de carga CSV con validación |
+| `CsvUploader` | Formulario genérico de carga CSV con validación y polling de progreso |
+| `BulkVisibilityIsland` | Selector mostrar/ocultar + carga CSV + polling de progreso de visibilidad de cursos |
 | `QueryTable` | Búsqueda asíncrona con polling y descarga CSV |
 | `HistoricoIsland` | Evolución semestral y comparación con Chart.js |
 | `OperationHistorico` | Gráfico Plotly theme-aware con métricas adaptativas por operación |
-| `Sidebar` | Navegación con secciones, avatar, ThemeToggle |
+| `Sidebar` | Navegación con 4 tarjetas (Usuarios, Cursos, Categorías, Operaciones), avatar, ThemeToggle |
 | `JobDetailIsland` | Progreso en vivo con polling, métricas, errores paginados |
 
 ### Componentes compartidos
 
 | Componente | Dónde se usa |
 |---|---|
+| `HubCard` | 4 hub pages (usuarios, cursos, categorias, operaciones) — tarjeta con icono, título, descripción |
 | `ErrorBox` | 8+ islas — mensaje de error con icono |
 | `Pagination` | ExecutionList, OperationList — anterior/siguiente |
 | `LoadingSkeleton` | 6+ islas — variantes `table`, `chart`, `kpi` |
@@ -185,8 +196,9 @@ SIAUGESMAT/
 │   │   ├── services/           # moodle.py (MoodleService), etl.py, course_comparison.py,
 │   │   │                       # reports.py, charts.py, parsers/ (DistanciaParser, patterns)
 │   │   │                       # moodle_adapter.py, rate_limiter.py
-│   │   ├── workers/            # tasks.py (ETL), phases/ (phase1_consult, phase2_analyze, phase3_structure, phase4_people),
-│   │   │                       # operations_tasks.py, query_tasks.py, cleanup_tasks.py
+│   │   ├── workers/            # tasks.py (ETL), phases/ (phase1_consult, phase2_analyze),
+│   │   │                       # operations_tasks.py, query_tasks.py, cleanup_tasks.py, etl_item_task.py
+│   │   ├── scripts/            # bulk_course_visibility.py (CLI para mostrar/ocultar cursos en lote)
 │   │   ├── celery_app.py       # Config Celery + beat schedule
 │   │   └── main.py
 │   ├── tests/                  # 177 tests (ETL, repos, phases, pipeline, analytics, API)
@@ -204,13 +216,13 @@ SIAUGESMAT/
 │   │                           # JobDetailIsland, ReportesIsland, Chart, MetricsChart,
 │   │                           # SemesterComparison, LoginForm, LoginPageIsland, UploadIsland
 │   ├── routes/                 # _app.tsx, _middleware.ts, index.tsx, login.tsx, dashboard.tsx
-│   │   ├── crear/              # cursos.tsx, usuarios.tsx, categorias.tsx
-│   │   ├── mantenimiento/      # cursos.tsx, categorias.tsx, usuarios.tsx
-│   │   ├── operaciones/        # index.tsx, ejecuciones.tsx, historico.tsx
-│   │   ├── consultas/          # cursos.tsx, categorias.tsx, usuarios.tsx
+│   │   ├── usuarios/           # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
+│   │   ├── cursos/             # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx, visibilidad.tsx
+│   │   ├── categorias/         # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
+│   │   ├── operaciones/        # index.tsx (hub), ejecuciones.tsx, historico.tsx
 │   │   ├── jobs/               # [id].tsx
 │   │   ├── reportes.tsx        # Redirects: ejecuciones.tsx, historico.tsx, upload.tsx
-│   ├── services/api.ts         # Barrel re-export → api/ (types, core, auth, jobs, analytics, reports, operations, queries)
+│   ├── services/api.ts         # Barrel re-export → api/ (types, core, auth, jobs, analytics, reports, operations, queries, mantenimiento)
 │   ├── utils/                  # theme.ts, plotly.ts, profile.ts, operations-tabs.ts, constants.ts,
 │   │                           # auth.ts, auth-guard.ts, cache.ts, date.ts, icons.tsx, toast.ts, reports.ts
 │   ├── static/styles.css       # Estilos globales, animaciones, responsive

@@ -688,9 +688,12 @@ class MoodleService:
             user_id = user_map.get(enrol.get("username"))
             course_id = course_map.get(enrol.get("course_shortname"))
             if not user_id or not course_id:
-                msg = (
-                    f"user={enrol.get('username')}, course={enrol.get('course_shortname')}"
-                )
+                if not user_id and not course_id:
+                    msg = f"Usuario y curso no encontrados: {enrol.get('username')} / {enrol.get('course_shortname')}"
+                elif not user_id:
+                    msg = f"Usuario no encontrado en Moodle: {enrol.get('username')}"
+                else:
+                    msg = f"Curso no encontrado en Moodle: {enrol.get('course_shortname')}"
                 errors.append(msg)
                 logger.error(f"No se pudo matricular: {msg}")
                 continue

@@ -56,10 +56,10 @@ class ExecutionOut(BaseModel):
 
     @model_validator(mode="after")
     def compute_eta(self):
-        if self.status == "running" and self.progress_pct is not None and self.progress_updated_at:
+        if self.status == "running" and self.progress_pct is not None and self.started_at:
             pct = self.progress_pct
-            elapsed = (datetime.now(timezone.utc) - self.progress_updated_at).total_seconds()
-            if elapsed > 5 and pct is not None and pct > 0:
+            elapsed = (datetime.now(timezone.utc) - self.started_at).total_seconds()
+            if elapsed > 5 and pct > 0:
                 rate = pct / elapsed
                 if rate > 0:
                     eta = (100 - pct) / rate

@@ -4,6 +4,7 @@ from typing import Dict, List, Set
 from app.repositories import log_repo
 from app.repositories.execution_repo import update_progress
 from app.services.course_comparison import SIAUGESMAT_PATTERN
+from app.services.parsers.patterns import parse_shortname
 from app.services.error_messages import translate_error
 from app.workers.phases.base import BasePhase, PhaseContext
 
@@ -92,6 +93,7 @@ class ConsultPhase(BasePhase):
             courses_with_teacher: Set[str] = set()
             if mode in ("courses", "both"):
                 teacher_emails_by_course: Dict[str, List[str]] = {}
+                teacher_emails_by_base_key: Dict[tuple, List[str]] = {}
                 for enr in etl_data["enrolments"]:
                     sn = enr["course_shortname"]
                     user = next(
@@ -101,10 +103,21 @@ class ConsultPhase(BasePhase):
                     if user:
                         emails = [e for e in [user.get("email"), user.get("email_personal")] if e]
                         teacher_emails_by_course.setdefault(sn, []).extend(emails)
+                        parsed = parse_shortname(sn)
+                        if parsed:
+                            bk = (parsed["cat_prefix"], parsed["cod_prog"], parsed["semestre"],
+                                  parsed["cod_curso"], parsed["grupo"])
+                            teacher_emails_by_base_key.setdefault(bk, []).extend(emails)
 
                 for c in ctx.existing_courses:
                     sn = c.get("shortname", "")
                     emails = teacher_emails_by_course.get(sn, [])
+                    if not emails:
+                        parsed = parse_shortname(sn)
+                        if parsed:
+                            bk = (parsed["cat_prefix"], parsed["cod_prog"], parsed["semestre"],
+                                  parsed["cod_curso"], parsed["grupo"])
+                            emails = teacher_emails_by_base_key.get(bk, [])
                     teachers = await moodle_service.get_enrolled_teachers(int(c["id"]), emails)
                     if teachers:
                         courses_with_teacher.add(sn)
