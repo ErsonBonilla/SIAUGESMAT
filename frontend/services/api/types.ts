@@ -10,16 +10,11 @@ export interface Execution {
   errors_count: number;
   current_phase?: string | null;
   progress_pct?: number | null;
-  progress_updated_at?: string | null;
   current_step?: number | null;
-  eta_seconds?: number | null;
   started_at: string | null;
   completed_at: string | null;
   duration_seconds: number | null;
   modalidad: string | null;
-  moodle_version?: string | null;
-  report_dir?: string | null;
-  celery_task_id?: string | null;
   created_at: string;
 }
 
@@ -151,11 +146,4 @@ export interface OperationsHistoryItem {
   categories_deleted: number;
   courses_deleted: number;
   total_errors: number;
-}
-
-export interface BulkVisibilityResult {
-  updated: number;
-  failed: number;
-  not_found: number;
-  duration_seconds: number;
 }

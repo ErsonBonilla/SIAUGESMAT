@@ -17,11 +17,14 @@ import { REPORT_LABELS, formatSize } from "../utils/reports.ts";
 import { toast } from "../utils/toast.ts";
 
 const CHART_NAMES: Record<string, string> = {
-  resumen_ejecutivo: "Resumen ejecutivo",
-  tasa_exito: "Tasa de éxito de matrícula",
-  top_programas: "Top programas",
-  distribucion_usuarios: "Distribución de usuarios",
-  top_incidencias: "Top incidencias",
+  resumen_operaciones: "Resumen de operaciones",
+  distribucion_incidencias: "Distribución de incidencias",
+  cursos_por_accion: "Cursos por tipo de acción",
+  matriculas_por_semestre: "Matrículas por semestre",
+  cursos_por_semestre: "Cursos creados por semestre",
+  profesores_por_semestre: "Profesores únicos por semestre",
+  tasa_exito_por_semestre: "Tasa de éxito por semestre",
+  distribucion_programas: "Distribución por programa académico",
 };
 
 interface Props {

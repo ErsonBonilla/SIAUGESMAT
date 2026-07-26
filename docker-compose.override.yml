@@ -4,10 +4,6 @@ services:
   redis:
     ports: ["6379:6379"]
   backend:
-    volumes:
-      - ./backend/app:/app/app:ro
-  worker:
-    volumes:
-      - ./backend/app:/app/app:ro
+    ports: ["8000:8000"]
   frontend:
     ports: ["3000:3000"]

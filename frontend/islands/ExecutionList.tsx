@@ -2,19 +2,15 @@
 import { useSignal, useComputed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import {
-  cancelExecution,
   listExecutions,
   downloadReport,
   startProcess,
-  resumeExecution,
-  confirmExecution,
-  pauseExecution,
   deleteExecution,
   BASE_URL,
   type Execution,
 } from "../services/api.ts";
 import { toast } from "../utils/toast.ts";
-import { STATUS_COLORS, STATUS_LABELS, MODE_LABELS } from "../utils/constants.ts";
+import { STATUS_COLORS, STATUS_LABELS } from "../utils/constants.ts";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
@@ -29,10 +25,6 @@ export default function ExecutionList() {
   const downloading = useSignal<number | null>(null);
   const processing = useSignal<number | null>(null);
   const deleting = useSignal<number | null>(null);
-  const confirming = useSignal<number | null>(null);
-  const pausing = useSignal<number | null>(null);
-  const resuming = useSignal<number | null>(null);
-  const cancelling = useSignal<number | null>(null);
 
   const filterSemester = useSignal("");
   const filterStatus = useSignal("");
@@ -120,60 +112,6 @@ export default function ExecutionList() {
     }
   }
 
-  async function handleConfirm(execId: number) {
-    if (!window.confirm("¿Confirmar la eliminación masiva de cursos? Esta acción continuará con el procesamiento.")) return;
-    confirming.value = execId;
-    try {
-      await confirmExecution(execId);
-      toast("Procesamiento reanudado con eliminación masiva confirmada", "success");
-      load();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Error al confirmar", "error");
-    } finally {
-      confirming.value = null;
-    }
-  }
-
-  async function handlePause(execId: number) {
-    pausing.value = execId;
-    try {
-      await pauseExecution(execId);
-      toast("Ejecución pausada", "success");
-      load();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Error al pausar", "error");
-    } finally {
-      pausing.value = null;
-    }
-  }
-
-  async function handleResume(execId: number) {
-    resuming.value = execId;
-    try {
-      await resumeExecution(execId);
-      toast("Ejecución reanudada", "success");
-      load();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Error al reanudar", "error");
-    } finally {
-      resuming.value = null;
-    }
-  }
-
-  async function handleCancel(execId: number) {
-    if (!window.confirm("¿Cancelar esta ejecución? Se detendrá el procesamiento en curso.")) return;
-    cancelling.value = execId;
-    try {
-      await cancelExecution(execId);
-      toast("Ejecución cancelada", "success");
-      load();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Error al cancelar", "error");
-    } finally {
-      cancelling.value = null;
-    }
-  }
-
   function clearFilters() {
     filterSemester.value = "";
     filterStatus.value = "";
@@ -212,11 +150,7 @@ export default function ExecutionList() {
             <option value="completed">Completado</option>
             <option value="running">En ejecución</option>
             <option value="pending">Pendiente</option>
-            <option value="queued">Encolado</option>
-            <option value="paused">Pausado</option>
-            <option value="cancelled">Cancelado</option>
             <option value="failed">Fallido</option>
-            <option value="review_required">Revisión requerida</option>
           </select>
         </div>
         <div>
@@ -288,7 +222,7 @@ export default function ExecutionList() {
                         )
                         : <span class="text-[var(--text-muted)]">—</span>}
                     </td>
-                    <td class="py-3 px-2">{MODE_LABELS[exec.mode] || exec.mode}</td>
+                    <td class="py-3 px-2 capitalize">{exec.mode}</td>
                     <td class="py-3 px-2">
                       <span
                         class={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
@@ -299,54 +233,46 @@ export default function ExecutionList() {
                       </span>
                     </td>
                     <td class="py-3 px-2 text-right whitespace-nowrap">
-                      {exec.status === "completed" && (
-                        <>
-                          <button
-                            onClick={() => handleDownloadZip(exec.id)}
-                            disabled={downloading.value !== null}
-                            class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium disabled:opacity-50"
-                          >
-                            {downloading.value === exec.id
-                              ? (
-                                <span class="inline-flex items-center gap-1">
-                                  <span class="w-3 h-3 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
-                                  ZIP
-                                </span>
-                              )
-                              : "ZIP"}
-                          </button>
-                          <span class="text-[var(--text-muted)] mx-1">|</span>
-                        </>
-                      )}
-                      {exec.status === "completed" && (
-                        <>
-                          <a
-                            href={`/reportes?execution_id=${exec.id}`}
-                            class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium"
-                          >
-                            Reportes
-                          </a>
-                          <span class="text-[var(--text-muted)] mx-1">|</span>
-                        </>
-                      )}
+                      <button
+                        onClick={() => handleDownloadZip(exec.id)}
+                        disabled={downloading.value !== null}
+                        class="gradient-text hover:brightness-110 text-sm font-medium disabled:opacity-50"
+                      >
+                        {downloading.value === exec.id
+                          ? (
+                            <span class="inline-flex items-center gap-1">
+                              <span class="w-3 h-3 border-2 gradient-text/80 border-t-transparent rounded-full animate-spin" />
+                              ZIP
+                            </span>
+                          )
+                          : "ZIP"}
+                      </button>
+                      <span class="text-[var(--text-muted)] mx-1">|</span>
+                      <a
+                        href={`/reportes?execution_id=${exec.id}`}
+                        class="gradient-text hover:brightness-110 text-sm font-medium"
+                      >
+                        Reportes
+                      </a>
+                      <span class="text-[var(--text-muted)] mx-1">|</span>
                       <a
                         href={`/jobs/${exec.id}`}
                         class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm"
                       >
                         Detalle
                       </a>
-                      {(exec.status === "pending" || exec.status === "queued" || exec.status === "failed" || exec.status === "review_required" || exec.status === "cancelled") && (
+                      {exec.status === "pending" && (
                         <>
                           <span class="text-[var(--text-muted)] mx-1">|</span>
                           <button
                             onClick={() => handleProcess(exec.id)}
                             disabled={processing.value !== null}
-                            class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium disabled:opacity-50"
+                            class="gradient-text hover:brightness-110 text-sm font-medium disabled:opacity-50"
                           >
                             {processing.value === exec.id
                               ? (
                                 <span class="inline-flex items-center gap-1">
-                                  <span class="w-3 h-3 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
+                                  <span class="w-3 h-3 border-2 gradient-text/80 border-t-transparent rounded-full animate-spin" />
                                   Encolando
                                 </span>
                               )
@@ -354,98 +280,22 @@ export default function ExecutionList() {
                           </button>
                         </>
                       )}
-                      {(exec.status === "pending" || exec.status === "failed" || exec.status === "review_required" || exec.status === "cancelled" || exec.status === "queued") && (
+                      {(exec.status === "pending" || exec.status === "failed") && (
                         <>
                           <span class="text-[var(--text-muted)] mx-1">|</span>
                           <button
                             onClick={() => handleDelete(exec.id)}
                             disabled={deleting.value !== null}
-                            class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium disabled:opacity-50"
+                            class="text-[var(--brand-red)] hover:brightness-125 text-sm font-medium disabled:opacity-50"
                           >
                             {deleting.value === exec.id
                               ? (
                                 <span class="inline-flex items-center gap-1">
-                                  <span class="w-3 h-3 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
+                                  <span class="w-3 h-3 border-2 border-[var(--brand-red)] border-t-transparent rounded-full animate-spin" />
                                   Eliminando
                                 </span>
                               )
                               : "Eliminar"}
-                          </button>
-                        </>
-                      )}
-                      {exec.status === "review_required" && (
-                        <>
-                          <span class="text-[var(--text-muted)] mx-1">|</span>
-                          <button
-                            onClick={() => handleConfirm(exec.id)}
-                            disabled={confirming.value !== null}
-                            class="text-[var(--brand-orange)] hover:text-[var(--brand-orange)] text-sm font-semibold disabled:opacity-50"
-                          >
-                            {confirming.value === exec.id
-                              ? (
-                                <span class="inline-flex items-center gap-1">
-                                  <span class="w-3 h-3 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
-                                  Confirmando
-                                </span>
-                              )
-                              : "Confirmar"}
-                          </button>
-                        </>
-                      )}
-                      {exec.status === "paused" && (
-                        <>
-                          <span class="text-[var(--text-muted)] mx-1">|</span>
-                          <button
-                            onClick={() => handleResume(exec.id)}
-                            disabled={resuming.value !== null}
-                            class="text-[var(--brand-orange)] hover:text-[var(--brand-orange)] text-sm font-semibold disabled:opacity-50"
-                          >
-                            {resuming.value === exec.id
-                              ? (
-                                <span class="inline-flex items-center gap-1">
-                                  <span class="w-3 h-3 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
-                                  Reanudando
-                                </span>
-                              )
-                              : "Reanudar"}
-                          </button>
-                        </>
-                      )}
-                      {exec.status === "running" && (
-                        <>
-                          <span class="text-[var(--text-muted)] mx-1">|</span>
-                          <button
-                            onClick={() => handlePause(exec.id)}
-                            disabled={pausing.value !== null}
-                            class="text-[var(--accent)] hover:text-[var(--accent)] text-sm font-medium disabled:opacity-50"
-                          >
-                            {pausing.value === exec.id
-                              ? (
-                                <span class="inline-flex items-center gap-1">
-                                  <span class="w-3 h-3 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
-                                  Pausando
-                                </span>
-                              )
-                              : "Pausar"}
-                          </button>
-                        </>
-                      )}
-                      {["running", "paused", "queued"].includes(exec.status) && (
-                        <>
-                          <span class="text-[var(--text-muted)] mx-1">|</span>
-                          <button
-                            onClick={() => handleCancel(exec.id)}
-                            disabled={cancelling.value !== null}
-                            class="text-red-500 hover:text-red-600 text-sm font-medium disabled:opacity-50"
-                          >
-                            {cancelling.value === exec.id
-                              ? (
-                                <span class="inline-flex items-center gap-1">
-                                  <span class="w-3 h-3 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
-                                  Cancelando
-                                </span>
-                              )
-                              : "Cancelar"}
                           </button>
                         </>
                       )}

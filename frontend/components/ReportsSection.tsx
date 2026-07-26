@@ -10,6 +10,7 @@ const REPORT_GROUPS = [
     icon: "⚠️",
     keys: [
       "inc_usuarios_inactivos",
+      "inc_correo_no_institucional",
       "inc_cursos_recientes",
       "inc_plantilla_no_encontrada",
       "inc_correos_duplicados",
@@ -22,12 +23,9 @@ const REPORT_GROUPS = [
       "audit_categorias_creadas",
       "audit_cursos_creados",
       "audit_cursos_eliminados",
-      "audit_cursos_ocultados",
-      "audit_cursos_renombrados",
+      "audit_cursos_cambio_grupo",
       "audit_cursos_activados",
-      "audit_usuarios",
-      "audit_matriculas",
-      "audit_errores",
+      "audit_usuarios_creados",
     ],
   },
   {

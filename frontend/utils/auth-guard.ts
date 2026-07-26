@@ -1,17 +1,7 @@
 import { Handlers } from "$fresh/server.ts";
 
-function getCookie(name: string, req: Request): string | null {
-  const cookie = req.headers.get("cookie");
-  if (!cookie) return null;
-  for (const part of cookie.split(";")) {
-    const [key, ...rest] = part.trim().split("=");
-    if (key === name) return rest.join("=");
-  }
-  return null;
-}
-
 function tokenPresent(req: Request): boolean {
-  return getCookie("auth_token", req) !== null;
+  return req.headers.get("cookie")?.includes("auth_token=") ?? false;
 }
 
 export function requireAuth(): Handlers {

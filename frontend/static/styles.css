@@ -33,20 +33,6 @@
   animation: shimmer 3s linear infinite, glow-pulse 2s ease-in-out infinite;
 }
 
-.progress-bar {
-  background: linear-gradient(to right, var(--brand-red), var(--brand-green));
-  transition: width 0.6s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1));
-}
-
-@keyframes phasePulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-.phase-active {
-  animation: phasePulse 1.2s ease-in-out infinite;
-  background: linear-gradient(to right, var(--brand-red), var(--brand-green));
-}
-
 .report-row:hover {
   filter: brightness(0.9);
 }
@@ -143,8 +129,6 @@ html.dark .status-yellow { background-color: #713f12; color: #fef08a; }
 html.dark .status-red { background-color: #7f1d1d; color: #fecaca; }
 .status-gray { background-color: #f3f4f6; color: #374151; }
 html.dark .status-gray { background-color: #374151; color: #f3f4f6; }
-.status-orange { background-color: #fed7aa; color: #9a3412; }
-html.dark .status-orange { background-color: #7c2d12; color: #fed7aa; }
 
 .error-msg {
   font-size: 0.8125rem;

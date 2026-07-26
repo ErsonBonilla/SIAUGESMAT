@@ -85,7 +85,7 @@ services:
       MOODLE_BURST_SIZE: ${MOODLE_BURST_SIZE:-10}
 
       # Seguridad JWT
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-cambiar-esta-clave-en-produccion}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
 
       # Umbrales del semáforo de analítica
@@ -102,7 +102,7 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
 
       # Job timeout (segundos)
-      JOB_TIMEOUT: ${JOB_TIMEOUT:-28800}
+      JOB_TIMEOUT: ${JOB_TIMEOUT:-7200}
 
       # Plantilla de curso para ETL
       DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE}
@@ -131,11 +131,7 @@ services:
     image: siaugesmat-backend:latest
     container_name: siaugesmat-worker
     restart: unless-stopped
-    command: celery -A app.celery_app worker --loglevel=info --concurrency=4 --max-tasks-per-child=1 --prefetch-multiplier=1
-    deploy:
-      resources:
-        limits:
-          memory: 2g
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=1
     environment:
       # Mismas variables que el backend para que el worker pueda operar
       MOODLE_URL: ${MOODLE_URL:-}
@@ -157,7 +153,7 @@ services:
       MOODLE_BURST_SIZE: ${MOODLE_BURST_SIZE:-10}
 
       UPLOAD_DIR: /app/uploads
-      JOB_TIMEOUT: ${JOB_TIMEOUT:-28800}
+      JOB_TIMEOUT: ${JOB_TIMEOUT:-7200}
 
       DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE}
 
@@ -212,7 +208,6 @@ services:
     environment:
       # El frontend apunta internamente al backend
       BACKEND_URL: http://backend:8000/api/v1
-      DOCKER_ENV: "1"
     networks:
       - siaugesmat-net
     depends_on:

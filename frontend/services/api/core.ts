@@ -1,7 +1,7 @@
 // services/api/core.ts
 import { getToken, removeToken, removeTokenCookie } from "../../utils/auth.ts";
 
-export const BASE_URL = "/api/v1";
+export const BASE_URL = (typeof Deno !== "undefined" ? Deno.env.get("BACKEND_URL") : undefined) || "http://localhost:8000/api/v1";
 
 export function authHeaders(): Record<string, string> {
   const token = getToken();

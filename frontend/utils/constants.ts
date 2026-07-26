@@ -18,27 +18,13 @@ export const SEMAPHORE_TEXTS: Record<string, string> = {
 export const STATUS_COLORS: Record<string, string> = {
   completed: "status-green",
   running: "status-blue",
-  queued: "status-yellow",
   pending: "status-yellow",
-  paused: "status-blue",
   failed: "status-red",
-  review_required: "status-orange",
-  cancelled: "status-gray",
 };
 
 export const STATUS_LABELS: Record<string, string> = {
   completed: "Completado",
   running: "En ejecución",
-  queued: "Encolado",
   pending: "Pendiente",
-  paused: "Pausado",
   failed: "Fallido",
-  review_required: "Revisión requerida",
-  cancelled: "Cancelado",
-};
-
-export const MODE_LABELS: Record<string, string> = {
-  both: "Completo",
-  courses: "Solo cursos",
-  users: "Solo usuarios",
 };

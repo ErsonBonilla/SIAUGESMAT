@@ -48,20 +48,6 @@ export function formatDuration(totalSeconds: number | null | undefined): string 
 }
 
 /**
- * Formatea segundos restantes a texto legible.
- * Ejemplo: 3661 → "~1h 1m"
- */
-export function formatEta(totalSeconds: number | null | undefined): string {
-  if (totalSeconds == null || totalSeconds <= 0) return "";
-  if (totalSeconds < 60) return `~${Math.round(totalSeconds)}s`;
-  if (totalSeconds < 3600) return `~${Math.round(totalSeconds / 60)} min`;
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.round((totalSeconds % 3600) / 60);
-  if (m === 0) return `~${h}h`;
-  return `~${h}h ${m}min`;
-}
-
-/**
  * Valida que un string tenga el formato de semestre esperado: 4 dígitos + A o B.
  * Ejemplo: "2025A", "2024B".
  */
