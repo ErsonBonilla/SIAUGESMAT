@@ -30,7 +30,8 @@ engine_kwargs = {
 if not _is_sqlite:
     engine_kwargs["pool_size"] = 10
     engine_kwargs["max_overflow"] = 20
-    engine_kwargs["pool_recycle"] = 3600
+    engine_kwargs["pool_recycle"] = 7200
+    engine_kwargs["pool_use_lifo"] = True
 
 engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
 

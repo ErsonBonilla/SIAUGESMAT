@@ -148,9 +148,9 @@ def process_etl_item(self, item_id: int):
             else:
                 error = integration.last_error or "Error desconocido"
                 update_item(db, item.id, "failed", error)
-                _handle_error(db, execution_id, action, identifier, error)
+                _handle_error(execution_id, action, identifier, error)
             db.commit()
-            _refresh_phase_progress(db, execution_id)
+            _refresh_phase_progress(execution_id)
 
         try:
             asyncio.run(_execute())
@@ -162,9 +162,9 @@ def process_etl_item(self, item_id: int):
                 db.commit()
                 raise MoodleOverloadedError(str(e)[:200])
             update_item(db, item.id, "failed", translate_error(e))
-            _handle_error(db, execution_id, action, identifier, translate_error(e))
+            _handle_error(execution_id, action, identifier, translate_error(e))
             db.commit()
-            _refresh_phase_progress(db, execution_id)
+            _refresh_phase_progress(execution_id)
 
     except MoodleOverloadedError:
         raise
@@ -174,7 +174,7 @@ def process_etl_item(self, item_id: int):
             db.rollback()
             if execution_id and item:
                 update_item(db, item.id, "failed", translate_error(e))
-                _handle_error(db, execution_id, action, identifier, translate_error(e))
+                _handle_error(execution_id, action, identifier, translate_error(e))
                 db.commit()
         except Exception:
             pass
@@ -182,39 +182,46 @@ def process_etl_item(self, item_id: int):
         db.close()
 
 
-def _refresh_phase_progress(db, execution_id):
+def _refresh_phase_progress(execution_id):
+    from app.db.session import SessionLocal
     from app.db.models import Execution, OperationItem
-    phase3_total = db.query(func.count(OperationItem.id)).filter(
-        OperationItem.batch_id.like(f"etl_3_%_{execution_id}")
-    ).scalar() or 0
-    phase3_done = db.query(func.count(OperationItem.id)).filter(
-        OperationItem.batch_id.like(f"etl_3_%_{execution_id}"),
-        OperationItem.status.in_(["completed", "failed"]),
-    ).scalar() or 0
-
-    if phase3_total > 0 and phase3_done < phase3_total:
-        pct = 34.0 + (phase3_done / phase3_total) * 28.0
-    else:
-        phase4_total = db.query(func.count(OperationItem.id)).filter(
-            OperationItem.batch_id.like(f"etl_4_%_{execution_id}")
+    db = SessionLocal()
+    try:
+        phase3_total = db.query(func.count(OperationItem.id)).filter(
+            OperationItem.batch_id.like(f"etl_3_%_{execution_id}")
         ).scalar() or 0
-        phase4_done = db.query(func.count(OperationItem.id)).filter(
-            OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
+        phase3_done = db.query(func.count(OperationItem.id)).filter(
+            OperationItem.batch_id.like(f"etl_3_%_{execution_id}"),
             OperationItem.status.in_(["completed", "failed"]),
         ).scalar() or 0
-        if phase4_total > 0:
-            pct = 65.0 + (phase4_done / phase4_total) * 20.0
-        else:
-            total = phase3_total + phase4_total
-            done = phase3_done + phase4_done
-            pct = 34.0 + (done / max(total, 1)) * 28.0
 
-    pct = round(pct, 1)
-    ex = db.query(Execution).filter(Execution.id == execution_id).first()
-    if ex and (ex.progress_pct is None or pct > ex.progress_pct):
-        ex.progress_pct = pct
-        ex.progress_updated_at = datetime.now(timezone.utc)
-        db.commit()
+        if phase3_total > 0 and phase3_done < phase3_total:
+            pct = 34.0 + (phase3_done / phase3_total) * 28.0
+        else:
+            phase4_total = db.query(func.count(OperationItem.id)).filter(
+                OperationItem.batch_id.like(f"etl_4_%_{execution_id}")
+            ).scalar() or 0
+            phase4_done = db.query(func.count(OperationItem.id)).filter(
+                OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
+                OperationItem.status.in_(["completed", "failed"]),
+            ).scalar() or 0
+            if phase4_total > 0:
+                pct = 65.0 + (phase4_done / phase4_total) * 20.0
+            else:
+                total = phase3_total + phase4_total
+                done = phase3_done + phase4_done
+                pct = 34.0 + (done / max(total, 1)) * 28.0
+
+        pct = round(pct, 1)
+        ex = db.query(Execution).filter(Execution.id == execution_id).first()
+        if ex and (ex.progress_pct is None or pct > ex.progress_pct):
+            ex.progress_pct = pct
+            ex.progress_updated_at = datetime.now(timezone.utc)
+            db.commit()
+    except Exception:
+        pass
+    finally:
+        db.close()
 
 
 def _log_success(db, execution_id, action, identifier, detail):
@@ -239,12 +246,19 @@ def _log_success(db, execution_id, action, identifier, detail):
         save_log(db, execution_id, phase, log_action, identifier, log_detail)
 
 
-def _handle_error(db, execution_id, action, identifier, error_msg):
+def _handle_error(execution_id, action, identifier, error_msg):
     if not execution_id:
         return
-    phase = "3" if action in ("delete", "activate", "hide", "rename", "create") else "4"
-    save_error(db, execution_id, phase, identifier, error_msg)
-    metric_key = "enrolment_errors" if action == "enrol" else "total_errors"
-    increment_metric(db, execution_id, metric_key)
-    if metric_key != "total_errors":
-        increment_metric(db, execution_id, "total_errors")  # enrol incrementa ambos
+    from app.db.session import SessionLocal
+    db = SessionLocal()
+    try:
+        phase = "3" if action in ("delete", "activate", "hide", "rename", "create") else "4"
+        save_error(db, execution_id, phase, identifier, error_msg)
+        metric_key = "enrolment_errors" if action == "enrol" else "total_errors"
+        increment_metric(db, execution_id, metric_key)
+        if metric_key != "total_errors":
+            increment_metric(db, execution_id, "total_errors")
+    except Exception:
+        pass
+    finally:
+        db.close()
