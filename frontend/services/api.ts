@@ -22,7 +22,6 @@ export {
 
 export {
   getHistory,
-  getSemaphore,
   getLatest,
   listCharts,
   getChartData,
@@ -42,6 +41,10 @@ export {
 } from "./api/operations.ts";
 
 export {
+  uploadVisibilityCsv,
+} from "./api/mantenimiento.ts";
+
+export {
   queryEntities,
   getQueryTaskStatus,
   getQueryExportUrl,
@@ -51,16 +54,13 @@ export type {
   Execution,
   ErrorLog,
   SemesterMetrics,
-  SemaphoreStatus,
   LatestExecution,
   UserProfile,
   ReportInfo,
   ReportsListResponse,
-  ChartInfo,
   ChartTracesLayout,
   ChartsListResponse,
   OperationBatchStatus,
-  OperationItemOut,
   CsvUploadResponse,
   QueryTaskStatus,
   OperationBatchOut,

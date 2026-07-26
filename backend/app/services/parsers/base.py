@@ -203,6 +203,7 @@ class BaseExcelParser(ABC):
         return firstname.title(), lastname.title()
 
     @staticmethod
+    @staticmethod
     def _to_roman_numeral(value: str) -> str:
         import re
 
@@ -213,13 +214,19 @@ class BaseExcelParser(ABC):
 
         if value.isdigit():
             num = int(value)
-            mapping = {
-                1: "I", 2: "II", 3: "III", 4: "IV", 5: "V",
-                6: "VI", 7: "VII", 8: "VIII", 9: "IX", 10: "X",
-                11: "XI", 12: "XII", 13: "XIII", 14: "XIV", 15: "XV",
-                16: "XVI", 17: "XVII", 18: "XVIII", 19: "XIX", 20: "XX",
-            }
-            return mapping.get(num, value)
+            if num < 1:
+                return value
+            numerals = [
+                (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
+                (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
+                (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"),
+            ]
+            result = ""
+            for n, roman in numerals:
+                while num >= n:
+                    result += roman
+                    num -= n
+            return result
 
         return value
 

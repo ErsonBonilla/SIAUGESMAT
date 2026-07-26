@@ -1,48 +1,21 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import type { JSX } from "preact";
 import { removeToken, removeTokenCookie } from "../utils/auth.ts";
 import { getMyProfile, type UserProfile } from "../services/api.ts";
 import { profileSignal, ensureProfile } from "../utils/profile.ts";
-import { UploadIcon, ListIcon, ChartBarIcon, TrashIcon, SearchIcon } from "../utils/icons.tsx";
+import { UserGroupIcon, BookOpenIcon, FolderIcon, CogIcon } from "../utils/icons.tsx";
 import ThemeToggle from "./ThemeToggle.tsx";
 
-const NAV_SECTIONS = [
-  {
-    label: "Carga académica",
-    items: [
-      { href: "/crear/cursos", icon: UploadIcon, label: "Crear Cursos" },
-      { href: "/crear/usuarios", icon: UploadIcon, label: "Crear Usuarios" },
-      { href: "/crear/categorias", icon: UploadIcon, label: "Crear Categorías" },
-    ],
-  },
-  {
-    label: "Mantenimiento",
-    items: [
-      { href: "/mantenimiento/cursos", icon: TrashIcon, label: "Eliminar Cursos" },
-      { href: "/mantenimiento/usuarios", icon: TrashIcon, label: "Eliminar Usuarios" },
-      { href: "/mantenimiento/categorias", icon: TrashIcon, label: "Eliminar Categorías" },
-    ],
-  },
-  {
-    label: "Operaciones",
-    items: [
-      { href: "/operaciones/ejecuciones", icon: ListIcon, label: "Ejecuciones" },
-      { href: "/operaciones/historico", icon: ChartBarIcon, label: "Histórico" },
-    ],
-  },
-  {
-    label: "Consultas",
-    items: [
-      { href: "/consultas/cursos", icon: SearchIcon, label: "Cursos" },
-      { href: "/consultas/usuarios", icon: SearchIcon, label: "Usuarios" },
-      { href: "/consultas/categorias", icon: SearchIcon, label: "Categorías" },
-    ],
-  },
+const NAV_ITEMS = [
+  { href: "/usuarios", icon: UserGroupIcon, label: "Usuarios", match: "/usuarios" },
+  { href: "/cursos", icon: BookOpenIcon, label: "Cursos", match: "/cursos" },
+  { href: "/categorias", icon: FolderIcon, label: "Categorías", match: "/categorias" },
+  { href: "/operaciones", icon: CogIcon, label: "Operaciones", match: "/operaciones" },
 ];
 
-const navBase = "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium no-underline text-inherit transition-all duration-150";
+const navBase = "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium no-underline text-inherit transition-all duration-150";
 const navIdle = "bg-transparent hover:bg-brand-red-100 dark:bg-transparent dark:hover:bg-[var(--bg-tertiary)]";
-const navMove = "hover:translate-x-0.5 active:translate-x-0 active:scale-[0.98]";
 const navActive = "font-semibold border border-brand-red-200 bg-brand-red-100 dark:bg-[var(--bg-tertiary)] dark:border-[var(--border-secondary)] text-brand-red-900 dark:text-[var(--text-primary)]";
 
 interface SidebarProps {
@@ -75,7 +48,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
   const closeMobile = () => { onClose(); };
 
-  const isActive = (href: string) => currentPath.value === href;
+  const isActive = (match: string) => currentPath.value.startsWith(match);
 
   return (
     <>
@@ -87,28 +60,21 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       <aside
         class={`w-[220px] h-screen flex flex-col fixed left-0 top-0 z-30 border-r border-[var(--border-secondary)] bg-[var(--navbar-bg)] text-[var(--navbar-text)] ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
       >
-        <a href="/dashboard" class="flex items-center gap-3 px-5 py-5 font-bold no-underline text-inherit">
+        <a href="/dashboard" class="flex items-center gap-3 px-5 py-5 font-bold no-underline text-inherit border-b border-[var(--border-secondary)]">
           <span class="gradient-text text-xl px-3 py-1 rounded-md bg-[var(--bg-tertiary)]">SIAUGESMAT</span>
         </a>
 
-        <nav class="flex-1 flex flex-col gap-0.5 px-2 py-2 overflow-y-auto">
-          {NAV_SECTIONS.map((section) => (
-            <div key={section.label}>
-              <p class="px-3 pt-3 pb-1 text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">
-                {section.label}
-              </p>
-              {section.items.map(({ href, icon: Icon, label }) => (
-                <a
-                  key={href}
-                  href={href}
-                  onClick={closeMobile}
-                  class={`${navBase} ${isActive(href) ? navActive : `${navIdle} ${navMove}`}`}
-                >
-                  <Icon class="w-4 h-4 shrink-0" />
-                  <span>{label}</span>
-                </a>
-              ))}
-            </div>
+        <nav class="flex-1 flex flex-col gap-1 px-3 py-3">
+          {NAV_ITEMS.map(({ href, icon: Icon, label, match }) => (
+            <a
+              key={href}
+              href={href}
+              onClick={closeMobile}
+              class={`${navBase} ${isActive(match) ? navActive : navIdle}`}
+            >
+              <Icon class="w-5 h-5 shrink-0" />
+              <span>{label}</span>
+            </a>
           ))}
         </nav>
 
@@ -120,7 +86,7 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
                   src={avatarUrl}
                   alt={`Foto de ${displayName}`}
                   class="w-8 h-8 rounded-full object-cover"
-                  onError={(e) => {
+                  onError={(e: JSX.TargetedEvent<HTMLImageElement, Event>) => {
                     (e.target as HTMLImageElement).style.display = "none";
                     const parent = (e.target as HTMLElement).parentElement;
                     if (parent) {

@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 def _extract_error(e: Exception) -> str:
-    """Extrae el mensaje real de error anidado."""
     if hasattr(e, 'spanish_message'):
         return e.spanish_message
     if e.__cause__ and hasattr(e.__cause__, 'spanish_message'):
@@ -27,10 +26,12 @@ def _extract_error(e: Exception) -> str:
             inner = e.last_attempt.exception()
             if hasattr(inner, 'spanish_message'):
                 return inner.spanish_message
-            return str(inner)[:300]
+            msg = str(inner)[:300]
+            return msg if msg.strip() else "Error sin mensaje específico del servidor"
         except Exception:
             pass
-    return str(e)[:300]
+    msg = str(e)[:300]
+    return msg if msg.strip() else "Error sin mensaje específico del servidor"
 
 
 class MoodleIntegration:
@@ -354,8 +355,8 @@ class MoodleIntegration:
                         "username": username,
                         "reason": "already_enrolled",
                     }
-                err = result.get("errors", ["error desconocido"])[0]
-                self.last_error = str(err)
+                err = result.get("errors", ["Error desconocido"])[0]
+                self.last_error = str(err) if str(err).strip() else "Error desconocido del servidor Moodle"
                 return {
                     "success": False,
                     "username": username,

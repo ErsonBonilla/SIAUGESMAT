@@ -104,7 +104,7 @@ export default function DashboardIsland() {
         <div class="text-center py-12 text-[var(--text-secondary)]">
           <p class="text-lg mb-2">Aún no hay datos</p>
           <p class="text-sm mb-4">Subí tu primer archivo para ver las métricas del dashboard.</p>
-           <a href="/crear/cursos" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium border border-[var(--border-secondary)] bg-[var(--bg-primary)] text-[var(--text-primary)] no-underline cursor-pointer font-inherit leading-[1.4] hover:border-[var(--accent)] hover:bg-[var(--accent-bg-hover)] active:scale-[0.97] transition-all duration-150">Subir archivo</a>
+            <a href="/cursos/crear" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium border border-[var(--border-secondary)] bg-[var(--bg-primary)] text-[var(--text-primary)] no-underline cursor-pointer font-inherit leading-[1.4] hover:border-[var(--accent)] hover:bg-[var(--accent-bg-hover)] active:scale-[0.97] transition-all duration-150">Subir archivo</a>
         </div>
       );
     }

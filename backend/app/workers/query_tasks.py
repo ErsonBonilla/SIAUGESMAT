@@ -26,7 +26,10 @@ async def _do_query(moodle: MoodleService, qr):
     if qr.entity == "courses":
         search = params.get("search")
         status_filter = params.get("status", "all")
-        raw = await moodle.get_courses_by_field("shortname", search) if search else await moodle.get_courses()
+        raw = await moodle.get_courses()
+        if search:
+            q = search.strip().lower()
+            raw = [c for c in raw if q in (c.get("shortname") or "").lower()]
         if status_filter == "unused_6months":
             cutoff = int(time.time()) - (6 * 30 * 24 * 3600)
             raw = [c for c in raw if c.get("timemodified", 0) and int(c.get("timemodified", 0)) < cutoff]
