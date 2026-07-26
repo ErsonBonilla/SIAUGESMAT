@@ -176,8 +176,8 @@ def process_etl_item(self, item_id: int):
                 update_item(db, item.id, "failed", translate_error(e))
                 _handle_error(execution_id, action, identifier, translate_error(e))
                 db.commit()
-    except Exception as e:
-        logger.exception(f"Error actualizando progreso para ejecución {execution_id}: {e}")
+        except Exception as e:
+            logger.exception(f"Error actualizando progreso para ejecución {execution_id}: {e}")
     finally:
         db.close()
 
