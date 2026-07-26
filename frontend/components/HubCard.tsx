@@ -11,10 +11,10 @@ export default function HubCard({ icon: Icon, title, description, href }: HubCar
   return (
     <a
       href={href}
-      class="group flex flex-col items-center gap-3 p-6 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] shadow-sm hover:shadow-md hover:border-[var(--accent)] transition-all duration-200 no-underline text-inherit"
+      class="group flex flex-col items-center gap-3 p-6 rounded-xl border border-[var(--border-primary)] bg-[var(--bg-primary)] shadow-sm hover:shadow-md hover:border-[var(--brand-green)] transition-all duration-200 no-underline text-inherit"
     >
       <div class="w-14 h-14 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
-        <Icon class="w-7 h-7 text-[var(--accent)]" />
+        <Icon class="w-7 h-7 text-[var(--brand-green)]" />
       </div>
       <h3 class="text-base font-semibold text-[var(--text-primary)] text-center">
         {title}

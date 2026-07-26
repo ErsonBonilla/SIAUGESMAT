@@ -2,7 +2,7 @@
 
 **Sistema de Integración y Automatización para la Gestión de Matrículas en Moodle**
 
-Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 4 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, reportes CSV, gráficos Plotly, dashboard de analítica y semáforos de estado en tiempo real.
+Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle 3.9)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 5 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 14 reportes CSV con información detallada, 5 gráficos Plotly profesionales, dashboard de analítica y semáforos de estado en tiempo real.
 
 ---
 
@@ -47,7 +47,7 @@ Los colores de la marca se definen en `utils/theme.ts` como `DARK_THEME_VARS` y 
 ┌────────▼─────────┐     ┌──────────────┐                                    │
 │  Celery Worker   │────▶│  Phases      │  Pipeline ETL:                     │
 │  (tasks.py)      │     │  (Consult,   │  ConsultPhase → AnalyzePhase →     │
-│                  │     │   Analyze,   │  ExecutePhase → ReportPhase        │
+│                  │     │   Analyze,   │  StructurePhase → PeoplePhase    │
 │                  │     │   Execute)   │                                    │
 └────────┬─────────┘     └──────┬───────┘                                    │
          │                      │                                            │
@@ -63,22 +63,27 @@ Los colores de la marca se definen en `utils/theme.ts` como `DARK_THEME_VARS` y 
 
 ---
 
-## Módulo de Novedades (ETL — 4 fases)
+## Módulo de Novedades (ETL — 5 fases)
 
 Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y matrículas con Moodle.
 
-| Fase | Clase | Descripción |
-|---|---|---|
-| **FASE 1** | `ConsultPhase` | Consulta categorías, cursos y usuarios en Moodle. Resuelve docentes por email. |
-| **FASE 2** | `AnalyzePhase` | Compara cursos contra Moodle. Determina crear, eliminar, activar, ocultar o renombrar. Detecta usuarios nuevos. |
-| **FASE 3** | `ExecutePhase` | Ejecuta cambios en Moodle: categorías → cursos → usuarios → matrículas. Maneja errores por ítem. |
-| **FASE 4** | `ReportService` | Genera 12 CSVs + 8 gráficos Plotly + ZIP con todo. |
+| Fase | Clase | Descripción | Progreso |
+|---|---|---|---|
+| **FASE 1** | `ConsultPhase` | Parsear Excel + consultar Moodle (categorías, cursos, usuarios). Resuelve docentes por email en batch. | 0% → 20% |
+| **FASE 2** | `AnalyzePhase` | Comparar cursos contra Moodle con matching en 3 niveles (exacto → base key → core key). Determina crear, eliminar, activar, ocultar o renombrar. | 20% → 34% |
+| **FASE 3** | `process_etl_phase` | Ejecutar cambios estructurales vía Celery chords en 2 oleadas: (1) delete, (2) activate, hide, rename, create cursos. | 34% → 62% |
+| **FASE 4** | `process_etl_phase` | Crear usuarios nuevos en Moodle + matricular docentes como editingteacher en sus cursos vía Celery chord. | 65% → 85% |
+| **FASE 5** | `ReportService` | Generar 14 CSVs + 5 gráficos Plotly + ZIP con todo. | 85% → 100% |
 
-**Algoritmo de partición de nombres:** `_split_name()` en `parsers/base.py` usa un diccionario de ~200 nombres propios colombianos + partículas de apellidos compuestos (`DE`, `LA`, `DEL`) para separar `"LEZAMA DE LA HOZ KAREN AUXILIADORA"` → `firstname="KAREN AUXILIADORA"`, `lastname="LEZAMA DE LA HOZ"`.
+### Destacados
 
-**Creación de usuarios:** Solo se crean docentes que no existen en Moodle (búsqueda por email institucional y personal). Password inicial = cédula + forcepasswordchange.
+- **Checkpointing por fase:** si Celery crashea en FASE 3, el retry restaura FASE 1–2 desde BD y reanuda desde FASE 3. Sin re-procesar trabajo ya hecho.
+- **Guard de delete masivo:** si el plan incluye >500 eliminaciones, la ejecución se pausa en `review_required` y requiere confirmación explícita vía `POST /api/v1/jobs/{id}/confirm`. Umbral configurable con `MAX_AUTO_DELETE_COURSES`.
+- **Creación de usuarios:** `createpassword=1` — Moodle genera la contraseña y la envía por email. No se almacena la cédula como password.
+- **Resolución batch de docentes:** 1 sola llamada a `core_user_get_users_by_field` con todos los emails, en vez de N llamadas individuales.
+- **Compatibilidad Moodle 3.9:** adapter pattern para diferencias entre versiones (sin `enrolment_1`, `templatecourse` como `int`, `createpassword` en vez de `preferences[]`, `categoryid` con fallback multi-nivel).
 
-**Archivos clave:** `workers/tasks.py` (orquestador), `workers/phases/` (fases), `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle.py` (MoodleService), `services/course_comparison.py`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`.
+**Archivos clave:** `workers/tasks.py` (orquestador), `workers/phases/phase1_consult.py`, `phase2_analyze.py`, `phase3_structure.py`, `phase4_people.py`, `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle.py` (MoodleService), `services/moodle_adapter.py`, `services/course_comparison.py`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`.
 
 ---
 
@@ -90,6 +95,7 @@ Sube archivos CSV para crear o eliminar entidades en lote.
 
 | Operación | Endpoint | CSV requerido |
 |---|---|---|
+| **Mostrar/Ocultar cursos** | `POST /operations/courses/visibility?visibility=show\|hide` | `shortname` |
 | **Crear usuarios** | `POST /operations/users/create-csv` | `username, firstname, lastname, email, role1, password, forcepasswordchange` |
 | **Crear categorías** | `POST /operations/categories/create-csv` | `name, idnumber, parent, description, visible` |
 | **Eliminar cursos** | `POST /operations/courses/upload-csv` | `shortname` |
@@ -114,28 +120,36 @@ Procesado por `query_tasks.py` (Celery).
 
 ## Interfaz de usuario
 
-### Sidebar con 5 secciones
+### Sidebar con 4 tarjetas principales
 
-| Sección | Items |
-|---|---|
-| **Carga académica** | Crear Cursos, Crear Usuarios, Crear Categorías |
-| **Mantenimiento** | Eliminar Cursos, Eliminar Usuarios, Eliminar Categorías |
-| **Operaciones** | Ejecuciones (unifica ETL + lotes con 6 tabs), Histórico (métricas ETL + operaciones masivas) |
-| **Consultas** | Cursos, Usuarios, Categorías |
+| Tarjeta | Hub page | Sub-opciones |
+|---|---|---|
+| **Usuarios** | `/usuarios` | Consultar, Crear, Eliminar |
+| **Cursos** | `/cursos` | Consultar, Crear, Eliminar, Visibilidad |
+| **Categorías** | `/categorias` | Consultar, Crear, Eliminar |
+| **Operaciones** | `/operaciones` | Ejecuciones, Histórico |
+
+Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic en una sub-opción, navega a la ruta funcional correspondiente.
 
 ### Páginas principales
 
 | Ruta | Contenido |
 |---|---|
 | `/dashboard` | KPI cards, minigráfico SVG, última ejecución, tabla de ejecuciones recientes |
-| `/crear/cursos` | FileUploader — sube Excel y lanza ETL |
-| `/crear/usuarios` | CsvUploader para creación de usuarios |
-| `/crear/categorias` | CsvUploader para creación de categorías |
+| `/cursos/crear` | FileUploader — sube Excel y lanza ETL |
+| `/cursos/consultar` | QueryTable — búsqueda de cursos por shortname con match parcial |
+| `/cursos/eliminar` | CsvUploader — eliminación masiva de cursos vía CSV |
+| `/cursos/visibilidad` | BulkVisibilityIsland — mostrar/ocultar cursos masivamente vía CSV |
+| `/usuarios/crear` | CsvUploader — creación masiva de usuarios |
+| `/usuarios/consultar` | QueryTable — búsqueda de usuarios por username/email |
+| `/usuarios/eliminar` | CsvUploader — eliminación masiva de usuarios |
+| `/categorias/crear` | CsvUploader — creación masiva de categorías |
+| `/categorias/consultar` | QueryTable — búsqueda de categorías por idnumber |
+| `/categorias/eliminar` | CsvUploader — eliminación masiva de categorías |
 | `/operaciones/ejecuciones` | Tabs (Crear/Eliminar Cursos/Usuarios/Categorías) con ExecutionList + OperationList |
 | `/operaciones/historico` | Tabs con gráficos Plotly theme-aware + tabla de datos |
 | `/jobs/{id}` | Detalle de ejecución con progreso en vivo, métricas, errores paginados |
-| `/reportes?execution_id={id}` | Descarga de CSVs + 8 gráficos Plotly |
-| `/consultas/{entity}` | QueryTable con búsqueda y descarga CSV |
+| `/reportes?execution_id={id}` | Descarga de 14 CSVs + 5 gráficos Plotly |
 
 ### Islas principales
 
@@ -144,17 +158,19 @@ Procesado por `query_tasks.py` (Celery).
 | `ExecutionList` | Tabla de ejecuciones ETL con filtros, paginación, acciones (Procesar, Eliminar, ZIP, Reportes) |
 | `OperationList` | Tabla de lotes con filtros bloqueables por entidad/acción |
 | `DashboardIsland` | KPI cards, minigráfico, semáforo, ejecuciones recientes |
-| `CsvUploader` | Formulario genérico de carga CSV con validación |
+| `CsvUploader` | Formulario genérico de carga CSV con validación y polling de progreso |
+| `BulkVisibilityIsland` | Selector mostrar/ocultar + carga CSV + polling de progreso de visibilidad de cursos |
 | `QueryTable` | Búsqueda asíncrona con polling y descarga CSV |
 | `HistoricoIsland` | Evolución semestral y comparación con Chart.js |
 | `OperationHistorico` | Gráfico Plotly theme-aware con métricas adaptativas por operación |
-| `Sidebar` | Navegación con secciones, avatar, ThemeToggle |
+| `Sidebar` | Navegación con 4 tarjetas (Usuarios, Cursos, Categorías, Operaciones), avatar, ThemeToggle |
 | `JobDetailIsland` | Progreso en vivo con polling, métricas, errores paginados |
 
 ### Componentes compartidos
 
 | Componente | Dónde se usa |
 |---|---|
+| `HubCard` | 4 hub pages (usuarios, cursos, categorias, operaciones) — tarjeta con icono, título, descripción |
 | `ErrorBox` | 8+ islas — mensaje de error con icono |
 | `Pagination` | ExecutionList, OperationList — anterior/siguiente |
 | `LoadingSkeleton` | 6+ islas — variantes `table`, `chart`, `kpi` |
@@ -180,11 +196,12 @@ SIAUGESMAT/
 │   │   ├── services/           # moodle.py (MoodleService), etl.py, course_comparison.py,
 │   │   │                       # reports.py, charts.py, parsers/ (DistanciaParser, patterns)
 │   │   │                       # moodle_adapter.py, rate_limiter.py
-│   │   ├── workers/            # tasks.py (ETL), phases/ (Consult, Analyze, Execute),
-│   │   │                       # operations_tasks.py, query_tasks.py, cleanup_tasks.py
+│   │   ├── workers/            # tasks.py (ETL), phases/ (phase1_consult, phase2_analyze),
+│   │   │                       # operations_tasks.py, query_tasks.py, cleanup_tasks.py, etl_item_task.py
+│   │   ├── scripts/            # bulk_course_visibility.py (CLI para mostrar/ocultar cursos en lote)
 │   │   ├── celery_app.py       # Config Celery + beat schedule
 │   │   └── main.py
-│   ├── tests/                  # 174 tests (ETL, repos, phases, pipeline, analytics, API)
+│   ├── tests/                  # 177 tests (ETL, repos, phases, pipeline, analytics, API)
 │   ├── alembic/                # Migraciones de base de datos
 │   ├── reports/                # Reportes generados (CSV, ZIP)
 │   ├── uploads/                # Archivos Excel subidos
@@ -199,19 +216,24 @@ SIAUGESMAT/
 │   │                           # JobDetailIsland, ReportesIsland, Chart, MetricsChart,
 │   │                           # SemesterComparison, LoginForm, LoginPageIsland, UploadIsland
 │   ├── routes/                 # _app.tsx, _middleware.ts, index.tsx, login.tsx, dashboard.tsx
-│   │   ├── crear/              # cursos.tsx, usuarios.tsx, categorias.tsx
-│   │   ├── mantenimiento/      # cursos.tsx, categorias.tsx, usuarios.tsx
-│   │   ├── operaciones/        # index.tsx, ejecuciones.tsx, historico.tsx
-│   │   ├── consultas/          # cursos.tsx, categorias.tsx, usuarios.tsx
+│   │   ├── usuarios/           # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
+│   │   ├── cursos/             # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx, visibilidad.tsx
+│   │   ├── categorias/         # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
+│   │   ├── operaciones/        # index.tsx (hub), ejecuciones.tsx, historico.tsx
 │   │   ├── jobs/               # [id].tsx
 │   │   ├── reportes.tsx        # Redirects: ejecuciones.tsx, historico.tsx, upload.tsx
-│   ├── services/api.ts         # Barrel re-export → api/ (types, core, auth, jobs, analytics, reports, operations, queries)
+│   ├── services/api.ts         # Barrel re-export → api/ (types, core, auth, jobs, analytics, reports, operations, queries, mantenimiento)
 │   ├── utils/                  # theme.ts, plotly.ts, profile.ts, operations-tabs.ts, constants.ts,
 │   │                           # auth.ts, auth-guard.ts, cache.ts, date.ts, icons.tsx, toast.ts, reports.ts
 │   ├── static/styles.css       # Estilos globales, animaciones, responsive
 │   ├── deno.json               # Configuración Fresh + dependencias
 │   └── fresh.gen.ts            # Manifest de rutas (generado por build)
-├── docker-compose.yml          # 6 servicios: db, redis, backend, worker, beat, frontend
+├── docker-compose.yml          # 7 servicios: db, redis, backend, worker, beat, frontend, nginx
+├── docker-compose.override.yml  # Puertos expuestos + volume mount para desarrollo
+├── e2e/                        # Pruebas end-to-end contra Moodle real
+│   ├── fixtures/               #   .xlsx con datos reales (protegidos por .gitignore)
+│   ├── run_test.py             #   Script unificado (upload + process + verify)
+│   └── README.md
 ├── .env.example                # Variables de entorno de ejemplo
 └── README.md
 ```
@@ -330,7 +352,8 @@ MOODLE_BURST_SIZE=10
 
 # Otros
 DEBUG=false
-JOB_TIMEOUT=7200
+JOB_TIMEOUT=28800
+MAX_AUTO_DELETE_COURSES=500
 ```
 
 Los archivos `.env.example` en la raíz y en `backend/` contienen todas las variables con valores de ejemplo. Copiarlos a `.env` y ajustar credenciales reales.
@@ -339,7 +362,7 @@ Los archivos `.env.example` en la raíz y en `backend/` contienen todas las vari
 
 ## Tests
 
-### Backend (174 tests)
+### Backend (177 tests)
 
 ```bash
 cd backend
@@ -347,7 +370,17 @@ pytest -v
 pytest --cov=app          # con cobertura
 ```
 
-Cubre: parser ETL, repositorios (execution, log, query, operation), fases del pipeline (Consult, Analyze, Execute), integración del pipeline completo, endpoints API, analítica y semáforo.
+Cubre: parser ETL, repositorios (execution, log, query, operation), fases del pipeline (Consult, Analyze, Structure, People), integración del pipeline completo, endpoints API, analítica y semáforo.
+
+### End-to-end (contra Moodle real)
+
+```bash
+# Modo seguro — solo usuarios (no toca cursos)
+python e2e/run_test.py e2e/fixtures/ibague.xlsx
+
+# Modo completo con confirmación de delete masivo
+python e2e/run_test.py e2e/fixtures/uraba.xlsx --mode both --confirm
+```
 
 ---
 

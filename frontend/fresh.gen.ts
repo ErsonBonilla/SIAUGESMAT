@@ -4,26 +4,31 @@
 
 import * as $_app from "./routes/_app.tsx";
 import * as $_middleware from "./routes/_middleware.ts";
-import * as $consultas_categorias from "./routes/consultas/categorias.tsx";
-import * as $consultas_cursos from "./routes/consultas/cursos.tsx";
-import * as $consultas_usuarios from "./routes/consultas/usuarios.tsx";
-import * as $crear_categorias from "./routes/crear/categorias.tsx";
-import * as $crear_cursos from "./routes/crear/cursos.tsx";
-import * as $crear_usuarios from "./routes/crear/usuarios.tsx";
+import * as $categorias_consultar from "./routes/categorias/consultar.tsx";
+import * as $categorias_crear from "./routes/categorias/crear.tsx";
+import * as $categorias_eliminar from "./routes/categorias/eliminar.tsx";
+import * as $categorias_index from "./routes/categorias/index.tsx";
+import * as $cursos_consultar from "./routes/cursos/consultar.tsx";
+import * as $cursos_crear from "./routes/cursos/crear.tsx";
+import * as $cursos_eliminar from "./routes/cursos/eliminar.tsx";
+import * as $cursos_index from "./routes/cursos/index.tsx";
+import * as $cursos_visibilidad from "./routes/cursos/visibilidad.tsx";
 import * as $dashboard from "./routes/dashboard.tsx";
 import * as $ejecuciones from "./routes/ejecuciones.tsx";
 import * as $historico from "./routes/historico.tsx";
 import * as $index from "./routes/index.tsx";
 import * as $jobs_id_ from "./routes/jobs/[id].tsx";
 import * as $login from "./routes/login.tsx";
-import * as $mantenimiento_categorias from "./routes/mantenimiento/categorias.tsx";
-import * as $mantenimiento_cursos from "./routes/mantenimiento/cursos.tsx";
-import * as $mantenimiento_usuarios from "./routes/mantenimiento/usuarios.tsx";
 import * as $operaciones_ejecuciones from "./routes/operaciones/ejecuciones.tsx";
 import * as $operaciones_historico from "./routes/operaciones/historico.tsx";
 import * as $operaciones_index from "./routes/operaciones/index.tsx";
 import * as $reportes from "./routes/reportes.tsx";
 import * as $upload from "./routes/upload.tsx";
+import * as $usuarios_consultar from "./routes/usuarios/consultar.tsx";
+import * as $usuarios_crear from "./routes/usuarios/crear.tsx";
+import * as $usuarios_eliminar from "./routes/usuarios/eliminar.tsx";
+import * as $usuarios_index from "./routes/usuarios/index.tsx";
+import * as $BulkVisibilityIsland from "./islands/BulkVisibilityIsland.tsx";
 import * as $Chart from "./islands/Chart.tsx";
 import * as $CrearUsuarios from "./islands/CrearUsuarios.tsx";
 import * as $CsvUploader from "./islands/CsvUploader.tsx";
@@ -49,28 +54,33 @@ const manifest = {
   routes: {
     "./routes/_app.tsx": $_app,
     "./routes/_middleware.ts": $_middleware,
-    "./routes/consultas/categorias.tsx": $consultas_categorias,
-    "./routes/consultas/cursos.tsx": $consultas_cursos,
-    "./routes/consultas/usuarios.tsx": $consultas_usuarios,
-    "./routes/crear/categorias.tsx": $crear_categorias,
-    "./routes/crear/cursos.tsx": $crear_cursos,
-    "./routes/crear/usuarios.tsx": $crear_usuarios,
+    "./routes/categorias/consultar.tsx": $categorias_consultar,
+    "./routes/categorias/crear.tsx": $categorias_crear,
+    "./routes/categorias/eliminar.tsx": $categorias_eliminar,
+    "./routes/categorias/index.tsx": $categorias_index,
+    "./routes/cursos/consultar.tsx": $cursos_consultar,
+    "./routes/cursos/crear.tsx": $cursos_crear,
+    "./routes/cursos/eliminar.tsx": $cursos_eliminar,
+    "./routes/cursos/index.tsx": $cursos_index,
+    "./routes/cursos/visibilidad.tsx": $cursos_visibilidad,
     "./routes/dashboard.tsx": $dashboard,
     "./routes/ejecuciones.tsx": $ejecuciones,
     "./routes/historico.tsx": $historico,
     "./routes/index.tsx": $index,
     "./routes/jobs/[id].tsx": $jobs_id_,
     "./routes/login.tsx": $login,
-    "./routes/mantenimiento/categorias.tsx": $mantenimiento_categorias,
-    "./routes/mantenimiento/cursos.tsx": $mantenimiento_cursos,
-    "./routes/mantenimiento/usuarios.tsx": $mantenimiento_usuarios,
     "./routes/operaciones/ejecuciones.tsx": $operaciones_ejecuciones,
     "./routes/operaciones/historico.tsx": $operaciones_historico,
     "./routes/operaciones/index.tsx": $operaciones_index,
     "./routes/reportes.tsx": $reportes,
     "./routes/upload.tsx": $upload,
+    "./routes/usuarios/consultar.tsx": $usuarios_consultar,
+    "./routes/usuarios/crear.tsx": $usuarios_crear,
+    "./routes/usuarios/eliminar.tsx": $usuarios_eliminar,
+    "./routes/usuarios/index.tsx": $usuarios_index,
   },
   islands: {
+    "./islands/BulkVisibilityIsland.tsx": $BulkVisibilityIsland,
     "./islands/Chart.tsx": $Chart,
     "./islands/CrearUsuarios.tsx": $CrearUsuarios,
     "./islands/CsvUploader.tsx": $CsvUploader,

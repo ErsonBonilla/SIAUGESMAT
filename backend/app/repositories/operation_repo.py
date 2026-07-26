@@ -147,7 +147,7 @@ def get_operations_analytics(db, modalidad: str = None, months: int = 12,
     base_metrics = {
         "users_created": 0, "users_deleted": 0,
         "categories_created": 0, "categories_deleted": 0,
-        "courses_deleted": 0, "courses_visibility": 0, "total_errors": 0,
+        "courses_deleted": 0, "total_errors": 0,
     }
 
     from collections import defaultdict
@@ -172,8 +172,6 @@ def get_operations_analytics(db, modalidad: str = None, months: int = 12,
             m["categories_deleted"] += (b.completed or 0)
         elif key == "courses_delete":
             m["courses_deleted"] += (b.completed or 0)
-        elif key == "courses_visibility":
-            m["courses_visibility"] += (b.completed or 0)
 
     all_months = sorted(months_data.values(), key=lambda m: m["month"])
     return all_months

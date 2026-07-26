@@ -1,15 +1,19 @@
 // components/ProgressBar.tsx
 
-const PHASE_ICONS = ["🔄", "📊", "⚡", "📋"];
-const PHASE_LABELS = ["Consultar Moodle", "Analizar datos", "Ejecutar cambios", "Generar reportes"];
+const PHASE_ICONS = ["🔄", "📊", "🏗️", "👥", "📋"];
+const PHASE_LABELS = ["Consultar Moodle", "Analizar datos", "Estructura", "Gestionar personas", "Generar reportes"];
+
+import { formatEta } from "../utils/date.ts";
 
 interface ProgressBarProps {
   currentPhase: string | null;
   currentStep: number | null;
   progressPct: number;
+  etaSeconds?: number | null;
+  status?: string;
 }
 
-export default function ProgressBar({ currentPhase, currentStep, progressPct }: ProgressBarProps) {
+export default function ProgressBar({ currentPhase, currentStep, progressPct, etaSeconds, status }: ProgressBarProps) {
   const step = currentStep ?? 1;
   const icon = PHASE_ICONS[step - 1] ?? "⏳";
   const phaseLabel = PHASE_LABELS[step - 1] ?? "Procesando";
@@ -20,27 +24,18 @@ export default function ProgressBar({ currentPhase, currentStep, progressPct }: 
     <div class="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl p-6 mb-6">
       <div class="flex items-center justify-between mb-3">
         <div class="flex items-center gap-3">
-          <span
-            class={`text-2xl ${running ? "animate-spin" : ""}`}
-          >
-            {icon}
-          </span>
+          <span class={`text-2xl ${running ? "animate-spin" : ""}`}>{icon}</span>
           <div>
             <p class="text-sm font-semibold text-[var(--text-primary)]">{currentPhase ?? "Procesando…"}</p>
-            <p class="text-xs text-[var(--text-secondary)]">{phaseLabel} · Fase {step} de 4</p>
+            <p class="text-xs text-[var(--text-secondary)]">{phaseLabel} · Fase {step} de 5</p>
           </div>
         </div>
-        <span class="text-2xl font-bold" style="color: var(--brand-red);">
-          {pct}%
-        </span>
+        <span class="text-2xl font-bold gradient-text">{pct}%</span>
       </div>
       <div class="w-full h-2.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
         <div
-          class="h-full rounded-full progress-bar-shimmer"
-          style={{
-            width: `${pct}%`,
-            transition: "width 0.6s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1))",
-          }}
+          class="h-full rounded-full progress-bar"
+          style={{ width: `${pct}%` }}
         />
       </div>
       <div class="flex justify-between gap-1 mt-2">
@@ -51,20 +46,25 @@ export default function ProgressBar({ currentPhase, currentStep, progressPct }: 
           return (
             <div
               key={l}
-              class="h-1 rounded-full transition-all duration-700"
+              class="h-1 rounded-full"
               style={{
                 width: "21%",
-                backgroundColor: isDone
-                  ? "var(--brand-red)"
-                  : isCurrent
-                  ? "var(--brand-red)"
+                background: isDone || isCurrent
+                  ? "linear-gradient(to right, var(--brand-red), var(--brand-green))"
                   : "var(--bg-tertiary)",
-                opacity: isDone ? 1 : isCurrent ? 0.8 : 0.3,
+                opacity: isDone ? 0.7 : isCurrent ? 1 : 0.3,
               }}
-            />
+            >
+              {isCurrent && <div class="h-full w-full rounded-full phase-active" />}
+            </div>
           );
         })}
       </div>
+      {etaSeconds != null && etaSeconds > 0 && status !== "paused" && status !== "cancelled" && (
+        <p class="text-xs text-[var(--text-muted)] mt-2 text-right">
+          Tiempo estimado restante: {formatEta(etaSeconds)}
+        </p>
+      )}
     </div>
   );
 }

@@ -20,15 +20,17 @@ export default function DashboardIsland() {
   useEffect(() => {
     loading.value = true;
     error.value = "";
+    const errors: string[] = [];
     Promise.all([
-      getHistory(),
-      getLatest().catch(() => null),
-      listExecutions({ limit: 5 }).catch(() => ({ total: 0, items: [] })),
+      getHistory().catch((e) => { errors.push("Historial: " + (e instanceof Error ? e.message : "error")); return [] as SemesterMetrics[]; }),
+      getLatest().catch((e) => { errors.push("Semáforo: " + (e instanceof Error ? e.message : "error")); return null; }),
+      listExecutions({ limit: 5 }).catch((e) => { errors.push("Ejecuciones: " + (e instanceof Error ? e.message : "error")); return { total: 0, items: [] as Execution[] }; }),
     ])
       .then(([history, latest, execs]) => {
         historyData.value = history;
         latestExec.value = latest;
         recentExecs.value = execs.items;
+        if (errors.length) error.value = errors.join(" | ");
       })
       .catch((e) => {
         error.value = e instanceof Error ? e.message : "Error al cargar datos.";
@@ -102,7 +104,7 @@ export default function DashboardIsland() {
         <div class="text-center py-12 text-[var(--text-secondary)]">
           <p class="text-lg mb-2">Aún no hay datos</p>
           <p class="text-sm mb-4">Subí tu primer archivo para ver las métricas del dashboard.</p>
-           <a href="/crear/cursos" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium border border-[var(--border-secondary)] bg-[var(--bg-primary)] text-[var(--text-primary)] no-underline cursor-pointer font-inherit leading-[1.4] hover:border-[var(--accent)] hover:bg-[var(--accent-bg-hover)] active:scale-[0.97] transition-all duration-150">Subir archivo</a>
+            <a href="/cursos/crear" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium border border-[var(--border-secondary)] bg-[var(--bg-primary)] text-[var(--text-primary)] no-underline cursor-pointer font-inherit leading-[1.4] hover:border-[var(--accent)] hover:bg-[var(--accent-bg-hover)] active:scale-[0.97] transition-all duration-150">Subir archivo</a>
         </div>
       );
     }
@@ -152,10 +154,12 @@ export default function DashboardIsland() {
                     </div>
                     <div>
                       <p class="font-semibold text-sm text-[var(--text-primary)]">
-                        {latestExec.value.semaphore === "green" && "Exitosa"}
-                        {latestExec.value.semaphore === "yellow" && "Advertencias"}
-                        {latestExec.value.semaphore === "red" && "Errores críticos"}
-                        {latestExec.value.semaphore === "gray" && "Sin datos"}
+                        {latestExec.value.status === "completed"
+                          ? (latestExec.value.semaphore === "green" ? "Exitosa"
+                            : latestExec.value.semaphore === "yellow" ? "Advertencias"
+                            : latestExec.value.semaphore === "red" ? "Errores críticos"
+                            : "Sin datos")
+                          : STATUS_LABELS[latestExec.value.status] || latestExec.value.status}
                       </p>
                       <p class="text-xs text-[var(--text-secondary)]">
                         {latestExec.value.semester}

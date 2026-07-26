@@ -243,7 +243,7 @@ def get_latest_execution_data(db: Session, modalidad: Optional[str] = None) -> L
         semaphore = "green"
 
     return LatestExecution(
-        id=execution.id,
+        execution_id=execution.id,
         semester=execution.semester,
         filename=execution.filename,
         status=execution.status,
