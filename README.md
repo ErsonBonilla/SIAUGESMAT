@@ -114,6 +114,10 @@ Consulta cursos, categorías y usuarios en Moodle sin timeout HTTP (Celery con `
 | Estado + resultado | `GET /queries/tasks/{id}` |
 | Descargar CSV | `GET /queries/tasks/{id}/download` |
 
+**Filtros de cursos**: el endpoint `POST /queries/courses` acepta los parámetros `search` (búsqueda por shortname), `status` (`unused_6months` para cursos sin uso > 6 meses) y `pattern` para filtrar por formato de código:
+- `6segments` → `CAL_0852_sIV_5031216_G-1_29114506` (6 segmentos separados por `_`)
+- `5segments` → `CHA_0845_sVI_102131_G-1` (5 segmentos separados por `_`)
+
 Procesado por `query_tasks.py` (Celery).
 
 ---
@@ -137,7 +141,7 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 |---|---|
 | `/dashboard` | KPI cards, minigráfico SVG, última ejecución, tabla de ejecuciones recientes |
 | `/cursos/crear` | FileUploader — sube Excel y lanza ETL |
-| `/cursos/consultar` | QueryTable — búsqueda de cursos por shortname con match parcial |
+| `/cursos/consultar` | QueryTable — búsqueda de cursos con filtros: shortname, estado (>6 meses sin uso) y formato de código (5 o 6 segmentos) |
 | `/cursos/eliminar` | CsvUploader — eliminación masiva de cursos vía CSV |
 | `/cursos/visibilidad` | BulkVisibilityIsland — mostrar/ocultar cursos masivamente vía CSV |
 | `/usuarios/crear` | CsvUploader — creación masiva de usuarios |
