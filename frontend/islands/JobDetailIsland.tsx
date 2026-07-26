@@ -43,7 +43,6 @@ interface Props {
 export default function JobDetailIsland({ executionId }: Props) {
   const execution = useSignal<Execution | null>(null);
   const errors = useSignal<ErrorLog[]>([]);
-  const errorTotal = useSignal(0);
   const loading = useSignal(true);
   const errorMsg = useSignal("");
   const errorPage = useSignal(0);
@@ -61,7 +60,6 @@ export default function JobDetailIsland({ executionId }: Props) {
         ]);
         execution.value = exec;
         errors.value = errorList;
-        errorTotal.value = errorList.length;
       } catch (e) {
         errorMsg.value = e instanceof Error ? e.message : "Error al cargar.";
       } finally {
@@ -71,7 +69,7 @@ export default function JobDetailIsland({ executionId }: Props) {
   }, [executionId]);
 
   useEffect(() => {
-    const runningStatuses = ["pending", "queued", "running"];
+    const runningStatuses = ["queued", "running"];
     if (!execution.value || !runningStatuses.includes(execution.value.status)) return;
     const interval = setInterval(async () => {
       try {
@@ -80,7 +78,7 @@ export default function JobDetailIsland({ executionId }: Props) {
         if (!runningStatuses.includes(exec.status)) clearInterval(interval);
         if (exec.errors_count > errors.value.length) {
           const more = await getExecutionErrors(executionId, exec.errors_count, 0);
-          if (more.length > 0) { errors.value = more; errorTotal.value = more.length; }
+          if (more.length > 0) { errors.value = more; }
         }
       } catch { toast("Error al actualizar estado", "error"); }
     }, 2000);
@@ -91,7 +89,7 @@ export default function JobDetailIsland({ executionId }: Props) {
     const nextPage = errorPage.value + 1;
     try {
       const more = await getExecutionErrors(executionId, ERRORS_PAGE_SIZE, nextPage * ERRORS_PAGE_SIZE);
-      if (more.length > 0) { errors.value = [...errors.value, ...more]; errorTotal.value += more.length; errorPage.value = nextPage; }
+      if (more.length > 0) { errors.value = [...errors.value, ...more]; errorPage.value = nextPage; }
     } catch { toast("Error al cargar más errores", "error"); }
   };
 
@@ -289,7 +287,7 @@ export default function JobDetailIsland({ executionId }: Props) {
               </li>
             ))}
           </ul>
-          {errors.value.length < (exec.errors_count ?? errorTotal.value) && (
+          {errors.value.length < (exec.errors_count ?? 0) && (
             <button
               onClick={loadMoreErrors}
               class="mt-4 w-full flex items-center justify-center gap-2 py-2 text-sm text-[var(--accent)] hover:bg-[var(--bg-secondary)] rounded-lg transition-colors"

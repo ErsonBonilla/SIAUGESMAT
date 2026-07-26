@@ -438,10 +438,22 @@ class MoodleService:
         return await self._adapter.get_courses(shortname, self._request)
 
     async def get_courses_by_shortnames(self, shortnames: List[str]) -> List[Dict]:
-        """Obtiene cursos por shortname. Trae todos y filtra localmente.
-        TODO: optimizar con core_course_get_courses_by_field en lote."""
+        """Obtiene cursos por shortname.
+
+        Para lotes pequeños (≤5) usa llamadas individuales vía
+        core_course_get_courses_by_field. Para lotes grandes trae
+        todos los cursos y filtra localmente."""
         if not shortnames:
             return []
+        if len(shortnames) <= 5:
+            result = []
+            for sn in shortnames:
+                try:
+                    courses = await self.get_courses_by_field("shortname", sn)
+                    result.extend(courses)
+                except Exception:
+                    logger.warning(f"Error obteniendo curso shortname={sn}", exc_info=True)
+            return result
         try:
             all_courses = await self.get_courses()
         except Exception as e:

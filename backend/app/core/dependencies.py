@@ -27,8 +27,6 @@ async def get_current_user(
 
     Args:
         credentials: Credenciales extraídas del header Authorization.
-        db: Sesión de base de datos (no usada actualmente pero disponible
-            para futuras ampliaciones, como consultar permisos adicionales).
 
     Returns:
         UserInToken con los campos user_id y username.
