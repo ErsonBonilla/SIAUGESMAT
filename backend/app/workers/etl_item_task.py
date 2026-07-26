@@ -50,8 +50,8 @@ _reset_stuck_items()
     retry_backoff=True,
     retry_backoff_max=600,
     retry_jitter=True,
-    soft_time_limit=120,
-    time_limit=300,
+    soft_time_limit=900,
+    time_limit=1800,
 )
 def process_etl_item(self, item_id: int):
     db = SessionLocal()
@@ -172,6 +172,10 @@ def process_etl_item(self, item_id: int):
         logger.exception(f"Error crítico en item {item_id}: {e}")
         try:
             db.rollback()
+            if execution_id and item:
+                update_item(db, item.id, "failed", translate_error(e))
+                _handle_error(db, execution_id, action, identifier, translate_error(e))
+                db.commit()
         except Exception:
             pass
     finally:
