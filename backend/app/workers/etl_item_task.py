@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def _reset_stuck_items():
     try:
         db = SessionLocal()
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
         stuck = db.query(OperationItem).filter(
             OperationItem.status == "processing",
             OperationItem.updated_at < cutoff,
