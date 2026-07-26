@@ -21,7 +21,7 @@ class SemaphoreStatus(BaseModel):
     message: str
 
 class LatestExecution(BaseModel):
-    execution_id: int
+    id: int
     semester: str
     filename: str
     status: str
