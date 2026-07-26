@@ -36,7 +36,7 @@ class ExecutionOut(BaseModel):
     semester: str
     mode: str
     status: str
-    metrics: Optional[Dict[str, Any]] = None
+    metrics: Optional[Dict[str, int]] = None
     errors_count: int = 0
     current_phase: Optional[str] = None
     progress_pct: Optional[float] = None
@@ -59,7 +59,7 @@ class ExecutionOut(BaseModel):
         if self.status == "running" and self.progress_pct is not None and self.progress_updated_at:
             pct = self.progress_pct
             elapsed = (datetime.now(timezone.utc) - self.progress_updated_at).total_seconds()
-            if elapsed > 10 and pct is not None and pct > 0:
+            if elapsed > 5 and pct is not None and pct > 0:
                 rate = pct / elapsed
                 if rate > 0:
                     eta = (100 - pct) / rate

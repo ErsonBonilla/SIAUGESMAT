@@ -20,14 +20,6 @@ def _extract_error(e: Exception) -> str:
     """Extrae el mensaje real de error anidado."""
     if hasattr(e, 'spanish_message'):
         return e.spanish_message
-    if hasattr(e, 'last_attempt'):
-        try:
-            inner = e.last_attempt.exception()
-            if hasattr(inner, 'spanish_message'):
-                return inner.spanish_message
-            return str(inner)[:300]
-        except Exception:
-            pass
     if e.__cause__ and hasattr(e.__cause__, 'spanish_message'):
         return e.__cause__.spanish_message
     return str(e)[:300]

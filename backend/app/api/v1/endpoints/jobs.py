@@ -86,7 +86,7 @@ async def start_process(
     if not atomic_mark_queued(db, execution_id, job.id, ALLOWED):
         # Otro request ya ganó la carrera — revocar task y responder 409
         try:
-            celery_app.control.revoke(job.id)
+            celery_app.control.revoke(job.id, terminate=False)
         except Exception:
             pass
         raise HTTPException(
@@ -335,7 +335,7 @@ async def cancel_execution_endpoint(
 
     if task_id:
         try:
-            celery_app.control.revoke(task_id)
+            celery_app.control.revoke(task_id, terminate=False)
             logger.info(f"Tarea Celery {task_id} revocada para ejecución {execution_id}")
         except Exception as e:
             logger.warning(f"No se pudo revocar tarea {task_id}: {e}")
