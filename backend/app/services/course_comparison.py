@@ -301,16 +301,36 @@ class CourseComparisonService:
         cls, existing: Dict, sn: str, professor: str
     ) -> Tuple[str, Dict]:
         age = cls._get_course_age_seconds(existing)
+        existing_sn = existing.get("shortname", "")
+        needs_rename = existing_sn != sn
+
         if age >= EIGHTEEN_MONTHS_SECONDS:
             return "recreate", {
                 "reason": "old_course_cleanup",
                 "professor": professor,
                 "age_seconds": age,
             }
+
         if cls._is_course_hidden(existing):
+            if needs_rename:
+                return "rename_group", {
+                    "reason": "same_professor_hidden_rename",
+                    "professor": professor,
+                    "old_shortname": existing_sn,
+                    "new_shortname": sn,
+                    "reactivate": True,
+                }
             return "activate", {
                 "reason": "same_professor_hidden",
                 "professor": professor,
+            }
+
+        if needs_rename:
+            return "rename_group", {
+                "reason": "same_professor_cedula_update",
+                "professor": professor,
+                "old_shortname": existing_sn,
+                "new_shortname": sn,
             }
         return "none", {"reason": "same_professor", "professor": professor}
 
