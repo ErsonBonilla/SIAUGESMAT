@@ -163,8 +163,19 @@ class MoodleIntegration:
     async def rename_course(
         self, old_shortname: str, new_shortname: str, new_fullname: str
     ) -> bool:
-        """Renombra un curso (grupo cambiado) vía REST API."""
+        """Renombra un curso (grupo cambiado) vía REST API.
+        Si el nuevo shortname ya existe en Moodle, se omite el rename
+        (el destino ya está en el estado deseado)."""
         try:
+            # Verificar que el nuevo shortname no esté ocupado
+            target = await self.service.get_courses(shortname=new_shortname)
+            if target:
+                logger.warning(
+                    f"No se renombra {old_shortname} → {new_shortname}: "
+                    f"el destino ya existe como curso ID {target[0]['id']}"
+                )
+                return True
+
             existing = await self.service.get_courses(shortname=old_shortname)
             if not existing:
                 self.last_error = f"Curso a renombrar no encontrado: {old_shortname}"
