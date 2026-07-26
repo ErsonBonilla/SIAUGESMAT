@@ -33,6 +33,11 @@ async def _do_query(moodle: MoodleService, qr):
         if status_filter == "unused_6months":
             cutoff = int(time.time()) - (6 * 30 * 24 * 3600)
             raw = [c for c in raw if c.get("timemodified", 0) and int(c.get("timemodified", 0)) < cutoff]
+        pattern = params.get("pattern", "all")
+        if pattern == "6segments":
+            raw = [c for c in raw if (c.get("shortname") or "").count("_") == 5]
+        elif pattern == "5segments":
+            raw = [c for c in raw if (c.get("shortname") or "").count("_") == 4]
         return raw
 
     elif qr.entity == "categories":

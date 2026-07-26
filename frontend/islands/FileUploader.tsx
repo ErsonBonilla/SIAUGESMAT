@@ -23,7 +23,6 @@ export default function FileUploader() {
       })
       .catch(() => {
         semesterLoading.value = false;
-        error.value = "No se pudo obtener el semestre actual.";
       });
   }, []);
 

@@ -6,6 +6,7 @@ services:
   backend:
     volumes:
       - ./backend/app:/app/app:ro
+    #ports: ["8000:8000"]  # puerto bloqueado por WinNAT, API via nginx
   worker:
     volumes:
       - ./backend/app:/app/app:ro

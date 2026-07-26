@@ -7,21 +7,23 @@ export {
 } from "./api/auth.ts";
 
 export {
-  cancelExecution,
   getCurrentSemester,
   uploadFile,
   startProcess,
-  resumeExecution,
-  confirmExecution,
-  pauseExecution,
   getExecution,
   listExecutions,
   getExecutionErrors,
   deleteExecution,
+  confirmExecution,
+  pauseExecution,
+  cancelExecution,
 } from "./api/jobs.ts";
+
+export { startProcess as resumeExecution } from "./api/jobs.ts";
 
 export {
   getHistory,
+  getSemaphore,
   getLatest,
   listCharts,
   getChartData,
@@ -54,15 +56,19 @@ export type {
   Execution,
   ErrorLog,
   SemesterMetrics,
+  SemaphoreStatus,
   LatestExecution,
   UserProfile,
   ReportInfo,
   ReportsListResponse,
+  ChartInfo,
   ChartTracesLayout,
   ChartsListResponse,
   OperationBatchStatus,
+  OperationItemOut,
   CsvUploadResponse,
   QueryTaskStatus,
   OperationBatchOut,
   OperationsHistoryItem,
+  BulkVisibilityResult,
 } from "./api/types.ts";
