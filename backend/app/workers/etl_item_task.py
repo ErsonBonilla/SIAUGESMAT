@@ -146,7 +146,7 @@ def process_etl_item(self, item_id: int):
                 update_item(db, item.id, "completed")
                 _log_success(db, execution_id, action, identifier, detail)
             else:
-                error = integration.last_error or "Error desconocido"
+                error = integration.last_error or f"Error desconocido ({action}:{identifier})"
                 update_item(db, item.id, "failed", error)
                 _handle_error(execution_id, action, identifier, error)
             db.commit()
