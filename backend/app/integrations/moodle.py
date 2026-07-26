@@ -22,6 +22,14 @@ def _extract_error(e: Exception) -> str:
         return e.spanish_message
     if e.__cause__ and hasattr(e.__cause__, 'spanish_message'):
         return e.__cause__.spanish_message
+    if hasattr(e, 'last_attempt'):
+        try:
+            inner = e.last_attempt.exception()
+            if hasattr(inner, 'spanish_message'):
+                return inner.spanish_message
+            return str(inner)[:300]
+        except Exception:
+            pass
     return str(e)[:300]
 
 
@@ -46,7 +54,8 @@ class MoodleIntegration:
         except Exception as e:
             if is_moodle_overloaded(e):
                 raise MoodleOverloadedError(_extract_error(e)[:200])
-            logger.warning(f"No se pudo reubicar categoría {idnumber}: {e}")
+            self.last_error = _extract_error(e)
+            logger.warning(f"No se pudo reubicar categoría {idnumber}: {self.last_error}")
             return False
 
     async def create_course(
@@ -256,7 +265,8 @@ class MoodleIntegration:
         """
         email = user.get("email", "").strip().lower()
         if not email.endswith("@ut.edu.co"):
-            logger.info(f"Correo no institucional, no se crea usuario: {email}")
+            self.last_error = f"Correo no institucional: {email}"
+            logger.info(self.last_error)
             return None, False
 
         username_esperado = email.split("@")[0]
@@ -345,10 +355,11 @@ class MoodleIntegration:
                         "reason": "already_enrolled",
                     }
                 err = result.get("errors", ["error desconocido"])[0]
+                self.last_error = str(err)
                 return {
                     "success": False,
                     "username": username,
-                    "reason": str(err),
+                    "reason": self.last_error,
                 }
             return {
                 "success": True,
