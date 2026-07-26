@@ -197,7 +197,7 @@ def _save_phase_2_data_to_checkpoint(db, eid, etl_data, metrics, phase2_data, mo
 # Subtask orchestration: FASE 3 (Structure) and FASE 4 (People)
 # ---------------------------------------------------------------------------
 
-@celery_app.task(bind=True, soft_time_limit=1800, time_limit=3600)
+@celery_app.task(bind=True, soft_time_limit=3600, time_limit=7200)
 def process_etl_phase(self, execution_id: int, phase: str):
     db = SessionLocal()
     try:
