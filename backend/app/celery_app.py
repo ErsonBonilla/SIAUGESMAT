@@ -73,6 +73,10 @@ celery_app.conf.update(
             "task": "app.workers.cleanup_tasks.cleanup_pending_executions",
             "schedule": 21600.0,
         },
+        "cleanup-stuck-executions": {
+            "task": "app.workers.cleanup_tasks.cleanup_stuck_executions",
+            "schedule": 3600.0,
+        },
     },
 )
 

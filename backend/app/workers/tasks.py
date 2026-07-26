@@ -222,7 +222,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
             return mode in ("users", "both")
 
         if phase == "3":
-            update_progress(db, execution_id, 34, "Procesando estructura…", step=3)
+            update_progress(db, execution_id, 34, "Preparando items de estructura…", step=3)
 
             # Categories inline (fast)
             if _do_courses() and ctx_data.get("missing_categories"):
@@ -275,6 +275,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
                 on_phase_items_done.delay(execution_id, "3")
                 return
 
+            update_progress(db, execution_id, 34, "Resolviendo templates y creando items…", step=3)
             item_counts = _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad)
             total = sum(item_counts.values())
             if total == 0:
@@ -576,11 +577,21 @@ def _launch_delete_chord(execution_id, delete_items):
                   default_retry_delay=10, retry_backoff=True, retry_backoff_max=60)
 def on_delete_items_done(self, results, execution_id):
     """Callback cuando todos los deletes de FASE 3 completan.
-    Consulta BD para obtener los items de estructura pendientes."""
+    Si el chord falló (quedan deletes pendientes), los relanza."""
     db = SessionLocal()
     try:
         execution = get_execution(db, execution_id)
         if not execution or execution.status in ("paused", "cancelled"):
+            return
+
+        # Verificar si quedaron deletes pendientes (chord falló parcialmente)
+        pending_deletes = _get_pending_items(db, execution_id, "3", "delete")
+        if pending_deletes:
+            logger.warning(
+                f"FASE 3: {len(pending_deletes)} deletes pendientes tras chord, relanzando"
+            )
+            structure_items = _get_pending_items(db, execution_id, "3", "structure")
+            _launch_delete_chord(execution_id, pending_deletes)
             return
 
         update_progress(db, execution_id, 44, "Deletes completados, lanzando estructura…", step=3)
@@ -615,6 +626,21 @@ def on_phase_items_done(self, results, execution_id, phase):
         execution = get_execution(db, execution_id)
         if not execution or execution.status in ("paused", "cancelled"):
             return
+
+        # Si quedaron items pendientes (chord falló parcialmente), relanzar
+        if phase == "3":
+            pending = _get_pending_items(db, execution_id, "3")
+            if pending:
+                logger.warning(f"FASE 3: {len(pending)} items pendientes tras chord, relanzando")
+                _launch_structure_chord(execution_id, pending)
+                return
+        elif phase == "4":
+            pending = _get_pending_items(db, execution_id, "4")
+            if pending:
+                logger.warning(f"FASE 4: {len(pending)} items pendientes tras chord, relanzando")
+                task_ids = [process_etl_item.si(item.id) for item in pending]
+                chord(task_ids)(on_phase_items_done.s(execution_id=execution_id, phase="4"))
+                return
 
         # Update metrics from item results
         _sync_metrics_from_items(db, execution_id)
