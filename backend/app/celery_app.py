@@ -11,7 +11,7 @@ import logging
 import os
 
 from celery import Celery
-from celery.signals import after_setup_logger, task_failure
+from celery.signals import after_setup_logger, task_failure, worker_process_init
 
 from app.core.config import settings
 
@@ -75,6 +75,18 @@ celery_app.conf.update(
         },
     },
 )
+
+
+# ---------------------------------------------------------------------------
+# Fork safety: descartar conexiones DB heredadas por workers prefork
+# ---------------------------------------------------------------------------
+@worker_process_init.connect
+def init_worker(**kwargs):
+    """Descarta el pool de conexiones DB heredado del proceso padre (fork).
+    Cada worker hijo crea su propio pool al abrir su primer SessionLocal()."""
+    from app.db.session import engine
+    engine.dispose()
+    logger.debug("Engine DB disposed after fork")
 
 
 # ---------------------------------------------------------------------------
