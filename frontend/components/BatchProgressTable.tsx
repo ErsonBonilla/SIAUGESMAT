@@ -1,5 +1,5 @@
 import { SpinnerIcon, CheckIcon, XMarkIcon } from "../utils/icons.tsx";
-import { getBatchReportUrl } from "../services/api.ts";
+import { getBatchReportUrl, downloadReport } from "../services/api.ts";
 import type { OperationBatchStatus } from "../services/api/types.ts";
 import Pagination from "./Pagination.tsx";
 
@@ -50,16 +50,15 @@ export default function BatchProgressTable({ batchStatus, batchId, labelSingular
             <CheckIcon class="w-4 h-4" />
             <span>Procesamiento completado</span>
           </div>
-          <a
-            href={getBatchReportUrl(batchId)}
-            download
-            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white text-sm font-medium no-underline hover:brightness-110 transition"
+          <button
+            onClick={() => downloadReport(getBatchReportUrl(batchId), `reportes_${batchId.slice(0, 8)}.zip`)}
+            class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white text-sm font-medium no-underline hover:brightness-110 transition cursor-pointer"
           >
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             <span>Descargar reportes (CSV)</span>
-          </a>
+          </button>
         </div>
       )}
 
