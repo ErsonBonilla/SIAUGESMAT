@@ -411,13 +411,16 @@ class CourseComparisonService:
 
             if existing_prof and existing_prof == professor:
                 if existing_group not in new_groups:
-                    return "rename_group", {
+                    entry = {
                         "reason": "same_professor_group_changed",
                         "professor": professor,
                         "old_shortname": existing_sn,
                         "old_group": existing_group,
                         "new_group": new_group,
                     }
+                    if cls._is_course_hidden(existing):
+                        entry["reactivate"] = True
+                    return "rename_group", entry
                 return "create_with_template", {
                     "reason": "same_professor_new_group",
                     "professor": professor,
