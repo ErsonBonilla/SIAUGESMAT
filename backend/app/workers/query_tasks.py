@@ -84,14 +84,13 @@ def execute_query(self, task_id: str):
             version=config["version"],
         )
 
-        try:
-            async def _run_and_close():
-                try:
-                    return await _do_query(moodle, qr)
-                finally:
-                    await moodle.close()
+        async def _run_and_close():
+            try:
+                return await _do_query(moodle, qr)
+            finally:
+                await moodle.close()
 
-            raw = asyncio.run(_run_and_close())
+        raw = asyncio.run(_run_and_close())
 
         set_query_completed(db, task_id, raw, len(raw))
 
