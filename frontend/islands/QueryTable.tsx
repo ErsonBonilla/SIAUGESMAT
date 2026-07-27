@@ -1,6 +1,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { queryEntities, getQueryTaskStatus, getQueryExportUrl, type QueryTaskStatus } from "../services/api.ts";
+import { authHeaders } from "../services/api/core.ts";
 import { ExclamationCircleIcon, SpinnerIcon, CheckIcon, XMarkIcon, DownloadIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 
@@ -150,14 +151,30 @@ export default function QueryTable({ entity, title, columns, filters, searchPlac
         </button>
 
         {exportUrl && data.value.length > 0 && (
-          <a
-            href={exportUrl}
-            download
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded text-sm font-medium no-underline hover:bg-[var(--border-secondary)] transition ml-auto"
+          <button
+            onClick={() => {
+              fetch(exportUrl, { headers: { ...authHeaders() } })
+                .then((r) => {
+                  if (!r.ok) throw new Error("Error al descargar");
+                  return r.blob();
+                })
+                .then((blob) => {
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "consulta.csv";
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                })
+                .catch(() => {});
+            }}
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded text-sm font-medium no-underline hover:bg-[var(--border-secondary)] transition ml-auto cursor-pointer"
           >
             <DownloadIcon class="w-4 h-4" />
             CSV
-          </a>
+          </button>
         )}
       </div>
 
