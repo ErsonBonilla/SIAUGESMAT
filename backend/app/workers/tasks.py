@@ -435,15 +435,15 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> D
                             except Exception:
                                 _create_template_cache[template] = None
                         template_id = _create_template_cache.get(template)
-                        if not template_id:
-                            fallback = settings.DEFAULT_COURSE_TEMPLATE
-                            if fallback not in _create_template_cache:
-                                try:
-                                    fb = await ms.get_courses(shortname=fallback)
-                                    _create_template_cache[fallback] = fb[0]["id"] if fb else None
-                                except Exception:
-                                    _create_template_cache[fallback] = None
-                            template_id = _create_template_cache.get(fallback)
+                    if not template_id:
+                        fallback = settings.DEFAULT_COURSE_TEMPLATE
+                        if fallback and fallback not in _create_template_cache:
+                            try:
+                                fb = await ms.get_courses(shortname=fallback)
+                                _create_template_cache[fallback] = fb[0]["id"] if fb else None
+                            except Exception:
+                                _create_template_cache[fallback] = None
+                        template_id = _create_template_cache.get(fallback) if fallback else None
                     return sn, course_data, template_id
 
                 return await asyncio.gather(*[_resolve_single(item) for item in create_items])
