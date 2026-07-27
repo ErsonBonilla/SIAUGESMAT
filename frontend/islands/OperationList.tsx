@@ -1,7 +1,7 @@
 // islands/OperationList.tsx
 import { useSignal, useComputed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { listBatches, getBatchReportUrl, pauseBatch, resumeBatch, deleteBatch, type OperationBatchOut } from "../services/api.ts";
+import { listBatches, getBatchReportUrl, pauseBatch, resumeBatch, deleteBatch, downloadReport, type OperationBatchOut } from "../services/api.ts";
 import { STATUS_COLORS, STATUS_LABELS } from "../utils/constants.ts";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
@@ -98,7 +98,7 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
     if (!confirm("¿Eliminar este lote? Se descargará un reporte final con el progreso antes de eliminar.")) return;
     actionLoading.value = batchId;
     try {
-      window.open(getBatchReportUrl(batchId), "_blank");
+      await downloadReport(getBatchReportUrl(batchId), `reportes_${batchId.slice(0, 8)}.zip`);
       await deleteBatch(batchId);
       load();
     } catch (e) {
@@ -252,7 +252,10 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                         >
                           {actionLoading.value === b.batch_id ? "..." : "Eliminar"}
                         </button>
-                        <a href={getBatchReportUrl(b.batch_id)} class="gradient-text hover:brightness-110 text-sm font-medium ml-1">CSV</a>
+                        <button
+                          onClick={() => downloadReport(getBatchReportUrl(b.batch_id), `reportes_${b.batch_id.slice(0, 8)}.zip`)}
+                          class="gradient-text hover:brightness-110 text-sm font-medium ml-1 cursor-pointer bg-transparent border-none p-0 font-inherit"
+                        >CSV</button>
                       </div>
                     </td>
                   </tr>
