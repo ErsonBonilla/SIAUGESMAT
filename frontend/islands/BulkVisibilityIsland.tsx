@@ -1,77 +1,24 @@
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
-import { uploadVisibilityCsv, getBatchStatus, type OperationBatchStatus } from "../services/api.ts";
+import { useBatchUpload } from "../hooks/useBatchUpload.ts";
+import { uploadVisibilityCsv, getBatchStatus } from "../services/api.ts";
 import { SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import OperationHistorySection from "../components/OperationHistorySection.tsx";
 import BatchProgressTable from "../components/BatchProgressTable.tsx";
 
 export default function BulkVisibilityIsland() {
-  const file = useSignal<File | null>(null);
   const visibility = useSignal<"show" | "hide">("show");
-  const uploading = useSignal(false);
-  const error = useSignal("");
-  const batchId = useSignal("");
-  const batchStatus = useSignal<OperationBatchStatus | null>(null);
-  const pollingId = useSignal<number | null>(null);
   const refreshKey = useSignal(0);
   const detailOffset = useSignal(0);
   const PAGE_SIZE = 20;
 
-  const handleFileChange = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-    const f = target.files?.[0];
-    if (f) {
-      if (!f.name.toLowerCase().endsWith(".csv")) {
-        error.value = "Solo se permiten archivos CSV";
-        file.value = null;
-        return;
-      }
-      file.value = f;
-      error.value = "";
-    }
-  };
-
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-    error.value = "";
-    if (!file.value) {
-      error.value = "Seleccione un archivo CSV.";
-      return;
-    }
-    uploading.value = true;
-    try {
-      const result = await uploadVisibilityCsv(file.value, visibility.value);
-      batchId.value = result.batch_id;
-      startPolling(result.batch_id);
-      refreshKey.value++;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Error al subir el archivo.";
-    } finally {
-      uploading.value = false;
-    }
-  };
-
-  const startPolling = (id: string) => {
-    if (pollingId.value) clearInterval(pollingId.value);
-    const fetchStatus = async () => {
-      try {
-        const status = await getBatchStatus(id, detailOffset.value, PAGE_SIZE);
-        batchStatus.value = status;
-        if (status.pending === 0 && status.processing === 0) {
-          if (pollingId.value) {
-            clearInterval(pollingId.value);
-            pollingId.value = null;
-          }
-          refreshKey.value++;
-        }
-      } catch {
-        // ignore polling errors
-      }
-    };
-    fetchStatus();
-    pollingId.value = setInterval(fetchStatus, 2000);
-  };
+  const { file, uploading, error, batchId, batchStatus, handleFileChange, handleSubmit, startPolling } = useBatchUpload({
+    storageKey: "batch_visibility",
+    doUpload: (f) => uploadVisibilityCsv(f, visibility.value),
+    onFetchStatus: (id) => getBatchStatus(id, detailOffset.value, PAGE_SIZE),
+    onUploadSuccess: () => { refreshKey.value++; },
+    onBatchComplete: () => { refreshKey.value++; },
+  });
 
   const handleSelectBatch = (id: string) => {
     batchId.value = id;
@@ -81,18 +28,8 @@ export default function BulkVisibilityIsland() {
 
   const handleDetailPageChange = (newOffset: number) => {
     detailOffset.value = newOffset;
-    if (pollingId.value) {
-      clearInterval(pollingId.value);
-      pollingId.value = null;
-    }
     startPolling(batchId.value);
   };
-
-  useEffect(() => {
-    return () => {
-      if (pollingId.value) clearInterval(pollingId.value);
-    };
-  }, []);
 
   return (
     <div>

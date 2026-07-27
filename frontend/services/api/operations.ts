@@ -13,8 +13,8 @@ export async function uploadCsvFile(endpoint: string, file: File): Promise<CsvUp
   return handleResponse<CsvUploadResponse>(response);
 }
 
-export async function getBatchStatus(batchId: string): Promise<OperationBatchStatus> {
-  const response = await fetch(`${BASE_URL}/operations/batch/${batchId}/status`, { headers: { ...authHeaders() } });
+export async function getBatchStatus(batchId: string, offset = 0, limit = 100): Promise<OperationBatchStatus> {
+  const response = await fetch(`${BASE_URL}/operations/batch/${batchId}/status?offset=${offset}&limit=${limit}`, { headers: { ...authHeaders() } });
   return handleResponse<OperationBatchStatus>(response);
 }
 
