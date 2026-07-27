@@ -1,7 +1,7 @@
 // islands/OperationList.tsx
 import { useSignal, useComputed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { listBatches, getBatchReportUrl, type OperationBatchOut } from "../services/api.ts";
+import { listBatches, getBatchReportUrl, pauseBatch, resumeBatch, deleteBatch, type OperationBatchOut } from "../services/api.ts";
 import { STATUS_COLORS, STATUS_LABELS } from "../utils/constants.ts";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
@@ -36,6 +36,7 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
   const total = useSignal(0);
   const loading = useSignal(true);
   const error = useSignal("");
+  const actionLoading = useSignal<string | null>(null);
 
   const isLocked = !!(defaultEntity && defaultAction);
 
@@ -65,6 +66,47 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
   }
 
   useEffect(() => { load(); }, []);
+
+  async function handlePause(batchId: string) {
+    if (actionLoading.value) return;
+    actionLoading.value = batchId;
+    try {
+      await pauseBatch(batchId);
+      load();
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : "Error al pausar el lote";
+    } finally {
+      actionLoading.value = null;
+    }
+  }
+
+  async function handleResume(batchId: string) {
+    if (actionLoading.value) return;
+    actionLoading.value = batchId;
+    try {
+      await resumeBatch(batchId);
+      load();
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : "Error al reanudar el lote";
+    } finally {
+      actionLoading.value = null;
+    }
+  }
+
+  async function handleDelete(batchId: string) {
+    if (actionLoading.value) return;
+    if (!confirm("¿Eliminar este lote? Se descargará un reporte final con el progreso antes de eliminar.")) return;
+    actionLoading.value = batchId;
+    try {
+      window.open(getBatchReportUrl(batchId), "_blank");
+      await deleteBatch(batchId);
+      load();
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : "Error al eliminar el lote";
+    } finally {
+      actionLoading.value = null;
+    }
+  }
 
   const totalPages = useComputed(() => Math.ceil(total.value / PAGE_SIZE));
   const currentPage = useComputed(() => Math.floor(offset.value / PAGE_SIZE) + 1);
@@ -184,7 +226,34 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                       </span>
                     </td>
                     <td class="py-3 px-2 text-right whitespace-nowrap">
-                      <a href={getBatchReportUrl(b.batch_id)} class="gradient-text hover:brightness-110 text-sm font-medium">CSV</a>
+                      <div class="flex items-center justify-end gap-1.5">
+                        {statusFromBatch(b) !== "completed" && (b.paused || 0) === 0 && (
+                          <button
+                            onClick={() => handlePause(b.batch_id)}
+                            disabled={actionLoading.value === b.batch_id}
+                            class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:brightness-90 disabled:opacity-40"
+                          >
+                            {actionLoading.value === b.batch_id ? "..." : "Pausar"}
+                          </button>
+                        )}
+                        {(b.paused || 0) > 0 && (
+                          <button
+                            onClick={() => handleResume(b.batch_id)}
+                            disabled={actionLoading.value === b.batch_id}
+                            class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:brightness-90 disabled:opacity-40"
+                          >
+                            {actionLoading.value === b.batch_id ? "..." : "Reanudar"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(b.batch_id)}
+                          disabled={actionLoading.value === b.batch_id}
+                          class="px-2 py-1 text-xs rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:brightness-90 disabled:opacity-40"
+                        >
+                          {actionLoading.value === b.batch_id ? "..." : "Eliminar"}
+                        </button>
+                        <a href={getBatchReportUrl(b.batch_id)} class="gradient-text hover:brightness-110 text-sm font-medium ml-1">CSV</a>
+                      </div>
                     </td>
                   </tr>
                 ))}

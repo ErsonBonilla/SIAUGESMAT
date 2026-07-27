@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
+from sqlalchemy import func
 from app.db.models import OperationBatch, OperationItem
 
 
@@ -79,6 +80,7 @@ def get_batch_status(db, batch_id: str) -> dict:
         "total": base_q.count(),
         "pending": base_q.filter_by(status="pending").count(),
         "processing": base_q.filter_by(status="processing").count(),
+        "paused": base_q.filter_by(status="paused").count(),
         "completed": base_q.filter_by(status="completed").count(),
         "failed": base_q.filter_by(status="failed").count(),
     }
@@ -92,6 +94,45 @@ def get_batch_items(db, batch_id: str, offset: int, limit: int) -> List[Operatio
 def get_all_batch_items(db, batch_id: str) -> List[OperationItem]:
     return db.query(OperationItem).filter_by(batch_id=batch_id).order_by(
         OperationItem.id).all()
+
+
+def pause_batch(db, batch_id: str) -> int:
+    paused = db.query(OperationItem).filter_by(
+        batch_id=batch_id, status="pending"
+    ).update({"status": "paused", "updated_at": datetime.now(timezone.utc)}, synchronize_session=False)
+    db.commit()
+    return paused
+
+
+def resume_batch(db, batch_id: str) -> int:
+    resumed = db.query(OperationItem).filter_by(
+        batch_id=batch_id, status="paused"
+    ).update({"status": "pending", "updated_at": datetime.now(timezone.utc)}, synchronize_session=False)
+    db.commit()
+    return resumed
+
+
+def delete_batch(db, batch_id: str) -> bool:
+    batch = get_batch(db, batch_id)
+    if not batch:
+        return False
+    db.query(OperationItem).filter_by(batch_id=batch_id).delete(synchronize_session=False)
+    db.delete(batch)
+    db.commit()
+    return True
+
+
+def get_batch_paused_counts(db, batch_ids: list[str]) -> dict[str, int]:
+    from sqlalchemy import func
+    if not batch_ids:
+        return {}
+    rows = db.query(
+        OperationItem.batch_id, func.count(OperationItem.id)
+    ).filter(
+        OperationItem.batch_id.in_(batch_ids),
+        OperationItem.status == "paused"
+    ).group_by(OperationItem.batch_id).all()
+    return {row[0]: row[1] for row in rows}
 
 
 def delete_old_batches(db, days: int) -> int:

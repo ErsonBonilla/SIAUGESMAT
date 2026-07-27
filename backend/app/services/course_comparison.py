@@ -112,6 +112,7 @@ class CourseComparisonService:
                 else:
                     action, detail = cls._handle_different_professor(
                         existing, sn, professor, existing_prof,
+                        should_hide_existing=True,
                         re_upload=re_upload,
                     )
 

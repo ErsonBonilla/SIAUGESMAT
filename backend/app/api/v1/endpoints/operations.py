@@ -18,13 +18,17 @@ from app.core.dependencies import get_current_user, get_db
 from app.repositories.operation_repo import (
     add_item,
     create_batch,
+    delete_batch,
     delete_old_batches,
     get_all_batch_items,
     get_batch,
     get_batch_items,
+    get_batch_paused_counts,
     get_batch_status,
     get_operations_analytics,
     list_batches,
+    pause_batch,
+    resume_batch,
 )
 from app.schemas.operations import (
     BatchListResponse,
@@ -256,13 +260,56 @@ def get_batch_status_endpoint(
     return BatchStatusResponse(
         batch_id=batch.batch_id, entity_type=batch.entity_type, action=batch.action,
         total=status["total"], pending=status["pending"], processing=status["processing"],
-        completed=status["completed"], failed=status["failed"],
+        paused=status["paused"], completed=status["completed"], failed=status["failed"],
         offset=offset, limit=limit,
         details=[OperationItemOut(
             identifier=i.identifier, status=i.status,
             error_message=i.error_message, attempt=i.attempt,
         ) for i in items],
     )
+
+
+@router.post("/batch/{batch_id}/pause",
+             summary="Pausar un lote de operaciones")
+def pause_batch_endpoint(
+    batch_id: str,
+    db: Session = Depends(get_db), current_user: UserInToken = Depends(get_current_user),
+):
+    batch = get_batch(db, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    paused = pause_batch(db, batch_id)
+    logger.info(f"Lote {batch_id} pausado por {current_user.username}: {paused} items")
+    return {"batch_id": batch_id, "paused": paused, "message": f"Lote pausado. {paused} items pendientes marcados como pausados."}
+
+
+@router.post("/batch/{batch_id}/resume",
+             summary="Reanudar un lote de operaciones pausado")
+def resume_batch_endpoint(
+    batch_id: str,
+    db: Session = Depends(get_db), current_user: UserInToken = Depends(get_current_user),
+):
+    batch = get_batch(db, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    resumed = resume_batch(db, batch_id)
+    logger.info(f"Lote {batch_id} reanudado por {current_user.username}: {resumed} items")
+    return {"batch_id": batch_id, "resumed": resumed, "message": f"Lote reanudado. {resumed} items vueltos a pendientes."}
+
+
+@router.delete("/batch/{batch_id}",
+               summary="Eliminar un lote de operaciones")
+def delete_batch_endpoint(
+    batch_id: str,
+    db: Session = Depends(get_db), current_user: UserInToken = Depends(get_current_user),
+):
+    batch = get_batch(db, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    if not delete_batch(db, batch_id):
+        raise HTTPException(status_code=500, detail="No se pudo eliminar el lote")
+    logger.info(f"Lote {batch_id} eliminado por {current_user.username}")
+    return {"batch_id": batch_id, "message": "Lote eliminado correctamente."}
 
 
 @router.get("/batch/{batch_id}/reports/download",
@@ -382,10 +429,17 @@ def list_operation_batches(
         db, entity_type=entity_type, action=action,
         modalidad=modalidad, limit=limit, offset=offset,
     )
+    batch_ids = [b.batch_id for b in batches]
+    paused_counts = get_batch_paused_counts(db, batch_ids)
     from app.schemas.operations import BatchListOut
+    items = []
+    for b in batches:
+        item = BatchListOut.model_validate(b)
+        item.paused = paused_counts.get(b.batch_id, 0)
+        items.append(item)
     return BatchListResponse(
         total=total,
-        items=[BatchListOut.model_validate(b) for b in batches],
+        items=items,
     )
 
 
