@@ -44,3 +44,27 @@ export async function getOperationsAnalytics(modalidad?: string, months = 12, en
   const data = await handleResponse<{ history: OperationsHistoryItem[] }>(response);
   return data.history;
 }
+
+export async function pauseBatch(batchId: string) {
+  const response = await fetch(`${BASE_URL}/operations/batch/${batchId}/pause`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<{ batch_id: string; paused: number; message: string }>(response);
+}
+
+export async function resumeBatch(batchId: string) {
+  const response = await fetch(`${BASE_URL}/operations/batch/${batchId}/resume`, {
+    method: "POST",
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<{ batch_id: string; resumed: number; message: string }>(response);
+}
+
+export async function deleteBatch(batchId: string) {
+  const response = await fetch(`${BASE_URL}/operations/batch/${batchId}`, {
+    method: "DELETE",
+    headers: { ...authHeaders() },
+  });
+  if (!response.ok) await handleResponse<unknown>(response);
+}

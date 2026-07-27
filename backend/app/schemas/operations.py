@@ -27,6 +27,7 @@ class BatchStatusResponse(BaseModel):
     total: int
     pending: int
     processing: int
+    paused: int = 0
     completed: int
     failed: int
     offset: int = 0
@@ -43,6 +44,7 @@ class BatchListOut(BaseModel):
     total: int
     completed: int
     failed: int
+    paused: int = 0
     modalidad: str
     created_at: datetime
     completed_at: Optional[datetime] = None

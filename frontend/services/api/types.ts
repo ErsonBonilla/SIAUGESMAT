@@ -100,6 +100,7 @@ export interface OperationBatchStatus {
   total: number;
   pending: number;
   processing: number;
+  paused: number;
   completed: number;
   failed: number;
   offset: number;
@@ -138,6 +139,7 @@ export interface OperationBatchOut {
   total: number;
   completed: number;
   failed: number;
+  paused: number;
   modalidad: string;
   created_at: string;
   completed_at: string | null;

@@ -40,6 +40,9 @@ export {
   getBatchReportUrl,
   listBatches,
   getOperationsAnalytics,
+  pauseBatch,
+  resumeBatch,
+  deleteBatch,
 } from "./api/operations.ts";
 
 export {
