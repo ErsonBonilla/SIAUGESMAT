@@ -17,11 +17,9 @@ from app.api.v1 import router as v1_router
 from app.core.config import settings
 from app.db.session import init_db
 
-# Configuración de logging
-logging.basicConfig(
-    level=logging.DEBUG if settings.DEBUG else logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+# Configuración de logging estructurado (JSON en producción)
+from app.core.logging_config import setup_logging
+setup_logging(debug=settings.DEBUG)
 logger = logging.getLogger(__name__)
 
 

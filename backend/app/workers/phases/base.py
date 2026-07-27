@@ -30,7 +30,7 @@ class PhaseContext:
         self.all_categories_map: Dict[str, Dict] = {}
         self.existing_courses: List[Dict] = []
         self.username_map: Dict[str, str] = {}
-        self.courses_with_teacher: Set[str] = set()
+        self.courses_with_teacher: Dict[str, str] = {}
         self.course_teacher_map: Dict[str, str] = {}
 
         self.re_upload: bool = False

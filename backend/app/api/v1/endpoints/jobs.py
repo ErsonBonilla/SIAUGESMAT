@@ -292,9 +292,17 @@ async def pause_execution_endpoint(
                    f"Solo se puede pausar ejecuciones en 'running'.",
         )
 
-    if not pause_execution(db, execution_id):
+    success, task_id = pause_execution(db, execution_id)
+    if not success:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail="No se pudo pausar la ejecución.")
+
+    if task_id:
+        try:
+            celery_app.control.revoke(task_id, terminate=False)
+            logger.info(f"Tarea Celery {task_id} revocada para ejecución {execution_id}")
+        except Exception as e:
+            logger.warning(f"No se pudo revocar tarea {task_id}: {e}")
 
     logger.info(f"Ejecución {execution_id} pausada por {current_user.username}")
     return ProcessResponse(

@@ -26,6 +26,7 @@ def create_batch(db, batch_id: str, entity_type: str, action: str,
     )
     db.add(batch)
     db.flush()
+    db.commit()
     return batch
 
 
