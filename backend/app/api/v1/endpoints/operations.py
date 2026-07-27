@@ -39,7 +39,7 @@ from app.schemas.operations import (
     OperationsAnalyticsResponse,
 )
 from app.schemas.user import UserInToken
-from app.services.moodle_adapter import resolve_role
+from app.services.roles import resolve_role
 from app.workers.operations_tasks import process_operation_batch
 
 logger = logging.getLogger(__name__)

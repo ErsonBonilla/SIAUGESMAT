@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List, Set
+from typing import Dict, List
 
 from app.repositories import log_repo
 from app.repositories.execution_repo import update_progress
@@ -90,10 +90,14 @@ class ConsultPhase(BasePhase):
             )
             update_progress(db, eid, 14, "Análisis de datos completado")
 
-            courses_with_teacher: Set[str] = set()
+            courses_with_teacher: Dict[str, str] = {}
             if mode in ("courses", "both"):
                 teacher_emails_by_course: Dict[str, List[str]] = {}
                 teacher_emails_by_base_key: Dict[tuple, List[str]] = {}
+                teacher_usernames_by_course: Dict[str, List[str]] = {}
+                teacher_usernames_by_base_key: Dict[tuple, List[str]] = {}
+                teacher_idnumbers_by_course: Dict[str, List[str]] = {}
+                teacher_idnumbers_by_base_key: Dict[tuple, List[str]] = {}
                 for enr in etl_data["enrolments"]:
                     sn = enr["course_shortname"]
                     user = next(
@@ -103,24 +107,38 @@ class ConsultPhase(BasePhase):
                     if user:
                         emails = [e for e in [user.get("email"), user.get("email_personal")] if e]
                         teacher_emails_by_course.setdefault(sn, []).extend(emails)
+                        teacher_usernames_by_course.setdefault(sn, []).append(enr["username"])
+                        cedula = user.get("cedula", "")
+                        if cedula:
+                            teacher_idnumbers_by_course.setdefault(sn, []).append(cedula)
                         parsed = parse_shortname(sn)
                         if parsed:
                             bk = (parsed["cat_prefix"], parsed["cod_prog"], parsed["semestre"],
                                   parsed["cod_curso"], parsed["grupo"])
                             teacher_emails_by_base_key.setdefault(bk, []).extend(emails)
+                            teacher_usernames_by_base_key.setdefault(bk, []).append(enr["username"])
+                            if cedula:
+                                teacher_idnumbers_by_base_key.setdefault(bk, []).append(cedula)
 
                 for c in ctx.existing_courses:
                     sn = c.get("shortname", "")
                     emails = teacher_emails_by_course.get(sn, [])
+                    usernames = teacher_usernames_by_course.get(sn, [])
+                    idnumbers = teacher_idnumbers_by_course.get(sn, [])
                     if not emails:
                         parsed = parse_shortname(sn)
                         if parsed:
                             bk = (parsed["cat_prefix"], parsed["cod_prog"], parsed["semestre"],
                                   parsed["cod_curso"], parsed["grupo"])
                             emails = teacher_emails_by_base_key.get(bk, [])
-                    teachers = await moodle_service.get_enrolled_teachers(int(c["id"]), emails)
+                            usernames = teacher_usernames_by_base_key.get(bk, [])
+                            idnumbers = teacher_idnumbers_by_base_key.get(bk, [])
+                    teachers = await moodle_service.get_enrolled_teachers(
+                        int(c["id"]), emails, teacher_usernames=usernames,
+                        teacher_idnumbers=idnumbers,
+                    )
                     if teachers:
-                        courses_with_teacher.add(sn)
+                        courses_with_teacher[sn] = teachers[0].get("username", "")
             ctx.courses_with_teacher = courses_with_teacher
 
             logger.info(

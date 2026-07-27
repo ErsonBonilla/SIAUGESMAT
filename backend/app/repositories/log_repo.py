@@ -14,7 +14,7 @@ def save_log(db, execution_id: int, phase: str, action: str,
         created_at=datetime.now(timezone.utc),
     )
     db.add(log)
-    db.commit()
+    db.flush()
 
 
 def save_error(db, execution_id: int, err_type: str,
@@ -27,7 +27,7 @@ def save_error(db, execution_id: int, err_type: str,
         created_at=datetime.now(timezone.utc),
     )
     db.add(error)
-    db.commit()
+    db.flush()
 
 
 def get_execution_logs(db, execution_id: int, limit: int = 100, offset: int = 0):

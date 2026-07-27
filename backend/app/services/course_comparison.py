@@ -28,7 +28,7 @@ class CourseComparisonService:
         new_courses: List[Dict],
         new_enrolments: List[Dict],
         re_upload: bool = False,
-        courses_with_teacher: Set[str] = None,
+        courses_with_teacher: Dict[str, str] = None,
     ) -> Dict[str, Any]:
         """
         Compara los cursos de la nueva carga contra los existentes en Moodle.
@@ -39,7 +39,7 @@ class CourseComparisonService:
             re_upload: True si es una re-carga del mismo semestre.
                        En ese caso, los cambios de profesor siempre hacen
                        recreate (sin ocultar), asumiendo renuncia/despido.
-            courses_with_teacher: Set de shortnames de cursos que tienen
+            courses_with_teacher: Dict[shortname, username] de cursos que tienen
                                   editingteacher en Moodle.
 
         Returns:
@@ -53,7 +53,7 @@ class CourseComparisonService:
                 - logs: registros detallados de cada acción/incidencia
         """
         if courses_with_teacher is None:
-            courses_with_teacher = set()
+            courses_with_teacher = {}
         siaugesmat_courses = [
             c for c in existing_courses
             if SIAUGESMAT_PATTERN.match(c.get("shortname", ""))
@@ -107,7 +107,7 @@ class CourseComparisonService:
                         "professor": professor,
                         "old_professor": existing_prof or "",
                     }
-                elif existing_prof and existing_prof == professor:
+                elif (existing_prof and existing_prof == professor) or courses_with_teacher.get(sn) == professor:
                     action, detail = cls._handle_same_professor(existing, sn, professor)
                 else:
                     action, detail = cls._handle_different_professor(
@@ -143,7 +143,8 @@ class CourseComparisonService:
                         match = next(
                             (c for c in candidates
                              if cls._get_course_professor(c) == professor
-                             or c.get("shortname", "") in courses_with_teacher),
+                             or (c.get("shortname", "") in courses_with_teacher
+                                 and courses_with_teacher[c.get("shortname", "")] == professor)),
                             None,
                         )
                         if match:
@@ -485,7 +486,7 @@ class CourseComparisonService:
                     "identifier": sn,
                     "detail": {"reason": "disappeared", "age_seconds": age},
                 })
-            else:
+            elif not cls._is_course_hidden(existing):
                 to_hide.append(sn)
                 alerts.append({
                     "shortname": sn,

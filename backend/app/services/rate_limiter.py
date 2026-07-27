@@ -66,6 +66,7 @@ class RedisRateLimiter:
         self.rate = rate
         self.window = window
         self._pool = None
+        self._redis = None
 
     async def _get_pool(self):
         if self._pool is None:
@@ -81,21 +82,24 @@ class RedisRateLimiter:
     async def acquire(self) -> None:
         import redis.asyncio as aredis
         pool = await self._get_pool()
-        r = aredis.Redis(connection_pool=pool)
+        if self._redis is None:
+            self._redis = aredis.Redis(connection_pool=pool)
         key = "ratelimit:moodle"
         now = time.monotonic()
         window_start = now - self.window
-        try:
-            pipe = r.pipeline(transaction=True)
-            pipe.zremrangebyscore(key, 0, window_start)
-            pipe.zadd(key, {str(now) + str(secrets.randbits(16)): now})
-            pipe.zcard(key)
-            pipe.expire(key, self.window + 1)
-            _, _, count, _ = await pipe.execute()
-            if count > self.rate:
-                await asyncio.sleep((count - self.rate) * (self.window / self.rate))
-        finally:
-            await r.aclose()
+        pipe = self._redis.pipeline(transaction=True)
+        pipe.zremrangebyscore(key, 0, window_start)
+        pipe.zadd(key, {str(now) + str(secrets.randbits(16)): now})
+        pipe.zcard(key)
+        pipe.expire(key, self.window + 1)
+        _, _, count, _ = await pipe.execute()
+        from app.services.metrics import inc, observe
+        inc("rate_limiter.acquire")
+        if count > self.rate:
+            wait = (count - self.rate) * (self.window / self.rate)
+            inc("rate_limiter.throttled")
+            observe("rate_limiter.wait_ms", wait * 1000)
+            await asyncio.sleep(wait)
 
     async def close(self):
         if self._pool is not None:

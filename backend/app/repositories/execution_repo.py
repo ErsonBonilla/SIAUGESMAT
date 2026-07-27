@@ -190,16 +190,18 @@ def clear_checkpoint(db, execution_id: int):
         db.commit()
 
 
-def pause_execution(db, execution_id: int) -> bool:
-    """Pone una ejecución en pausa. El worker la detectará al final de la iteración actual."""
+def pause_execution(db, execution_id: int) -> tuple[bool, str]:
+    """Pone una ejecución en pausa. Retorna (success, celery_task_id)
+    para que el caller pueda revocar la tarea Celery."""
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if not execution or execution.status != "running":
-        return False
+        return False, ""
+    task_id = execution.celery_task_id or ""
     execution.status = "paused"
     if " (pausado)" not in (execution.current_phase or ""):
         execution.current_phase = f"{execution.current_phase or ''} (pausado)"
     db.commit()
-    return True
+    return True, task_id
 
 
 def increment_metric(db, execution_id: int, metric_name: str, delta: int = 1):
@@ -209,7 +211,7 @@ def increment_metric(db, execution_id: int, metric_name: str, delta: int = 1):
         metrics[metric_name] = metrics.get(metric_name, 0) + delta
         execution.metrics = metrics
         flag_modified(execution, "metrics")
-        db.commit()
+        db.flush()
 
 
 def _should_pause(db, execution_id: int) -> bool:

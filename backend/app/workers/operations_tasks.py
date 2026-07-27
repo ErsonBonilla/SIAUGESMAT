@@ -17,7 +17,7 @@ from app.repositories.operation_repo import (
 )
 from app.services.error_messages import translate_error
 from app.services.moodle import MoodleAPIError, MoodleService
-from app.services.moodle_adapter import resolve_role
+from app.services.roles import resolve_role
 
 logger = logging.getLogger(__name__)
 

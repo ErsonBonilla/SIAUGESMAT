@@ -7,14 +7,23 @@ interface ProgressBarProps {
   currentPhase: string | null;
   currentStep: number | null;
   progressPct: number;
+  status?: string;
+  etaSeconds?: number;
 }
 
-export default function ProgressBar({ currentPhase, currentStep, progressPct }: ProgressBarProps) {
+export default function ProgressBar({ currentPhase, currentStep, progressPct, status, etaSeconds }: ProgressBarProps) {
   const step = currentStep ?? 1;
   const icon = PHASE_ICONS[step - 1] ?? "⏳";
   const phaseLabel = PHASE_LABELS[step - 1] ?? "Procesando";
   const pct = Math.round(progressPct);
   const running = pct < 100;
+
+  function formatEta(seconds: number): string {
+    if (seconds <= 0) return "";
+    if (seconds < 60) return "< 1 min";
+    const mins = Math.ceil(seconds / 60);
+    return `~${mins} min${mins > 1 ? "" : ""} restantes`;
+  }
 
   return (
     <div class="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl p-6 mb-6">
@@ -30,9 +39,16 @@ export default function ProgressBar({ currentPhase, currentStep, progressPct }: 
             <p class="text-xs text-[var(--text-secondary)]">{phaseLabel} · Fase {step} de 4</p>
           </div>
         </div>
-        <span class="text-2xl font-bold" style="color: var(--brand-red);">
-          {pct}%
-        </span>
+        <div class="flex items-center gap-2">
+          <span class="text-2xl font-bold" style="color: var(--brand-red);">
+            {pct}%
+          </span>
+          {status === "running" && etaSeconds !== undefined && etaSeconds > 0 && (
+            <span class="text-xs text-[var(--text-secondary)] whitespace-nowrap">
+              {formatEta(etaSeconds)}
+            </span>
+          )}
+        </div>
       </div>
       <div class="w-full h-2.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
         <div

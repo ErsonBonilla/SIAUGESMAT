@@ -84,6 +84,7 @@ class AnalyzePhase(BasePhase):
                 ctx.users_to_create = [
                     u for u in etl_data["users"]
                     if u["username"] not in ctx.username_map
+                    and u.get("email", "").endswith("@ut.edu.co")
                 ]
 
             ctx.metrics["alerts"] = len(ctx.comparison.get("alerts", []))

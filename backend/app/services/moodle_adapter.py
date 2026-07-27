@@ -9,38 +9,14 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional
 
+from app.services.roles import resolve_role, role_shortname_to_id
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Tipo para la función de llamada WS (MoodleService._request)
 # ---------------------------------------------------------------------------
 WSFunc = Callable[[str, Dict[str, Any]], Any]
-
-
-def resolve_role(value: str) -> int:
-    """Convierte un rol (shortname o roleid numérico) a roleid de Moodle."""
-    try:
-        role_id = int(value)
-        if role_id in (1, 3, 4, 5):
-            return role_id
-    except ValueError:
-        pass
-    return role_shortname_to_id(value.strip().lower())
-
-
-def role_shortname_to_id(shortname: str) -> int:
-    """Convierte el nombre corto de un rol a su ID estándar de Moodle."""
-    mapping = {
-        "student": 5,
-        "editingteacher": 3,
-        "teacher": 4,
-        "manager": 1,
-    }
-    role_id = mapping.get(shortname)
-    if role_id is None:
-        logger.warning(f"Rol desconocido '{shortname}', usando 'student' (5)")
-        return 5
-    return role_id
 
 
 # ---------------------------------------------------------------------------

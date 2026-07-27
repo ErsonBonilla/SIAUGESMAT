@@ -117,7 +117,7 @@ class TestComparison:
 
         result = await CourseComparisonService.compare(
             existing_courses, new_courses, new_enrolments,
-            courses_with_teacher={sn},
+            courses_with_teacher={sn: "prof1"},
         )
 
         assert len(result["to_create"]) == 0
@@ -140,7 +140,7 @@ class TestComparison:
 
         result = await CourseComparisonService.compare(
             existing_courses, new_courses, new_enrolments,
-            courses_with_teacher={sn},
+            courses_with_teacher={sn: "prof1"},
         )
 
         assert sn in result["to_delete"]
@@ -162,18 +162,18 @@ class TestComparison:
 
         result = await CourseComparisonService.compare(
             existing_courses, new_courses, new_enrolments,
-            courses_with_teacher={sn},
+            courses_with_teacher={sn: "prof1"},
         )
 
         assert sn in result["to_activate"]
 
     @pytest.mark.asyncio
     async def test_case_3_different_professor(self):
-        """Caso 3: Curso existe con distinto profesor (antiguo >6 meses)."""
+        """Caso 3: Curso existe con distinto profesor → hide_and_create."""
         sn = "IDE_0105_sI_202_G-01"
-        old_time = 100000  # más de 6 meses
+        recent_time = int(__import__("time").time()) - 1000
         existing_courses = [
-            _make_moodle_course(sn, timecreated=old_time, customfields=[
+            _make_moodle_course(sn, timecreated=recent_time, customfields=[
                 {"shortname": "professor", "value": "old_prof"},
             ]),
         ]
@@ -183,30 +183,11 @@ class TestComparison:
 
         result = await CourseComparisonService.compare(
             existing_courses, new_courses, new_enrolments,
-            courses_with_teacher={sn},
+            courses_with_teacher={sn: "old_prof"},
         )
 
-        assert sn in result["to_delete"]
+        assert len(result["to_hide"]) >= 1
         assert any(c["shortname"] == sn for c in result["to_create"])
-
-    @pytest.mark.asyncio
-    async def test_case_3_different_professor(self):
-        """Caso 3: Curso existe con distinto profesor (antiguo >6 meses)."""
-        sn = "IDE_0105_sI_202_G-01"
-        old_time = 100000  # más de 6 meses
-        existing_courses = [
-            _make_moodle_course(sn, timecreated=old_time, customfields=[
-                {"shortname": "professor", "value": "old_prof"},
-            ]),
-        ]
-
-        new_courses = [_make_new_course(sn)]
-        new_enrolments = [{"course_shortname": sn, "username": "new_prof"}]
-
-        result = await CourseComparisonService.compare(
-            existing_courses, new_courses, new_enrolments,
-            courses_with_teacher={sn},
-        )
 
         assert sn in result["to_delete"]
         assert any(c["shortname"] == sn for c in result["to_create"])

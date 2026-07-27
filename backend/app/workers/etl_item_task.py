@@ -6,6 +6,7 @@ from sqlalchemy import func
 
 from app.celery_app import celery_app
 from app.core.config import settings
+from app.core.logging_config import ExecutionContextFilter
 from app.db.session import SessionLocal
 from app.integrations.moodle import MoodleIntegration
 from app.db.models import OperationItem
@@ -68,6 +69,12 @@ def process_etl_item(self, item_id: int):
         execution_id = detail.get("execution_id")
         modalidad = detail.get("modalidad", "DISTANCIA")
         identifier = item.identifier
+
+        ExecutionContextFilter.set_context(
+            execution_id=execution_id,
+            item_id=item_id,
+            action=action,
+        )
 
         if not action:
             update_item(db, item.id, "failed", "Falta 'action' en detail")
@@ -148,9 +155,9 @@ def process_etl_item(self, item_id: int):
             else:
                 error = integration.last_error or f"Error desconocido ({action}:{identifier})"
                 update_item(db, item.id, "failed", error)
-                _handle_error(execution_id, action, identifier, error)
+                _handle_error(execution_id, action, identifier, error, db=db)
             db.commit()
-            _refresh_phase_progress(execution_id)
+            _refresh_phase_progress(execution_id, db=db)
 
         try:
             asyncio.run(_execute())
@@ -162,9 +169,9 @@ def process_etl_item(self, item_id: int):
                 db.commit()
                 raise MoodleOverloadedError(str(e)[:200])
             update_item(db, item.id, "failed", translate_error(e))
-            _handle_error(execution_id, action, identifier, translate_error(e))
+            _handle_error(execution_id, action, identifier, translate_error(e), db=db)
             db.commit()
-            _refresh_phase_progress(execution_id)
+            _refresh_phase_progress(execution_id, db=db)
 
     except MoodleOverloadedError:
         raise
@@ -174,18 +181,17 @@ def process_etl_item(self, item_id: int):
             db.rollback()
             if execution_id and item:
                 update_item(db, item.id, "failed", translate_error(e))
-                _handle_error(execution_id, action, identifier, translate_error(e))
+                _handle_error(execution_id, action, identifier, translate_error(e), db=db)
                 db.commit()
         except Exception as e:
             logger.exception(f"Error actualizando progreso para ejecución {execution_id}: {e}")
     finally:
+        ExecutionContextFilter.clear_context()
         db.close()
 
 
-def _refresh_phase_progress(execution_id):
-    from app.db.session import SessionLocal
+def _refresh_phase_progress(execution_id, db):
     from app.db.models import Execution, OperationItem
-    db = SessionLocal()
     try:
         phase3_total = db.query(func.count(OperationItem.id)).filter(
             OperationItem.batch_id.like(f"etl_3_%_{execution_id}")
@@ -220,8 +226,7 @@ def _refresh_phase_progress(execution_id):
             db.commit()
     except Exception as e:
         logger.exception(f"Error actualizando progreso para ejecución {execution_id}: {e}")
-    finally:
-        db.close()
+    # Nota: No cerramos db porque la sesión pertenece al caller
 
 
 def _log_success(db, execution_id, action, identifier, detail):
@@ -246,11 +251,9 @@ def _log_success(db, execution_id, action, identifier, detail):
         save_log(db, execution_id, phase, log_action, identifier, log_detail)
 
 
-def _handle_error(execution_id, action, identifier, error_msg):
+def _handle_error(execution_id, action, identifier, error_msg, db):
     if not execution_id:
         return
-    from app.db.session import SessionLocal
-    db = SessionLocal()
     try:
         phase = "3" if action in ("delete", "activate", "hide", "rename", "create") else "4"
         save_error(db, execution_id, phase, identifier, error_msg)
@@ -260,5 +263,4 @@ def _handle_error(execution_id, action, identifier, error_msg):
             increment_metric(db, execution_id, "total_errors")
     except Exception:
         pass
-    finally:
-        db.close()
+    # Nota: No cerramos db porque la sesión pertenece al caller

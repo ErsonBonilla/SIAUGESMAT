@@ -86,6 +86,11 @@ class MoodleIntegration:
                 "format": "onetopic",
                 "visible": visible,
             }])
+            created = await self.service.get_courses(shortname=shortname)
+            if not created:
+                self.last_error = f"El curso {shortname} no fue creado a pesar de respuesta exitosa de la API"
+                logger.error(self.last_error)
+                return False
             logger.info(f"Curso creado (vacío): {shortname}")
             if template_id:
                 try:
@@ -107,11 +112,12 @@ class MoodleIntegration:
             return False
 
     async def delete_course(self, shortname: str) -> bool:
-        """Elimina un curso en Moodle vía REST API."""
+        """Elimina un curso en Moodle vía REST API.
+        Retorna True si el curso fue eliminado o no existía (idempotente)."""
         try:
             result = await self.service.delete_courses([shortname])
             if result is None:
-                logger.warning(f"Curso {shortname} no encontrado, no se eliminó")
+                logger.info(f"Curso {shortname} no encontrado, se omite (idempotente)")
                 return True
             logger.info(f"Curso eliminado: {shortname}")
             return True
@@ -133,6 +139,11 @@ class MoodleIntegration:
                 "shortname": shortname,
                 "visible": 1,
             }])
+            verified = await self.service.get_courses(shortname=shortname)
+            if not verified or verified[0].get("visible") != 1:
+                self.last_error = f"Activación de {shortname} no se confirmó en Moodle"
+                logger.error(self.last_error)
+                return False
             logger.info(f"Curso activado: {shortname}")
             return True
         except Exception as e:
@@ -153,6 +164,11 @@ class MoodleIntegration:
                 "shortname": shortname,
                 "visible": 0,
             }])
+            verified = await self.service.get_courses(shortname=shortname)
+            if not verified or verified[0].get("visible") != 0:
+                self.last_error = f"Ocultamiento de {shortname} no se confirmó en Moodle"
+                logger.error(self.last_error)
+                return False
             logger.info(f"Curso oculto: {shortname}")
             return True
         except Exception as e:
@@ -189,6 +205,11 @@ class MoodleIntegration:
                 "shortname": new_shortname,
                 "fullname": new_fullname,
             }])
+            verified = await self.service.get_courses(shortname=new_shortname)
+            if not verified:
+                self.last_error = f"Rename {old_shortname} → {new_shortname} no se confirmó en Moodle"
+                logger.error(self.last_error)
+                return False
             logger.info(f"Curso renombrado: {old_shortname} → {new_shortname}")
             return True
         except Exception as e:
@@ -283,7 +304,20 @@ class MoodleIntegration:
             logger.exception(f"Error al buscar usuario por email {email}: {self.last_error}")
             return None, False
         if existing:
-            return existing.get("username", username_esperado), False
+            existing_username = existing.get("username", "")
+            if existing_username and existing_username != username_esperado:
+                try:
+                    await self.service.update_users([{
+                        "id": existing["id"],
+                        "username": username_esperado,
+                        "firstname": user.get("firstname", existing.get("firstname", "")),
+                        "lastname": user.get("lastname", existing.get("lastname", "")),
+                    }])
+                    logger.info(f"Usuario actualizado: {existing_username} → {username_esperado}")
+                except Exception as upd_e:
+                    logger.warning(f"No se pudo actualizar username {existing_username} → {username_esperado}: {upd_e}")
+                    return existing_username, False
+            return username_esperado, False
 
         # 2. Buscar por email personal
         if email_personal:
@@ -307,10 +341,16 @@ class MoodleIntegration:
                 "lastname": user.get("lastname", ""),
                 "email": email,
                 "password": password,
+                "cedula": user.get("cedula", ""),
                 "forcepasswordchange": 1,
                 "city": user.get("city", ""),
                 "description": user.get("description", ""),
             }])
+            created_user = await self.service.get_user_by_username(username_esperado)
+            if not created_user:
+                self.last_error = f"El usuario {username_esperado} no fue creado a pesar de respuesta exitosa de la API"
+                logger.error(self.last_error)
+                return None, False
             logger.info(f"Usuario creado: {username_esperado}")
             return username_esperado, True
         except Exception as e:
@@ -333,6 +373,9 @@ class MoodleIntegration:
                              course_map=None, courses=None) -> Dict[str, Any]:
         """
         Matricula un profesor en un curso por su username.
+        No remueve profesores existentes — el cambio de profesor se maneja
+        en la comparación (hide_and_create) para preservar derechos de autor.
+
         Si course_map (shortname→id) se provee, se reutiliza sin
         llamadas extra a la API (optimizacion para ETL).
         El parámetro courses solo se usa cuando course_map es None.

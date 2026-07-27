@@ -13,6 +13,7 @@ recibir tanto IDs numéricos como nombres de usuario.
 import asyncio
 import logging
 import secrets
+import time
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -29,9 +30,9 @@ from app.core.config import settings
 from app.services.moodle_adapter import (
     MoodleAdapter,
     MoodleAdapterFactory,
-    role_shortname_to_id,
 )
 from app.services.rate_limiter import RedisRateLimiter
+from app.services.roles import role_shortname_to_id
 
 logger = logging.getLogger(__name__)
 
@@ -179,24 +180,31 @@ class MoodleService:
             )
         self._client = httpx.AsyncClient(timeout=settings.MOODLE_REQUEST_TIMEOUT)
         self._adapter = adapter or MoodleAdapterFactory.create(resolved_version)
+        self._categories_cache: Optional[List[Dict]] = None
+        self._course_cache: Optional[Dict[str, Dict]] = None
 
     # ------------------------------------------------------------------
     # Método genérico para llamar a la API
     # ------------------------------------------------------------------
+    async def _request(self, wsfunction: str, params: Dict[str, Any], use_post: bool = False,
+                       timeout: Optional[float] = None) -> Any:
+        """Realiza una petición a la API de Moodle con rate limiting.
+        El rate limit se adquiere UNA SOLA VEZ, antes del loop de reintentos,
+        para evitar consumir tokens extra en cada retry."""
+        _t0 = time.monotonic()
+        await self._rate_limiter.acquire()
+        return await self._request_with_retry(wsfunction, params, use_post, timeout, _t0)
+
     @retry(
         retry=retry_if_exception(_is_retryable_error),
         stop=stop_after_attempt(settings.MOODLE_MAX_RETRIES),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         before=before_log(logger, logging.WARNING),
     )
-    async def _request(self, wsfunction: str, params: Dict[str, Any], use_post: bool = False,
-                       timeout: Optional[float] = None) -> Any:
-        """Realiza una petición a la API de Moodle con rate limiting.
-        Si use_post=True o la URL excede ~7KB, usa POST para evitar limitaciones de longitud.
-        timeout: opcional, sobrescribe el timeout por defecto para operaciones largas (ej. import).
-        Los errores de sobrecarga (502/503/504/invalidrecord) se convierten en MoodleOverloadedError."""
-        await self._rate_limiter.acquire()
-
+    async def _request_with_retry(self, wsfunction: str, params: Dict[str, Any],
+                                   use_post: bool, timeout: Optional[float],
+                                   _t0: float) -> Any:
+        """Inner method — el rate limit token ya fue adquirido por _request()."""
         payload = {
             "wstoken": self._token,
             "wsfunction": wsfunction,
@@ -222,6 +230,9 @@ class MoodleService:
             raise
 
         data = response.json()
+        _duration = (time.monotonic() - _t0) * 1000
+        from app.services.metrics import inc, observe
+        observe("moodle.request_duration_ms", _duration, wsfunction=wsfunction)
 
         if data is not None and not isinstance(data, (dict, list)):
             raise MoodleAPIError(
@@ -231,6 +242,7 @@ class MoodleService:
         if isinstance(data, dict) and ("error" in data or "exception" in data):
             error_code = data.get("errorcode", "")
             error_msg = data.get("error") or data.get("exception") or data.get("message", "")
+            inc("moodle.request_errors", wsfunction=wsfunction, error_code=error_code)
             logger.error(f"Moodle API error [{wsfunction}]: {error_code} — {error_msg}")
             exc = MoodleAPIError(
                 data.get("error") or data.get("exception"),
@@ -240,6 +252,7 @@ class MoodleService:
                 raise MoodleOverloadedError(str(exc)[:200]) from exc
             raise exc
 
+        inc("moodle.requests", wsfunction=wsfunction)
         return data
 
     # ------------------------------------------------------------------
@@ -268,11 +281,14 @@ class MoodleService:
         return await self._request("core_course_create_categories", params)
 
     async def get_categories(self, idnumber: Optional[str] = None) -> List[Dict]:
-        """Busca categorías. Filtra localmente porque Moodle 3.9 ignora criteria."""
-        result = await self._request("core_course_get_categories", {})
+        """Busca categorías. Filtra localmente porque Moodle 3.9 ignora criteria.
+        Cachea el resultado completo tras la primera llamada para evitar
+        N+1 requests en resoluciones masivas de category_idnumber."""
+        if self._categories_cache is None:
+            self._categories_cache = await self._request("core_course_get_categories", {})
         if idnumber:
-            return [c for c in result if c.get("idnumber") == idnumber]
-        return result
+            return [c for c in self._categories_cache if c.get("idnumber") == idnumber]
+        return self._categories_cache
 
     async def delete_category(self, category_id: int, recursive: bool = True) -> Dict:
         """Elimina una categoría por ID. Si recursive=True, borra subcategorías y cursos."""
@@ -418,9 +434,13 @@ class MoodleService:
         use_post = use_post or len(course_ids) > 25
         return await self._request("core_course_delete_courses", params, use_post=use_post)
 
-    async def get_enrolled_teachers(self, course_id: int, teacher_emails: List[str]) -> List[Dict]:
-        """Obtiene usuarios con rol editingteacher en un curso cuyos emails coincidan."""
-        if not teacher_emails:
+    async def get_enrolled_teachers(self, course_id: int, teacher_emails: List[str],
+                                     teacher_usernames: List[str] = None,
+                                     teacher_idnumbers: List[str] = None) -> List[Dict]:
+        """Obtiene usuarios con rol editingteacher en un curso cuyos emails/usernames/idnumbers coincidan.
+        El matching por idnumber (cédula) es el más robusto porque es único por persona,
+        a diferencia del email que puede estar compartido entre varios usuarios."""
+        if not teacher_emails and not teacher_usernames and not teacher_idnumbers:
             return []
         users = await self._request(
             "core_enrol_get_enrolled_users",
@@ -430,37 +450,53 @@ class MoodleService:
                 "options[0][value]": "moodle/course:manageactivities",
             },
         )
-        target = set(e.lower() for e in teacher_emails if e)
-        return [u for u in users if u.get("email", "").lower() in target]
+        target_emails = set(e.lower() for e in teacher_emails if e)
+        target_usernames = set(teacher_usernames) if teacher_usernames else set()
+        target_idnumbers = set(teacher_idnumbers) if teacher_idnumbers else set()
+        return [
+            u for u in users
+            if (target_emails and u.get("email", "").lower() in target_emails)
+            or (target_usernames and u.get("username", "") in target_usernames)
+            or (target_idnumbers and u.get("idnumber", "") in target_idnumbers)
+        ]
 
     async def get_courses(self, shortname: Optional[str] = None) -> List[Dict]:
         """Busca cursos por shortname. Si no se especifica, devuelve todos."""
         return await self._adapter.get_courses(shortname, self._request)
 
     async def get_courses_by_shortnames(self, shortnames: List[str]) -> List[Dict]:
-        """Obtiene cursos por shortname.
-
-        Para lotes pequeños (≤5) usa llamadas individuales vía
-        core_course_get_courses_by_field. Para lotes grandes trae
-        todos los cursos y filtra localmente."""
+        """Obtiene cursos por shortname usando caché interno.
+        En la primera llamada poblá el caché con todos los cursos.
+        Búsquedas subsiguientes usan el caché sin llamadas API."""
         if not shortnames:
             return []
-        if len(shortnames) <= 5:
-            result = []
-            for sn in shortnames:
-                try:
-                    courses = await self.get_courses_by_field("shortname", sn)
-                    result.extend(courses)
-                except Exception:
-                    logger.warning(f"Error obteniendo curso shortname={sn}", exc_info=True)
+
+        # Poblar caché si es primera llamada
+        if self._course_cache is None:
+            try:
+                all_courses = await self.get_courses()
+                self._course_cache = {c["shortname"]: c for c in all_courses if c.get("shortname")}
+            except Exception as e:
+                logger.warning(f"Error poblando course_cache: {e}")
+                self._course_cache = {}
+
+        # Buscar en caché
+        result = [self._course_cache[sn] for sn in shortnames if sn in self._course_cache]
+        missing = [sn for sn in shortnames if sn not in self._course_cache]
+
+        if not missing:
             return result
-        try:
-            all_courses = await self.get_courses()
-        except Exception as e:
-            logger.error(f"Error obteniendo todos los cursos para filtrar por shortnames: {e}")
-            raise
-        target = set(shortnames)
-        return [c for c in all_courses if c.get("shortname") in target]
+
+        # Fallback para shortnames no encontrados en caché
+        for sn in missing:
+            try:
+                courses = await self.get_courses_by_field("shortname", sn)
+                if courses:
+                    self._course_cache[sn] = courses[0]
+                    result.append(courses[0])
+            except Exception:
+                logger.warning(f"Error obteniendo curso shortname={sn}", exc_info=True)
+        return result
 
     # ------------------------------------------------------------------
     # Auto-matriculación (self enrolment)
@@ -495,6 +531,9 @@ class MoodleService:
                 params[f"users[{i}][city]"] = user["city"]
             if user.get("description"):
                 params[f"users[{i}][description]"] = user["description"]
+            idn = user.get("idnumber") or user.get("cedula")
+            if idn:
+                params[f"users[{i}][idnumber]"] = str(idn)
         use_post = len(users) > 10
         return await self._request("core_user_create_users", params, use_post=use_post)
 
@@ -545,7 +584,14 @@ class MoodleService:
         for i, v in enumerate(values):
             params[f"values[{i}]"] = v
         # Usar POST si hay muchos valores para evitar URL too long (>50 valores ≈ >2KB URL)
-        return await self._request("core_user_get_users_by_field", params, use_post=len(values) > 50)
+        # Moodle 3.9 retorna {"error":"invalidparameter"} cuando no hay resultados,
+        # en vez de []. Convertimos ese error en lista vacía para todos los callers.
+        try:
+            return await self._request("core_user_get_users_by_field", params, use_post=len(values) > 50)
+        except MoodleAPIError as e:
+            if getattr(e, 'error_code', None) == "invalidparameter":
+                return []
+            raise
 
     async def get_user_by_username(self, username: str) -> Optional[Dict]:
         """Obtiene un usuario por su username exacto."""
@@ -570,6 +616,8 @@ class MoodleService:
             params[f"users[{idx}][id]"] = user_id
             if "email" in user:
                 params[f"users[{idx}][email]"] = user["email"]
+            if "username" in user:
+                params[f"users[{idx}][username]"] = user["username"]
             if "firstname" in user:
                 params[f"users[{idx}][firstname]"] = user["firstname"]
             if "lastname" in user:
@@ -741,6 +789,15 @@ class MoodleService:
             "failed": len(enrolments) - idx,
             "errors": errors,
         }
+
+    async def unenrol_users(self, course_id: int, user_ids: List[int], role_id: int) -> Dict:
+        """Desmatricula usuarios de un curso vía enrol_manual_unenrol_users."""
+        params = {}
+        for i, uid in enumerate(user_ids):
+            params[f"enrolments[{i}][userid]"] = uid
+            params[f"enrolments[{i}][courseid]"] = course_id
+            params[f"enrolments[{i}][roleid]"] = role_id
+        return await self._request("enrol_manual_unenrol_users", params, use_post=len(user_ids) > 10)
 
     # ------------------------------------------------------------------
     # Cierre del cliente
