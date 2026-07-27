@@ -6,6 +6,7 @@ export const OPERATIONS_TABS = [
   { key: "eliminar_cursos", label: "Eliminar Cursos", component: "batch", entity: "courses", action: "delete" },
   { key: "eliminar_usuarios", label: "Eliminar Usuarios", component: "batch", entity: "users", action: "delete" },
   { key: "eliminar_categorias", label: "Eliminar Categorías", component: "batch", entity: "categories", action: "delete" },
+  { key: "visibilidad_cursos", label: "Visibilidad de Cursos", component: "batch", entity: "courses", action: "visibility" },
 ] as const;
 
 export type TabKey = (typeof OPERATIONS_TABS)[number]["key"];

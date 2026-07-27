@@ -1,6 +1,6 @@
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
-import { uploadCsvFile, getBatchStatus, type OperationBatchStatus } from "../services/api.ts";
+import { useBatchUpload } from "../hooks/useBatchUpload.ts";
+import { uploadCsvFile, getBatchStatus } from "../services/api.ts";
 import { SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import BatchProgressTable from "../components/BatchProgressTable.tsx";
@@ -15,71 +15,19 @@ interface CsvUploaderProps {
 }
 
 export default function CsvUploader({ title, description, uploadEndpoint, labelSingular, labelPlural, action }: CsvUploaderProps) {
-  const file = useSignal<File | null>(null);
-  const uploading = useSignal(false);
-  const error = useSignal("");
-  const batchId = useSignal("");
-  const batchStatus = useSignal<OperationBatchStatus | null>(null);
-  const pollingId = useSignal<number | null>(null);
+  const detailOffset = useSignal(0);
+  const PAGE_SIZE = 20;
 
-  const handleFileChange = (e: Event) => {
-    const target = e.target as HTMLInputElement;
-    const f = target.files?.[0];
-    if (f) {
-      if (!f.name.toLowerCase().endsWith(".csv")) {
-        error.value = "Solo se permiten archivos CSV";
-        file.value = null;
-        return;
-      }
-      file.value = f;
-      error.value = "";
-    }
+  const { file, uploading, error, batchId, batchStatus, handleFileChange, handleSubmit, startPolling } = useBatchUpload({
+    storageKey: `batch_${uploadEndpoint}`,
+    doUpload: (f) => uploadCsvFile(uploadEndpoint, f),
+    onFetchStatus: (id) => getBatchStatus(id, detailOffset.value, PAGE_SIZE),
+  });
+
+  const handleDetailPageChange = (newOffset: number) => {
+    detailOffset.value = newOffset;
+    startPolling(batchId.value);
   };
-
-  const handleSubmit = async (e: Event) => {
-    e.preventDefault();
-    error.value = "";
-    if (!file.value) {
-      error.value = "Seleccione un archivo CSV.";
-      return;
-    }
-    uploading.value = true;
-    try {
-      const result = await uploadCsvFile(uploadEndpoint, file.value);
-      batchId.value = result.batch_id;
-      startPolling(result.batch_id);
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Error al subir el archivo.";
-    } finally {
-      uploading.value = false;
-    }
-  };
-
-  const startPolling = (id: string) => {
-    if (pollingId.value) clearInterval(pollingId.value);
-    const fetchStatus = async () => {
-      try {
-        const status = await getBatchStatus(id);
-        batchStatus.value = status;
-        if (status.pending === 0 && status.processing === 0) {
-          if (pollingId.value) {
-            clearInterval(pollingId.value);
-            pollingId.value = null;
-          }
-        }
-      } catch {
-        //
-      }
-    };
-    fetchStatus();
-    pollingId.value = setInterval(fetchStatus, 2000);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (pollingId.value) clearInterval(pollingId.value);
-    };
-  }, []);
 
   return (
     <div>
@@ -126,6 +74,7 @@ export default function CsvUploader({ title, description, uploadEndpoint, labelS
           batchId={batchId.value}
           labelSingular={labelSingular}
           labelPlural={labelPlural}
+          pagination={{ offset: detailOffset.value, pageSize: PAGE_SIZE, onPageChange: handleDetailPageChange }}
         />
       )}
     </div>
