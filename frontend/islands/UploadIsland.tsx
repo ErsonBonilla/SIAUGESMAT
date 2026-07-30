@@ -37,19 +37,6 @@ export default function UploadIsland() {
       </div>
 
       <FileUploader />
-
-      <div class="mt-6 text-center">
-        <a
-          href="/cursos/novedades"
-          class="inline-flex items-center gap-2 py-2.5 px-6 rounded-lg border border-[var(--border-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] transition text-sm font-medium"
-        >
-          <span class="text-lg">📋</span>
-          Gestionar novedades
-        </a>
-        <p class="mt-2 text-xs text-[var(--text-muted)]">
-          Compare dos cargas académicas del mismo semestre para detectar cambios de profesores.
-        </p>
-      </div>
     </div>
   );
 }

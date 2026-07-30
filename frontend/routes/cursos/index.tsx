@@ -3,6 +3,7 @@ import HubPage from "../../components/HubPage.tsx";
 import {
   EyeIcon,
   SearchIcon,
+  SwitchIcon,
   TrashIcon,
   UploadIcon,
 } from "../../utils/icons.tsx";
@@ -39,6 +40,13 @@ export default function CursosHub() {
         description:
           "Muestra u oculta cursos existentes en Moodle masivamente.",
         href: "/cursos/visibilidad",
+      },
+      {
+        icon: SwitchIcon,
+        title: "Gestionar Novedades",
+        description:
+          "Compara dos cargas académicas del mismo semestre y gestiona cambios de asignación docente.",
+        href: "/cursos/novedades",
       },
     ],
   });
