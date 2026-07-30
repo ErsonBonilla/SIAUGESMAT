@@ -1,6 +1,4 @@
 // services/api.ts — barrel (split: types, core, auth, trabajos, analytics, reportes, operaciones, consultas)
-export { authHeaders, BASE_URL, handleResponse } from "./api/core.ts";
-
 export { getMyProfile, login } from "./api/auth.ts";
 
 export {
@@ -56,7 +54,6 @@ export {
 export { compareNovedades } from "./api/novedades.ts";
 
 export type {
-  BulkVisibilityResult,
   ChartInfo,
   ChartsListResponse,
   ChartTracesLayout,
@@ -64,7 +61,6 @@ export type {
   ErrorLog,
   Execution,
   InactiveTeacherRow,
-  InactiveTeachersResponse,
   LatestExecution,
   NovedadItem,
   NovedadesResponse,

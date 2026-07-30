@@ -8,11 +8,8 @@ import {
   type QueryTaskStatus,
 } from "../services/api.ts";
 import {
-  CheckIcon,
   DownloadIcon,
-  ExclamationCircleIcon,
   SpinnerIcon,
-  XMarkIcon,
 } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
