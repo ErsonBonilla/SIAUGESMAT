@@ -37,6 +37,10 @@ export function getBatchReportUrl(batchId: string): string {
   return `${BASE_URL}/operations/batch/${batchId}/reports/download`;
 }
 
+export function getBatchReportFileUrl(batchId: string, reportName: string): string {
+  return `${BASE_URL}/operations/batch/${batchId}/reports/${reportName}`;
+}
+
 export async function listBatches(params: {
   entity_type?: string;
   action?: string;

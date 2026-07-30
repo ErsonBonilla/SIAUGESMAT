@@ -11,10 +11,13 @@ from app.repositories.execution_repo import (
     create_execution,
     mark_completed,
     mark_running,
+    set_report_dir,
 )
+from app.repositories.log_repo import save_log
 from app.services.etl import ETLService
 from app.services.moodle_factory import get_moodle_service
 from app.services.parsers.patterns import parse_shortname
+from app.services.reports import ReportService
 
 logger = logging.getLogger(__name__)
 
@@ -187,11 +190,12 @@ async def apply(
     for item in items:
         nov_id = item["id"]
         action = item["action"]
+        item["execution_id"] = execution_id
         try:
             if action == "hide_and_create":
-                result = await _apply_hide_and_create(moodle_service, item)
+                result = await _apply_hide_and_create(moodle_service, item, db)
             elif action == "unhide":
-                result = await _apply_unhide(moodle_service, item)
+                result = await _apply_unhide(moodle_service, item, db)
             else:
                 result = {"success": False, "message": f"Acción desconocida: {action}"}
 
@@ -219,6 +223,13 @@ async def apply(
     }
     mark_completed(db, execution_id, metrics, failed, duration)
 
+    # Generar reportes si hay resultados
+    try:
+        report_dir = ReportService.generate_all(execution_id, db)
+        set_report_dir(db, execution_id, report_dir)
+    except Exception:
+        logger.exception("Error generando reportes de novedades")
+
     return {
         "total": len(items),
         "applied": applied,
@@ -230,6 +241,7 @@ async def apply(
 async def _apply_hide_and_create(
     moodle_service,
     item: Dict,
+    db: Session = None,
 ) -> Dict[str, Any]:
     old_sn = item["old_shortname"]
     new_sn = item["new_shortname"]
@@ -287,6 +299,19 @@ async def _apply_hide_and_create(
             logger.error(f"Error matriculando profesor {new_prof_username} en {new_sn}: {e}")
             enrol_ok = False
 
+    execution_id = item.get("execution_id")
+    if execution_id and db:
+        if hide_ok:
+            save_log(db, execution_id, "4", "course_hidden",
+                     old_sn, {"fullname": fullname, "reason": "novedad_profesor"})
+        if create_ok:
+            save_log(db, execution_id, "4", "course_created",
+                     new_sn, {"fullname": fullname, "category_idnumber": category_idnumber,
+                              "reason": "novedad_profesor"})
+        if enrol_ok and new_prof_username:
+            save_log(db, execution_id, "4", "enrolment_ok",
+                     new_prof_username, {"course": new_sn, "fullname": fullname})
+
     success = hide_ok and create_ok
     msg_parts = []
     if hide_ok:
@@ -308,6 +333,7 @@ async def _apply_hide_and_create(
 async def _apply_unhide(
     moodle_service,
     item: Dict,
+    db: Session = None,
 ) -> Dict[str, Any]:
     course_id = item.get("target_course_id")
     shortname = item.get("new_shortname", "")
@@ -343,5 +369,13 @@ async def _apply_unhide(
                 logger.info(f"Profesor {new_prof_username} matriculado en {shortname}")
         except Exception as e:
             logger.warning(f"Error matriculando profesor en {shortname}: {e}")
+
+    execution_id = item.get("execution_id")
+    if execution_id and db:
+        save_log(db, execution_id, "4", "course_activated",
+                 shortname, {"fullname": item.get("course_fullname", ""), "reason": "novedad_profesor"})
+        if new_prof_username:
+            save_log(db, execution_id, "4", "enrolment_ok",
+                     new_prof_username, {"course": shortname, "fullname": item.get("course_fullname", "")})
 
     return {"success": True, "message": f"Curso {shortname} rehabilitado y profesor matriculado"}

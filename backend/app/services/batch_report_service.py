@@ -4,20 +4,23 @@ import logging
 import os
 import tempfile
 import zipfile
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
+from app.core.config import settings
 from app.core.entity_config import ENTITY_CONFIG
 from app.db.models import OperationBatch, OperationItem
 
 logger = logging.getLogger(__name__)
 
+REPORT_BASE = os.path.join(settings.REPORT_DIR, "batch")
 
-def build_batch_report_zip(batch: OperationBatch, items: List[OperationItem]) -> Tuple[str, str]:
-    """Genera un ZIP con CSVs de resultados para un lote de operaciones.
 
-    Returns:
-        (zip_path, zip_filename) — la ruta al archivo temporal y el nombre sugerido.
-    """
+def _batch_dir(batch_id: str) -> str:
+    return os.path.join(REPORT_BASE, batch_id)
+
+
+def _build_rows(batch: OperationBatch, items: List[OperationItem]) -> Dict[str, list]:
+    """Returns {csv_name: (headers, rows)} for each CSV to generate."""
     config = ENTITY_CONFIG.get(batch.entity_type, ENTITY_CONFIG["courses"])
 
     all_rows, failed_rows, success_rows, not_found_rows = [], [], [], []
@@ -55,16 +58,16 @@ def build_batch_report_zip(batch: OperationBatch, items: List[OperationItem]) ->
     elif batch.entity_type == "users" and batch.action == "create":
         base_headers += ["firstname", "lastname", "email", "rol"]
 
-    csv_files = [
-        ("resultados.csv", base_headers, all_rows),
-        ("fallidos.csv", base_headers, failed_rows),
-    ]
-    if batch.action == "create":
-        csv_files.append(("creados.csv", base_headers, success_rows))
+    csvs: Dict[str, tuple] = {}
+
+    if all_rows:
+        csvs["resultados"] = (base_headers, all_rows)
+    if failed_rows:
+        csvs["fallidos"] = (base_headers, failed_rows)
+    if batch.action == "create" and success_rows:
+        csvs["creados"] = (base_headers, success_rows)
     if batch.action == "delete" and not_found_rows:
-        csv_files.append(("no_encontrados.csv",
-                          ["identificador", "estado", "error", "intentos"],
-                          not_found_rows))
+        csvs["no_encontrados"] = (["identificador", "estado", "error", "intentos"], not_found_rows)
 
     total = len(items)
     completed = sum(1 for i in items if i.status == "completed")
@@ -79,20 +82,91 @@ def build_batch_report_zip(batch: OperationBatch, items: List[OperationItem]) ->
         {"campo": "Creado", "valor": batch.created_at.isoformat() if batch.created_at else ""},
         {"campo": "Completado", "valor": batch.completed_at.isoformat() if batch.completed_at else ""},
     ]
-    csv_files.append(("resumen.csv", ["campo", "valor"], resumen_rows))
+    csvs["resumen"] = (["campo", "valor"], resumen_rows)
+
+    return csvs
+
+
+def save_batch_reports(batch: OperationBatch, items: List[OperationItem]) -> str:
+    """Genera y persiste CSVs individuales en disco.
+
+    Returns:
+        Ruta al directorio con los reportes.
+    """
+    csvs = _build_rows(batch, items)
+    batch_dir = _batch_dir(batch.batch_id)
+    os.makedirs(batch_dir, exist_ok=True)
+
+    for name, (headers, rows) in csvs.items():
+        filepath = os.path.join(batch_dir, f"{name}.csv")
+        with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            for row in rows:
+                if isinstance(row, dict):
+                    writer.writerow([row.get(h, "") for h in headers])
+                else:
+                    writer.writerow(row)
+        logger.info(f"Reporte batch {name}.csv: {len(rows)} filas")
+
+    # Generar ZIP
+    zip_path = batch_dir + ".zip"
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for name in csvs:
+            filepath = os.path.join(batch_dir, f"{name}.csv")
+            if os.path.exists(filepath):
+                zf.write(filepath, f"{name}.csv")
+
+    logger.info(f"Reportes batch guardados en: {batch_dir}")
+    return batch_dir
+
+
+def list_batch_reports(batch_id: str) -> List[Dict[str, str]]:
+    """Lista los CSVs individuales disponibles para un batch.
+
+    Returns:
+        [{name, filename, size}, ...]
+    """
+    batch_dir = _batch_dir(batch_id)
+    if not os.path.isdir(batch_dir):
+        return []
+    reports = []
+    for fname in sorted(os.listdir(batch_dir)):
+        if fname.endswith(".csv"):
+            path = os.path.join(batch_dir, fname)
+            name = fname.replace(".csv", "")
+            reports.append({
+                "name": name,
+                "filename": fname,
+                "size": os.path.getsize(path),
+            })
+    return reports
+
+
+def get_batch_report_path(batch_id: str, report_name: str) -> Optional[str]:
+    """Retorna la ruta completa a un CSV individual."""
+    path = os.path.join(_batch_dir(batch_id), f"{report_name}.csv")
+    return path if os.path.exists(path) else None
+
+
+def build_batch_report_zip(batch: OperationBatch, items: List[OperationItem]) -> Tuple[str, str]:
+    """Genera ZIP temporal para descarga (compatibilidad con endpoint legacy)."""
+    csvs = _build_rows(batch, items)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp:
         zip_path = tmp.name
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for filename, headers, rows in csv_files:
+        for name, (headers, rows) in csvs.items():
             buf = io.StringIO()
             writer = csv.writer(buf)
             writer.writerow(headers)
-            if rows and isinstance(rows[0], dict):
-                for r in rows:
-                    writer.writerow([r.get(h, "") for h in headers])
+            for row in rows:
+                if isinstance(row, dict):
+                    writer.writerow([row.get(h, "") for h in headers])
+                else:
+                    writer.writerow(row)
             buf.seek(0)
-            zf.writestr(filename, buf.getvalue().encode("utf-8-sig"))
+            zf.writestr(f"{name}.csv", buf.getvalue().encode("utf-8-sig"))
 
     zip_filename = f"reportes_{batch.action}_{batch.entity_type}_{batch.batch_id[:8]}.zip"
     return zip_path, zip_filename

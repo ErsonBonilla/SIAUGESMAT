@@ -35,6 +35,7 @@ export {
 export {
   cancelBatch,
   deleteBatch,
+  getBatchReportFileUrl,
   getBatchReportUrl,
   getBatchStatus,
   getOperationsAnalytics,

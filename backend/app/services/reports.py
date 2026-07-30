@@ -71,11 +71,15 @@ class ReportService:
                         rows.append(cfg["extract"](log))
                 except Exception:
                     logger.warning(f"Error extrayendo log para reporte {cfg.get('key', '?')}, log_id={log.id}")
-            cls._write_csv(
-                os.path.join(report_dir, cls.REPORT_NAMES[cfg["key"]]),
-                cfg["headers"],
-                rows,
-            )
+            if rows:
+                cls._write_csv(
+                    os.path.join(report_dir, cls.REPORT_NAMES[cfg["key"]]),
+                    cfg["headers"],
+                    rows,
+                )
+                logger.info(f"Reporte {cfg['key']}: {len(rows)} filas")
+            else:
+                logger.info(f"Reporte {cfg['key']}: sin datos, se omite")
         cls._write_audit_errores(report_dir, db, execution_id)
         cls._write_resumen_ejecutivo(report_dir, logs, execution)
 
@@ -328,26 +332,26 @@ class ReportService:
                 ["Modalidad", execution.modalidad or "-"],
                 ["Errores totales (DB)", str(execution.errors_count or 0)],
             ]
-        rows += [
-            ["Categorías creadas", str(counts.get("category_created", 0))],
-            ["Cursos creados", str(
-                counts.get("course_created", 0) + counts.get("course_created_with_template", 0)
-                + counts.get("course_recreated", 0) + counts.get("course_hidden_and_created", 0)
-            )],
-            ["Cursos eliminados", str(counts.get("course_deleted", 0))],
-            ["Cursos ocultados", str(counts.get("course_hidden", 0))],
-            ["Cursos renombrados", str(counts.get("course_renamed", 0))],
-            ["Cursos activados", str(counts.get("course_activated", 0))],
-            ["Usuarios nuevos", str(counts.get("user_created_createpassword", 0))],
-            ["Usuarios existentes (resueltos)", str(counts.get("user_resolved", 0))],
-            ["Matriculaciones exitosas", str(counts.get("enrolment_ok", 0))],
-            ["Matriculaciones fallidas", str(counts.get("enrolment_failed", 0))],
-            ["Plantillas no encontradas", str(counts.get("template_not_found", 0))],
-            ["Correos duplicados", str(counts.get("duplicate_email", 0))],
-            ["Alertas: cursos recientes", str(
-                counts.get("alert_disappeared_recent", 0) + counts.get("alert_teacher_change_recent", 0)
-            )],
+        metric_rows = [
+            ("Categorías creadas", "category_created"),
+            ("Cursos creados", lambda c: c.get("course_created", 0) + c.get("course_created_with_template", 0)
+             + c.get("course_recreated", 0) + c.get("course_hidden_and_created", 0)),
+            ("Cursos eliminados", "course_deleted"),
+            ("Cursos ocultados", "course_hidden"),
+            ("Cursos renombrados", "course_renamed"),
+            ("Cursos activados", "course_activated"),
+            ("Usuarios nuevos", "user_created_createpassword"),
+            ("Usuarios existentes (resueltos)", "user_resolved"),
+            ("Matriculaciones exitosas", "enrolment_ok"),
+            ("Matriculaciones fallidas", "enrolment_failed"),
+            ("Plantillas no encontradas", "template_not_found"),
+            ("Correos duplicados", "duplicate_email"),
+            ("Alertas: cursos recientes", lambda c: c.get("alert_disappeared_recent", 0) + c.get("alert_teacher_change_recent", 0)),
         ]
+        for label, src in metric_rows:
+            val = src(counts) if callable(src) else counts.get(src, 0)
+            if val > 0:
+                rows.append([label, str(val)])
         # Tasa de error
         total_ops = sum(v for k, v in counts.items() if k.startswith("course_") or k.startswith("enrolment_"))
         total_errs = counts.get("enrolment_failed", 0)
@@ -364,6 +368,8 @@ class ReportService:
     def _write_audit_errores(cls, report_dir: str, db, execution_id: int):
         from app.db.models import ErrorLog
         errors = db.query(ErrorLog).filter(ErrorLog.execution_id == execution_id).all()
+        if not errors:
+            return
         rows = [[e.type, e.identifier or "", e.message or "", str(e.created_at)] for e in errors]
         cls._write_csv(
             os.path.join(report_dir, cls.REPORT_NAMES["audit_errores"]),
