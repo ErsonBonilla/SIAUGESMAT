@@ -23,7 +23,6 @@ from app.repositories.execution_repo import (
 from app.repositories.log_repo import save_error
 from app.services.error_messages import translate_error
 from app.services.moodle_factory import get_moodle_service
-from app.services.reports import ReportService
 from app.workers.phases.base import PhaseContext
 from app.workers.phases.common import (
     _get_pending_items,
