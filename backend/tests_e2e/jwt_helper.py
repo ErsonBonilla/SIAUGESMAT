@@ -8,8 +8,7 @@ autenticar las llamadas a la API sin necesidad de login Moodle.
 import sys
 from pathlib import Path
 
-# Agregar backend al PYTHONPATH para importar app.core.security
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core.security import create_access_token
 
