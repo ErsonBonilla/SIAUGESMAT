@@ -1,3 +1,4 @@
+import type { JSX } from "preact";
 import { useSignal } from "@preact/signals";
 import { EyeIcon, EyeOffIcon } from "../utils/icons.tsx";
 
@@ -9,11 +10,20 @@ interface InputProps {
   error?: string;
   disabled?: boolean;
   autocomplete?: string;
-  onInput?: (e: Event) => void;
+  onInput?: (e: JSX.TargetedEvent<HTMLInputElement, Event>) => void;
 }
 
 export default function Input(
-  { label, type = "text", placeholder, value, error, disabled, autocomplete, onInput }: InputProps,
+  {
+    label,
+    type = "text",
+    placeholder,
+    value,
+    error,
+    disabled,
+    autocomplete,
+    onInput,
+  }: InputProps,
 ) {
   const showPassword = useSignal(false);
   const isPassword = type === "password";
@@ -21,7 +31,11 @@ export default function Input(
 
   return (
     <div class="flex flex-col gap-1">
-      {label && <label class="text-xs font-medium text-[var(--text-primary)]">{label}</label>}
+      {label && (
+        <label class="text-xs font-medium text-[var(--text-primary)]">
+          {label}
+        </label>
+      )}
       <div class="relative w-full">
         <input
           type={actualType}
@@ -39,9 +53,13 @@ export default function Input(
             onClick={() => (showPassword.value = !showPassword.value)}
             tabIndex={-1}
             class="absolute top-1/2 -translate-y-1/2 right-3 bg-transparent border-0 cursor-pointer p-1 text-[var(--text-primary)] opacity-70 flex items-center justify-center leading-none"
-            title={showPassword.value ? "Ocultar contraseña" : "Mostrar contraseña"}
+            title={showPassword.value
+              ? "Ocultar contraseña"
+              : "Mostrar contraseña"}
           >
-            {showPassword.value ? <EyeOffIcon width={20} height={20} /> : <EyeIcon width={20} height={20} />}
+            {showPassword.value
+              ? <EyeOffIcon width={20} height={20} />
+              : <EyeIcon width={20} height={20} />}
           </button>
         )}
       </div>

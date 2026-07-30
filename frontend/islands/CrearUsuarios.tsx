@@ -16,12 +16,13 @@ const ROLE_CONFIG = {
     desc: "Crear profesores",
     help: "para crear profesores en Moodle (rol editingteacher).",
   },
-    all: {
-        endpoint: "users/create-csv",
-        label: "General",
-        desc: "Crear usuarios",
-        help: "para crear usuarios en Moodle. El CSV debe incluir la columna 'role1' (student, editingteacher, teacher, manager o su ID: 1,3,4,5) y opcionalmente 'forcepasswordchange' (1/0).",
-    },
+  all: {
+    endpoint: "users/create-csv",
+    label: "General",
+    desc: "Crear usuarios",
+    help:
+      "para crear usuarios en Moodle. El CSV debe incluir la columna 'role1' (student, editingteacher, teacher, manager o su ID: 1,3,4,5) y opcionalmente 'forcepasswordchange' (1/0).",
+  },
 };
 
 export default function CrearUsuarios() {

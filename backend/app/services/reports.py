@@ -70,7 +70,7 @@ class ReportService:
                     if cfg["match"](log):
                         rows.append(cfg["extract"](log))
                 except Exception:
-                    pass
+                    logger.warning(f"Error extrayendo log para reporte {cfg.get('key', '?')}, log_id={log.id}")
             cls._write_csv(
                 os.path.join(report_dir, cls.REPORT_NAMES[cfg["key"]]),
                 cfg["headers"],

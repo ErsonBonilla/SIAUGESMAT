@@ -1,6 +1,12 @@
 // utils/theme.ts
 import { signal } from "@preact/signals";
 
+declare global {
+  interface Window {
+    __THEME__?: string;
+  }
+}
+
 /**
  * Inicializa la señal de tema desde localStorage.
  * Se ejecuta en el ámbito del módulo, antes de que los componentes se rendericen,
@@ -9,8 +15,8 @@ import { signal } from "@preact/signals";
  */
 function getInitialTheme(): boolean {
   if (typeof document === "undefined") return true;
-  if (typeof window !== "undefined" && (window as any).__THEME__) {
-    return (window as any).__THEME__ !== "light";
+  if (typeof window !== "undefined" && window.__THEME__) {
+    return window.__THEME__ !== "light";
   }
   return true;
 }
@@ -42,6 +48,13 @@ export const DARK_THEME_VARS: Record<string, string> = {
   "--file-btn-bg": "rgba(0,168,89,0.12)",
   "--file-btn-text": "var(--brand-green)",
   "--file-btn-hover": "rgba(0,168,89,0.2)",
+  "--brand-green-dark": "#008647",
+  "--brand-green-rgb": "0,168,89",
+  "--brand-red-50": "#fcf1f2",
+  "--brand-red-100": "#fbdfe0",
+  "--brand-red-200": "#f9bcbe",
+  "--brand-red-900": "#821b1e",
+  "--brand-orange": "#f97316",
 };
 
 export const LIGHT_THEME_VARS: Record<string, string> = {
@@ -64,9 +77,19 @@ export const LIGHT_THEME_VARS: Record<string, string> = {
   "--file-btn-bg": "var(--brand-red-50)",
   "--file-btn-text": "var(--brand-red)",
   "--file-btn-hover": "var(--brand-red-100)",
+  "--brand-green-dark": "#008647",
+  "--brand-green-rgb": "0,168,89",
+  "--brand-red-50": "#fcf1f2",
+  "--brand-red-100": "#fbdfe0",
+  "--brand-red-200": "#f9bcbe",
+  "--brand-red-900": "#821b1e",
+  "--brand-orange": "#f97316",
 };
 
-export function applyThemeVars(root: HTMLElement, vars: Record<string, string>) {
+export function applyThemeVars(
+  root: HTMLElement,
+  vars: Record<string, string>,
+) {
   for (const [key, value] of Object.entries(vars)) {
     root.style.setProperty(key, value);
   }

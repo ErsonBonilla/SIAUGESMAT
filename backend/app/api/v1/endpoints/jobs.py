@@ -36,6 +36,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _resolve_execution(db: Session, execution_id: int, expected_statuses=None, conflict_message=None):
+    """Obtiene una ejecución y valida que exista y esté en el estado esperado."""
+    execution = get_execution(db, execution_id)
+    if not execution:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Ejecución no encontrada.")
+    if expected_statuses and execution.status not in expected_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=conflict_message or (
+                f"La ejecución está en estado '{execution.status}'"
+                f" y no puede ser procesada nuevamente."
+            ),
+        )
+    return execution
+
+
 @router.post(
     "/{execution_id}/process",
     response_model=ProcessResponse,
@@ -47,17 +64,10 @@ async def start_process(
     db: Session = Depends(get_db),
     current_user: UserInToken = Depends(get_current_user),
 ):
-    execution = get_execution(db, execution_id)
-    if not execution:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="No se encontró la ejecución solicitada.")
-
-    if execution.status not in ("pending", "failed", "queued", "review_required", "paused"):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"La ejecución ya está en estado '{execution.status}'"
-                   f" y no puede ser procesada nuevamente.",
-        )
+    execution = _resolve_execution(
+        db, execution_id,
+        expected_statuses={"pending", "failed", "queued", "review_required", "paused"},
+    )
 
     if execution.modalidad == "PRESENCIAL":
         raise HTTPException(
@@ -88,7 +98,7 @@ async def start_process(
         try:
             celery_app.control.revoke(job.id, terminate=False)
         except Exception:
-            pass
+            logger.debug(f"No se pudo revocar la tarea {job.id} tras race condition")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="La ejecución ya fue procesada por otra solicitud concurrente.",
@@ -117,12 +127,7 @@ async def get_execution_endpoint(
     db: Session = Depends(get_db),
     current_user: UserInToken = Depends(get_current_user),
 ):
-    execution = get_execution(db, execution_id)
-    if not execution:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Ejecución no encontrada.")
-
-    return execution
+    return _resolve_execution(db, execution_id)
 
 
 @router.get(
@@ -137,10 +142,7 @@ async def get_execution_errors_endpoint(
     limit: int = Query(100, ge=1, le=1000),
     offset: int = Query(0, ge=0),
 ):
-    execution = get_execution(db, execution_id)
-    if not execution:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Ejecución no encontrada.")
+    _resolve_execution(db, execution_id)
     return get_execution_errors(db, execution_id, limit, offset)
 
 
@@ -181,17 +183,10 @@ async def delete_execution_endpoint(
     db: Session = Depends(get_db),
     current_user: UserInToken = Depends(get_current_user),
 ):
-    execution = get_execution(db, execution_id)
-    if not execution:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Ejecución no encontrada.")
-
-    if execution.status not in ("pending", "failed", "review_required", "cancelled", "queued"):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Solo se pueden eliminar ejecuciones en estado 'pending', 'failed', 'cancelled', 'queued' o 'review_required'.",
-        )
-
+    _resolve_execution(
+        db, execution_id,
+        expected_statuses={"pending", "failed", "review_required", "cancelled", "queued"},
+    )
     delete_execution(db, execution_id)
     logger.info(f"Ejecución {execution_id} eliminada por {current_user.username}")
     return None
@@ -208,10 +203,7 @@ async def confirm_mass_delete(
     db: Session = Depends(get_db),
     current_user: UserInToken = Depends(get_current_user),
 ):
-    execution = get_execution(db, execution_id)
-    if not execution:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Ejecución no encontrada.")
+    execution = _resolve_execution(db, execution_id)
 
     if execution.status != "review_required":
         raise HTTPException(
@@ -280,17 +272,10 @@ async def pause_execution_endpoint(
     db: Session = Depends(get_db),
     current_user: UserInToken = Depends(get_current_user),
 ):
-    execution = get_execution(db, execution_id)
-    if not execution:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Ejecución no encontrada.")
-
-    if execution.status != "running":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"La ejecución está en estado '{execution.status}'. "
-                   f"Solo se puede pausar ejecuciones en 'running'.",
-        )
+    execution = _resolve_execution(
+        db, execution_id, expected_statuses={"running"},
+        conflict_message="Solo se puede pausar ejecuciones en 'running'.",
+    )
 
     success, task_id = pause_execution(db, execution_id)
     if not success:
@@ -324,17 +309,12 @@ async def cancel_execution_endpoint(
     db: Session = Depends(get_db),
     current_user: UserInToken = Depends(get_current_user),
 ):
-    execution = get_execution(db, execution_id)
-    if not execution:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Ejecución no encontrada.")
-
-    if execution.status not in ("running", "paused", "queued"):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"La ejecución está en estado '{execution.status}'. "
-                   f"Solo se puede cancelar ejecuciones en 'running', 'paused' o 'queued'.",
-        )
+    execution = _resolve_execution(
+        db, execution_id, expected_statuses={"running", "paused", "queued"},
+        conflict_message=(
+            "Solo se puede cancelar ejecuciones en 'running', 'paused' o 'queued'."
+        ),
+    )
 
     success, task_id = cancel_execution(db, execution_id)
     if not success:

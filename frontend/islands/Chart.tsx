@@ -28,7 +28,9 @@ export default function Chart(
         await loadPlotly();
         if (cancelled) return;
 
-        const data = await getChartData(executionId, chartName);
+        const theme = document.documentElement.getAttribute("data-theme") ||
+          "dark";
+        const data = await getChartData(executionId, chartName, theme);
         if (cancelled) return;
 
         const layout = {

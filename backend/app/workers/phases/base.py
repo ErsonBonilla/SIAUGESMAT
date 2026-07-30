@@ -2,7 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Set
 
 from app.integrations.moodle import MoodleIntegration
-from app.services.moodle import MoodleOverloadedError, MoodleService
+from app.services.moodle_errors import MoodleOverloadedError
+from app.services.moodle_operations import MoodleService
 
 
 class PhaseContext:

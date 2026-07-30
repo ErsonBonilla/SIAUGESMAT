@@ -16,7 +16,8 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.core.security import create_access_token
 from app.schemas.user import TokenResponse, UserInToken
-from app.services.moodle import MoodleAPIError, MoodleService
+from app.services.moodle_errors import MoodleAPIError
+from app.services.moodle_factory import get_moodle_service
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +218,7 @@ async def login(request: LoginRequest):
         HTTPException 502/503: Error de comunicación con Moodle.
     """
     # 1. Validar modalidad PRESENCIAL bloqueada
-    if request.modalidad.upper() == "PRESENCIAL":
+    if request.modalidad.upper() == "PRESENCIAL" and not settings.ALLOW_PRESENCIAL:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Modalidad PRESENCIAL no disponible actualmente."
@@ -263,12 +264,7 @@ async def get_my_profile(current_user: UserInToken = Depends(get_current_user)):
 
     Requiere el token JWT en la cabecera Authorization.
     """
-    moodle_config = settings.get_moodle_config(current_user.modalidad)
-    moodle = MoodleService(
-        token=moodle_config["token"],
-        base_url=moodle_config["url"],
-        version=moodle_config["version"],
-    )
+    moodle = get_moodle_service(current_user.modalidad)
     try:
         # Buscar el usuario en Moodle por su username (el que viene en el JWT)
         users = await moodle.get_users("username", [current_user.username])

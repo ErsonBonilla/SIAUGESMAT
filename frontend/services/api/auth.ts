@@ -1,8 +1,12 @@
 // services/api/auth.ts
-import { BASE_URL, authHeaders, handleResponse } from "./core.ts";
+import { authHeaders, BASE_URL, handleResponse } from "./core.ts";
 import type { UserProfile } from "./types.ts";
 
-export async function login(username: string, password: string, modalidad: string) {
+export async function login(
+  username: string,
+  password: string,
+  modalidad: string,
+) {
   const response = await fetch(`${BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -12,10 +16,19 @@ export async function login(username: string, password: string, modalidad: strin
     const body = await response.json().catch(() => null);
     throw new Error(body?.detail || body?.message || "Credenciales inválidas");
   }
-  return response.json() as Promise<{ access_token: string; user_id: number; username: string; modalidad: string }>;
+  return response.json() as Promise<
+    {
+      access_token: string;
+      user_id: number;
+      username: string;
+      modalidad: string;
+    }
+  >;
 }
 
 export async function getMyProfile(): Promise<UserProfile> {
-  const response = await fetch(`${BASE_URL}/auth/me`, { headers: { ...authHeaders() } });
+  const response = await fetch(`${BASE_URL}/auth/me`, {
+    headers: { ...authHeaders() },
+  });
   return handleResponse<UserProfile>(response);
 }

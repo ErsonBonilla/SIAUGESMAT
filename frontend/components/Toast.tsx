@@ -1,6 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { toasts, dismissToast } from "../utils/toast.ts";
+import { dismissToast, toasts } from "../utils/toast.ts";
 import { CheckIcon, XMarkIcon } from "../utils/icons.tsx";
 
 export default function ToastContainer() {
@@ -18,12 +18,15 @@ export default function ToastContainer() {
         <div
           key={t.id}
           class={`flex items-start gap-2 px-4 py-3 rounded-lg shadow-lg text-sm animate-fadeIn ${
-            t.type === "success" ? "bg-[var(--brand-green)] text-white"
-              : t.type === "error" ? "bg-[var(--brand-red)] text-white"
+            t.type === "success"
+              ? "bg-[var(--brand-green)] text-white"
+              : t.type === "error"
+              ? "bg-[var(--brand-red)] text-white"
               : "bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-secondary)]"
           }`}
         >
-          {t.type === "success" && <CheckIcon class="w-4 h-4 shrink-0 mt-0.5" />}
+          {t.type === "success" &&
+            <CheckIcon class="w-4 h-4 shrink-0 mt-0.5" />}
           {t.type === "error" && <XMarkIcon class="w-4 h-4 shrink-0 mt-0.5" />}
           <span class="flex-1 text-xs leading-relaxed">{t.message}</span>
           <button

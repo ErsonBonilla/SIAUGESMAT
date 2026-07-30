@@ -27,7 +27,9 @@ celery_app.conf.update(
     # Auto-descubrimiento de tareas (strings → evita imports eager)
     imports=(
         "app.workers.tasks",
-        "app.workers.etl_item_task",
+        "app.workers.phases.item_task",
+        "app.workers.phases.common",
+        "app.workers.phases.orchestrator",
         "app.workers.cleanup_tasks",
         "app.workers.operations_tasks",
         "app.workers.query_tasks",

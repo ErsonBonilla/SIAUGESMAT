@@ -9,9 +9,10 @@ import logging
 from datetime import datetime, timezone
 
 from app.celery_app import celery_app
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.db.models import Execution
-from app.repositories.execution_repo import delete_old_pending_executions, mark_failed
+from app.repositories.execution_repo import delete_old_pending_executions
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ def cleanup_stuck_executions():
         count = 0
         for ex in stuck:
             age = (cutoff - (ex.progress_updated_at or ex.started_at or ex.created_at)).total_seconds()
-            if age > 21600:  # 6 horas
+            if age > settings.STUCK_EXECUTION_TIMEOUT:
                 ex.status = "failed"
                 ex.current_phase = f"{ex.current_phase or ''} (timeout 6h)"
                 ex.completed_at = cutoff

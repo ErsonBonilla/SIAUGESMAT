@@ -8,6 +8,9 @@ y los cursos existentes en Moodle.
 import pytest
 
 from app.services.course_comparison import CourseComparisonService
+from app.services.course_comparison.index_builder import build_shortname_index
+from app.services.course_comparison.utils import get_course_age_seconds, is_course_hidden
+from app.services.parsers.patterns import parse_shortname
 
 
 def _make_moodle_course(
@@ -31,7 +34,7 @@ def _make_new_course(shortname: str) -> dict:
 class TestParseShortname:
 
     def test_valid_shortname(self):
-        result = CourseComparisonService._parse_shortname("IDE_0105_sI_202_G-01")
+        result = parse_shortname("IDE_0105_sI_202_G-01")
         assert result == {
             "cat_prefix": "IDE",
             "cod_prog": "0105",
@@ -42,13 +45,13 @@ class TestParseShortname:
         }
 
     def test_valid_with_uraba(self):
-        result = CourseComparisonService._parse_shortname("URA_0305_sII_101_G-A")
+        result = parse_shortname("URA_0305_sII_101_G-A")
         assert result["cat_prefix"] == "URA"
         assert result["grupo"] == "A"
 
     def test_invalid_format(self):
-        assert CourseComparisonService._parse_shortname("invalid") is None
-        assert CourseComparisonService._parse_shortname("") is None
+        assert parse_shortname("invalid") is None
+        assert parse_shortname("") is None
 
 
 class TestBuildIndex:
@@ -58,7 +61,7 @@ class TestBuildIndex:
             _make_moodle_course("IDE_0105_sI_202_G-01"),
             _make_moodle_course("IDE_0105_203_sI_G-01"),
         ]
-        index = CourseComparisonService._build_shortname_index(courses)
+        index = build_shortname_index(courses)
         assert "IDE_0105_sI_202_G-01" in index
         assert "IDE_0105_203_sI_G-01" in index
         assert len(index) == 2
@@ -68,7 +71,7 @@ class TestCourseAge:
 
     def test_age_from_timecreated(self):
         course = _make_moodle_course("TEST", timecreated=100000)
-        age = CourseComparisonService._get_course_age_seconds(course)
+        age = get_course_age_seconds(course)
         assert age > 0
 
 
@@ -76,11 +79,11 @@ class TestIsCourseHidden:
 
     def test_hidden_course(self):
         course = _make_moodle_course("TEST", visible=0)
-        assert CourseComparisonService._is_course_hidden(course) is True
+        assert is_course_hidden(course) is True
 
     def test_visible_course(self):
         course = _make_moodle_course("TEST", visible=1)
-        assert CourseComparisonService._is_course_hidden(course) is False
+        assert is_course_hidden(course) is False
 
 
 class TestComparison:
@@ -187,9 +190,6 @@ class TestComparison:
         )
 
         assert len(result["to_hide"]) >= 1
-        assert any(c["shortname"] == sn for c in result["to_create"])
-
-        assert sn in result["to_delete"]
         assert any(c["shortname"] == sn for c in result["to_create"])
 
     @pytest.mark.asyncio

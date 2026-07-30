@@ -7,7 +7,9 @@ interface Props {
   rows?: number;
 }
 
-export default function LoadingSkeleton({ variant = "table", rows = 5 }: Props) {
+export default function LoadingSkeleton(
+  { variant = "table", rows = 5 }: Props,
+) {
   if (variant === "chart") {
     return (
       <div class="flex flex-col gap-4 animate-pulse">

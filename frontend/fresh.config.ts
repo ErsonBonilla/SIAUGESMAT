@@ -1,9 +1,10 @@
-import { defineConfig } from "$fresh/server.ts";
-import tailwind from "$fresh/plugins/tailwind.ts";
+import type { FreshConfig } from "@fresh/core";
 
-export default defineConfig({
-  plugins: [tailwind()],
-  server: {
-    port: parseInt(Deno.env.get("PORT") || "3000"),
-  },
-});
+const config: FreshConfig = {
+  basePath: "/",
+  mode: Deno.env.get("DENO_ENV") === "development"
+    ? "development"
+    : "production",
+};
+
+export default config;

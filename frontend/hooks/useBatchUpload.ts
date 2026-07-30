@@ -1,5 +1,5 @@
 import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import { getBatchStatus, type OperationBatchStatus } from "../services/api.ts";
 
 interface UseBatchUploadOptions {
@@ -22,11 +22,15 @@ export function useBatchUpload({
   const file = useSignal<File | null>(null);
   const uploading = useSignal(false);
   const error = useSignal("");
+  const pollingError = useSignal("");
   const batchId = useSignal("");
   const batchStatus = useSignal<OperationBatchStatus | null>(null);
   const pollingId = useSignal<number | null>(null);
 
   const fetchStatusFn = onFetchStatus ?? ((id: string) => getBatchStatus(id));
+  const startPollingRef = useRef<(id: string) => void>(() => {});
+  const onBatchCompleteRef = useRef(onBatchComplete);
+  onBatchCompleteRef.current = onBatchComplete;
 
   const startPolling = (id: string) => {
     if (pollingId.value) clearInterval(pollingId.value);
@@ -35,6 +39,7 @@ export function useBatchUpload({
     }
     const tick = async () => {
       try {
+        pollingError.value = "";
         const status = await fetchStatusFn(id);
         batchStatus.value = status;
         if (status.pending === 0 && status.processing === 0) {
@@ -45,15 +50,17 @@ export function useBatchUpload({
           if (typeof sessionStorage !== "undefined") {
             sessionStorage.removeItem(storageKey);
           }
-          onBatchComplete?.();
+          onBatchCompleteRef.current?.();
         }
       } catch {
-        // ignorar errores de polling
+        pollingError.value = "Error de conexión al consultar estado del lote";
       }
     };
     tick();
     pollingId.value = setInterval(tick, 2000);
   };
+
+  startPollingRef.current = startPolling;
 
   const handleFileChange = (e: Event) => {
     const target = e.target as HTMLInputElement;
@@ -72,6 +79,8 @@ export function useBatchUpload({
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     error.value = "";
+    pollingError.value = "";
+    batchStatus.value = null;
     if (!file.value) {
       error.value = "Seleccione un archivo CSV.";
       return;
@@ -83,7 +92,9 @@ export function useBatchUpload({
       startPolling(result.batch_id);
       onUploadSuccess?.();
     } catch (err) {
-      error.value = err instanceof Error ? err.message : "Error al subir el archivo.";
+      error.value = err instanceof Error
+        ? err.message
+        : "Error al subir el archivo.";
     } finally {
       uploading.value = false;
     }
@@ -94,18 +105,19 @@ export function useBatchUpload({
       const saved = sessionStorage.getItem(storageKey);
       if (saved && !batchId.value) {
         batchId.value = saved;
-        startPolling(saved);
+        startPollingRef.current(saved);
       }
     }
     return () => {
       if (pollingId.value) clearInterval(pollingId.value);
     };
-  }, []);
+  }, [storageKey]);
 
   return {
     file,
     uploading,
     error,
+    pollingError,
     batchId,
     batchStatus,
     handleFileChange,

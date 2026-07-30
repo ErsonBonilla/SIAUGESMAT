@@ -1,4 +1,4 @@
-import { format, formatDistanceToNow, parseISO, isValid } from "date-fns";
+import { format, formatDistanceToNow, isValid, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 
 /**
@@ -35,7 +35,9 @@ export function formatDate(isoString: string | null | undefined): string {
  * Convierte una duración en segundos a una cadena legible.
  * Ejemplo: 3661 → "1h 1m 1s"
  */
-export function formatDuration(totalSeconds: number | null | undefined): string {
+export function formatDuration(
+  totalSeconds: number | null | undefined,
+): string {
   if (totalSeconds == null || totalSeconds <= 0) return "—";
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);

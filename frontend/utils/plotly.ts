@@ -4,7 +4,12 @@
 declare global {
   interface Window {
     Plotly: {
-      newPlot(el: HTMLElement, traces: unknown[], layout: Record<string, unknown>, config?: Record<string, unknown>): void;
+      newPlot(
+        el: HTMLElement,
+        traces: unknown[],
+        layout: Record<string, unknown>,
+        config?: Record<string, unknown>,
+      ): void;
       purge(el: HTMLElement): void;
     };
   }
@@ -19,8 +24,14 @@ export function loadPlotly(): Promise<void> {
   plotlyLoading = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
     script.src = "https://cdn.plot.ly/plotly-3.0.1.min.js";
-    script.onload = () => { plotlyLoaded = true; resolve(); };
-    script.onerror = () => { plotlyLoading = null; reject(new Error("No se pudo cargar Plotly.js")); };
+    script.onload = () => {
+      plotlyLoaded = true;
+      resolve();
+    };
+    script.onerror = () => {
+      plotlyLoading = null;
+      reject(new Error("No se pudo cargar Plotly.js"));
+    };
     document.head.appendChild(script);
   });
   return plotlyLoading;

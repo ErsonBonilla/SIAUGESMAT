@@ -1,7 +1,11 @@
 // islands/FileUploader.tsx
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import { uploadFile, startProcess, getCurrentSemester } from "../services/api.ts";
+import {
+  getCurrentSemester,
+  startProcess,
+  uploadFile,
+} from "../services/api.ts";
 import { ExclamationCircleIcon, SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 
@@ -51,12 +55,18 @@ export default function FileUploader() {
 
     uploading.value = true;
     try {
-      const uploadResult = await uploadFile(file.value, semester.value.toUpperCase(), modalidad.value);
+      const uploadResult = await uploadFile(
+        file.value,
+        semester.value.toUpperCase(),
+        modalidad.value,
+      );
       const executionId = uploadResult.execution_id;
       await startProcess(executionId);
       successExecutionId.value = executionId;
     } catch (err) {
-      error.value = err instanceof Error ? err.message : "Error al subir el archivo.";
+      error.value = err instanceof Error
+        ? err.message
+        : "Error al subir el archivo.";
     } finally {
       uploading.value = false;
     }
@@ -71,10 +81,16 @@ export default function FileUploader() {
   if (successExecutionId.value) return null;
 
   return (
-    <form onSubmit={handleSubmit} class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 space-y-6">
+    <form
+      onSubmit={handleSubmit}
+      class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 space-y-6"
+    >
       {/* Archivo */}
       <div>
-        <label for="file" class="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+        <label
+          for="file"
+          class="block text-sm font-medium text-[var(--text-secondary)] mb-2"
+        >
           Archivo Excel
         </label>
         <div class="flex items-center gap-4">
@@ -106,9 +122,7 @@ export default function FileUploader() {
       <input type="hidden" name="modalidad" value={modalidad.value} />
 
       {/* Error */}
-      {error.value && (
-        <ErrorBox message={error.value} />
-      )}
+      {error.value && <ErrorBox message={error.value} />}
 
       {/* Botón de envío */}
       <button
@@ -116,14 +130,16 @@ export default function FileUploader() {
         disabled={uploading.value}
         class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white font-semibold hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[rgba(var(--brand-green-rgb),0.4)] transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        {uploading.value ? (
-          <>
-            <SpinnerIcon class="animate-spin h-5 w-5 text-white" />
-            <span>Subiendo y encolando...</span>
-          </>
-        ) : (
-          "Subir y procesar archivo"
-        )}
+        {uploading.value
+          ? (
+            <>
+              <SpinnerIcon class="animate-spin h-5 w-5 text-white" />
+              <span>Subiendo y encolando...</span>
+            </>
+          )
+          : (
+            "Subir y procesar archivo"
+          )}
       </button>
     </form>
   );

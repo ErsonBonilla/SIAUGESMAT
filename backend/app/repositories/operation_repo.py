@@ -1,21 +1,23 @@
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import func
+from sqlalchemy.orm import Session
+
 from app.db.models import OperationBatch, OperationItem
 
 
-def get_batch(db, batch_id: str) -> Optional[OperationBatch]:
+def get_batch(db: Session, batch_id: str) -> Optional[OperationBatch]:
     return db.query(OperationBatch).filter_by(batch_id=batch_id).first()
 
 
-def get_pending_items(db, batch_id: str) -> List[OperationItem]:
+def get_pending_items(db: Session, batch_id: str) -> List[OperationItem]:
     return db.query(OperationItem).filter_by(
         batch_id=batch_id, status="pending"
     ).all()
 
 
-def create_batch(db, batch_id: str, entity_type: str, action: str,
+def create_batch(db: Session, batch_id: str, entity_type: str, action: str,
                  total: int, modalidad: str) -> OperationBatch:
     batch = OperationBatch(
         batch_id=batch_id,
@@ -30,7 +32,7 @@ def create_batch(db, batch_id: str, entity_type: str, action: str,
     return batch
 
 
-def add_item(db, batch_id: str, identifier: str, detail: dict = None,
+def add_item(db: Session, batch_id: str, identifier: str, detail: dict = None,
              status: str = "pending") -> OperationItem:
     item = OperationItem(
         batch_id=batch_id,
@@ -42,11 +44,11 @@ def add_item(db, batch_id: str, identifier: str, detail: dict = None,
     return item
 
 
-def get_item(db, item_id: int) -> Optional[OperationItem]:
+def get_item(db: Session, item_id: int) -> Optional[OperationItem]:
     return db.query(OperationItem).filter(OperationItem.id == item_id).first()
 
 
-def update_item(db, item_id: int, status: str, error_message: str = None):
+def update_item(db: Session, item_id: int, status: str, error_message: str = None) -> Optional[OperationItem]:
     item = db.query(OperationItem).filter(OperationItem.id == item_id).first()
     if item:
         item.status = status
@@ -58,7 +60,7 @@ def update_item(db, item_id: int, status: str, error_message: str = None):
     return item
 
 
-def update_batch_counts(db, batch_id: str, completed: int = 0, failed: int = 0):
+def update_batch_counts(db: Session, batch_id: str, completed: int = 0, failed: int = 0) -> None:
     batch = db.query(OperationBatch).filter_by(batch_id=batch_id).first()
     if batch:
         if completed:
@@ -68,14 +70,14 @@ def update_batch_counts(db, batch_id: str, completed: int = 0, failed: int = 0):
         db.commit()
 
 
-def complete_batch(db, batch_id: str):
+def complete_batch(db: Session, batch_id: str) -> None:
     batch = db.query(OperationBatch).filter_by(batch_id=batch_id).first()
     if batch:
         batch.completed_at = datetime.now(timezone.utc)
         db.commit()
 
 
-def get_batch_status(db, batch_id: str) -> dict:
+def get_batch_status(db: Session, batch_id: str) -> dict:
     base_q = db.query(OperationItem).filter_by(batch_id=batch_id)
     return {
         "total": base_q.count(),
@@ -87,17 +89,17 @@ def get_batch_status(db, batch_id: str) -> dict:
     }
 
 
-def get_batch_items(db, batch_id: str, offset: int, limit: int) -> List[OperationItem]:
+def get_batch_items(db: Session, batch_id: str, offset: int, limit: int) -> List[OperationItem]:
     return db.query(OperationItem).filter_by(batch_id=batch_id).order_by(
         OperationItem.id).offset(offset).limit(limit).all()
 
 
-def get_all_batch_items(db, batch_id: str) -> List[OperationItem]:
+def get_all_batch_items(db: Session, batch_id: str) -> List[OperationItem]:
     return db.query(OperationItem).filter_by(batch_id=batch_id).order_by(
         OperationItem.id).all()
 
 
-def pause_batch(db, batch_id: str) -> int:
+def pause_batch(db: Session, batch_id: str) -> int:
     paused = db.query(OperationItem).filter_by(
         batch_id=batch_id, status="pending"
     ).update({"status": "paused", "updated_at": datetime.now(timezone.utc)}, synchronize_session=False)
@@ -105,7 +107,7 @@ def pause_batch(db, batch_id: str) -> int:
     return paused
 
 
-def resume_batch(db, batch_id: str) -> int:
+def resume_batch(db: Session, batch_id: str) -> int:
     resumed = db.query(OperationItem).filter_by(
         batch_id=batch_id, status="paused"
     ).update({"status": "pending", "updated_at": datetime.now(timezone.utc)}, synchronize_session=False)
@@ -113,7 +115,7 @@ def resume_batch(db, batch_id: str) -> int:
     return resumed
 
 
-def delete_batch(db, batch_id: str) -> bool:
+def delete_batch(db: Session, batch_id: str) -> bool:
     batch = get_batch(db, batch_id)
     if not batch:
         return False
@@ -123,8 +125,7 @@ def delete_batch(db, batch_id: str) -> bool:
     return True
 
 
-def get_batch_paused_counts(db, batch_ids: list[str]) -> dict[str, int]:
-    from sqlalchemy import func
+def get_batch_paused_counts(db: Session, batch_ids: list[str]) -> dict[str, int]:
     if not batch_ids:
         return {}
     rows = db.query(
@@ -136,7 +137,7 @@ def get_batch_paused_counts(db, batch_ids: list[str]) -> dict[str, int]:
     return {row[0]: row[1] for row in rows}
 
 
-def delete_old_batches(db, days: int) -> int:
+def delete_old_batches(db: Session, days: int) -> int:
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     old_batches = db.query(OperationBatch).filter(
         OperationBatch.created_at < cutoff
@@ -154,9 +155,9 @@ def delete_old_batches(db, days: int) -> int:
     return deleted
 
 
-def list_batches(db, entity_type: str = None, action: str = None,
+def list_batches(db: Session, entity_type: str = None, action: str = None,
                  modalidad: str = None, limit: int = 20,
-                 offset: int = 0) -> tuple[int, list[OperationBatch]]:
+                 offset: int = 0) -> Tuple[int, List[OperationBatch]]:
     query = db.query(OperationBatch)
     if entity_type:
         query = query.filter(OperationBatch.entity_type == entity_type)
@@ -169,10 +170,8 @@ def list_batches(db, entity_type: str = None, action: str = None,
     return total, batches
 
 
-def get_operations_analytics(db, modalidad: str = None, months: int = 12,
-                            entity_type: str = None, action: str = None):
-    from sqlalchemy import func, extract, case, cast, Integer
-
+def get_operations_analytics(db: Session, modalidad: str = None, months: int = 12,
+                             entity_type: str = None, action: str = None) -> List[Dict]:
     cutoff = datetime.now(timezone.utc) - timedelta(days=months * 30)
     base_filters = [OperationBatch.created_at >= cutoff]
     if modalidad:
@@ -193,7 +192,6 @@ def get_operations_analytics(db, modalidad: str = None, months: int = 12,
     }
 
     from collections import defaultdict
-    from sqlalchemy import func
     months_data: dict[str, dict] = {}
 
     for b in raw_monthly:

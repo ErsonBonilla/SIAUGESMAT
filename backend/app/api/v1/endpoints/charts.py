@@ -40,7 +40,11 @@ def _get_execution_and_logs(execution_id: int, db: Session):
 
 
 @router.get("/executions/{execution_id}/charts")
-async def list_charts(execution_id: int, db: Session = Depends(get_db)):
+async def list_charts(
+    execution_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserInToken = Depends(get_current_user),
+):
     execution, logs = _get_execution_and_logs(execution_id, db)
     return {
         "execution_id": execution_id,
@@ -63,6 +67,7 @@ async def get_chart_data(
     chart_name: str,
     theme: str = Query("light", description="Tema: light | dark"),
     db: Session = Depends(get_db),
+    current_user: UserInToken = Depends(get_current_user),
 ) -> Dict[str, Any]:
     if chart_name not in CHART_ENDPOINTS:
         raise HTTPException(

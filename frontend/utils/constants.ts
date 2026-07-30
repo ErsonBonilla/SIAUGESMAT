@@ -42,3 +42,8 @@ export const MODE_LABELS: Record<string, string> = {
   courses: "Solo cursos",
   users: "Solo usuarios",
 };
+
+export const MONTH_LABELS: Record<string, string> = {
+  A: "Ene - Jun",
+  B: "Jul - Dic",
+};

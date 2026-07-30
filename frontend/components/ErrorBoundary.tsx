@@ -10,7 +10,8 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export default class ErrorBoundary
+  extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   override state: ErrorBoundaryState = { hasError: false, error: null };
 
   static override getDerivedStateFromError(error: Error): ErrorBoundaryState {
@@ -26,8 +27,12 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
       return this.props.fallback ?? (
         <div class="flex flex-col items-center justify-center gap-2 p-6 text-center">
           <span class="text-lg">⚠️</span>
-          <p class="text-sm font-medium text-[var(--brand-red)]">Algo salió mal</p>
-          <p class="text-xs text-[var(--text-secondary)]">{this.state.error?.message}</p>
+          <p class="text-sm font-medium text-[var(--brand-red)]">
+            Algo salió mal
+          </p>
+          <p class="text-xs text-[var(--text-secondary)]">
+            {this.state.error?.message}
+          </p>
         </div>
       );
     }

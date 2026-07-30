@@ -106,6 +106,10 @@ class MoodleAdapterFactory:
         "4.4": Moodle3Adapter,
         "4.5": Moodle3Adapter,
     }
+    # NOTA: Las versiones 4.x se mapean a Moodle3Adapter por compatibilidad observada.
+    # Si Moodle 4.x introduce cambios en core_course_get_courses_by_field,
+    # core_enrol_get_course_enrolment_methods o core_course_create_courses,
+    # se debe crear Moodle4Adapter y actualizar este mapeo.
 
     @classmethod
     def create(cls, version: str) -> MoodleAdapter:

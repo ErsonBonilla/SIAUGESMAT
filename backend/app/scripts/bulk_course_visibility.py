@@ -5,7 +5,7 @@ import sys
 import time
 
 from app.core.config import settings
-from app.services.moodle import MoodleService
+from app.services.moodle_factory import get_moodle_service
 
 
 async def main():
@@ -33,8 +33,7 @@ async def main():
 
     print(f"Loaded {len(shortnames)} shortnames from {args.csv}")
 
-    cfg = settings.get_moodle_config(args.modalidad)
-    moodle = MoodleService(token=cfg["token"], base_url=cfg["url"], version=cfg["version"])
+    moodle = get_moodle_service(args.modalidad)
 
     print("Resolving course IDs...")
     all_courses = await moodle.get_courses()

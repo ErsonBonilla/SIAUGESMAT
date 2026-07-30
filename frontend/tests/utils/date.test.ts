@@ -1,19 +1,15 @@
 import {
-  formatDateTime,
   formatDate,
+  formatDateTime,
   formatDuration,
-  isValidSemester,
-  getCurrentSemester,
   formatSemester,
+  getCurrentSemester,
+  isValidSemester,
   nowISO,
   timeAgo,
 } from "../../utils/date.ts";
 
-import {
-  assertEquals,
-  assert,
-  assertFalse,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals, assertFalse } from "@std/assert";
 
 // ---------------------------------------------------------------------------
 // formatDateTime

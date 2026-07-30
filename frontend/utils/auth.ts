@@ -11,7 +11,7 @@ const TOKEN_KEY = "auth_token";
 // ---------------------------------------------------------------------------
 
 /** Estructura esperada del payload del JWT (claims). */
-interface TokenPayload {
+export interface TokenPayload {
   exp?: number;
   username?: string;
   [key: string]: unknown;
@@ -66,7 +66,8 @@ export function removeToken(): void {
 export function setTokenCookie(token: string): void {
   if (typeof document === "undefined") return;
   const expires = new Date(Date.now() + 60 * 60 * 1000).toUTCString();
-  document.cookie = `${TOKEN_KEY}=${token}; expires=${expires}; path=/; SameSite=Lax`;
+  document.cookie =
+    `${TOKEN_KEY}=${token}; expires=${expires}; path=/; SameSite=Lax`;
 }
 
 /**
@@ -74,7 +75,8 @@ export function setTokenCookie(token: string): void {
  */
 export function removeTokenCookie(): void {
   if (typeof document === "undefined") return;
-  document.cookie = `${TOKEN_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
+  document.cookie =
+    `${TOKEN_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
 }
 
 // ---------------------------------------------------------------------------

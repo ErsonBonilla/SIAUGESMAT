@@ -8,7 +8,9 @@ interface Props {
 export default function ErrorBox({ message }: Props) {
   return (
     <div class="flex items-center gap-1.5 text-xs text-[var(--brand-red)]">
-      <ExclamationCircleIcon style={{ width: "0.75rem", height: "0.75rem", flexShrink: 0 }} />
+      <ExclamationCircleIcon
+        style={{ width: "0.75rem", height: "0.75rem", flexShrink: 0 }}
+      />
       <span>{message}</span>
     </div>
   );

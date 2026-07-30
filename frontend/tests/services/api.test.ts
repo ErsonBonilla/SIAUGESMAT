@@ -1,21 +1,18 @@
 // tests/services/api.test.ts
 import {
-  login,
-  uploadFile,
-  startProcess,
-  getExecution,
-  listExecutions,
-  getExecutionErrors,
   deleteExecution,
+  getExecution,
+  getExecutionErrors,
   getHistory,
-  getSemaphore,
   getLatest,
+  getSemaphore,
+  listExecutions,
+  login,
+  startProcess,
+  uploadFile,
 } from "../../services/api.ts";
 
-import {
-  assertEquals,
-  assertRejects,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals, assertRejects } from "@std/assert";
 
 // ---------------------------------------------------------------------------
 // Mock de fetch
@@ -66,7 +63,12 @@ function setup() {
 // ---------------------------------------------------------------------------
 Deno.test("api - login exitoso retorna datos del usuario", async () => {
   setup();
-  mockFetch(200, { access_token: "jwt123", user_id: 1, username: "juan", modalidad: "PRESENCIAL" });
+  mockFetch(200, {
+    access_token: "jwt123",
+    user_id: 1,
+    username: "juan",
+    modalidad: "PRESENCIAL",
+  });
   const result = await login("juan", "secreto", "PRESENCIAL");
   assertEquals(result.access_token, "jwt123");
   assertEquals(result.user_id, 1);

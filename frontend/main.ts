@@ -4,8 +4,14 @@
 /// <reference lib="dom.asynciterable" />
 /// <reference lib="deno.ns" />
 
-import { start } from "$fresh/server.ts";
-import manifest from "./fresh.gen.ts";
+import { App } from "@fresh/core";
 import config from "./fresh.config.ts";
 
-await start(manifest, config);
+const app = new App(config);
+app.fsRoutes();
+
+export { app };
+
+if (import.meta.main) {
+  await app.listen();
+}

@@ -1,8 +1,8 @@
 // islands/SemesterComparison.tsx
-import { useSignal, useComputed } from "@preact/signals";
+import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { SemesterMetrics } from "../services/api.ts";
-import { useChart, METRIC_LABELS, METRIC_KEYS } from "../utils/chart.ts";
+import { METRIC_KEYS, METRIC_LABELS, useChart } from "../utils/chart.ts";
 import SemesterPicker from "../components/SemesterPicker.tsx";
 
 interface SemesterComparisonProps {
@@ -12,7 +12,9 @@ interface SemesterComparisonProps {
 const COLOR_A = "#ED3237";
 const COLOR_B = "#1E40AF";
 
-export default function SemesterComparison({ allMetrics }: SemesterComparisonProps) {
+export default function SemesterComparison(
+  { allMetrics }: SemesterComparisonProps,
+) {
   const semesterA = useSignal<string>("");
   const semesterB = useSignal<string>("");
   const { canvasRef, createChart } = useChart();
@@ -29,7 +31,8 @@ export default function SemesterComparison({ allMetrics }: SemesterComparisonPro
   );
 
   const bothSelected = useComputed(
-    () => semesterA.value && semesterB.value && semesterA.value !== semesterB.value
+    () =>
+      semesterA.value && semesterB.value && semesterA.value !== semesterB.value,
   );
 
   const handleSwap = () => {
@@ -81,7 +84,9 @@ export default function SemesterComparison({ allMetrics }: SemesterComparisonPro
           <SemesterPicker
             value={semesterA.value}
             onChange={(s) => (semesterA.value = s)}
-            availableSemesters={availableSemesters.value.filter((s) => s !== semesterB.value)}
+            availableSemesters={availableSemesters.value.filter((s) =>
+              s !== semesterB.value
+            )}
           />
         </div>
 
@@ -102,14 +107,18 @@ export default function SemesterComparison({ allMetrics }: SemesterComparisonPro
           <SemesterPicker
             value={semesterB.value}
             onChange={(s) => (semesterB.value = s)}
-            availableSemesters={availableSemesters.value.filter((s) => s !== semesterA.value)}
+            availableSemesters={availableSemesters.value.filter((s) =>
+              s !== semesterA.value
+            )}
           />
         </div>
       </div>
 
       {!bothSelected.value && (
         <div class="text-center text-[var(--text-secondary)] py-12">
-          <p class="text-lg font-medium">Seleccione dos semestres para comparar</p>
+          <p class="text-lg font-medium">
+            Seleccione dos semestres para comparar
+          </p>
         </div>
       )}
 

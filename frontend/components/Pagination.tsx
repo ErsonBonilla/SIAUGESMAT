@@ -7,7 +7,9 @@ interface Props {
   onPageChange: (offset: number) => void;
 }
 
-export default function Pagination({ offset, pageSize, total, label, onPageChange }: Props) {
+export default function Pagination(
+  { offset, pageSize, total, label, onPageChange }: Props,
+) {
   const totalPages = Math.ceil(total / pageSize);
   const currentPage = Math.floor(offset / pageSize) + 1;
 

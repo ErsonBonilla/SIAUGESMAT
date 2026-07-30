@@ -15,7 +15,8 @@ from app.repositories.query_repo import (
     set_query_failed,
     set_query_running,
 )
-from app.services.moodle import MoodleService
+from app.services.moodle_factory import get_moodle_service
+from app.services.moodle_operations import MoodleService
 
 logger = logging.getLogger(__name__)
 
@@ -77,12 +78,7 @@ def execute_query(self, task_id: str):
             logger.error(f"QueryResult {task_id} no encontrado")
             return
 
-        config = settings.get_moodle_config(qr.modalidad)
-        moodle = MoodleService(
-            token=config["token"],
-            base_url=config["url"],
-            version=config["version"],
-        )
+        moodle = get_moodle_service(qr.modalidad)
 
         async def _run_and_close():
             try:
