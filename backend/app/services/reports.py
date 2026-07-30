@@ -6,12 +6,10 @@ almacenados en ExecutionLog, documentando todas las incidencias y
 operaciones realizadas durante el proceso ETL.
 """
 
-import csv
 import logging
 import os
 import shutil
 import time
-import zipfile
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -19,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import Execution, ExecutionLog
+from app.services.report_utils import write_csv, create_zip, list_csv_files, get_csv_path
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +71,7 @@ class ReportService:
                 except Exception:
                     logger.warning(f"Error extrayendo log para reporte {cfg.get('key', '?')}, log_id={log.id}")
             if rows:
-                cls._write_csv(
+                write_csv(
                     os.path.join(report_dir, cls.REPORT_NAMES[cfg["key"]]),
                     cfg["headers"],
                     rows,
@@ -87,7 +86,7 @@ class ReportService:
             from app.services.charts import ChartService
             ChartService.generate_all(execution, logs, report_dir)
 
-        cls._create_zip(report_dir)
+        create_zip(report_dir, report_dir + ".zip", extensions=(".csv", ".png", ".html"))
         cls._cleanup_old_reports(report_dir)
 
         logger.info(f"Reportes generados en: {report_dir}")
@@ -274,27 +273,6 @@ class ReportService:
         # Errores — desde ErrorLog (se procesa aparte en generate_all)
     ]
 
-    # ------------------------------------------------------------------
-    # Escritura de CSV
-    # ------------------------------------------------------------------
-    @staticmethod
-    def _write_csv(filepath: str, headers: List[str], rows: List[List[str]]):
-        with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
-            writer = csv.writer(f)
-            writer.writerow(headers)
-            for row in rows:
-                writer.writerow(row)
-
-    @staticmethod
-    def _create_zip(report_dir: str):
-        zip_path = report_dir + ".zip"
-        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            for root, _, files in os.walk(report_dir):
-                for file in files:
-                    if file.endswith((".csv", ".png", ".html")):
-                        file_path = os.path.join(root, file)
-                        zf.write(file_path, os.path.relpath(file_path, report_dir))
-
     @staticmethod
     def _cleanup_old_reports(current_dir: str, max_age_days: int = 90):
         """Elimina directorios y ZIPs de reportes más antiguos que max_age_days."""
@@ -358,7 +336,7 @@ class ReportService:
         rate = round(total_errs / total_ops * 100, 1) if total_ops > 0 else 0
         rows.append(["Tasa de error (%)", str(rate)])
 
-        cls._write_csv(
+        write_csv(
             os.path.join(report_dir, cls.REPORT_NAMES["resumen_ejecutivo"]),
             ["Métrica", "Valor"],
             rows,
@@ -371,7 +349,7 @@ class ReportService:
         if not errors:
             return
         rows = [[e.type, e.identifier or "", e.message or "", str(e.created_at)] for e in errors]
-        cls._write_csv(
+        write_csv(
             os.path.join(report_dir, cls.REPORT_NAMES["audit_errores"]),
             ["Fase/Tipo", "Identificador", "Mensaje", "Fecha"],
             rows,
