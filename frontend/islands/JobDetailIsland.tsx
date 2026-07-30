@@ -1,6 +1,7 @@
 // islands/JobDetailIsland.tsx
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
+import Pagination from "../components/Pagination.tsx";
 import ProgressBar from "../components/ProgressBar.tsx";
 import ReportsSection from "../components/ReportsSection.tsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
@@ -31,7 +32,7 @@ const ERROR_TYPE_LABELS: Record<string, string> = {
   "critical": "Error crítico",
 };
 
-const ERRORS_PAGE_SIZE = 30;
+const ERRORS_PAGE_SIZE = 20;
 
 const THRESHOLD_YELLOW = 1.0;
 const THRESHOLD_RED = 5.0;
@@ -70,7 +71,7 @@ export default function JobDetailIsland({ executionId }: Props) {
   const errors = useSignal<ErrorLog[]>([]);
   const loading = useSignal(true);
   const errorMsg = useSignal("");
-  const errorPage = useSignal(0);
+  const errorOffset = useSignal(0);
   const confirming = useSignal(false);
   const pausing = useSignal(false);
   const resuming = useSignal(false);
@@ -103,13 +104,13 @@ export default function JobDetailIsland({ executionId }: Props) {
         const exec = await getExecution(executionId);
         execution.value = exec;
         if (!runningStatuses.includes(exec.status)) clearInterval(interval);
-        if (exec.errors_count > errors.value.length) {
-          const more = await getExecutionErrors(
+        if (exec.errors_count > errors.value.length && errorOffset.value === 0) {
+          const fresh = await getExecutionErrors(
             executionId,
-            exec.errors_count,
+            ERRORS_PAGE_SIZE,
             0,
           );
-          if (more.length > 0) errors.value = more;
+          if (fresh.length > 0) errors.value = fresh;
         }
       } catch {
         toast("Error al actualizar estado", "error");
@@ -118,21 +119,20 @@ export default function JobDetailIsland({ executionId }: Props) {
     return () => clearInterval(interval);
   }, [executionId, execution.value?.status]);
 
-  const loadMoreErrors = async () => {
-    const nextPage = errorPage.value + 1;
+  const fetchErrorsPage = async (offset: number) => {
     try {
-      const more = await getExecutionErrors(
-        executionId,
-        ERRORS_PAGE_SIZE,
-        nextPage * ERRORS_PAGE_SIZE,
-      );
-      if (more.length > 0) {
-        errors.value = [...errors.value, ...more];
-        errorPage.value = nextPage;
+      const page = await getExecutionErrors(executionId, ERRORS_PAGE_SIZE, offset);
+      if (page.length > 0) {
+        errors.value = page;
+        errorOffset.value = offset;
       }
     } catch {
-      toast("Error al cargar más errores", "error");
+      toast("Error al cargar errores", "error");
     }
+  };
+
+  const handleErrorPageChange = (offset: number) => {
+    fetchErrorsPage(offset);
   };
 
   if (loading.value) return <LoadingSkeleton variant="chart" />;
@@ -416,52 +416,45 @@ export default function JobDetailIsland({ executionId }: Props) {
       {errors.value.length > 0 && (
         <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 mb-6">
           <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-4">
-            Errores registrados ({errors.value.length}
-            {exec.errors_count && exec.errors_count > errors.value.length
-              ? ` de ${exec.errors_count}`
-              : ""})
+            Errores registrados ({errorOffset.value + 1}–{errorOffset.value + errors.value.length} de {exec.errors_count ?? 0})
           </h3>
-          <ul class="divide-y divide-[var(--border-primary)]">
-            {errors.value.map((err) => (
-              <li key={err.id} class="py-2">
-                <p class="text-sm font-medium text-[var(--brand-red)]">
-                  {ERROR_TYPE_LABELS[err.type] || err.type}
-                </p>
-                {err.identifier && (
-                  <p class="text-xs text-[var(--text-secondary)]">
-                    ID: {err.identifier}
-                  </p>
-                )}
-                <p class="text-sm text-[var(--text-secondary)]">
-                  {err.message}
-                </p>
-                <p class="text-xs text-[var(--text-muted)]">
-                  {formatDateTime(err.created_at)}
-                </p>
-              </li>
-            ))}
-          </ul>
-          {errors.value.length < (exec.errors_count ?? 0) && (
-            <button
-              onClick={loadMoreErrors}
-              class="mt-4 w-full flex items-center justify-center gap-2 py-2 text-sm text-[var(--accent)] hover:bg-[var(--bg-secondary)] rounded-lg transition-colors"
-            >
-              <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-              Mostrar más
-            </button>
-          )}
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-[var(--border-primary)]">
+                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">Fase</th>
+                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">Identificador</th>
+                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">Mensaje</th>
+                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {errors.value.map((err) => (
+                  <tr key={err.id} class="border-b border-[var(--border-primary)]">
+                    <td class="py-2 px-2 text-xs font-medium text-[var(--brand-red)] whitespace-nowrap">
+                      {ERROR_TYPE_LABELS[err.type] || err.type}
+                    </td>
+                    <td class="py-2 px-2 text-xs text-[var(--text-secondary)] font-mono">
+                      {err.identifier || "—"}
+                    </td>
+                    <td class="py-2 px-2 text-sm text-[var(--text-secondary)] max-w-xs truncate" title={err.message ?? ""}>
+                      {err.message || "—"}
+                    </td>
+                    <td class="py-2 px-2 text-xs text-[var(--text-muted)] whitespace-nowrap">
+                      {formatDateTime(err.created_at)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination
+            offset={errorOffset.value}
+            pageSize={ERRORS_PAGE_SIZE}
+            total={exec.errors_count ?? 0}
+            label="errores"
+            onPageChange={handleErrorPageChange}
+          />
         </div>
       )}
 
