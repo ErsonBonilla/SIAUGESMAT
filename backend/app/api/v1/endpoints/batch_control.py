@@ -19,7 +19,12 @@ from app.repositories.operation_repo import (
 )
 from app.schemas.operations import BatchStatusResponse, DeleteOldBatchesResponse, OperationItemOut
 from app.schemas.user import UserInToken
-from app.services.batch_report_service import build_batch_report_zip
+from app.services.batch_report_service import (
+    build_batch_report_zip,
+    get_batch_report_path,
+    list_batch_reports,
+    save_batch_reports,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +113,34 @@ def delete_batch_endpoint(
     return {"batch_id": batch_id, "message": "Lote eliminado correctamente."}
 
 
+@router.get("/batch/{batch_id}/reports",
+            summary="Listar reportes individuales de un lote")
+def list_batch_reports_endpoint(
+    batch_id: str,
+    db: Session = Depends(get_db), current_user: UserInToken = Depends(get_current_user),
+):
+    batch = get_batch(db, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    return {"batch_id": batch_id, "reports": list_batch_reports(batch_id)}
+
+
+@router.get("/batch/{batch_id}/reports/{report_name}",
+            summary="Descargar un CSV individual de un lote")
+def download_batch_report(
+    batch_id: str, report_name: str,
+    db: Session = Depends(get_db), current_user: UserInToken = Depends(get_current_user),
+):
+    batch = get_batch(db, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+
+    path = get_batch_report_path(batch_id, report_name)
+    if not path:
+        raise HTTPException(status_code=404, detail="Reporte no encontrado")
+    return FileResponse(path=path, media_type="text/csv", filename=f"{report_name}.csv")
+
+
 @router.get("/batch/{batch_id}/reports/download",
             summary="Descargar reportes (ZIP con CSVs)")
 def download_batch_reports(
@@ -119,9 +152,16 @@ def download_batch_reports(
         raise HTTPException(status_code=404, detail="Lote no encontrado")
 
     items = get_all_batch_items(db, batch_id)
-    zip_path, zip_filename = build_batch_report_zip(batch, items)
-    background_tasks.add_task(os.unlink, zip_path)
-    return FileResponse(path=zip_path, media_type="application/zip", filename=zip_filename)
+    save_batch_reports(batch, items)
+    zip_path = os.path.join(
+        os.path.join(settings.REPORT_DIR, "batch", batch_id) + ".zip"
+    )
+    if not os.path.exists(zip_path):
+        zip_path, zip_filename = build_batch_report_zip(batch, items)
+        background_tasks.add_task(os.unlink, zip_path)
+        return FileResponse(path=zip_path, media_type="application/zip", filename=zip_filename)
+    return FileResponse(path=zip_path, media_type="application/zip",
+                        filename=f"reportes_{batch.action}_{batch.entity_type}_{batch_id[:8]}.zip")
 
 
 @router.delete("/batches/old", response_model=DeleteOldBatchesResponse,
