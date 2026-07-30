@@ -67,6 +67,8 @@ Los colores de la marca se definen en `utils/theme.ts` como `DARK_THEME_VARS` y 
 
 Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y matrículas con Moodle.
 
+> Además del pipeline ETL, el sistema incluye una herramienta de **Gestión de Novedades** en `/cursos/novedades` que permite comparar dos cargas académicas del mismo semestre (la ejecución anterior vs una nueva), detectar cambios de profesores en cursos existentes y aplicar acciones correctivas: ocultar curso viejo, crear curso nuevo para el nuevo profesor, o rehabilitar un curso oculto si el nuevo profesor ya lo tenía asignado. Usa el endpoint `POST /api/v1/novedades/compare` y `POST /api/v1/novedades/apply`.
+
 | Fase | Clase | Descripción | Progreso |
 |---|---|---|---|
 | **FASE 1** | `ConsultPhase` | Parsear Excel + consultar Moodle (categorías, cursos, usuarios). Resuelve docentes por email en batch. | 0% → 20% |
@@ -106,13 +108,19 @@ Procesado por `operations_tasks.py` (Celery). El estado se consulta en `GET /ope
 
 ### Consultas asíncronas
 
-Consulta cursos, categorías y usuarios en Moodle sin timeout HTTP (Celery con `task_time_limit=300`).
+Consulta cursos, categorías, usuarios y docentes inactivos en Moodle sin timeout HTTP (Celery con `task_time_limit=600`).
 
 | Operación | Endpoint |
 |---|---|
 | Encolar consulta | `POST /queries/{entity}` |
 | Estado + resultado | `GET /queries/tasks/{id}` |
 | Descargar CSV | `GET /queries/tasks/{id}/download` |
+
+**Entidades disponibles**:
+- `courses` — filtros por shortname, estado (>6 meses sin uso), formato de código (5 o 6 segmentos)
+- `categories` — búsqueda por idnumber
+- `users` — filtros por rol (todos/profesores) y estado (nunca ingresaron)
+- `inactive_teachers` — docentes (**editingteacher**) que no han accedido a sus cursos desde el inicio de un semestre seleccionado. Consulta todos los cursos SIAUGESMAT en Moodle, obtiene los profesores matriculados con su `lastcourseaccess` y los filtra por la fecha de corte del semestre. Devuelve: nombre del docente, username, correo, curso, programa académico (código de 4 dígitos) y CAT (prefijo de 3 letras). Procesado en lotes paralelos (5 cursos simultáneos).
 
 **Filtros de cursos**: el endpoint `POST /queries/courses` acepta los parámetros `search` (búsqueda por shortname), `status` (`unused_6months` para cursos sin uso > 6 meses) y `pattern` para filtrar por formato de código:
 - `6segments` → `CAL_0852_sIV_5031216_G-1_29114506` (6 segmentos separados por `_`)
@@ -140,12 +148,13 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | Ruta | Contenido |
 |---|---|
 | `/dashboard` | KPI cards, minigráfico SVG, última ejecución, tabla de ejecuciones recientes |
-| `/cursos/crear` | FileUploader — sube Excel y lanza ETL |
+| `/cursos/crear` | FileUploader — sube Excel y lanza ETL. Incluye botón **Gestionar novedades** que redirige a `/cursos/novedades` |
+| `/cursos/novedades` | NovedadesIsland — compara dos cargas académicas del mismo semestre (re-parsing del Excel anterior), detecta cambios de asignación docente (profesores que ya no dictan el curso) y permite aplicar acciones: ocultar curso viejo + crear nuevo, o rehabilitar curso oculto del nuevo profesor |
 | `/cursos/consultar` | QueryTable — búsqueda de cursos con filtros: shortname, estado (>6 meses sin uso) y formato de código (5 o 6 segmentos) |
 | `/cursos/eliminar` | CsvUploader — eliminación masiva de cursos vía CSV |
 | `/cursos/visibilidad` | BulkVisibilityIsland — mostrar/ocultar cursos masivamente vía CSV |
 | `/usuarios/crear` | CsvUploader — creación masiva de usuarios |
-| `/usuarios/consultar` | QueryTable — búsqueda de usuarios por username/email |
+| `/usuarios/consultar` | QueryTable + InactiveTeachersQuery — búsqueda de usuarios por username/email (modo normal) y consulta de **docentes que no han accedido a sus cursos** desde el inicio de un semestre seleccionado, con datos de programa y CAT |
 | `/usuarios/eliminar` | CsvUploader — eliminación masiva de usuarios |
 | `/categorias/crear` | CsvUploader — creación masiva de categorías |
 | `/categorias/consultar` | QueryTable — búsqueda de categorías por idnumber |
@@ -165,6 +174,8 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | `CsvUploader` | Formulario genérico de carga CSV con validación y polling de progreso |
 | `BulkVisibilityIsland` | Selector mostrar/ocultar + carga CSV + polling de progreso de visibilidad de cursos |
 | `QueryTable` | Búsqueda asíncrona con polling y descarga CSV |
+| `NovedadesIsland` | Subir Excel de nueva carga académica, comparar con la ejecución anterior del mismo semestre, detectar cambios de profesores y aplicar acciones (ocultar/crear/rehabilitar cursos) |
+| `InactiveTeachersQuery` | Seleccionar semestre de corte y consultar docentes editingteacher que no han accedido a sus cursos desde esa fecha, con resultados de programa y CAT |
 | `Historico` | Evolución semestral y comparación con Chart.js |
 | `HistoricoOperaciones` | Gráfico Plotly theme-aware con métricas adaptativas por operación |
 | `Sidebar` | Navegación con 4 tarjetas (Usuarios, Cursos, Categorías, Operaciones), avatar, ThemeToggle |
@@ -190,18 +201,20 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 SIAUGESMAT/
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/endpoints/   # auth, jobs, upload, analytics, reports, charts, operations, queries, batch_control, batch_listing
+│   │   ├── api/v1/endpoints/   # auth, jobs, upload, analytics, reports, charts, operations, queries, batch_control, batch_listing, novedades
 │   │   ├── core/               # config.py, security.py, dependencies.py, entity_config.py
 │   │   ├── db/                 # models.py, session.py, base.py
 │   │   ├── integrations/       # moodle.py (MoodleIntegration — orquestación alto nivel)
 │   │   ├── repositories/       # execution_repo, log_repo, query_repo, operation_repo (CRUD puro)
-│   │   ├── schemas/            # Pydantic schemas (job, analytics, operations, upload, user)
+│   │   ├── schemas/            # Pydantic schemas (job, analytics, operations, upload, user, novedades)
 │   │   ├── services/           # moodle.py (MoodleService), metrics_service.py, etl.py, reports.py,
+│   │   │                       # novedades_service.py,
 │   │   │                       # charts.py, csv_validator.py, roles.py, rate_limiter.py, moodle_client.py,
 │   │   │                       # moodle_errors.py, moodle_error_handler.py, moodle_factory.py,
 │   │   │                       # moodle_adapter.py, moodle_operations.py, batch_report_service.py,
 │   │   │                       # category_utils.py, error_messages.py
-│   │   │                       # parsers/ (DistanciaParser, patterns), course_comparison/
+│   │   │                       # parsers/ (DistanciaParser, patterns), course_comparison/,
+│   │   │                       # novedades_service.py
 │   │   ├── workers/            # tasks.py (ETL), phases/ (phase1_consult, phase2_analyze, phase3_structure,
 │   │   │                       #   phase4_people, item_task, orchestrator, common, base)
 │   │   │                       # operations_tasks.py, query_tasks.py, cleanup_tasks.py, utils.py
@@ -221,10 +234,11 @@ SIAUGESMAT/
 │   ├── islands/                # Sidebar, ThemeToggle, DashboardIsland, ExecutionList, OperationList,
 │   │                           # Historico, HistoricoOperaciones, FileUploader, CsvUploader, QueryTable,
 │   │                           # CrearUsuarios, JobDetailIsland, Reportes, Chart, MetricsChart,
-│   │                           # SemesterComparison, LoginForm, LoginPageIsland, UploadIsland
+│   │   # SemesterComparison, LoginForm, LoginPageIsland, UploadIsland,
+│   │   # NovedadesIsland, InactiveTeachersQuery
 │   ├── routes/                 # _app.tsx, _middleware.ts, index.tsx, login.tsx, dashboard.tsx
 │   │   ├── usuarios/           # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
-│   │   ├── cursos/             # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx, visibilidad.tsx
+│   │   ├── cursos/             # index.tsx (hub), consultar.tsx, crear.tsx, novedades.tsx, eliminar.tsx, visibilidad.tsx
 │   │   ├── categorias/         # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
 │   │   ├── operaciones/        # index.tsx (hub), ejecuciones.tsx, historico.tsx
 │   │   ├── jobs/               # [id].tsx

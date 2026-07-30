@@ -161,3 +161,60 @@ export interface BulkVisibilityResult {
   not_found: number;
   duration_seconds: number;
 }
+
+export interface InactiveTeacherRow {
+  teacher_name: string;
+  username: string;
+  email: string;
+  course_name: string;
+  course_shortname: string;
+  program: string;
+  cat: string;
+  cat_prefix: string;
+  last_access: number;
+}
+
+export interface InactiveTeachersResponse {
+  task_id: string;
+  entity: string;
+  status: string;
+  total_count: number;
+  result?: InactiveTeacherRow[];
+  error?: string;
+}
+
+export interface NovedadItem {
+  id: string;
+  base_key: string;
+  old_shortname: string;
+  new_shortname: string;
+  old_prof_cedula: string | null;
+  new_prof_cedula: string | null;
+  old_prof_name: string;
+  new_prof_name: string;
+  course_fullname: string;
+  action: "hide_and_create" | "unhide";
+  target_course_id: number | null;
+}
+
+export interface NovedadesResponse {
+  semester: string;
+  previous_execution_id: number;
+  previous_filename: string;
+  total_compared: number;
+  novedades: NovedadItem[];
+}
+
+export interface ApplyResult {
+  novedad_id: string;
+  success: boolean;
+  action: string;
+  message: string;
+}
+
+export interface ApplyNovedadesResponse {
+  total: number;
+  applied: number;
+  failed: number;
+  results: ApplyResult[];
+}

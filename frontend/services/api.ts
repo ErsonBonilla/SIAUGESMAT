@@ -51,7 +51,11 @@ export {
   queryEntities,
 } from "./api/consultas.ts";
 
+export { compareNovedades, applyNovedades } from "./api/novedades.ts";
+
 export type {
+  ApplyNovedadesResponse,
+  ApplyResult,
   BulkVisibilityResult,
   ChartInfo,
   ChartsListResponse,
@@ -59,7 +63,11 @@ export type {
   CsvUploadResponse,
   ErrorLog,
   Execution,
+  InactiveTeacherRow,
+  InactiveTeachersResponse,
   LatestExecution,
+  NovedadItem,
+  NovedadesResponse,
   OperationBatchOut,
   OperationBatchStatus,
   OperationItemOut,
