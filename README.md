@@ -47,7 +47,7 @@ Los colores de la marca se definen en `utils/theme.ts` como `DARK_THEME_VARS` y 
 ┌────────▼─────────┐     ┌──────────────┐                                    │
 │  Celery Worker   │────▶│  Phases      │  Pipeline ETL:                     │
 │  (tasks.py)      │     │  (Consult,   │  ConsultPhase → AnalyzePhase →     │
-│                  │     │   Analyze,   │  StructurePhase → PeoplePhase    │
+│                  │     │   Analyze,   │  Phase3 → Phase4                 │
 │                  │     │   Execute)   │                                    │
 └────────┬─────────┘     └──────┬───────┘                                    │
          │                      │                                            │
@@ -83,7 +83,7 @@ Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y m
 - **Resolución batch de docentes:** 1 sola llamada a `core_user_get_users_by_field` con todos los emails, en vez de N llamadas individuales.
 - **Compatibilidad Moodle 3.9:** adapter pattern para diferencias entre versiones (sin `enrolment_1`, `templatecourse` como `int`, `createpassword` en vez de `preferences[]`, `categoryid` con fallback multi-nivel).
 
-**Archivos clave:** `workers/tasks.py` (orquestador), `workers/phases/phase1_consult.py`, `phase2_analyze.py`, `phase3_structure.py`, `phase4_people.py`, `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle.py` (MoodleService), `services/moodle_adapter.py`, `services/course_comparison.py`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`.
+**Archivos clave:** `workers/tasks.py` (orquestador), `workers/phases/phase1_consult.py`, `phase2_analyze.py`, `phase3_structure.py`, `phase4_people.py`, `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle.py` (MoodleService), `services/moodle_adapter.py`, `services/course_comparison/`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`, `services/metrics_service.py`.
 
 ---
 
@@ -158,15 +158,15 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 ### Islas principales
 
 | Isla | Función |
-|---|---|
+|---|---|---|
 | `ExecutionList` | Tabla de ejecuciones ETL con filtros, paginación, acciones (Procesar, Eliminar, ZIP, Reportes) |
 | `OperationList` | Tabla de lotes con filtros bloqueables por entidad/acción |
 | `DashboardIsland` | KPI cards, minigráfico, semáforo, ejecuciones recientes |
 | `CsvUploader` | Formulario genérico de carga CSV con validación y polling de progreso |
 | `BulkVisibilityIsland` | Selector mostrar/ocultar + carga CSV + polling de progreso de visibilidad de cursos |
 | `QueryTable` | Búsqueda asíncrona con polling y descarga CSV |
-| `HistoricoIsland` | Evolución semestral y comparación con Chart.js |
-| `OperationHistorico` | Gráfico Plotly theme-aware con métricas adaptativas por operación |
+| `Historico` | Evolución semestral y comparación con Chart.js |
+| `HistoricoOperaciones` | Gráfico Plotly theme-aware con métricas adaptativas por operación |
 | `Sidebar` | Navegación con 4 tarjetas (Usuarios, Cursos, Categorías, Operaciones), avatar, ThemeToggle |
 | `JobDetailIsland` | Progreso en vivo con polling, métricas, errores paginados |
 
@@ -190,34 +190,37 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 SIAUGESMAT/
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/endpoints/   # auth, jobs, upload, analytics, reports, charts, operations, queries
-│   │   ├── analytics/          # metrics.py (métricas agregadas, semáforo)
-│   │   ├── core/               # config.py, security.py, dependencies.py
+│   │   ├── api/v1/endpoints/   # auth, jobs, upload, analytics, reports, charts, operations, queries, batch_control, batch_listing
+│   │   ├── core/               # config.py, security.py, dependencies.py, entity_config.py
 │   │   ├── db/                 # models.py, session.py, base.py
 │   │   ├── integrations/       # moodle.py (MoodleIntegration — orquestación alto nivel)
 │   │   ├── repositories/       # execution_repo, log_repo, query_repo, operation_repo (CRUD puro)
 │   │   ├── schemas/            # Pydantic schemas (job, analytics, operations, upload, user)
-│   │   ├── services/           # moodle.py (MoodleService), etl.py, course_comparison.py,
-│   │   │                       # reports.py, charts.py, parsers/ (DistanciaParser, patterns)
-│   │   │                       # moodle_adapter.py, rate_limiter.py
-│   │   ├── workers/            # tasks.py (ETL), phases/ (phase1_consult, phase2_analyze),
-│   │   │                       # operations_tasks.py, query_tasks.py, cleanup_tasks.py, etl_item_task.py
-│   │   ├── scripts/            # bulk_course_visibility.py (CLI para mostrar/ocultar cursos en lote)
+│   │   ├── services/           # moodle.py (MoodleService), metrics_service.py, etl.py, reports.py,
+│   │   │                       # charts.py, csv_validator.py, roles.py, rate_limiter.py, moodle_client.py,
+│   │   │                       # moodle_errors.py, moodle_error_handler.py, moodle_factory.py,
+│   │   │                       # moodle_adapter.py, moodle_operations.py, batch_report_service.py,
+│   │   │                       # category_utils.py, error_messages.py
+│   │   │                       # parsers/ (DistanciaParser, patterns), course_comparison/
+│   │   ├── workers/            # tasks.py (ETL), phases/ (phase1_consult, phase2_analyze, phase3_structure,
+│   │   │                       #   phase4_people, item_task, orchestrator, common, base)
+│   │   │                       # operations_tasks.py, query_tasks.py, cleanup_tasks.py, utils.py
+│   │   ├── scripts/            # bulk_course_visibility.py, diagnostic_sibate.py
 │   │   ├── celery_app.py       # Config Celery + beat schedule
 │   │   └── main.py
-│   ├── tests/                  # 177 tests (ETL, repos, phases, pipeline, analytics, API)
+│   ├── tests/                  # ~350 tests (ETL, repos, phases, pipeline, analytics, API)
 │   ├── alembic/                # Migraciones de base de datos
 │   ├── reports/                # Reportes generados (CSV, ZIP)
 │   ├── uploads/                # Archivos Excel subidos
 │   └── requirements.txt
 ├── frontend/
-│   ├── components/             # Button, Input, Card, Layout, ProgressBar, Toast,
-│   │                           # ErrorBox, Pagination, LoadingSkeleton, KpiCard, MiniBarChart,
-│   │                           # YearNav, SemesterPicker, SemesterMultiPicker, ReportsSection
-│   ├── islands/                # Sidebar, ThemeToggle, DashboardIsland, ExecutionList,
-│   │                           # OperationList, OperationHistorico, HistoricoIsland,
-│   │                           # FileUploader, CsvUploader, QueryTable, CrearUsuarios,
-│   │                           # JobDetailIsland, ReportesIsland, Chart, MetricsChart,
+│   ├── components/             # Button, Input, Card, Layout, ProgressBar, Toast, ErrorBox, Pagination,
+│   │                           # LoadingSkeleton, KpiCard, MiniBarChart, YearNav, SemesterPicker,
+│   │                           # SemesterMultiPicker, ReportsSection, HubCard, HubPage, TabbedPage,
+│   │                           # ConsultPage, CsvActionPage, PeriodButton, OperationHistorySection
+│   ├── islands/                # Sidebar, ThemeToggle, DashboardIsland, ExecutionList, OperationList,
+│   │                           # Historico, HistoricoOperaciones, FileUploader, CsvUploader, QueryTable,
+│   │                           # CrearUsuarios, JobDetailIsland, Reportes, Chart, MetricsChart,
 │   │                           # SemesterComparison, LoginForm, LoginPageIsland, UploadIsland
 │   ├── routes/                 # _app.tsx, _middleware.ts, index.tsx, login.tsx, dashboard.tsx
 │   │   ├── usuarios/           # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
@@ -225,20 +228,22 @@ SIAUGESMAT/
 │   │   ├── categorias/         # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
 │   │   ├── operaciones/        # index.tsx (hub), ejecuciones.tsx, historico.tsx
 │   │   ├── jobs/               # [id].tsx
-│   │   ├── reportes.tsx        # Redirects: ejecuciones.tsx, historico.tsx, upload.tsx
-│   ├── services/api.ts         # Barrel re-export → api/ (types, core, auth, jobs, analytics, reports, operations, queries, mantenimiento)
+│   │   └── reportes.tsx
+│   ├── services/api.ts         # Barrel re-export → api/ (types, core, auth, trabajos, analytics, reportes, operaciones, consultas, mantenimiento)
 │   ├── utils/                  # theme.ts, plotly.ts, profile.ts, operations-tabs.ts, constants.ts,
-│   │                           # auth.ts, auth-guard.ts, cache.ts, date.ts, icons.tsx, toast.ts, reports.ts
-│   ├── static/styles.css       # Estilos globales, animaciones, responsive
+│   │                           # auth.ts, auth-guard.ts, date.ts, icons.tsx, toast.ts, reports.ts,
+│   │                           # entity-configs.ts
+│   ├── static/                 # styles.css, main.css, SIAUGESMAT.ico
 │   ├── deno.json               # Configuración Fresh + dependencias
-│   └── fresh.gen.ts            # Manifest de rutas (generado por build)
+│   └── deno.lock               # Lock de dependencias Deno
 ├── docker-compose.yml          # 7 servicios: db, redis, backend, worker, beat, frontend, nginx
 ├── docker-compose.override.yml  # Puertos expuestos + volume mount para desarrollo
 ├── e2e/                        # Pruebas end-to-end contra Moodle real
 │   ├── fixtures/               #   .xlsx con datos reales (protegidos por .gitignore)
 │   ├── run_test.py             #   Script unificado (upload + process + verify)
 │   └── README.md
-├── .env.example                # Variables de entorno de ejemplo
+├── .env.example                # Variables de entorno de ejemplo (único, copiar a backend/.env)
+├── certs/                      # Certificados SSL para HTTPS
 └── README.md
 ```
 
@@ -360,13 +365,13 @@ JOB_TIMEOUT=28800
 MAX_AUTO_DELETE_COURSES=500
 ```
 
-Los archivos `.env.example` en la raíz y en `backend/` contienen todas las variables con valores de ejemplo. Copiarlos a `.env` y ajustar credenciales reales.
+El archivo `.env.example` en la raíz contiene todas las variables con valores de ejemplo. Copiarlo a `backend/.env` y ajustar credenciales reales.
 
 ---
 
 ## Tests
 
-### Backend (177 tests)
+### Backend (~350 tests)
 
 ```bash
 cd backend
@@ -374,7 +379,7 @@ pytest -v
 pytest --cov=app          # con cobertura
 ```
 
-Cubre: parser ETL, repositorios (execution, log, query, operation), fases del pipeline (Consult, Analyze, Structure, People), integración del pipeline completo, endpoints API, analítica y semáforo.
+Cubre: parser ETL, repositorios, fases del pipeline, integración, endpoints API, analítica, workers, tareas Celery, cliente Moodle, adaptadores y más.
 
 ### End-to-end (contra Moodle real)
 

@@ -9,7 +9,7 @@ import pytest
 from datetime import datetime, timezone
 
 from app.db.models import Execution
-from app.analytics.metrics import (
+from app.services.metrics_service import (
     get_history_metrics,
     get_semaphore_status,
     get_latest_execution_data,

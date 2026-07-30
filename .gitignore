@@ -37,12 +37,8 @@ Thumbs.db
 *.db
 *.sqlite3
 
-# Archivos de construcción de Fresh (si se generan)
+# Archivos de construcción de Fresh (build output)
 _fresh/
-_fresh/*.gen.ts
-
-# Archivos de caché de Deno
-deno.lock
 
 # ---------------------------------------------------------------------------
 # e2e — pruebas end-to-end contra Moodle real
