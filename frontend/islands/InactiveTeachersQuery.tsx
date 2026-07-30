@@ -1,25 +1,12 @@
 import { useSignal, useComputed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { getQueryExportUrl, getQueryTaskStatus, queryEntities, downloadReport } from "../services/api.ts";
-import type { QueryTaskStatus } from "../services/api/types.ts";
+import { getQueryExportUrl, getQueryTaskStatus, queryEntities, downloadReport, type InactiveTeacherRow, type QueryTaskStatus } from "../services/api.ts";
 import { SpinnerIcon, DownloadIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
 import SemesterPicker from "../components/SemesterPicker.tsx";
 
 const PAGE_SIZE = 20;
-
-export interface InactiveTeacherRow {
-  teacher_name: string;
-  username: string;
-  email: string;
-  course_name: string;
-  course_shortname: string;
-  program: string;
-  cat: string;
-  cat_prefix: string;
-  last_access: number;
-}
 
 const COLUMNS = [
   { key: "teacher_name", label: "Docente" },

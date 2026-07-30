@@ -20,7 +20,6 @@ import { formatDateTime, formatDuration } from "../utils/date.ts";
 import { toast } from "../utils/toast.ts";
 import {
   MODE_LABELS,
-  STATUS_COLORS,
   STATUS_LABELS,
 } from "../utils/constants.ts";
 
