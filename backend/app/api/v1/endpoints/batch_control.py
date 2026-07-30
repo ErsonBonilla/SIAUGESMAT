@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, get_db
 from app.repositories.operation_repo import (
+    cancel_batch,
     delete_batch,
     delete_old_batches,
     get_all_batch_items,
@@ -76,6 +77,20 @@ def resume_batch_endpoint(
     resumed = resume_batch(db, batch_id)
     logger.info(f"Lote {batch_id} reanudado por {current_user.username}: {resumed} items")
     return {"batch_id": batch_id, "resumed": resumed, "message": f"Lote reanudado. {resumed} items vueltos a pendientes."}
+
+
+@router.post("/batch/{batch_id}/cancel",
+             summary="Cancelar un lote de operaciones")
+def cancel_batch_endpoint(
+    batch_id: str,
+    db: Session = Depends(get_db), current_user: UserInToken = Depends(get_current_user),
+):
+    batch = get_batch(db, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    cancelled = cancel_batch(db, batch_id)
+    logger.info(f"Lote {batch_id} cancelado por {current_user.username}: {cancelled} items")
+    return {"batch_id": batch_id, "cancelled": cancelled, "message": f"Lote cancelado. {cancelled} items marcados como cancelados."}
 
 
 @router.delete("/batch/{batch_id}",

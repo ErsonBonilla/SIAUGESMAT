@@ -1,6 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { useBatchUpload } from "../hooks/useBatchUpload.ts";
-import { getBatchStatus, uploadCsvFile } from "../services/api.ts";
+import { cancelBatch, getBatchStatus, pauseBatch, resumeBatch, uploadCsvFile } from "../services/api.ts";
 import { SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import BatchProgressTable from "../components/BatchProgressTable.tsx";
@@ -94,6 +94,9 @@ export default function CsvUploader(
           batchId={batchId.value}
           labelSingular={labelSingular}
           labelPlural={labelPlural}
+          onPause={() => pauseBatch(batchId.value!)}
+          onResume={() => resumeBatch(batchId.value!)}
+          onCancel={() => cancelBatch(batchId.value!)}
           pagination={{
             offset: detailOffset.value,
             pageSize: PAGE_SIZE,

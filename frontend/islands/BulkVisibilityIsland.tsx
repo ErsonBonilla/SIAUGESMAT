@@ -1,6 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { useBatchUpload } from "../hooks/useBatchUpload.ts";
-import { getBatchStatus, uploadVisibilityCsv } from "../services/api.ts";
+import { cancelBatch, getBatchStatus, pauseBatch, resumeBatch, uploadVisibilityCsv } from "../services/api.ts";
 import { SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import OperationHistorySection from "../components/OperationHistorySection.tsx";
@@ -140,6 +140,9 @@ export default function BulkVisibilityIsland() {
           batchId={batchId.value}
           labelSingular="Curso"
           labelPlural="cursos"
+          onPause={() => pauseBatch(batchId.value!)}
+          onResume={() => resumeBatch(batchId.value!)}
+          onCancel={() => cancelBatch(batchId.value!)}
           pagination={{
             offset: detailOffset.value,
             pageSize: PAGE_SIZE,
