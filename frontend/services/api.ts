@@ -33,6 +33,7 @@ export {
 } from "./api/reportes.ts";
 
 export {
+  cancelBatch,
   deleteBatch,
   getBatchReportUrl,
   getBatchStatus,

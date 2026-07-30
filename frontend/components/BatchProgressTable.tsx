@@ -9,6 +9,9 @@ interface BatchProgressTableProps {
   batchId: string;
   labelSingular: string;
   labelPlural: string;
+  onPause?: () => void;
+  onResume?: () => void;
+  onCancel?: () => void;
   pagination?: {
     offset: number;
     pageSize: number;
@@ -96,6 +99,26 @@ export default function BatchProgressTable(
           </>
         );
       })()}
+
+      {(batchStatus.pending > 0 || batchStatus.processing > 0 || batchStatus.paused > 0) && (
+        <div class="flex justify-end gap-2 mt-3">
+          {(batchStatus.pending > 0 || batchStatus.processing > 0) && onPause && (
+            <button onClick={onPause} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-400 hover:bg-amber-500 text-white transition">
+              ⏸ Pausa
+            </button>
+          )}
+          {batchStatus.paused > 0 && onResume && (
+            <button onClick={onResume} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition">
+              ▶ Reanudar
+            </button>
+          )}
+          {onCancel && (
+            <button onClick={onCancel} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition">
+              ✖ Cancelar
+            </button>
+          )}
+        </div>
+      )}
 
       <div class="mt-6 overflow-x-auto">
         <table class="w-full text-sm">

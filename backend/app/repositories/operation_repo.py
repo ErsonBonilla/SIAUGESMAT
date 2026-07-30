@@ -115,6 +115,15 @@ def resume_batch(db: Session, batch_id: str) -> int:
     return resumed
 
 
+def cancel_batch(db: Session, batch_id: str) -> int:
+    cancelled = db.query(OperationItem).filter(
+        OperationItem.batch_id == batch_id,
+        OperationItem.status.in_(["pending", "processing", "paused"]),
+    ).update({"status": "cancelled", "updated_at": datetime.now(timezone.utc)}, synchronize_session=False)
+    db.commit()
+    return cancelled
+
+
 def delete_batch(db: Session, batch_id: str) -> bool:
     batch = get_batch(db, batch_id)
     if not batch:

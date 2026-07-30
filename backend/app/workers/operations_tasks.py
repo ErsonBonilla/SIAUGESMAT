@@ -42,6 +42,21 @@ def process_operation_batch(self, batch_id: str):
                     await _ensure_root_category(moodle)
 
                 for item in items:
+                    # Re-consultar batch por si fue pausado o cancelado
+                    current_batch = get_batch(db, batch_id)
+                    if current_batch:
+                        paused_count = db.query(OperationItem).filter_by(
+                            batch_id=batch_id, status="paused"
+                        ).count()
+                        cancelled_count = db.query(OperationItem).filter_by(
+                            batch_id=batch_id, status="cancelled"
+                        ).count()
+                        if paused_count > 0:
+                            logger.info(f"Lote {batch_id} pausado, deteniendo procesamiento ({paused_count} items pausados)")
+                            break
+                        if cancelled_count > 0:
+                            logger.info(f"Lote {batch_id} cancelado, deteniendo procesamiento ({cancelled_count} items cancelados)")
+                            break
                     try:
                         await _process_single_item(item, batch, moodle, db)
                     except MoodleAPIError as e:
