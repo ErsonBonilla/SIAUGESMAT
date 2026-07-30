@@ -12,7 +12,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.analytics.metrics import (
+from app.services.metrics_service import (
     get_history_metrics,
     get_latest_execution_data,
     get_semaphore_status,
