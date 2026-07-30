@@ -8,7 +8,7 @@ import ErrorBox from "../components/ErrorBox.tsx";
 
 type Step = "upload" | "results";
 
-function downloadCsv(items: NovedadItem[]) {
+function _rowsToCsv(items: NovedadItem[]): string {
   const headers = [
     "tipo", "cat", "programa", "base_key", "curso",
     "shortname_anterior", "shortname_nuevo",
@@ -17,29 +17,25 @@ function downloadCsv(items: NovedadItem[]) {
   ];
   const rows = items.map((n) => {
     const parts = n.base_key.split("_");
-    const cat = parts[0] || "";
-    const prog = parts[1] || "";
     return [
-      n.action,
-      cat,
-      prog,
-      n.base_key,
-      n.course_fullname,
-      n.old_shortname,
-      n.new_shortname,
+      n.action, parts[0] || "", parts[1] || "", n.base_key, n.course_fullname,
+      n.old_shortname, n.new_shortname,
       n.old_prof_name || n.old_prof_cedula || "",
       n.new_prof_name || n.new_prof_cedula || "",
-      n.old_prof_cedula || "",
-      n.new_prof_cedula || "",
+      n.old_prof_cedula || "", n.new_prof_cedula || "",
     ].map((v) => `"${v}"`);
   });
-  const bom = "\uFEFF";
-  const csv = bom + headers.join(",") + "\n" + rows.map((r) => r.join(",")).join("\n");
+  return "\uFEFF" + headers.join(",") + "\n" + rows.map((r) => r.join(",")).join("\n");
+}
+
+function downloadCsv(items: NovedadItem[], filename: string) {
+  if (items.length === 0) return;
+  const csv = _rowsToCsv(items);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `novedades_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -236,13 +232,29 @@ export default function NovedadesIsland() {
             >
               Volver
             </a>
-            <button
-              onClick={() => downloadCsv(novedades.value)}
-              class="inline-flex items-center gap-2 py-2.5 px-6 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white font-semibold hover:brightness-110 transition"
-            >
-              <DownloadIcon class="w-4 h-4" />
-              Descargar CSV
-            </button>
+            <div class="flex gap-2">
+              {novedades.value.filter((n) => n.action === "curso_eliminado").length > 0 && (
+                <button
+                  onClick={() =>
+                    downloadCsv(
+                      novedades.value.filter((n) => n.action === "curso_eliminado"),
+                      `eliminados_${new Date().toISOString().slice(0, 10)}.csv`,
+                    )}
+                  class="inline-flex items-center gap-2 py-2.5 px-4 rounded-lg border border-red-400 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition"
+                >
+                  <DownloadIcon class="w-4 h-4" />
+                  Solo eliminados ({novedades.value.filter((n) => n.action === "curso_eliminado").length})
+                </button>
+              )}
+              <button
+                onClick={() =>
+                  downloadCsv(novedades.value, `novedades_${new Date().toISOString().slice(0, 10)}.csv`)}
+                class="inline-flex items-center gap-2 py-2.5 px-6 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white font-semibold hover:brightness-110 transition"
+              >
+                <DownloadIcon class="w-4 h-4" />
+                Descargar CSV
+              </button>
+            </div>
           </div>
         </div>
       )}
