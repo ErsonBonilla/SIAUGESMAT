@@ -24,5 +24,6 @@ export async function handleResponse<T>(response: Response): Promise<T> {
         `Error del servidor (${response.status})`,
     );
   }
+  if (response.status === 204) return undefined as T;
   return response.json();
 }
