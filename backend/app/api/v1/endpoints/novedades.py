@@ -7,14 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
-from app.schemas.novedades import (
-    ApplyNovedadesRequest,
-    ApplyNovedadesResponse,
-    NovedadesResponse,
-    NovedadItem,
-)
+from app.schemas.novedades import NovedadesResponse, NovedadItem
 from app.schemas.user import UserInToken
-from app.services.novedades_service import apply as apply_novedades
 from app.services.novedades_service import detect as detect_novedades
 
 logger = logging.getLogger(__name__)
@@ -92,28 +86,4 @@ async def compare_novedades(
         previous_filename=result["previous_filename"],
         total_compared=result["total_compared"],
         novedades=novedades_items,
-    )
-
-
-@router.post("/apply", response_model=ApplyNovedadesResponse,
-             summary="Aplicar novedades seleccionadas")
-async def apply_novedades_endpoint(
-    req: ApplyNovedadesRequest,
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
-):
-    modalidad = current_user.modalidad or "DISTANCIA"
-    items = [item.model_dump() for item in req.novedades]
-    result = await apply_novedades(db, req.semester, modalidad, items)
-
-    results_items = []
-    for r in result["results"]:
-        from app.schemas.novedades import ApplyResult as AR
-        results_items.append(AR(**r))
-
-    return ApplyNovedadesResponse(
-        total=result["total"],
-        applied=result["applied"],
-        failed=result["failed"],
-        results=results_items,
     )

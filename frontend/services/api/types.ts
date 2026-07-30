@@ -193,7 +193,7 @@ export interface NovedadItem {
   old_prof_name: string;
   new_prof_name: string;
   course_fullname: string;
-  action: "hide_and_create" | "unhide";
+  action: string;
   target_course_id: number | null;
 }
 
@@ -205,16 +205,4 @@ export interface NovedadesResponse {
   novedades: NovedadItem[];
 }
 
-export interface ApplyResult {
-  novedad_id: string;
-  success: boolean;
-  action: string;
-  message: string;
-}
 
-export interface ApplyNovedadesResponse {
-  total: number;
-  applied: number;
-  failed: number;
-  results: ApplyResult[];
-}
