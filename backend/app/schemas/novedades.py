@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -13,13 +13,8 @@ class NovedadItem(BaseModel):
     old_prof_name: str = ""
     new_prof_name: str = ""
     course_fullname: str = ""
-    action: str  # "hide_and_create" | "unhide"
+    action: str = ""
     target_course_id: Optional[int] = None
-
-
-class NovedadesCompareRequest(BaseModel):
-    semester: str
-    modalidad: str = "DISTANCIA"
 
 
 class NovedadesResponse(BaseModel):
@@ -28,33 +23,3 @@ class NovedadesResponse(BaseModel):
     previous_filename: str
     total_compared: int
     novedades: List[NovedadItem]
-
-
-class ApplyNovedadItem(BaseModel):
-    id: str
-    action: str
-    old_shortname: str
-    new_shortname: str
-    course_fullname: str
-    category_idnumber: str = ""
-    new_prof_username: str = ""
-    new_prof_cedula: str = ""
-
-
-class ApplyNovedadesRequest(BaseModel):
-    semester: str
-    novedades: List[ApplyNovedadItem]
-
-
-class ApplyResult(BaseModel):
-    novedad_id: str
-    success: bool
-    action: str
-    message: str = ""
-
-
-class ApplyNovedadesResponse(BaseModel):
-    total: int
-    applied: int
-    failed: int
-    results: List[ApplyResult]

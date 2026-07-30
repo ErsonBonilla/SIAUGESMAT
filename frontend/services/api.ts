@@ -53,11 +53,9 @@ export {
   queryEntities,
 } from "./api/consultas.ts";
 
-export { compareNovedades, applyNovedades } from "./api/novedades.ts";
+export { compareNovedades } from "./api/novedades.ts";
 
 export type {
-  ApplyNovedadesResponse,
-  ApplyResult,
   BulkVisibilityResult,
   ChartInfo,
   ChartsListResponse,
