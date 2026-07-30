@@ -59,6 +59,7 @@ services:
       # FastAPI / Proyecto
       PROJECT_NAME: SIAUGESMAT
       DEBUG: "false"
+      ALLOW_PRESENCIAL: ${ALLOW_PRESENCIAL:-false}
 
       # Moodle
       MOODLE_URL: ${MOODLE_URL:-}
@@ -161,6 +162,7 @@ services:
 
       DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE}
 
+      ALLOW_PRESENCIAL: ${ALLOW_PRESENCIAL:-false}
       DEBUG: ${DEBUG:-false}
 
       REPORT_DIR: /app/reports
