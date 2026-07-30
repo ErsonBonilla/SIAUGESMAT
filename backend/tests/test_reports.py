@@ -11,6 +11,7 @@ import zipfile
 from unittest.mock import patch
 
 from app.core.config import settings
+from app.services.report_utils import write_csv
 from app.services.reports import ReportService
 
 
@@ -28,7 +29,7 @@ def _process_report_config(report_dir: str, key: str, logs: list):
     cfg = next(c for c in ReportService.REPORT_CONFIGS if c["key"] == key)
     filename = ReportService.REPORT_NAMES[key]
     rows = [cfg["extract"](log) for log in logs if cfg["match"](log)]
-    ReportService._write_csv(
+    write_csv(
         os.path.join(report_dir, filename),
         cfg["headers"],
         rows,
@@ -140,11 +141,15 @@ class TestReportServiceIntegration:
                 report_dir = ReportService.generate_all(999, FakeDB())
 
             assert os.path.exists(report_dir)
+            expected = {"audit_cursos_creados", "audit_matriculas", "resumen_ejecutivo"}
             for key, filename in ReportService.REPORT_NAMES.items():
                 if key == "audit_errores":
-                    continue  # mockeado en este test
+                    continue
                 path = os.path.join(report_dir, filename)
-                assert os.path.exists(path), f"Falta: {filename}"
+                if key in expected:
+                    assert os.path.exists(path), f"Falta: {filename}"
+                else:
+                    assert not os.path.exists(path), f"Sobró: {filename}"
 
             zip_path = report_dir + ".zip"
             assert os.path.exists(zip_path)

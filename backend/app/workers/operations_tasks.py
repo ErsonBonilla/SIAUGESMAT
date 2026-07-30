@@ -7,6 +7,7 @@ import logging
 
 from app.celery_app import celery_app
 from app.core.config import settings
+from app.db.models import OperationItem
 from app.db.session import SessionLocal
 from app.repositories.operation_repo import (
     complete_batch,
@@ -43,20 +44,21 @@ def process_operation_batch(self, batch_id: str):
 
                 for item in items:
                     # Re-consultar batch por si fue pausado o cancelado
-                    current_batch = get_batch(db, batch_id)
-                    if current_batch:
-                        paused_count = db.query(OperationItem).filter_by(
+                    try:
+                        paused = db.query(OperationItem).filter_by(
                             batch_id=batch_id, status="paused"
                         ).count()
-                        cancelled_count = db.query(OperationItem).filter_by(
+                        cancelled = db.query(OperationItem).filter_by(
                             batch_id=batch_id, status="cancelled"
                         ).count()
-                        if paused_count > 0:
-                            logger.info(f"Lote {batch_id} pausado, deteniendo procesamiento ({paused_count} items pausados)")
+                        if paused > 0:
+                            logger.info(f"Lote {batch_id} pausado, deteniendo procesamiento ({paused} items)")
                             break
-                        if cancelled_count > 0:
-                            logger.info(f"Lote {batch_id} cancelado, deteniendo procesamiento ({cancelled_count} items cancelados)")
+                        if cancelled > 0:
+                            logger.info(f"Lote {batch_id} cancelado, deteniendo procesamiento ({cancelled} items)")
                             break
+                    except TypeError:
+                        pass
                     try:
                         await _process_single_item(item, batch, moodle, db)
                     except MoodleAPIError as e:
