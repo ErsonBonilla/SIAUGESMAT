@@ -1,10 +1,13 @@
-import { useSignal } from "@preact/signals";
+import { useSignal, useComputed } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import { getQueryExportUrl, getQueryTaskStatus, queryEntities, downloadReport } from "../services/api.ts";
 import type { QueryTaskStatus } from "../services/api/types.ts";
 import { SpinnerIcon, DownloadIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
+import Pagination from "../components/Pagination.tsx";
 import SemesterPicker from "../components/SemesterPicker.tsx";
+
+const PAGE_SIZE = 20;
 
 export interface InactiveTeacherRow {
   teacher_name: string;
@@ -42,6 +45,11 @@ export default function InactiveTeachersQuery() {
   const taskStatus = useSignal<QueryTaskStatus | null>(null);
   const pollingId = useSignal<number | null>(null);
   const started = useSignal(false);
+  const pageOffset = useSignal(0);
+  const totalItems = useSignal(0);
+  const pageData = useComputed(() =>
+    data.value.slice(pageOffset.value, pageOffset.value + PAGE_SIZE)
+  );
 
   useEffect(() => {
     return () => {
@@ -81,6 +89,8 @@ export default function InactiveTeachersQuery() {
           started.value = true;
         } else if (status.status === "completed") {
           data.value = (status.result || []) as InactiveTeacherRow[];
+          totalItems.value = data.value.length;
+          pageOffset.value = 0;
           loading.value = false;
           if (pollingId.value) {
             clearInterval(pollingId.value);
@@ -152,7 +162,7 @@ export default function InactiveTeachersQuery() {
       {!loading.value && !error.value && data.value.length > 0 && (
         <div class="flex items-center justify-between">
           <span class="text-xs text-[var(--text-secondary)]">
-            {data.value.length} resultado{data.value.length !== 1 ? "s" : ""}
+            {pageOffset.value + 1}–{Math.min(pageOffset.value + PAGE_SIZE, totalItems.value)} de {totalItems.value} resultado{totalItems.value !== 1 ? "s" : ""}
           </span>
           {exportUrl && (
             <button
@@ -193,7 +203,7 @@ export default function InactiveTeachersQuery() {
                     </td>
                   </tr>
                 )
-                : data.value.map((row, idx) => (
+                : pageData.value.map((row, idx) => (
                   <tr
                     key={idx}
                     class="border-b border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)]"
@@ -216,6 +226,16 @@ export default function InactiveTeachersQuery() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {!loading.value && !error.value && data.value.length > PAGE_SIZE && (
+        <Pagination
+          offset={pageOffset.value}
+          pageSize={PAGE_SIZE}
+          total={totalItems.value}
+          label="resultados"
+          onPageChange={(o) => { pageOffset.value = o; }}
+        />
       )}
     </div>
   );
