@@ -213,6 +213,17 @@ class MoodleService(MoodleClient):
             or (target_idnumbers and u.get("idnumber", "") in target_idnumbers)
         ]
 
+    async def get_enrolled_teachers_with_access(self, course_id: int) -> List[Dict]:
+        users = await self._request(
+            "core_enrol_get_enrolled_users",
+            params={
+                "courseid": course_id,
+                "options[0][name]": "withcapability",
+                "options[0][value]": "moodle/course:manageactivities",
+            },
+        )
+        return users
+
     async def get_courses(self, shortname: Optional[str] = None) -> List[Dict]:
         return await self._adapter.get_courses(shortname, self._request)
 

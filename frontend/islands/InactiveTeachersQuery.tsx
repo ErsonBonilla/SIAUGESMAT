@@ -1,0 +1,222 @@
+import { useSignal } from "@preact/signals";
+import { useEffect } from "preact/hooks";
+import { getQueryExportUrl, getQueryTaskStatus, queryEntities, downloadReport } from "../services/api.ts";
+import type { QueryTaskStatus } from "../services/api/types.ts";
+import { SpinnerIcon, DownloadIcon } from "../utils/icons.tsx";
+import ErrorBox from "../components/ErrorBox.tsx";
+import SemesterPicker from "../components/SemesterPicker.tsx";
+
+export interface InactiveTeacherRow {
+  teacher_name: string;
+  username: string;
+  email: string;
+  course_name: string;
+  course_shortname: string;
+  program: string;
+  cat: string;
+  cat_prefix: string;
+  last_access: number;
+}
+
+const COLUMNS = [
+  { key: "teacher_name", label: "Docente" },
+  { key: "username", label: "Username" },
+  { key: "email", label: "Correo" },
+  { key: "course_name", label: "Curso" },
+  { key: "program", label: "Programa" },
+  { key: "cat", label: "CAT" },
+  { key: "last_access", label: "Último acceso" },
+];
+
+function formatLastAccess(ts: number): string {
+  if (!ts || ts <= 0) return "Nunca";
+  return new Date(ts * 1000).toLocaleString();
+}
+
+export default function InactiveTeachersQuery() {
+  const semester = useSignal("");
+  const data = useSignal<InactiveTeacherRow[]>([]);
+  const loading = useSignal(false);
+  const error = useSignal("");
+  const taskId = useSignal("");
+  const taskStatus = useSignal<QueryTaskStatus | null>(null);
+  const pollingId = useSignal<number | null>(null);
+  const started = useSignal(false);
+
+  useEffect(() => {
+    return () => {
+      if (pollingId.value) clearInterval(pollingId.value);
+    };
+  }, []);
+
+  const startQuery = async () => {
+    if (!semester.value) {
+      error.value = "Seleccione un semestre.";
+      return;
+    }
+    loading.value = true;
+    error.value = "";
+    data.value = [];
+    taskStatus.value = null;
+    started.value = false;
+    try {
+      const result = await queryEntities("inactive_teachers", {
+        semester: semester.value,
+      });
+      taskId.value = result.task_id;
+      startPolling(result.task_id);
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : "Error al consultar.";
+      loading.value = false;
+    }
+  };
+
+  const startPolling = (id: string) => {
+    if (pollingId.value) clearInterval(pollingId.value);
+    const fetchStatus = async () => {
+      try {
+        const status = await getQueryTaskStatus(id);
+        taskStatus.value = status;
+        if (status.status === "running") {
+          started.value = true;
+        } else if (status.status === "completed") {
+          data.value = (status.result || []) as InactiveTeacherRow[];
+          loading.value = false;
+          if (pollingId.value) {
+            clearInterval(pollingId.value);
+            pollingId.value = null;
+          }
+        } else if (status.status === "failed") {
+          error.value = status.error || "Error desconocido.";
+          loading.value = false;
+          if (pollingId.value) {
+            clearInterval(pollingId.value);
+            pollingId.value = null;
+          }
+        }
+      } catch {
+        //
+      }
+    };
+    fetchStatus();
+    pollingId.value = setInterval(fetchStatus, 2000);
+  };
+
+  const exportUrl = taskId.value ? getQueryExportUrl(taskId.value) : "";
+
+  return (
+    <div class="space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-end gap-4">
+        <div>
+          <label class="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+            Semestre de corte
+          </label>
+          <SemesterPicker
+            value={semester.value}
+            onChange={(s) => {
+              semester.value = s;
+              error.value = "";
+            }}
+            minYear={2020}
+          />
+        </div>
+
+        <button
+          onClick={startQuery}
+          disabled={loading.value || !semester.value}
+          class="px-3 py-1.5 bg-[var(--brand-green)] text-white rounded text-sm hover:brightness-90 disabled:opacity-60 self-start mt-6"
+        >
+          {loading.value
+            ? (
+              <span class="flex items-center gap-1.5">
+                <SpinnerIcon class="animate-spin h-4 w-4" />
+                Consultando...
+              </span>
+            )
+            : "Consultar"}
+        </button>
+      </div>
+
+      {loading.value && started.value && (
+        <div class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <SpinnerIcon class="animate-spin h-4 w-4" />
+          <span>
+            Consultando Moodle (procesando {taskStatus.value?.total_count || 0} cursos)...
+            puede tardar varios minutos.
+          </span>
+        </div>
+      )}
+
+      {error.value && <ErrorBox message={error.value} />}
+
+      {!loading.value && !error.value && data.value.length > 0 && (
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-[var(--text-secondary)]">
+            {data.value.length} resultado{data.value.length !== 1 ? "s" : ""}
+          </span>
+          {exportUrl && (
+            <button
+              onClick={() => downloadReport(exportUrl, "docentes_inactivos.csv").catch(() => {})}
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded text-sm font-medium no-underline hover:bg-[var(--border-secondary)] transition cursor-pointer"
+            >
+              <DownloadIcon class="w-4 h-4" />
+              CSV
+            </button>
+          )}
+        </div>
+      )}
+
+      {!loading.value && !error.value && (
+        <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-[var(--border-primary)]">
+                {COLUMNS.map((col) => (
+                  <th
+                    key={col.key}
+                    class="text-left py-3 px-3 font-medium text-[var(--text-secondary)]"
+                  >
+                    {col.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {data.value.length === 0 && !loading.value
+                ? (
+                  <tr>
+                    <td
+                      colSpan={COLUMNS.length}
+                      class="py-12 text-center text-[var(--text-muted)]"
+                    >
+                      Seleccione un semestre y presione "Consultar".
+                    </td>
+                  </tr>
+                )
+                : data.value.map((row, idx) => (
+                  <tr
+                    key={idx}
+                    class="border-b border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)]"
+                  >
+                    <td class="py-2 px-3 text-[var(--text-primary)] font-medium">
+                      {row.teacher_name || "—"}
+                    </td>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">{row.username}</td>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">{row.email}</td>
+                    <td class="py-2 px-3 text-[var(--text-primary)] max-w-xs truncate" title={row.course_name}>
+                      {row.course_name}
+                    </td>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">{row.program || "—"}</td>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">{row.cat || "—"}</td>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">
+                      {formatLastAccess(row.last_access)}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

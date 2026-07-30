@@ -87,8 +87,8 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Comparación de cursos (FASE 2)
     # ------------------------------------------------------------------
-    COURSE_MAX_AGE_SECONDS: int = 18 * 30 * 24 * 3600       # 18 meses
-    COURSE_DISAPPEARED_AGE_SECONDS: int = 6 * 30 * 24 * 3600  # 6 meses
+    COURSE_MAX_AGE_SECONDS: int = 24 * 30 * 24 * 3600       # 24 meses
+    COURSE_DISAPPEARED_AGE_SECONDS: int = 18 * 30 * 24 * 3600  # 18 meses
 
     # ------------------------------------------------------------------
     # Archivos subidos

@@ -6,6 +6,7 @@ import csv
 import io
 import logging
 import uuid
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
@@ -29,12 +30,17 @@ ENTITY_LABELS = {
     "courses": "Cursos",
     "categories": "Categorías",
     "users": "Usuarios",
+    "inactive_teachers": "Docentes sin acceso",
 }
 
 ENTITY_CSV_HEADERS = {
     "courses": ["ID", "Shortname", "Nombre", "Categoría", "Visible", "Creado"],
     "categories": ["ID", "Nombre", "ID Number", "Padre", "Cursos", "Descripción"],
     "users": ["Username", "Email", "Nombres", "Apellidos", "Último login"],
+    "inactive_teachers": [
+        "Docente", "Username", "Correo", "Curso", "Shortname",
+        "Programa", "CAT", "Último acceso",
+    ],
 }
 
 ENTITY_CSV_EXTRACT = {
@@ -52,6 +58,13 @@ ENTITY_CSV_EXTRACT = {
         u.get("username", ""), u.get("email", ""),
         u.get("firstname", ""), u.get("lastname", ""),
         "Nunca" if u.get("lastlogin", 0) == 0 else str(u.get("lastlogin", "")),
+    ],
+    "inactive_teachers": lambda r: [
+        r.get("teacher_name", ""), r.get("username", ""), r.get("email", ""),
+        r.get("course_name", ""), r.get("course_shortname", ""),
+        r.get("program", ""), r.get("cat", ""),
+        "Nunca" if r.get("last_access", 0) == 0
+        else datetime.fromtimestamp(r["last_access"]).strftime("%Y-%m-%d %H:%M"),
     ],
 }
 

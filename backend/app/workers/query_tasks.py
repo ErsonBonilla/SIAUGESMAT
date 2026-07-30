@@ -4,7 +4,9 @@ Tarea Celery para ejecutar consultas asíncronas contra la API REST de Moodle.
 
 import asyncio
 import logging
+import re
 import time
+from datetime import datetime
 
 from app.celery_app import celery_app
 from app.core.config import settings
@@ -17,8 +19,28 @@ from app.repositories.query_repo import (
 )
 from app.services.moodle_factory import get_moodle_service
 from app.services.moodle_operations import MoodleService
+from app.services.parsers.patterns import SIAUGESMAT_PATTERN, parse_shortname
 
 logger = logging.getLogger(__name__)
+
+SIAUGESMAT_RE = re.compile(SIAUGESMAT_PATTERN.pattern, re.IGNORECASE)
+
+CAT_NAMES = {
+    "IDE": "IDEAD",
+    "URA": "Urabá",
+    "SIB": "Sibaté",
+    "FAC": "Facultad",
+    "SIN": "Sin CAT",
+}
+
+
+def _semester_to_cutoff(semester: str) -> int:
+    year = int(semester[:4])
+    if semester[4] == "A":
+        month, day = 1, 1
+    else:
+        month, day = 7, 1
+    return int(datetime(year, month, day).timestamp())
 
 
 async def _do_query(moodle: MoodleService, qr):
@@ -63,11 +85,59 @@ async def _do_query(moodle: MoodleService, qr):
                    or q in (u.get("lastname") or "").lower()]
         return raw
 
+    elif qr.entity == "inactive_teachers":
+        semester = params.get("semester", "")
+        if not semester or len(semester) != 5 or semester[-1] not in ("A", "B"):
+            raise ValueError("Se requiere un semestre válido (ej. 2026A).")
+        cutoff = _semester_to_cutoff(semester)
+
+        all_courses = await moodle.get_courses()
+        siau_courses = [c for c in all_courses if SIAUGESMAT_RE.match(c.get("shortname", ""))]
+
+        sem = asyncio.Semaphore(5)
+        results = []
+
+        async def process_course(course):
+            async with sem:
+                course_id = int(course["id"])
+                try:
+                    teachers = await moodle.get_enrolled_teachers_with_access(course_id)
+                except Exception as e:
+                    logger.warning(f"Error obteniendo profesores del curso {course.get('shortname')}: {e}")
+                    return
+                sn = course.get("shortname", "")
+                parsed = parse_shortname(sn)
+                program = parsed["cod_prog"] if parsed else ""
+                cat_prefix = parsed["cat_prefix"] if parsed else ""
+                cat_name = CAT_NAMES.get(cat_prefix, cat_prefix)
+                for t in teachers:
+                    last_access = t.get("lastcourseaccess", 0) or 0
+                    if last_access > 0 and last_access >= cutoff:
+                        continue
+                    results.append({
+                        "teacher_name": f'{t.get("firstname", "")} {t.get("lastname", "")}'.strip(),
+                        "username": t.get("username", ""),
+                        "email": t.get("email", ""),
+                        "course_name": course.get("fullname", ""),
+                        "course_shortname": sn,
+                        "program": program,
+                        "cat": cat_name,
+                        "cat_prefix": cat_prefix,
+                        "last_access": last_access,
+                    })
+
+        batch_size = 5
+        for i in range(0, len(siau_courses), batch_size):
+            batch = siau_courses[i:i + batch_size]
+            await asyncio.gather(*[process_course(c) for c in batch])
+
+        return results
+
     else:
         raise ValueError(f"Entidad desconocida: {qr.entity}")
 
 
-@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, task_time_limit=300)
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, task_time_limit=600)
 def execute_query(self, task_id: str):
     db = SessionLocal()
     qr = None
