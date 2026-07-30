@@ -9,7 +9,7 @@ from app.services.course_comparison.action_handler import (
 )
 from app.services.course_comparison.disappeared import find_disappeared_courses
 from app.services.course_comparison.apply_action import apply_action
-from app.services.course_comparison.utils import get_course_professor, get_suffix, parse_sn
+from app.services.course_comparison.utils import build_enrolment_map, get_course_professor, get_suffix, parse_sn
 from app.services.parsers.patterns import SIAUGESMAT_PATTERN, parse_shortname
 
 logger = logging.getLogger(__name__)
@@ -37,9 +37,7 @@ class CourseComparisonService:
         existing_by_base_key = build_base_key_index(siaugesmat_courses)
         existing_by_core = build_core_index(siaugesmat_courses)
 
-        enrolment_index: Dict[str, str] = {}
-        for enr in new_enrolments:
-            enrolment_index[enr["course_shortname"]] = enr["username"]
+        enrolment_index = build_enrolment_map(new_enrolments)
 
         to_create: List[Dict] = []
         to_delete: List[str] = []

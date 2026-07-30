@@ -6,33 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import Execution
+from app.services.course_comparison.utils import build_enrolment_map, index_courses
 from app.services.etl import ETLService
 from app.services.moodle_factory import get_moodle_service
-from app.services.parsers.patterns import parse_shortname
 
 logger = logging.getLogger(__name__)
-
-
-def _build_base_key(parsed: Dict[str, str]) -> str:
-    return f"{parsed['cat_prefix']}_{parsed['cod_prog']}_s{parsed['semestre']}_{parsed['cod_curso']}_G-{parsed['grupo']}"
-
-
-def _index_courses(courses: List[Dict]) -> Dict[str, List[Dict]]:
-    index: Dict[str, List[Dict]] = {}
-    for c in courses:
-        sn = c.get("shortname", "")
-        parsed = parse_shortname(sn)
-        if not parsed:
-            continue
-        bk = _build_base_key(parsed)
-        c["_parsed"] = parsed
-        c["_base_key"] = bk
-        index.setdefault(bk, []).append(c)
-    return index
-
-
-def _build_enrolment_map(enrolments: List[Dict]) -> Dict[str, str]:
-    return {e["course_shortname"]: e.get("username", "") for e in enrolments if e.get("course_shortname")}
 
 
 def _build_user_map(users: List[Dict]) -> Dict[str, Dict]:
@@ -73,11 +51,11 @@ async def detect(
     old_data = ETLService.process(old_file_path, modalidad)
     old_courses = old_data.get("courses", [])
 
-    old_index = _index_courses(old_courses)
-    new_index = _index_courses(new_courses)
+    old_index = index_courses(old_courses)
+    new_index = index_courses(new_courses)
 
-    enrolment_map_old = _build_enrolment_map(old_data.get("enrolments", []))
-    enrolment_map_new = _build_enrolment_map(new_enrolments)
+    enrolment_map_old = build_enrolment_map(old_data.get("enrolments", []))
+    enrolment_map_new = build_enrolment_map(new_enrolments)
     user_map_new = _build_user_map(new_users)
 
     common_keys = set(old_index.keys()) & set(new_index.keys())

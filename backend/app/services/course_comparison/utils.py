@@ -25,6 +25,28 @@ def build_base_key(parsed: Dict) -> Tuple[str, ...]:
     )
 
 
+def build_base_key_str(parsed: Dict) -> str:
+    return f"{parsed['cat_prefix']}_{parsed['cod_prog']}_s{parsed['semestre']}_{parsed['cod_curso']}_G-{parsed['grupo']}"
+
+
+def index_courses(courses: List[Dict]) -> Dict[str, List[Dict]]:
+    index: Dict[str, List[Dict]] = {}
+    for c in courses:
+        sn = c.get("shortname", "")
+        parsed = parse_shortname(sn)
+        if not parsed:
+            continue
+        bk = build_base_key_str(parsed)
+        c["_parsed"] = parsed
+        c["_base_key"] = bk
+        index.setdefault(bk, []).append(c)
+    return index
+
+
+def build_enrolment_map(enrolments: List[Dict]) -> Dict[str, str]:
+    return {e["course_shortname"]: e.get("username", "") for e in enrolments if e.get("course_shortname")}
+
+
 def get_course_professor(course: Dict) -> Optional[str]:
     custom = course.get("customfields", [])
     for field in custom:
