@@ -238,9 +238,9 @@ SIAUGESMAT/
 │   └── deno.lock               # Lock de dependencias Deno
 ├── docker-compose.yml          # 7 servicios: db, redis, backend, worker, beat, frontend, nginx
 ├── docker-compose.override.yml  # Puertos expuestos + volume mount para desarrollo
-├── e2e/                        # Pruebas end-to-end contra Moodle real
-│   ├── fixtures/               #   .xlsx con datos reales (protegidos por .gitignore)
-│   ├── run_test.py             #   Script unificado (upload + process + verify)
+├── backend/tests_e2e/           # Pruebas de integración contra Moodle real
+│   ├── fixtures/                #   .xlsx con datos reales
+│   ├── run_test.py              #   Script unificado
 │   └── README.md
 ├── .env.example                # Variables de entorno de ejemplo (único, copiar a backend/.env)
 ├── certs/                      # Certificados SSL para HTTPS
@@ -384,11 +384,12 @@ Cubre: parser ETL, repositorios, fases del pipeline, integración, endpoints API
 ### End-to-end (contra Moodle real)
 
 ```bash
+cd backend
 # Modo seguro — solo usuarios (no toca cursos)
-python e2e/run_test.py e2e/fixtures/ibague.xlsx
+python tests_e2e/run_test.py tests_e2e/fixtures/ibague.xlsx
 
 # Modo completo con confirmación de delete masivo
-python e2e/run_test.py e2e/fixtures/uraba.xlsx --mode both --confirm
+python tests_e2e/run_test.py tests_e2e/fixtures/uraba.xlsx --mode both --confirm
 ```
 
 ---

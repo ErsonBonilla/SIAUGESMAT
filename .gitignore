@@ -18,6 +18,7 @@ node_modules/
 uploads/
 *.xlsx
 *.xls
+!backend/tests_e2e/fixtures/*.xlsx
 
 # Reportes generados por el backend (CSVs y ZIPs)
 reports/
@@ -41,7 +42,7 @@ Thumbs.db
 _fresh/
 
 # ---------------------------------------------------------------------------
-# e2e — pruebas end-to-end contra Moodle real
-# Los *.xlsx contienen datos reales de docentes (protegidos por regla global).
+# tests_e2e — pruebas de integración contra Moodle real
+# Los *.xlsx en fixtures contienen datos reales de docentes.
 # Los scripts .py y README.md se comitean.
 # ---------------------------------------------------------------------------

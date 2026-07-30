@@ -3,9 +3,10 @@
 Runner unificado para pruebas reales contra Moodle 3.9.
 
 Uso:
-    python tests/real/run_test.py fixtures/bajocalima.xlsx
-    python tests/real/run_test.py fixtures/ibague.xlsx --mode users
-    python tests/real/run_test.py fixtures/uraba.xlsx --mode both --confirm
+    cd backend
+    python tests_e2e/run_test.py tests_e2e/fixtures/bajocalima.xlsx
+    python tests_e2e/run_test.py tests_e2e/fixtures/ibague.xlsx --mode users
+    python tests_e2e/run_test.py tests_e2e/fixtures/uraba.xlsx --mode both --confirm
 
 Flujo:
     1. Genera token JWT automáticamente
@@ -19,7 +20,6 @@ Flujo:
 import argparse
 import json
 import os
-import sys
 import time
 import urllib.error
 import urllib.request
@@ -166,13 +166,8 @@ def main():
         sys.exit(1)
 
     # Generar token JWT
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
-    from app.core.security import create_access_token
-    token = create_access_token({
-        "sub": "1",
-        "username": "admin",
-        "modalidad": args.modalidad,
-    })
+    from jwt_helper import get_token
+    token = get_token(modalidad=args.modalidad)
 
     print(f"SIAUGESMAT - Prueba real")
     print(f"  Archivo:   {filepath.name}")
