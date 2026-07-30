@@ -2,6 +2,7 @@ import { CheckIcon, SpinnerIcon, XMarkIcon } from "../utils/icons.tsx";
 import { downloadReport, getBatchReportUrl } from "../services/api.ts";
 import type { OperationBatchStatus } from "../services/api.ts";
 import Pagination from "./Pagination.tsx";
+import ProgressBar from "./ProgressBar.tsx";
 
 interface BatchProgressTableProps {
   batchStatus: OperationBatchStatus;
@@ -52,44 +53,49 @@ export default function BatchProgressTable(
         </div>
       </div>
 
-      {batchStatus.pending > 0 || batchStatus.processing > 0
-        ? (
-          <div class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-            <SpinnerIcon class="animate-spin h-4 w-4" />
-            <span>Procesando {labelPlural}...</span>
-          </div>
-        )
-        : (
-          <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div class="flex items-center gap-2 text-sm text-[var(--brand-green)]">
-              <CheckIcon class="w-4 h-4" />
-              <span>Procesamiento completado</span>
-            </div>
-            <button
-              onClick={() =>
-                downloadReport(
-                  getBatchReportUrl(batchId),
-                  `reportes_${batchId.slice(0, 8)}.zip`,
-                )}
-              class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white text-sm font-medium no-underline hover:brightness-110 transition cursor-pointer"
-            >
-              <svg
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                class="w-4 h-4"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-              <span>Descargar reportes (CSV)</span>
-            </button>
-          </div>
-        )}
+      {(() => {
+        const total = batchStatus.total || 1;
+        const done = batchStatus.completed + batchStatus.failed;
+        const pct = Math.round(done / total * 100);
+        const running = batchStatus.pending > 0 || batchStatus.processing > 0;
+        return (
+          <>
+            <ProgressBar
+              currentPhase={running ? `Procesando ${labelPlural}...` : `${labelSingular} procesados`}
+              currentStep={running ? 1 : 4}
+              progressPct={running ? pct : 100}
+              status={running ? "running" : "completed"}
+            />
+            {!running && (
+              <div class="flex justify-end mt-3">
+                <button
+                  onClick={() =>
+                    downloadReport(
+                      getBatchReportUrl(batchId),
+                      `reportes_${batchId.slice(0, 8)}.zip`,
+                    )}
+                  class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white text-sm font-medium no-underline hover:brightness-110 transition cursor-pointer"
+                >
+                  <svg
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    class="w-4 h-4"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                    />
+                  </svg>
+                  <span>Descargar reportes (CSV)</span>
+                </button>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <div class="mt-6 overflow-x-auto">
         <table class="w-full text-sm">
