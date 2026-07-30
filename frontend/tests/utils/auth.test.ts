@@ -1,12 +1,12 @@
 import {
   getToken,
-  setToken,
-  removeToken,
-  isTokenValid,
   getTokenPayload,
   getUsername,
+  isTokenValid,
+  removeToken,
+  setToken,
 } from "../../utils/auth.ts";
-import { assertEquals, assertExists, assertFalse, assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertEquals, assertExists, assertFalse } from "@std/assert";
 
 function base64urlEncode(str: string): string {
   return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");

@@ -1,10 +1,10 @@
 import { useEffect, useRef } from "preact/hooks";
 import {
   Chart,
-  registerables,
   type ChartConfiguration,
   type ChartType,
   type DefaultDataPoint,
+  registerables,
 } from "chart.js";
 
 Chart.register(...registerables);
@@ -29,6 +29,7 @@ export const METRIC_COLORS: Record<string, ColorPair> = {
 };
 
 export const METRIC_KEYS = [
+  "total_executions",
   "total_courses_created",
   "total_users_created",
   "total_enrollments",
@@ -61,19 +62,14 @@ export function useChart(dark = false) {
     config: ChartConfiguration<TType, TData>,
   ) {
     if (!canvasRef.current) return;
-    chartRef.current?.destroy();
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
 
     const gridColor = dark
       ? "rgba(255, 255, 255, 0.08)"
       : "rgba(0, 0, 0, 0.07)";
-    const tickColor = dark
-      ? "rgba(255, 255, 255, 0.6)"
-      : "rgba(0, 0, 0, 0.5)";
-    const titleColor = dark
-      ? "rgba(255, 255, 255, 0.8)"
-      : "rgba(0, 0, 0, 0.7)";
+    const tickColor = dark ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 0, 0, 0.5)";
+    const titleColor = dark ? "rgba(255, 255, 255, 0.8)" : "rgba(0, 0, 0, 0.7)";
 
     const defaults = {
       options: {
@@ -124,7 +120,12 @@ export function useChart(dark = false) {
                 }
                 return `${label}: ${value}`;
               },
-              afterBody: (contexts: { chart: { data: { datasets: { data: number[] }[] } }; dataIndex: number }[]) => {
+              afterBody: (
+                contexts: {
+                  chart: { data: { datasets: { data: number[] }[] } };
+                  dataIndex: number;
+                }[],
+              ) => {
                 if (!contexts.length) return;
                 const idx = contexts[0].dataIndex;
                 let total = 0;
@@ -173,7 +174,7 @@ export function useChart(dark = false) {
     };
 
     chartRef.current?.destroy();
-    chartRef.current = new Chart(ctx, config) as unknown as Chart;
+    chartRef.current = new Chart(ctx, config) as Chart;
   }
 
   useEffect(() => {

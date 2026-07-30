@@ -53,7 +53,10 @@ async def upload_excel(
                             detail=f"Modo inválido: '{mode}'.")
 
     modalidad = modalidad.strip().upper()
-    if modalidad not in {"DISTANCIA"}:
+    allowed_modalidades = {"DISTANCIA"}
+    if settings.ALLOW_PRESENCIAL:
+        allowed_modalidades.add("PRESENCIAL")
+    if modalidad not in allowed_modalidades:
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
                             detail="Modalidad inválida. Solo DISTANCIA está disponible.")
 

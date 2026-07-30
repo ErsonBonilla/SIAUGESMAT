@@ -1,17 +1,18 @@
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import text as sql_text
+from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.db.models import ErrorLog, Execution
 
 
-def get_execution(db, execution_id: int) -> Optional[Execution]:
+def get_execution(db: Session, execution_id: int) -> Optional[Execution]:
     return db.query(Execution).filter(Execution.id == execution_id).first()
 
 
-def create_execution(db, filename: str, semester: str, mode: str,
+def create_execution(db: Session, filename: str, semester: str, mode: str,
                      modalidad: str, moodle_version: str) -> Execution:
     execution = Execution(
         filename=filename,
@@ -28,7 +29,7 @@ def create_execution(db, filename: str, semester: str, mode: str,
     return execution
 
 
-def mark_queued(db, execution_id: int):
+def mark_queued(db: Session, execution_id: int) -> Optional[Execution]:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.status = "queued"
@@ -36,9 +37,7 @@ def mark_queued(db, execution_id: int):
     return execution
 
 
-def atomic_mark_queued(db, execution_id: int, task_id: str, allowed_statuses: tuple) -> bool:
-    """Marca como queued y guarda task_id en un solo UPDATE atómico.
-    Retorna True si la fila fue actualizada, False si el status no coincidía."""
+def atomic_mark_queued(db: Session, execution_id: int, task_id: str, allowed_statuses: tuple) -> bool:
     result = db.execute(
         sql_text(
             "UPDATE executions SET status = 'queued', started_at = :now, celery_task_id = :task_id "
@@ -51,7 +50,7 @@ def atomic_mark_queued(db, execution_id: int, task_id: str, allowed_statuses: tu
     return result.rowcount > 0
 
 
-def update_progress(db, execution_id: int, pct: float, phase: str = None, step: int = None):
+def update_progress(db: Session, execution_id: int, pct: float, phase: str = None, step: int = None) -> None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         if phase is not None:
@@ -63,7 +62,7 @@ def update_progress(db, execution_id: int, pct: float, phase: str = None, step: 
         db.commit()
 
 
-def mark_running(db, execution_id: int):
+def mark_running(db: Session, execution_id: int) -> Optional[Execution]:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.status = "running"
@@ -73,8 +72,8 @@ def mark_running(db, execution_id: int):
     return execution
 
 
-def mark_completed(db, execution_id: int, metrics: dict,
-                   errors_count: int, duration_seconds: float):
+def mark_completed(db: Session, execution_id: int, metrics: dict,
+                   errors_count: int, duration_seconds: float) -> Optional[Execution]:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.status = "completed"
@@ -88,7 +87,7 @@ def mark_completed(db, execution_id: int, metrics: dict,
     return execution
 
 
-def mark_failed(db, execution_id: int, duration_seconds: float):
+def mark_failed(db: Session, execution_id: int, duration_seconds: float) -> Optional[Execution]:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.status = "failed"
@@ -98,16 +97,16 @@ def mark_failed(db, execution_id: int, duration_seconds: float):
     return execution
 
 
-def delete_execution(db, execution_id: int):
+def delete_execution(db: Session, execution_id: int) -> None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         db.delete(execution)
         db.commit()
 
 
-def list_executions(db, semester: str = None, status: str = None, mode: str = None,
+def list_executions(db: Session, semester: str = None, status: str = None, mode: str = None,
                     moodle_version: str = None, modalidad: str = None,
-                    limit: int = 20, offset: int = 0) -> tuple[int, List[Execution]]:
+                    limit: int = 20, offset: int = 0) -> Tuple[int, List[Execution]]:
     query = db.query(Execution)
     if semester:
         query = query.filter(Execution.semester == semester)
@@ -124,7 +123,7 @@ def list_executions(db, semester: str = None, status: str = None, mode: str = No
     return total, executions
 
 
-def get_execution_errors(db, execution_id: int, limit: int, offset: int) -> List[ErrorLog]:
+def get_execution_errors(db: Session, execution_id: int, limit: int, offset: int) -> List[ErrorLog]:
     return (
         db.query(ErrorLog)
         .filter(ErrorLog.execution_id == execution_id)
@@ -135,14 +134,14 @@ def get_execution_errors(db, execution_id: int, limit: int, offset: int) -> List
     )
 
 
-def set_report_dir(db, execution_id: int, report_dir: str):
+def set_report_dir(db: Session, execution_id: int, report_dir: str) -> None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.report_dir = report_dir
         db.commit()
 
 
-def is_reupload(db, semester: str, modalidad: str, exclude_id: int) -> bool:
+def is_reupload(db: Session, semester: str, modalidad: str, exclude_id: int) -> bool:
     return db.query(Execution).filter(
         Execution.semester == semester,
         Execution.modalidad == modalidad,
@@ -151,7 +150,7 @@ def is_reupload(db, semester: str, modalidad: str, exclude_id: int) -> bool:
     ).first() is not None
 
 
-def delete_old_pending_executions(db, hours: int = 24) -> int:
+def delete_old_pending_executions(db: Session, hours: int = 24) -> int:
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     old = db.query(Execution).filter(
         Execution.status == "pending",
@@ -165,7 +164,7 @@ def delete_old_pending_executions(db, hours: int = 24) -> int:
     return len(old)
 
 
-def save_checkpoint(db, execution_id: int, phase: str, data: dict):
+def save_checkpoint(db: Session, execution_id: int, phase: str, data: dict) -> None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         if execution.phase_checkpoint is None:
@@ -175,14 +174,14 @@ def save_checkpoint(db, execution_id: int, phase: str, data: dict):
         db.commit()
 
 
-def get_checkpoint(db, execution_id: int):
+def get_checkpoint(db: Session, execution_id: int) -> Optional[Dict]:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if not execution or not execution.phase_checkpoint:
         return None
     return dict(execution.phase_checkpoint)
 
 
-def clear_checkpoint(db, execution_id: int):
+def clear_checkpoint(db: Session, execution_id: int) -> None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.phase_checkpoint = None
@@ -190,9 +189,7 @@ def clear_checkpoint(db, execution_id: int):
         db.commit()
 
 
-def pause_execution(db, execution_id: int) -> tuple[bool, str]:
-    """Pone una ejecución en pausa. Retorna (success, celery_task_id)
-    para que el caller pueda revocar la tarea Celery."""
+def pause_execution(db: Session, execution_id: int) -> Tuple[bool, str]:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if not execution or execution.status != "running":
         return False, ""
@@ -204,7 +201,7 @@ def pause_execution(db, execution_id: int) -> tuple[bool, str]:
     return True, task_id
 
 
-def increment_metric(db, execution_id: int, metric_name: str, delta: int = 1):
+def increment_metric(db: Session, execution_id: int, metric_name: str, delta: int = 1) -> None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         metrics = execution.metrics or {}
@@ -214,21 +211,19 @@ def increment_metric(db, execution_id: int, metric_name: str, delta: int = 1):
         db.flush()
 
 
-def _should_pause(db, execution_id: int) -> bool:
-    """Verifica si la ejecución fue puesta en pausa (uso interno en las fases)."""
+def should_pause(db: Session, execution_id: int) -> bool:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     return execution is not None and execution.status == "paused"
 
 
-def set_celery_task_id(db, execution_id: int, task_id: str):
+def set_celery_task_id(db: Session, execution_id: int, task_id: str) -> None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.celery_task_id = task_id
         db.commit()
 
 
-def cancel_execution(db, execution_id: int) -> tuple[bool, str]:
-    """Marca una ejecución como cancelada. Retorna (success, celery_task_id)."""
+def cancel_execution(db: Session, execution_id: int) -> Tuple[bool, str]:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if not execution or execution.status not in ("running", "paused", "queued"):
         return False, ""
@@ -243,7 +238,6 @@ def cancel_execution(db, execution_id: int) -> tuple[bool, str]:
     return True, task_id
 
 
-def _should_cancel(db, execution_id: int) -> bool:
-    """Verifica si la ejecución fue cancelada (uso interno en las fases)."""
+def should_cancel(db: Session, execution_id: int) -> bool:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     return execution is not None and execution.status == "cancelled"

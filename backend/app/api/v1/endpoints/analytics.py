@@ -17,12 +17,13 @@ from app.analytics.metrics import (
     get_latest_execution_data,
     get_semaphore_status,
 )
-from app.core.dependencies import get_db
+from app.core.dependencies import get_current_user, get_db
 from app.schemas.analytics import (
     LatestExecution,
     SemesterMetrics,
     SemaphoreStatus,
 )
+from app.schemas.user import UserInToken
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ async def get_history(
         description="Filtrar por modalidad (PRESENCIAL, DISTANCIA)",
     ),
     db: Session = Depends(get_db),
+    current_user: UserInToken = Depends(get_current_user),
 ):
     """
     Devuelve una lista con las métricas agregadas de todos los procesos ETL
@@ -78,6 +80,7 @@ async def get_semaphore(
         description="Filtrar por modalidad (PRESENCIAL, DISTANCIA)",
     ),
     db: Session = Depends(get_db),
+    current_user: UserInToken = Depends(get_current_user),
 ):
     """
     Devuelve el estado del semáforo (verde, amarillo, rojo) basado en las
@@ -108,6 +111,7 @@ async def get_latest_execution(
         description="Filtrar por modalidad (PRESENCIAL, DISTANCIA)",
     ),
     db: Session = Depends(get_db),
+    current_user: UserInToken = Depends(get_current_user),
 ):
     """
     Devuelve los detalles de la última ejecución registrada,

@@ -1,6 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { useBatchUpload } from "../hooks/useBatchUpload.ts";
-import { uploadVisibilityCsv, getBatchStatus } from "../services/api.ts";
+import { getBatchStatus, uploadVisibilityCsv } from "../services/api.ts";
 import { SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import OperationHistorySection from "../components/OperationHistorySection.tsx";
@@ -12,12 +12,25 @@ export default function BulkVisibilityIsland() {
   const detailOffset = useSignal(0);
   const PAGE_SIZE = 20;
 
-  const { file, uploading, error, batchId, batchStatus, handleFileChange, handleSubmit, startPolling } = useBatchUpload({
+  const {
+    file,
+    uploading,
+    error,
+    batchId,
+    batchStatus,
+    handleFileChange,
+    handleSubmit,
+    startPolling,
+  } = useBatchUpload({
     storageKey: "batch_visibility",
     doUpload: (f) => uploadVisibilityCsv(f, visibility.value),
     onFetchStatus: (id) => getBatchStatus(id, detailOffset.value, PAGE_SIZE),
-    onUploadSuccess: () => { refreshKey.value++; },
-    onBatchComplete: () => { refreshKey.value++; },
+    onUploadSuccess: () => {
+      refreshKey.value++;
+    },
+    onBatchComplete: () => {
+      refreshKey.value++;
+    },
   });
 
   const handleSelectBatch = (id: string) => {
@@ -34,11 +47,17 @@ export default function BulkVisibilityIsland() {
   return (
     <div>
       <p class="text-[var(--text-secondary)] text-sm mb-6">
-        Suba un archivo CSV con la columna <code class="bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded text-xs">shortname</code> conteniendo
-        los shortnames de los cursos a mostrar u ocultar.
+        Suba un archivo CSV con la columna{" "}
+        <code class="bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded text-xs">
+          shortname
+        </code>{" "}
+        conteniendo los shortnames de los cursos a mostrar u ocultar.
       </p>
 
-      <form onSubmit={handleSubmit} class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 space-y-5">
+      <form
+        onSubmit={handleSubmit}
+        class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 space-y-5"
+      >
         <div>
           <label class="block text-sm font-medium text-[var(--text-secondary)] mb-3">
             Acción
@@ -54,7 +73,10 @@ export default function BulkVisibilityIsland() {
                 class="text-[var(--brand-green)] focus:ring-[var(--brand-green)]"
               />
               <span class="text-sm text-[var(--text-primary)]">
-                <span class="text-[var(--brand-green)] font-medium">Mostrar</span> (visible = 1)
+                <span class="text-[var(--brand-green)] font-medium">
+                  Mostrar
+                </span>{" "}
+                (visible = 1)
               </span>
             </label>
             <label class="flex items-center gap-2 cursor-pointer">
@@ -67,14 +89,19 @@ export default function BulkVisibilityIsland() {
                 class="text-[var(--brand-red)] focus:ring-[var(--brand-red)]"
               />
               <span class="text-sm text-[var(--text-primary)]">
-                <span class="text-[var(--brand-red)] font-medium">Ocultar</span> (visible = 0)
+                <span class="text-[var(--brand-red)] font-medium">Ocultar</span>
+                {" "}
+                (visible = 0)
               </span>
             </label>
           </div>
         </div>
 
         <div>
-          <label for="csv-file" class="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+          <label
+            for="csv-file"
+            class="block text-sm font-medium text-[var(--text-secondary)] mb-2"
+          >
             Archivo CSV
           </label>
           <input
@@ -113,7 +140,11 @@ export default function BulkVisibilityIsland() {
           batchId={batchId.value}
           labelSingular="Curso"
           labelPlural="cursos"
-          pagination={{ offset: detailOffset.value, pageSize: PAGE_SIZE, onPageChange: handleDetailPageChange }}
+          pagination={{
+            offset: detailOffset.value,
+            pageSize: PAGE_SIZE,
+            onPageChange: handleDetailPageChange,
+          }}
         />
       )}
 

@@ -16,19 +16,12 @@ from app.repositories.operation_repo import (
     update_item,
 )
 from app.services.error_messages import translate_error
-from app.services.moodle import MoodleAPIError, MoodleService
+from app.services.moodle_errors import MoodleAPIError
+from app.services.moodle_factory import get_moodle_service
+from app.services.moodle_operations import MoodleService
 from app.services.roles import resolve_role
 
 logger = logging.getLogger(__name__)
-
-
-def _get_moodle_service(modalidad: str) -> MoodleService:
-    config = settings.get_moodle_config(modalidad)
-    return MoodleService(
-        token=config["token"],
-        base_url=config["url"],
-        version=config["version"],
-    )
 
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=5)
@@ -40,7 +33,7 @@ def process_operation_batch(self, batch_id: str):
             logger.error(f"Lote {batch_id} no encontrado")
             return
 
-        moodle = _get_moodle_service(batch.modalidad)
+        moodle = get_moodle_service(batch.modalidad)
         items = get_pending_items(db, batch_id)
 
         try:
@@ -103,7 +96,7 @@ async def _process_single_item(item, batch, moodle, db):
                 "username": item.identifier,
                 "firstname": detail.get("firstname", item.identifier),
                 "lastname": detail.get("lastname", ""),
-                "email": detail.get("email", f"{item.identifier}@ut.edu.co"),
+                "email": detail.get("email", f"{item.identifier}{settings.INSTITUTIONAL_EMAIL_DOMAIN}"),
             }
             if detail.get("password"):
                 user_data["password"] = detail["password"]
@@ -153,13 +146,13 @@ async def _ensure_root_category(moodle: MoodleService):
         cats = await moodle.get_categories(idnumber="DISTANCIA")
         if not cats:
             await moodle.create_categories([{
-                "name": "IDEAD",
+                "name": settings.ROOT_CATEGORY_NAME,
                 "idnumber": "DISTANCIA",
                 "parent": 0,
             }])
-            logger.info("Categoría raíz IDEAD (DISTANCIA) creada automáticamente")
+            logger.info(f"Categoría raíz {settings.ROOT_CATEGORY_NAME} (DISTANCIA) creada automáticamente")
     except MoodleAPIError as e:
-        logger.error(f"Error al crear categoría raíz IDEAD: {e}")
+        logger.error(f"Error al crear categoría raíz {settings.ROOT_CATEGORY_NAME}: {e}")
         raise
 
 

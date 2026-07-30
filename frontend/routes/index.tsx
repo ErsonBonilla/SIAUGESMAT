@@ -1,5 +1,5 @@
 // routes/index.tsx
-import { Handlers } from "$fresh/server.ts";
+import type { FreshContext } from "@fresh/core";
 
 /**
  * Página raíz que redirige según la presencia de un token de autenticación.
@@ -7,20 +7,20 @@ import { Handlers } from "$fresh/server.ts";
  * - Si existe la cookie "auth_token", redirige al dashboard.
  * - Si no existe, redirige a la página de inicio de sesión.
  */
-export const handler: Handlers = {
-  GET(req) {
+export const handler = {
+  GET(req: Request, _ctx: FreshContext) {
     const cookies = req.headers.get("cookie") || "";
-    const token = cookies.split(";").some((c) => c.trim().startsWith("auth_token="));
+    const token = cookies.split(";").some((c) =>
+      c.trim().startsWith("auth_token=")
+    );
 
     if (token) {
-      // Token presente → redirigir al panel principal
       return new Response("", {
         status: 302,
         headers: { Location: "/dashboard" },
       });
     }
 
-    // Sin token → redirigir al login
     return new Response("", {
       status: 302,
       headers: { Location: "/login" },

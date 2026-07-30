@@ -1,77 +1,73 @@
-// services/api.ts — barrel (split: types, core, auth, jobs, analytics, reports, operations, queries)
-export { BASE_URL } from "./api/core.ts";
+// services/api.ts — barrel (split: types, core, auth, trabajos, analytics, reportes, operaciones, consultas)
+export { authHeaders, BASE_URL, handleResponse } from "./api/core.ts";
+
+export { getMyProfile, login } from "./api/auth.ts";
 
 export {
-  login,
-  getMyProfile,
-} from "./api/auth.ts";
-
-export {
-  getCurrentSemester,
-  uploadFile,
-  startProcess,
-  getExecution,
-  listExecutions,
-  getExecutionErrors,
-  deleteExecution,
-  confirmExecution,
-  pauseExecution,
   cancelExecution,
-} from "./api/jobs.ts";
-
-export { startProcess as resumeExecution } from "./api/jobs.ts";
+  confirmExecution,
+  deleteExecution,
+  getCurrentSemester,
+  getExecution,
+  getExecutionErrors,
+  listExecutions,
+  pauseExecution,
+  resumeExecution,
+  startProcess,
+  uploadFile,
+} from "./api/trabajos.ts";
 
 export {
-  getHistory,
-  getSemaphore,
-  getLatest,
-  listCharts,
   getChartData,
+  getHistory,
+  getLatest,
+  getSemaphore,
+  listCharts,
 } from "./api/analytics.ts";
 
 export {
-  listReports,
   downloadReport,
-} from "./api/reports.ts";
+  getReportDownloadUrl,
+  getReportFileUrl,
+  listReports,
+} from "./api/reportes.ts";
 
 export {
-  uploadCsvFile,
-  getBatchStatus,
+  deleteBatch,
   getBatchReportUrl,
-  listBatches,
+  getBatchStatus,
   getOperationsAnalytics,
+  listBatches,
   pauseBatch,
   resumeBatch,
-  deleteBatch,
-} from "./api/operations.ts";
+  uploadCsvFile,
+} from "./api/operaciones.ts";
+
+export { uploadVisibilityCsv } from "./api/mantenimiento.ts";
 
 export {
-  uploadVisibilityCsv,
-} from "./api/mantenimiento.ts";
-
-export {
-  queryEntities,
-  getQueryTaskStatus,
   getQueryExportUrl,
-} from "./api/queries.ts";
+  getQueryTaskStatus,
+  queryEntities,
+} from "./api/consultas.ts";
 
 export type {
-  Execution,
-  ErrorLog,
-  SemesterMetrics,
-  SemaphoreStatus,
-  LatestExecution,
-  UserProfile,
-  ReportInfo,
-  ReportsListResponse,
+  BulkVisibilityResult,
   ChartInfo,
-  ChartTracesLayout,
   ChartsListResponse,
+  ChartTracesLayout,
+  CsvUploadResponse,
+  ErrorLog,
+  Execution,
+  LatestExecution,
+  OperationBatchOut,
   OperationBatchStatus,
   OperationItemOut,
-  CsvUploadResponse,
-  QueryTaskStatus,
-  OperationBatchOut,
   OperationsHistoryItem,
-  BulkVisibilityResult,
+  QueryTaskStatus,
+  ReportInfo,
+  ReportsListResponse,
+  SemaphoreStatus,
+  SemesterMetrics,
+  UserProfile,
 } from "./api/types.ts";

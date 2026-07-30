@@ -1,7 +1,9 @@
 // services/api/core.ts
 import { getToken, removeToken, removeTokenCookie } from "../../utils/auth.ts";
 
-export const BASE_URL = (typeof Deno !== "undefined" ? Deno.env.get("BACKEND_URL") : "/api/v1");
+export const BASE_URL = typeof Deno !== "undefined"
+  ? Deno.env.get("BACKEND_URL")
+  : "/api/v1";
 
 export function authHeaders(): Record<string, string> {
   const token = getToken();
@@ -17,7 +19,10 @@ export async function handleResponse<T>(response: Response): Promise<T> {
       throw new Error("Sesión expirada. Vuelva a iniciar sesión.");
     }
     const body = await response.json().catch(() => null);
-    throw new Error(body?.detail || body?.message || `Error del servidor (${response.status})`);
+    throw new Error(
+      body?.detail || body?.message ||
+        `Error del servidor (${response.status})`,
+    );
   }
   return response.json();
 }

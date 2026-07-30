@@ -14,8 +14,7 @@ from app.integrations.moodle import MoodleIntegration
 from app.workers.phases.base import PhaseContext
 from app.workers.phases.phase1_consult import ConsultPhase
 from app.workers.phases.phase2_analyze import AnalyzePhase
-from app.workers.phases.phase3_structure import StructurePhase
-from app.workers.phases.phase4_people import PeoplePhase
+# Phase3 y Phase4 usan el patrón chord + item_task, no clases phase directas
 
 
 def _make_ctx(test_db, mock_moodle, mode="both"):
@@ -151,99 +150,3 @@ class TestAnalyzePhase:
             assert ctx.metrics["total_errors"] >= 1
 
 
-class TestStructurePhase:
-    @pytest.mark.asyncio
-    async def test_raises_without_template(self, test_db, mock_moodle_service):
-        ctx = _make_ctx(test_db, mock_moodle_service)
-        ctx.missing_categories = []
-        ctx.comparison = {"to_create": [], "to_delete": [], "to_activate": [],
-                          "to_hide": [], "to_update": [], "alerts": [], "logs": []}
-
-        with patch("app.workers.phases.phase3_structure.settings") as mock_settings:
-            mock_settings.DEFAULT_COURSE_TEMPLATE = ""
-            phase = StructurePhase()
-            with pytest.raises(ValueError, match="DEFAULT_COURSE_TEMPLATE"):
-                await phase.run(ctx)
-
-    @pytest.mark.asyncio
-    async def test_creates_categories_and_courses(self, test_db, mock_moodle_service):
-        ctx = _make_ctx(test_db, mock_moodle_service)
-        ctx.missing_categories = [{"name": "Nueva", "idnumber": "NUEVA", "parent": 0}]
-        ctx.comparison = {
-            "to_create": [{
-                "shortname": "IDE_0001_sI_101_G-01",
-                "template_shortname": None,
-            }],
-            "to_delete": [],
-            "to_activate": [],
-            "to_hide": [],
-            "to_update": [],
-            "alerts": [],
-            "logs": [],
-        }
-
-        mock_moodle_service.get_courses.return_value = [{"id": 99, "shortname": "PORTAFOLIO_0001_sI_101"}]
-
-        phase = StructurePhase()
-        await phase.run(ctx)
-
-        assert ctx.metrics["categories_created"] == 1
-        assert ctx.metrics["courses_created"] == 1
-        mock_moodle_service.create_categories.assert_called_once()
-
-
-class TestPeoplePhase:
-    @pytest.mark.asyncio
-    async def test_creates_user_when_not_exists(self, test_db, mock_moodle_service):
-        ctx = _make_ctx(test_db, mock_moodle_service)
-        ctx.comparison = {"to_create": [], "to_delete": [], "to_activate": [],
-                          "to_hide": [], "to_update": [], "alerts": [], "logs": []}
-        ctx.users_to_create = [ctx.etl_data["users"][0]]
-        ctx.resolved_enrolments = []
-
-        with patch.object(MoodleIntegration, "create_user_if_not_exists") as mock_create:
-            mock_create.return_value = ("doc1", True)
-            phase = PeoplePhase()
-            await phase.run(ctx)
-
-        assert ctx.metrics["users_created"] == 1
-        mock_create.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_user_failure_increments_errors(self, test_db, mock_moodle_service):
-        ctx = _make_ctx(test_db, mock_moodle_service)
-        ctx.comparison = {"to_create": [], "to_delete": [], "to_activate": [],
-                          "to_hide": [], "to_update": [], "alerts": [], "logs": []}
-        ctx.users_to_create = [ctx.etl_data["users"][0]]
-        ctx.resolved_enrolments = []
-
-        with patch.object(MoodleIntegration, "create_user_if_not_exists") as mock_create:
-            mock_create.return_value = (None, False)
-            phase = PeoplePhase()
-            await phase.run(ctx)
-
-        assert ctx.metrics["total_errors"] >= 1
-        assert ctx.metrics["users_created"] == 0
-
-    @pytest.mark.asyncio
-    async def test_enrols_teachers(self, test_db, mock_moodle_service):
-        ctx = _make_ctx(test_db, mock_moodle_service)
-        ctx.comparison = {"to_create": [], "to_delete": [], "to_activate": [],
-                          "to_hide": [], "to_update": [], "alerts": [], "logs": []}
-        ctx.users_to_create = []
-        ctx.resolved_enrolments = [
-            {"username": "doc1", "course_shortname": "IDE_0001_sI_101_G-01", "role": "editingteacher"},
-        ]
-
-        mock_moodle_service.get_courses.return_value = [
-            {"id": 99, "shortname": "IDE_0001_sI_101_G-01"},
-        ]
-        mock_moodle_service.get_users.return_value = [
-            {"id": 1, "username": "doc1"},
-        ]
-        mock_moodle_service.enrol_users.return_value = {"success": True, "errors": []}
-
-        phase = PeoplePhase()
-        await phase.run(ctx)
-
-        assert ctx.metrics["enrolments"] == 1

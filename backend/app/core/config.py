@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     MOODLE_ADMIN_TOKEN: str = ""  # alias legacy
     MOODLE_VERSION: str = "3.9"
 
+    # Permitir login en modalidad PRESENCIAL (deshabilitado por contrato)
+    ALLOW_PRESENCIAL: bool = False
+
     # Configuración por modalidad (opcional, sobreescribe la base)
     MOODLE_URL__PRESENCIAL: Optional[str] = None
     MOODLE_TOKEN__PRESENCIAL: Optional[str] = None
@@ -56,6 +59,9 @@ class Settings(BaseSettings):
     # Reintentos automáticos ante fallos de red
     MOODLE_MAX_RETRIES: int = 3
 
+    # Tamaño de lote para consultas masivas a Moodle
+    MOODLE_QUERY_BATCH_SIZE: int = 5
+
     # ------------------------------------------------------------------
     # Plantilla genérica para cursos sin PORTAFOLIO
     # ------------------------------------------------------------------
@@ -70,6 +76,19 @@ class Settings(BaseSettings):
     # Redis (cola de tareas Celery)
     # ------------------------------------------------------------------
     REDIS_URL: str = ""
+
+    # ------------------------------------------------------------------
+    # Institucional
+    # ------------------------------------------------------------------
+    INSTITUTIONAL_EMAIL_DOMAIN: str = "@ut.edu.co"
+    ROOT_CATEGORY_NAME: str = "IDEAD"
+    DEFAULT_COURSE_FORMAT: str = "onetopic"
+
+    # ------------------------------------------------------------------
+    # Comparación de cursos (FASE 2)
+    # ------------------------------------------------------------------
+    COURSE_MAX_AGE_SECONDS: int = 18 * 30 * 24 * 3600       # 18 meses
+    COURSE_DISAPPEARED_AGE_SECONDS: int = 6 * 30 * 24 * 3600  # 6 meses
 
     # ------------------------------------------------------------------
     # Archivos subidos
@@ -93,6 +112,15 @@ class Settings(BaseSettings):
     # Máximo de cursos a eliminar automáticamente. Si el plan supera
     # este número, la ejecución se detiene y requiere confirmación manual.
     MAX_AUTO_DELETE_COURSES: int = 500
+
+    # Tiempo de espera para considerar un item como "stuck" (minutos)
+    STUCK_ITEM_TIMEOUT_MINUTES: int = 30
+
+    # Tiempo de espera para considerar una ejecución como "stuck" (segundos)
+    STUCK_EXECUTION_TIMEOUT: int = 21600                   # 6 horas
+
+    # Días de antigüedad para limpieza automática de lotes
+    DEFAULT_BATCH_CLEANUP_DAYS: int = 30
 
     # ------------------------------------------------------------------
     # Umbrales del semáforo de analítica
@@ -128,7 +156,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="forbid",
+        extra="ignore",
     )
 
     def get_moodle_config(self, modalidad: str) -> Dict[str, str]:

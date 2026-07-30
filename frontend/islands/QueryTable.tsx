@@ -1,17 +1,28 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { queryEntities, getQueryTaskStatus, getQueryExportUrl, type QueryTaskStatus } from "../services/api.ts";
-import { authHeaders } from "../services/api/core.ts";
-import { ExclamationCircleIcon, SpinnerIcon, CheckIcon, XMarkIcon, DownloadIcon } from "../utils/icons.tsx";
+import {
+  downloadReport,
+  getQueryExportUrl,
+  getQueryTaskStatus,
+  queryEntities,
+  type QueryTaskStatus,
+} from "../services/api.ts";
+import {
+  CheckIcon,
+  DownloadIcon,
+  ExclamationCircleIcon,
+  SpinnerIcon,
+  XMarkIcon,
+} from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 
-interface Column {
+export interface Column {
   key: string;
   label: string;
   render?: (value: unknown, row: Record<string, unknown>) => string;
 }
 
-interface Filter {
+export interface Filter {
   key: string;
   label: string;
   type: "select";
@@ -27,7 +38,10 @@ interface QueryTableProps {
   searchKey?: string;
 }
 
-export default function QueryTable({ entity, title, columns, filters, searchPlaceholder, searchKey = "search" }: QueryTableProps) {
+export default function QueryTable(
+  { entity, title, columns, filters, searchPlaceholder, searchKey = "search" }:
+    QueryTableProps,
+) {
   const data = useSignal<Record<string, unknown>[]>([]);
   const loading = useSignal(false);
   const error = useSignal("");
@@ -109,7 +123,8 @@ export default function QueryTable({ entity, title, columns, filters, searchPlac
           <select
             key={f.key}
             value={filterValues.value[f.key] || f.options[0].value}
-            onChange={(e) => handleFilterChange(f.key, (e.target as HTMLSelectElement).value)}
+            onChange={(e) =>
+              handleFilterChange(f.key, (e.target as HTMLSelectElement).value)}
             class="border border-[var(--border-secondary)] rounded px-3 py-1.5 text-sm bg-[var(--bg-primary)] text-[var(--text-primary)]"
           >
             {f.options.map((o) => (
@@ -123,7 +138,9 @@ export default function QueryTable({ entity, title, columns, filters, searchPlac
             <input
               type="text"
               value={search.value}
-              onInput={(e) => (search.value = (e.target as HTMLInputElement).value)}
+              onInput={(
+                e,
+              ) => (search.value = (e.target as HTMLInputElement).value)}
               placeholder={searchPlaceholder}
               class="border border-[var(--border-secondary)] rounded px-3 py-1.5 text-sm bg-[var(--bg-primary)] text-[var(--text-primary)] w-48"
             />
@@ -142,33 +159,20 @@ export default function QueryTable({ entity, title, columns, filters, searchPlac
           disabled={loading.value}
           class="px-3 py-1.5 bg-[var(--brand-green)] text-white rounded text-sm hover:brightness-90 disabled:opacity-60"
         >
-          {loading.value ? (
-            <span class="flex items-center gap-1.5">
-              <SpinnerIcon class="animate-spin h-4 w-4" />
-              Consultando...
-            </span>
-          ) : "Consultar"}
+          {loading.value
+            ? (
+              <span class="flex items-center gap-1.5">
+                <SpinnerIcon class="animate-spin h-4 w-4" />
+                Consultando...
+              </span>
+            )
+            : "Consultar"}
         </button>
 
         {exportUrl && data.value.length > 0 && (
           <button
             onClick={() => {
-              fetch(exportUrl, { headers: { ...authHeaders() } })
-                .then((r) => {
-                  if (!r.ok) throw new Error("Error al descargar");
-                  return r.blob();
-                })
-                .then((blob) => {
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = "consulta.csv";
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                })
-                .catch(() => {});
+              downloadReport(exportUrl, "consulta.csv").catch(() => {});
             }}
             class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded text-sm font-medium no-underline hover:bg-[var(--border-secondary)] transition ml-auto cursor-pointer"
           >
@@ -186,7 +190,8 @@ export default function QueryTable({ entity, title, columns, filters, searchPlac
           </div>
           {taskStatus.value?.total_count > 0 && (
             <div class="text-xs text-[var(--text-secondary)]">
-              {taskStatus.value.total_count} resultados encontrados hasta ahora...
+              {taskStatus.value.total_count}{" "}
+              resultados encontrados hasta ahora...
             </div>
           )}
         </div>
@@ -210,7 +215,12 @@ export default function QueryTable({ entity, title, columns, filters, searchPlac
             <thead>
               <tr class="border-b border-[var(--border-primary)]">
                 {columns.map((col) => (
-                  <th key={col.key} class="text-left py-3 px-3 font-medium text-[var(--text-secondary)]">{col.label}</th>
+                  <th
+                    key={col.key}
+                    class="text-left py-3 px-3 font-medium text-[var(--text-secondary)]"
+                  >
+                    {col.label}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -218,15 +228,24 @@ export default function QueryTable({ entity, title, columns, filters, searchPlac
               {data.value.length === 0 && !loading.value
                 ? (
                   <tr>
-                    <td colSpan={columns.length} class="py-12 text-center text-[var(--text-muted)]">
+                    <td
+                      colSpan={columns.length}
+                      class="py-12 text-center text-[var(--text-muted)]"
+                    >
                       Sin resultados. Usá los filtros y presioná "Consultar".
                     </td>
                   </tr>
                 )
                 : data.value.map((row, idx) => (
-                  <tr key={idx} class="border-b border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)]">
+                  <tr
+                    key={idx}
+                    class="border-b border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)]"
+                  >
                     {columns.map((col) => (
-                      <td key={col.key} class="py-2 px-3 text-[var(--text-primary)]">
+                      <td
+                        key={col.key}
+                        class="py-2 px-3 text-[var(--text-primary)]"
+                      >
                         {col.render
                           ? col.render(row[col.key], row)
                           : String(row[col.key] ?? "—")}
@@ -239,7 +258,8 @@ export default function QueryTable({ entity, title, columns, filters, searchPlac
         </div>
       )}
 
-      {!loading.value && !error.value && data.value.length === 0 && taskStatus.value?.status === "completed" && (
+      {!loading.value && !error.value && data.value.length === 0 &&
+        taskStatus.value?.status === "completed" && (
         <div class="text-center py-12 text-[var(--text-muted)]">
           <p class="text-lg mb-2">Sin resultados</p>
           <p class="text-sm">La consulta no devolvió datos.</p>

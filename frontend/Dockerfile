@@ -5,18 +5,11 @@ WORKDIR /app
 
 COPY . .
 
-# Cachear dependencias (incluye tailwindcss via Fresh plugin)
+# Cachear dependencias
 RUN deno cache main.ts dev.ts fresh.config.ts
 
-# Build Fresh (rutas, islas, manifest)
+# Build Fresh (Tailwind compilado vía plugin)
 RUN deno task build
-
-# Compilar Tailwind CSS manualmente (Fresh 1.7.2 no lo compila en build)
-RUN deno run -A npm:tailwindcss@3.4.1 -- --config ./tailwind.config.js -i ./static/main.css -o ./_fresh/static/main.css --minify
-
-# Copiar CSS personalizado y favicon a _fresh/static/
-RUN cp static/styles.css _fresh/static/styles.css
-RUN cp static/SIAUGESMAT.ico _fresh/static/SIAUGESMAT.ico
 
 EXPOSE 3000
 

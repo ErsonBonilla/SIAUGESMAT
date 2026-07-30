@@ -7,7 +7,9 @@ interface HubCardProps {
   href: string;
 }
 
-export default function HubCard({ icon: Icon, title, description, href }: HubCardProps) {
+export default function HubCard(
+  { icon: Icon, title, description, href }: HubCardProps,
+) {
   return (
     <a
       href={href}

@@ -93,12 +93,8 @@ class RedisRateLimiter:
         pipe.zcard(key)
         pipe.expire(key, self.window + 1)
         _, _, count, _ = await pipe.execute()
-        from app.services.metrics import inc, observe
-        inc("rate_limiter.acquire")
         if count > self.rate:
             wait = (count - self.rate) * (self.window / self.rate)
-            inc("rate_limiter.throttled")
-            observe("rate_limiter.wait_ms", wait * 1000)
             await asyncio.sleep(wait)
 
     async def close(self):

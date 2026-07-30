@@ -1,4 +1,4 @@
-import { Handlers } from "$fresh/server.ts";
+import type { FreshContext } from "@fresh/core";
 
 function getCookie(name: string, req: Request): string | null {
   const cookie = req.headers.get("cookie");
@@ -14,30 +14,28 @@ function tokenPresent(req: Request): boolean {
   return getCookie("auth_token", req) !== null;
 }
 
-export function requireAuth(): Handlers {
+export function requireAuth() {
   return {
-    GET(req, ctx) {
+    GET(req: Request, ctx: FreshContext) {
       if (!tokenPresent(req)) {
         return new Response("", {
           status: 302,
           headers: { Location: "/login" },
         });
       }
-      return ctx.render();
     },
   };
 }
 
-export function redirectIfAuth(): Handlers {
+export function redirectIfAuth() {
   return {
-    GET(req, ctx) {
+    GET(req: Request, ctx: FreshContext) {
       if (tokenPresent(req)) {
         return new Response("", {
           status: 302,
           headers: { Location: "/dashboard" },
         });
       }
-      return ctx.render();
     },
   };
 }

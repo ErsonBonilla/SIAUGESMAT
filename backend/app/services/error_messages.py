@@ -5,7 +5,7 @@ Mapea excepciones de Python, httpx, tenacity y MoodleAPI a mensajes
 que un usuario administrador pueda entender sin ser programador.
 """
 
-from app.services.moodle import MoodleAPIError
+from app.services.moodle_errors import MoodleAPIError
 
 
 def translate_error(e: Exception) -> str:

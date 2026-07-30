@@ -1,7 +1,11 @@
 import { useSignal } from "@preact/signals";
 import { login } from "../services/api.ts";
 import { setToken, setTokenCookie } from "../utils/auth.ts";
-import { BuildingIcon, DeviceIcon, ExclamationCircleIcon } from "../utils/icons.tsx";
+import {
+  BuildingIcon,
+  DeviceIcon,
+  ExclamationCircleIcon,
+} from "../utils/icons.tsx";
 import { MODALIDADES } from "../utils/constants.ts";
 import Button from "../components/Button.tsx";
 import Input from "../components/Input.tsx";
@@ -11,7 +15,9 @@ interface LoginFormProps {
   onModalidadChange: (m: string) => void;
 }
 
-export default function LoginForm({ modalidad, onModalidadChange }: LoginFormProps) {
+export default function LoginForm(
+  { modalidad, onModalidadChange }: LoginFormProps,
+) {
   const username = useSignal("");
   const password = useSignal("");
   const error = useSignal("");
@@ -31,7 +37,11 @@ export default function LoginForm({ modalidad, onModalidadChange }: LoginFormPro
     loading.value = true;
     error.value = "";
     try {
-      const data = await login(username.value.trim(), password.value.trim(), modalidad);
+      const data = await login(
+        username.value.trim(),
+        password.value.trim(),
+        modalidad,
+      );
       setToken(data.access_token);
       setTokenCookie(data.access_token);
       if (typeof window !== "undefined") {
@@ -39,8 +49,12 @@ export default function LoginForm({ modalidad, onModalidadChange }: LoginFormPro
       }
     } catch (err) {
       let msg = err instanceof Error ? err.message : "";
-      if (msg.includes("Failed to fetch")) msg = "Error de conexión. Verifique su red.";
-      error.value = msg.includes("Fallo de autenticación") ? "Credenciales inválidas" : msg || "Error inesperado.";
+      if (msg.includes("Failed to fetch")) {
+        msg = "Error de conexión. Verifique su red.";
+      }
+      error.value = msg.includes("Fallo de autenticación")
+        ? "Credenciales inválidas"
+        : msg || "Error inesperado.";
     } finally {
       loading.value = false;
     }
@@ -65,7 +79,8 @@ export default function LoginForm({ modalidad, onModalidadChange }: LoginFormPro
   const showPills = modalidad === "" && !transitioning.value;
   const showLogin = modalidad !== "" && !transitioning.value;
 
-  const pillBase = "flex items-center gap-2 w-full px-4 py-2.5 rounded-[2rem] border border-[var(--border-secondary)] bg-[var(--bg-primary)] cursor-pointer transition-all duration-200 text-sm";
+  const pillBase =
+    "flex items-center gap-2 w-full px-4 py-2.5 rounded-[2rem] border border-[var(--border-secondary)] bg-[var(--bg-primary)] cursor-pointer transition-all duration-200 text-sm";
   const pillHover = "hover:border-[var(--accent)] hover:brightness-95";
   const pillDisabled = "disabled:opacity-40 disabled:cursor-not-allowed";
 
@@ -74,9 +89,14 @@ export default function LoginForm({ modalidad, onModalidadChange }: LoginFormPro
       {showPills && (
         <div class="login-fadeIn flex flex-col gap-3">
           <button type="button" disabled class={`${pillBase} ${pillDisabled}`}>
-            <BuildingIcon class="w-5 h-5 shrink-0" style={{ color: "var(--text-muted)" }} />
+            <BuildingIcon
+              class="w-5 h-5 shrink-0"
+              style={{ color: "var(--text-muted)" }}
+            />
             <span class="text-[var(--text-muted)]">PRESENCIAL</span>
-            <span class="ml-auto text-[0.6rem] px-1.5 py-0.5 rounded bg-[var(--brand-red-100)] text-[var(--brand-red-900)] whitespace-nowrap">No disponible</span>
+            <span class="ml-auto text-[0.6rem] px-1.5 py-0.5 rounded bg-[var(--brand-red-100)] text-[var(--brand-red-900)] whitespace-nowrap">
+              No disponible
+            </span>
           </button>
 
           <button
@@ -84,11 +104,18 @@ export default function LoginForm({ modalidad, onModalidadChange }: LoginFormPro
             onClick={() => selectModalidad("DISTANCIA")}
             class={`${pillBase} ${pillHover}`}
           >
-            <DeviceIcon class="w-5 h-5 shrink-0" style={{ color: "var(--brand-red)" }} />
-            <span class="font-semibold text-[var(--text-primary)]">DISTANCIA</span>
+            <DeviceIcon
+              class="w-5 h-5 shrink-0"
+              style={{ color: "var(--brand-red)" }}
+            />
+            <span class="font-semibold text-[var(--text-primary)]">
+              DISTANCIA
+            </span>
           </button>
 
-          <p class="text-center text-xs text-[var(--text-muted)] -mt-2">Seleccioná tu modalidad para continuar</p>
+          <p class="text-center text-xs text-[var(--text-muted)] -mt-2">
+            Seleccioná tu modalidad para continuar
+          </p>
         </div>
       )}
 
@@ -107,7 +134,9 @@ export default function LoginForm({ modalidad, onModalidadChange }: LoginFormPro
             value={username.value}
             disabled={loading.value}
             autocomplete="username"
-            onInput={(e) => (username.value = (e.target as HTMLInputElement).value)}
+            onInput={(
+              e,
+            ) => (username.value = (e.target as HTMLInputElement).value)}
           />
 
           <Input
@@ -117,7 +146,9 @@ export default function LoginForm({ modalidad, onModalidadChange }: LoginFormPro
             value={password.value}
             disabled={loading.value}
             autocomplete="current-password"
-            onInput={(e) => (password.value = (e.target as HTMLInputElement).value)}
+            onInput={(
+              e,
+            ) => (password.value = (e.target as HTMLInputElement).value)}
           />
 
           {error.value && (
@@ -127,7 +158,12 @@ export default function LoginForm({ modalidad, onModalidadChange }: LoginFormPro
             </div>
           )}
 
-          <Button variant="gradient" type="submit" loading={loading.value} style={{ width: "100%" }}>
+          <Button
+            variant="gradient"
+            type="submit"
+            loading={loading.value}
+            style={{ width: "100%" }}
+          >
             Iniciar sesión
           </Button>
 

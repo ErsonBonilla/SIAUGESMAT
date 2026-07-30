@@ -1,5 +1,5 @@
 import render from "preact-render-to-string";
-import { assertStringIncludes, assert } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assert, assertStringIncludes } from "@std/assert";
 
 import LoginForm from "../../islands/LoginForm.tsx";
 import { darkSignal } from "../../utils/theme.ts";
@@ -17,7 +17,9 @@ Deno.test("LoginForm - muestra selector de modalidad sin campos de login", () =>
 
 Deno.test("LoginForm - muestra campos de login cuando se selecciona modalidad", () => {
   darkSignal.value = false;
-  const html = render(<LoginForm modalidad="DISTANCIA" onModalidadChange={() => {}} />);
+  const html = render(
+    <LoginForm modalidad="DISTANCIA" onModalidadChange={() => {}} />,
+  );
 
   assertStringIncludes(html, "Usuario");
   assertStringIncludes(html, "Contraseña");

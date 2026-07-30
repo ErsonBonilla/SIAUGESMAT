@@ -9,36 +9,37 @@ Proporciona:
 
 import logging
 import os
+from contextvars import ContextVar
 from typing import Optional
 
 from pythonjsonlogger import jsonlogger
 
+_context_vars: ContextVar[dict] = ContextVar("execution_context", default={})
+
 
 class ExecutionContextFilter(logging.Filter):
     """Filtro que agrega execution_id, item_id y action a cada LogRecord.
-    Los valores se toman de una variable de contexto (thread-local) que
-    debe establecerse al inicio de cada tarea Celery."""
+    Los valores se toman de un ContextVar que debe establecerse al inicio
+    de cada tarea Celery. Thread-safe (contextvars)."""
 
-    _context_vars: dict = {}
-
-    @classmethod
-    def set_context(cls, execution_id: Optional[int] = None,
+    @staticmethod
+    def set_context(execution_id: Optional[int] = None,
                     item_id: Optional[int] = None,
                     action: Optional[str] = None,
                     phase: Optional[str] = None):
-        cls._context_vars = {
+        _context_vars.set({
             "execution_id": execution_id,
             "item_id": item_id,
             "action": action,
             "phase": phase,
-        }
+        })
 
-    @classmethod
-    def clear_context(cls):
-        cls._context_vars = {}
+    @staticmethod
+    def clear_context():
+        _context_vars.set({})
 
     def filter(self, record: logging.LogRecord) -> bool:
-        for key, value in self._context_vars.items():
+        for key, value in _context_vars.get().items():
             if value is not None:
                 setattr(record, key, value)
         return True

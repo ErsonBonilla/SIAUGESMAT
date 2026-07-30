@@ -13,7 +13,7 @@ import pytest
 
 from app.db.session import SessionLocal
 from app.repositories.operation_repo import create_batch
-from app.workers.phase4_items import _create_phase4_items
+from app.workers.phases.phase4_people import _create_phase4_items_async as _create_phase4_items
 
 
 def _make_ctx_data(users=None, enrolments=None):
@@ -41,21 +41,21 @@ class TestCreatePhase4Items:
     @pytest.mark.asyncio
     async def test_happy_path_users_and_enrolments(self, test_db):
         """Crea usuarios + enrolments correctamente."""
-        with patch("app.workers.phase4_items._acquire_advisory_lock", return_value=True), \
-             patch("app.workers.phase4_items.MoodleService") as mock_ms:
+        with patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True), \
+             patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory:
 
             instance = AsyncMock()
             instance.get_courses.return_value = [
                 {"id": 100, "shortname": "TST_0001_sI_001_G-1_12345"},
             ]
-            mock_ms.return_value = instance
+            mock_factory.return_value = instance
 
             ctx = _make_ctx_data(
                 users=[_make_user()],
                 enrolments=[_make_enrolment()],
             )
 
-            counts = _create_phase4_items(test_db, 1, ctx, "DISTANCIA")
+            counts = await _create_phase4_items(test_db, 1, ctx, "DISTANCIA")
 
         assert counts.get("create_users") == 1
         assert counts.get("enrol") == 1
@@ -73,7 +73,7 @@ class TestCreatePhase4Items:
     @pytest.mark.asyncio
     async def test_lock_contention(self, test_db):
         """Advisory lock evita duplicados: segundo llamado retorna vacío."""
-        with patch("app.workers.phase4_items._acquire_advisory_lock") as mock_lock:
+        with patch("app.workers.phases.phase4_people._acquire_advisory_lock") as mock_lock:
             # Primer worker obtiene el lock
             mock_lock.side_effect = [True, False]
 
@@ -82,56 +82,60 @@ class TestCreatePhase4Items:
                 enrolments=[_make_enrolment()],
             )
 
-            counts_1 = _create_phase4_items(test_db, 2, ctx, "DISTANCIA")
-            counts_2 = _create_phase4_items(test_db, 2, ctx, "DISTANCIA")
+            counts_1 = await _create_phase4_items(test_db, 2, ctx, "DISTANCIA")
+            counts_2 = await _create_phase4_items(test_db, 2, ctx, "DISTANCIA")
 
         assert counts_1.get("create_users") == 1
-        assert counts_2 == {}  # Segundo worker no crea nada
+        # Segundo worker retoma items pendientes (no duplica)
+        assert counts_2.get("create_user") == 1
+        assert counts_2.get("enrol") == 1
 
     @pytest.mark.asyncio
     async def test_already_exists(self, test_db):
         """Items ya existen → retomar sin duplicar."""
-        with patch("app.workers.phase4_items._acquire_advisory_lock", return_value=True), \
-             patch("app.workers.phase4_items.MoodleService") as mock_ms:
+        with patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True), \
+             patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory:
 
             instance = AsyncMock()
             instance.get_courses.return_value = []
-            mock_ms.return_value = instance
+            mock_factory.return_value = instance
 
             # Primera llamada: crear items
             ctx = _make_ctx_data(
                 users=[_make_user()],
                 enrolments=[_make_enrolment()],
             )
-            counts_1 = _create_phase4_items(test_db, 3, ctx, "DISTANCIA")
+            counts_1 = await _create_phase4_items(test_db, 3, ctx, "DISTANCIA")
             assert counts_1.get("create_users") == 1
 
         # Segunda llamada: ya existen, debe retomar
-        with patch("app.workers.phase4_items._acquire_advisory_lock", return_value=True), \
-             patch("app.workers.phase4_items.MoodleService") as mock_ms:
+        with patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True), \
+             patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory:
             instance = AsyncMock()
             instance.get_courses.return_value = []
-            mock_ms.return_value = instance
+            mock_factory.return_value = instance
 
-            counts_2 = _create_phase4_items(test_db, 3, ctx, "DISTANCIA")
-            assert counts_2 == {}  # Sin pendientes, salta
+            counts_2 = await _create_phase4_items(test_db, 3, ctx, "DISTANCIA")
+            # Devuelve pendientes (items aún no procesados)
+            assert counts_2.get("create_user") == 1
+            assert counts_2.get("enrol") == 1
 
     @pytest.mark.asyncio
     async def test_enrol_items_have_course_id(self, test_db):
         """Items de enrolment deben tener _course_id resuelto."""
-        with patch("app.workers.phase4_items._acquire_advisory_lock", return_value=True), \
-             patch("app.workers.phase4_items.MoodleService") as mock_ms:
+        with patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True), \
+             patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory:
 
             instance = AsyncMock()
             instance.get_courses.return_value = [
                 {"id": 200, "shortname": "TST_0001_sI_001_G-1_12345"},
             ]
-            mock_ms.return_value = instance
+            mock_factory.return_value = instance
 
             ctx = _make_ctx_data(
                 enrolments=[_make_enrolment()],
             )
-            _create_phase4_items(test_db, 4, ctx, "DISTANCIA")
+            await _create_phase4_items(test_db, 4, ctx, "DISTANCIA")
 
         from app.db.models import OperationItem
         enrol_item = test_db.query(OperationItem).filter(

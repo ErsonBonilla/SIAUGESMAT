@@ -3,9 +3,6 @@ import os
 from collections import Counter, defaultdict
 from typing import Any, Dict, List, Optional
 
-os.environ.setdefault("KALEIDO_CHROMIUM_PATH", os.environ.get("CHROME_PATH", "/usr/bin/chromium"))
-os.environ.setdefault("KALEIDO_CHROMIUM_FLAGS", "--no-sandbox --disable-gpu --disable-dev-shm-usage --disable-setuid-sandbox --no-zygote")
-
 import plotly.graph_objects as go
 
 from app.db.models import Execution, ExecutionLog
@@ -46,11 +43,6 @@ def _get_palette(theme: str = "light") -> dict:
 
 def _get_categorical(theme: str = "light") -> list:
     return PALETTE_CATEGORICAL_DARK if theme == "dark" else PALETTE_CATEGORICAL_LIGHT
-
-
-def _semestre_from_shortname(shortname: str) -> Optional[str]:
-    m = SHORTNAME_PATTERN.match(shortname)
-    return get_semestre(m) if m else None
 
 
 def _cat_prefix_from_shortname(shortname: str) -> Optional[str]:

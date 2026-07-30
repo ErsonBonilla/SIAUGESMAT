@@ -1,7 +1,12 @@
 import { useEffect } from "preact/hooks";
 import { useComputed } from "@preact/signals";
 import type { SemesterMetrics } from "../services/api.ts";
-import { useChart, METRIC_LABELS, METRIC_COLORS, createGradient } from "../utils/chart.ts";
+import {
+  createGradient,
+  METRIC_COLORS,
+  METRIC_LABELS,
+  useChart,
+} from "../utils/chart.ts";
 import { darkSignal } from "../utils/theme.ts";
 
 interface MetricsChartProps {
@@ -18,14 +23,24 @@ const STACK_ORDER: Record<string, number> = {
   avg_duration_seconds: 4,
 };
 
-function gradientPlugin(ctx: CanvasRenderingContext2D, height: number, dark: boolean) {
+function gradientPlugin(
+  ctx: CanvasRenderingContext2D,
+  height: number,
+  dark: boolean,
+) {
   return {
     id: "gradientFill",
-    beforeDraw(chart: { data: { datasets: { backgroundColor: unknown; label?: string }[] }; chartArea: { top: number } }) {
-
+    beforeDraw(
+      chart: {
+        data: { datasets: { backgroundColor: unknown; label?: string }[] };
+        chartArea: { top: number };
+      },
+    ) {
       for (const ds of chart.data.datasets) {
         const label = ds.label || "";
-        const entry = Object.entries(METRIC_LABELS).find(([, v]) => v === label);
+        const entry = Object.entries(METRIC_LABELS).find(([, v]) =>
+          v === label
+        );
         const key = entry?.[0];
         const color = key ? METRIC_COLORS[key] : METRIC_COLORS.total_errors;
         if (color) {
@@ -94,7 +109,8 @@ export default function MetricsChart(
     } as never);
   }, [data, metrics, selectedSemesters, dark.value]);
 
-  const noSelection = selectedSemesters !== undefined && selectedSemesters.length === 0;
+  const noSelection = selectedSemesters !== undefined &&
+    selectedSemesters.length === 0;
 
   if (noSelection) {
     return (

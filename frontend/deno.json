@@ -1,15 +1,16 @@
 {
-  "lock": false,
+  "lock": true,
   "tasks": {
-    "check": "deno fmt --check && deno lint && deno check **/*.ts && deno check **/*.tsx",
-    "start": "deno run -A --no-check --watch=static/,routes/ dev.ts",
-    "build": "deno run -A --no-check dev.ts build",
+    "check": "deno fmt --check && deno lint && deno check main.ts dev.ts fresh.config.ts && deno check routes/ && deno check islands/ && deno check components/ && deno check utils/ && deno check services/ && deno check hooks/",
+    "start": "deno run -A --watch=static/,routes/ dev.ts",
+    "build": "deno run -A dev.ts build",
     "preview": "deno run -A main.ts",
-    "update": "deno run -A -r https://fresh.deno.dev/update .",
-    "test": "deno test --no-check -A tests/"
+    "test": "deno test -A tests/"
   },
   "imports": {
-    "$fresh/": "https://deno.land/x/fresh@1.7.2/",
+    "@fresh/core": "jsr:@fresh/core@^2.3.3",
+    "@fresh/core/dev": "jsr:@fresh/core@^2.3.3/dev",
+    "@fresh/plugin-tailwind": "jsr:@fresh/plugin-tailwind@^1.0.0",
     "preact": "npm:preact",
     "preact/hooks": "npm:preact/hooks",
     "preact/jsx-runtime": "npm:preact/jsx-runtime",
@@ -19,7 +20,8 @@
     "chart.js": "https://esm.sh/chart.js@4.4.1",
     "date-fns": "npm:date-fns",
     "preact-render-to-string": "npm:preact-render-to-string",
-    "tailwindcss": "npm:tailwindcss@3.4.1"
+    "tailwindcss": "npm:tailwindcss@4.3.3",
+    "@std/assert": "jsr:@std/assert@^1"
   },
   "compilerOptions": {
     "jsx": "react-jsx",

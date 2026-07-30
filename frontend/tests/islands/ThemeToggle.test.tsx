@@ -1,5 +1,5 @@
 import render from "preact-render-to-string";
-import { assertEquals, assertStringIncludes } from "https://deno.land/std@0.224.0/assert/mod.ts";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 
 import ThemeToggle from "../../islands/ThemeToggle.tsx";
 import { darkSignal } from "../../utils/theme.ts";

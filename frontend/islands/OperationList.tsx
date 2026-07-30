@@ -1,7 +1,15 @@
 // islands/OperationList.tsx
-import { useSignal, useComputed } from "@preact/signals";
+import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { listBatches, getBatchReportUrl, pauseBatch, resumeBatch, deleteBatch, downloadReport, type OperationBatchOut } from "../services/api.ts";
+import {
+  deleteBatch,
+  downloadReport,
+  getBatchReportUrl,
+  listBatches,
+  type OperationBatchOut,
+  pauseBatch,
+  resumeBatch,
+} from "../services/api.ts";
 import { STATUS_COLORS, STATUS_LABELS } from "../utils/constants.ts";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
@@ -65,7 +73,9 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function handlePause(batchId: string) {
     if (actionLoading.value) return;
@@ -87,7 +97,9 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
       await resumeBatch(batchId);
       load();
     } catch (e) {
-      error.value = e instanceof Error ? e.message : "Error al reanudar el lote";
+      error.value = e instanceof Error
+        ? e.message
+        : "Error al reanudar el lote";
     } finally {
       actionLoading.value = null;
     }
@@ -95,23 +107,37 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
 
   async function handleDelete(batchId: string) {
     if (actionLoading.value) return;
-    if (!confirm("¿Eliminar este lote? Se descargará un reporte final con el progreso antes de eliminar.")) return;
+    if (
+      !confirm(
+        "¿Eliminar este lote? Se descargará un reporte final con el progreso antes de eliminar.",
+      )
+    ) return;
     actionLoading.value = batchId;
     try {
-      await downloadReport(getBatchReportUrl(batchId), `reportes_${batchId.slice(0, 8)}.zip`);
+      await downloadReport(
+        getBatchReportUrl(batchId),
+        `reportes_${batchId.slice(0, 8)}.zip`,
+      );
       await deleteBatch(batchId);
       load();
     } catch (e) {
-      error.value = e instanceof Error ? e.message : "Error al eliminar el lote";
+      error.value = e instanceof Error
+        ? e.message
+        : "Error al eliminar el lote";
     } finally {
       actionLoading.value = null;
     }
   }
 
   const totalPages = useComputed(() => Math.ceil(total.value / PAGE_SIZE));
-  const currentPage = useComputed(() => Math.floor(offset.value / PAGE_SIZE) + 1);
+  const currentPage = useComputed(() =>
+    Math.floor(offset.value / PAGE_SIZE) + 1
+  );
 
-  function applyFilters() { offset.value = 0; load(); }
+  function applyFilters() {
+    offset.value = 0;
+    load();
+  }
 
   const hasFilters = useComputed(() =>
     filterEntity.value || filterAction.value || filterModalidad.value
@@ -122,38 +148,47 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
       <div class="flex flex-wrap gap-4 mb-8 items-end">
         {!isLocked && (
           <>
-        <div>
-          <label class="block text-xs text-[var(--text-secondary)] mb-1">Entidad</label>
-          <select
-            value={filterEntity.value}
-            onChange={(e) => filterEntity.value = (e.target as HTMLSelectElement).value}
-            class="border border-[var(--border-secondary)] rounded px-3 py-1.5 text-sm bg-[var(--bg-primary)] text-[var(--text-primary)]"
-          >
-            <option value="">Todas</option>
-            <option value="courses">Cursos</option>
-            <option value="categories">Categorías</option>
-            <option value="users">Usuarios</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs text-[var(--text-secondary)] mb-1">Acción</label>
-          <select
-            value={filterAction.value}
-            onChange={(e) => filterAction.value = (e.target as HTMLSelectElement).value}
-            class="border border-[var(--border-secondary)] rounded px-3 py-1.5 text-sm bg-[var(--bg-primary)] text-[var(--text-primary)]"
-          >
-            <option value="">Todas</option>
-            <option value="create">Creación</option>
-            <option value="delete">Eliminación</option>
-          </select>
-        </div>
+            <div>
+              <label class="block text-xs text-[var(--text-secondary)] mb-1">
+                Entidad
+              </label>
+              <select
+                value={filterEntity.value}
+                onChange={(e) =>
+                  filterEntity.value = (e.target as HTMLSelectElement).value}
+                class="border border-[var(--border-secondary)] rounded px-3 py-1.5 text-sm bg-[var(--bg-primary)] text-[var(--text-primary)]"
+              >
+                <option value="">Todas</option>
+                <option value="courses">Cursos</option>
+                <option value="categories">Categorías</option>
+                <option value="users">Usuarios</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-[var(--text-secondary)] mb-1">
+                Acción
+              </label>
+              <select
+                value={filterAction.value}
+                onChange={(e) =>
+                  filterAction.value = (e.target as HTMLSelectElement).value}
+                class="border border-[var(--border-secondary)] rounded px-3 py-1.5 text-sm bg-[var(--bg-primary)] text-[var(--text-primary)]"
+              >
+                <option value="">Todas</option>
+                <option value="create">Creación</option>
+                <option value="delete">Eliminación</option>
+              </select>
+            </div>
           </>
         )}
         <div>
-          <label class="block text-xs text-[var(--text-secondary)] mb-1">Modalidad</label>
+          <label class="block text-xs text-[var(--text-secondary)] mb-1">
+            Modalidad
+          </label>
           <select
             value={filterModalidad.value}
-            onChange={(e) => filterModalidad.value = (e.target as HTMLSelectElement).value}
+            onChange={(e) =>
+              filterModalidad.value = (e.target as HTMLSelectElement).value}
             class="border border-[var(--border-secondary)] rounded px-3 py-1.5 text-sm bg-[var(--bg-primary)] text-[var(--text-primary)]"
           >
             <option value="">Todas</option>
@@ -169,7 +204,10 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
         {hasFilters.value && (
           <button
             onClick={() => {
-              if (!isLocked) { filterEntity.value = ""; filterAction.value = ""; }
+              if (!isLocked) {
+                filterEntity.value = "";
+                filterAction.value = "";
+              }
               filterModalidad.value = "";
               applyFilters();
             }}
@@ -180,99 +218,151 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
         )}
       </div>
 
-      {loading.value ? (
-        <LoadingSkeleton />
-      ) : error.value ? (
-        <ErrorBox message={error.value} />
-      ) : items.value.length === 0 ? (
-        <div class="text-center py-12 text-[var(--text-secondary)]">
-          <p class="text-lg mb-2">No se encontraron lotes</p>
-          <p class="text-sm">Pruebe con otros filtros o cree una operación desde el panel.</p>
-        </div>
-      ) : (
-        <>
-          <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="border-b border-[var(--border-primary)]">
-                  <th class="text-left py-3 px-2 font-medium text-[var(--text-secondary)]">Lote</th>
-                  <th class="text-left py-3 px-2 font-medium text-[var(--text-secondary)]">Entidad</th>
-                  <th class="text-left py-3 px-2 font-medium text-[var(--text-secondary)]">Acción</th>
-                  <th class="text-center py-3 px-2 font-medium text-[var(--text-secondary)]">Total</th>
-                  <th class="text-center py-3 px-2 font-medium text-[var(--text-secondary)]">Completado</th>
-                  <th class="text-center py-3 px-2 font-medium text-[var(--text-secondary)]">Fallido</th>
-                  <th class="text-left py-3 px-2 font-medium text-[var(--text-secondary)]">Modalidad</th>
-                  <th class="text-left py-3 px-2 font-medium text-[var(--text-secondary)]">Estado</th>
-                  <th class="text-right py-3 px-2 font-medium text-[var(--text-secondary)]">Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.value.map((b) => (
-                  <tr class="border-b border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)]">
-                    <td class="py-3 px-2 font-mono text-xs text-[var(--text-secondary)]">{b.batch_id.slice(0, 12)}</td>
-                    <td class="py-3 px-2">{ENTITY_LABELS[b.entity_type] || b.entity_type}</td>
-                    <td class="py-3 px-2">{ACTION_LABELS[b.action] || b.action}</td>
-                    <td class="py-3 px-2 text-center">{b.total}</td>
-                    <td class="py-3 px-2 text-center text-[var(--brand-green)]">{b.completed || 0}</td>
-                    <td class="py-3 px-2 text-center text-[var(--brand-red)]">{b.failed || 0}</td>
-                    <td class="py-3 px-2">
-                      <span class="inline-flex items-center px-1.5 py-0.5 status-blue rounded text-xs font-medium">
-                        {b.modalidad}
-                      </span>
-                    </td>
-                    <td class="py-3 px-2">
-                      <span class={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[statusFromBatch(b)]}`}>
-                        {STATUS_LABELS[statusFromBatch(b)]}
-                      </span>
-                    </td>
-                    <td class="py-3 px-2 text-right whitespace-nowrap">
-                      <div class="flex items-center justify-end gap-1.5">
-                        {statusFromBatch(b) !== "completed" && (b.paused || 0) === 0 && (
-                          <button
-                            onClick={() => handlePause(b.batch_id)}
-                            disabled={actionLoading.value === b.batch_id}
-                            class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:brightness-90 disabled:opacity-40"
-                          >
-                            {actionLoading.value === b.batch_id ? "..." : "Pausar"}
-                          </button>
-                        )}
-                        {(b.paused || 0) > 0 && (
-                          <button
-                            onClick={() => handleResume(b.batch_id)}
-                            disabled={actionLoading.value === b.batch_id}
-                            class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:brightness-90 disabled:opacity-40"
-                          >
-                            {actionLoading.value === b.batch_id ? "..." : "Reanudar"}
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDelete(b.batch_id)}
-                          disabled={actionLoading.value === b.batch_id}
-                          class="px-2 py-1 text-xs rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:brightness-90 disabled:opacity-40"
-                        >
-                          {actionLoading.value === b.batch_id ? "..." : "Eliminar"}
-                        </button>
-                        <button
-                          onClick={() => downloadReport(getBatchReportUrl(b.batch_id), `reportes_${b.batch_id.slice(0, 8)}.zip`)}
-                          class="gradient-text hover:brightness-110 text-sm font-medium ml-1 cursor-pointer bg-transparent border-none p-0 font-inherit"
-                        >CSV</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {loading.value
+        ? <LoadingSkeleton />
+        : error.value
+        ? <ErrorBox message={error.value} />
+        : items.value.length === 0
+        ? (
+          <div class="text-center py-12 text-[var(--text-secondary)]">
+            <p class="text-lg mb-2">No se encontraron lotes</p>
+            <p class="text-sm">
+              Pruebe con otros filtros o cree una operación desde el panel.
+            </p>
           </div>
+        )
+        : (
+          <>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-[var(--border-primary)]">
+                    <th class="text-left py-3 px-2 font-medium text-[var(--text-secondary)]">
+                      Lote
+                    </th>
+                    <th class="text-left py-3 px-2 font-medium text-[var(--text-secondary)]">
+                      Entidad
+                    </th>
+                    <th class="text-left py-3 px-2 font-medium text-[var(--text-secondary)]">
+                      Acción
+                    </th>
+                    <th class="text-center py-3 px-2 font-medium text-[var(--text-secondary)]">
+                      Total
+                    </th>
+                    <th class="text-center py-3 px-2 font-medium text-[var(--text-secondary)]">
+                      Completado
+                    </th>
+                    <th class="text-center py-3 px-2 font-medium text-[var(--text-secondary)]">
+                      Fallido
+                    </th>
+                    <th class="text-left py-3 px-2 font-medium text-[var(--text-secondary)]">
+                      Modalidad
+                    </th>
+                    <th class="text-left py-3 px-2 font-medium text-[var(--text-secondary)]">
+                      Estado
+                    </th>
+                    <th class="text-right py-3 px-2 font-medium text-[var(--text-secondary)]">
+                      Acción
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.value.map((b) => (
+                    <tr class="border-b border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)]">
+                      <td class="py-3 px-2 font-mono text-xs text-[var(--text-secondary)]">
+                        {b.batch_id.slice(0, 12)}
+                      </td>
+                      <td class="py-3 px-2">
+                        {ENTITY_LABELS[b.entity_type] || b.entity_type}
+                      </td>
+                      <td class="py-3 px-2">
+                        {ACTION_LABELS[b.action] || b.action}
+                      </td>
+                      <td class="py-3 px-2 text-center">{b.total}</td>
+                      <td class="py-3 px-2 text-center text-[var(--brand-green)]">
+                        {b.completed || 0}
+                      </td>
+                      <td class="py-3 px-2 text-center text-[var(--brand-red)]">
+                        {b.failed || 0}
+                      </td>
+                      <td class="py-3 px-2">
+                        <span class="inline-flex items-center px-1.5 py-0.5 status-blue rounded text-xs font-medium">
+                          {b.modalidad}
+                        </span>
+                      </td>
+                      <td class="py-3 px-2">
+                        <span
+                          class={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            STATUS_COLORS[statusFromBatch(b)]
+                          }`}
+                        >
+                          {STATUS_LABELS[statusFromBatch(b)]}
+                        </span>
+                      </td>
+                      <td class="py-3 px-2 text-right whitespace-nowrap">
+                        <div class="flex items-center justify-end gap-1.5">
+                          {statusFromBatch(b) !== "completed" &&
+                            (b.paused || 0) === 0 && (
+                            <button
+                              onClick={() => handlePause(b.batch_id)}
+                              disabled={actionLoading.value === b.batch_id}
+                              class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:brightness-90 disabled:opacity-40"
+                            >
+                              {actionLoading.value === b.batch_id
+                                ? "..."
+                                : "Pausar"}
+                            </button>
+                          )}
+                          {(b.paused || 0) > 0 && (
+                            <button
+                              onClick={() => handleResume(b.batch_id)}
+                              disabled={actionLoading.value === b.batch_id}
+                              class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:brightness-90 disabled:opacity-40"
+                            >
+                              {actionLoading.value === b.batch_id
+                                ? "..."
+                                : "Reanudar"}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(b.batch_id)}
+                            disabled={actionLoading.value === b.batch_id}
+                            class="px-2 py-1 text-xs rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:brightness-90 disabled:opacity-40"
+                          >
+                            {actionLoading.value === b.batch_id
+                              ? "..."
+                              : "Eliminar"}
+                          </button>
+                          <button
+                            onClick={() =>
+                              downloadReport(
+                                getBatchReportUrl(b.batch_id),
+                                `reportes_${b.batch_id.slice(0, 8)}.zip`,
+                              )}
+                            class="gradient-text hover:brightness-110 text-sm font-medium ml-1 cursor-pointer bg-transparent border-none p-0 font-inherit"
+                          >
+                            CSV
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          <Pagination
-            offset={offset.value}
-            pageSize={PAGE_SIZE}
-            total={total.value}
-            label="lotes"
-            onPageChange={(o) => { offset.value = o; load(); }}
-          />
-        </>
-      )}
+            <Pagination
+              offset={offset.value}
+              pageSize={PAGE_SIZE}
+              total={total.value}
+              label="lotes"
+              onPageChange={(o) => {
+                offset.value = o;
+                load();
+              }}
+            />
+          </>
+        )}
     </div>
   );
 }

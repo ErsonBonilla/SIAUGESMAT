@@ -1,3 +1,14 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-brand-red: #ed3237;
+  --color-brand-red-50: #fcf1f2;
+  --color-brand-red-100: #fbdfe0;
+  --color-brand-red-200: #f9bcbe;
+  --color-brand-red-300: #f6a2a4;
+  --color-brand-red-800: #b12529;
+  --color-brand-red-900: #821b1e;
+  --color-brand-green: #00a859;
+  --color-brand-green-dark: #008647;
+  --color-brand-white: #fefefe;
+}

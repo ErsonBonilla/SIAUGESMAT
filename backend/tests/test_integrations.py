@@ -9,14 +9,14 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from app.integrations.moodle import MoodleIntegration
-from app.services.moodle import MoodleAPIError
+from app.services.moodle_errors import MoodleAPIError
 
 
 @pytest.fixture
 def integration():
     mock_service = AsyncMock()
     mock_service.get_users.return_value = []
-    mock_service.get_user_by_username.return_value = None
+    mock_service.get_user_by_username.return_value = {"username": "testuser", "suspended": "0"}
     mock_service.create_users.return_value = [{"id": 1, "username": "testuser"}]
     mock_service.enrol_users.return_value = {
         "success": True, "enrolled": 1, "failed": 0, "errors": [],

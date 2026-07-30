@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
+from app.services.category_utils import sort_categories
+
 
 class BaseExcelParser(ABC):
     CANONICAL_MAP: Dict[str, str] = {}
@@ -230,21 +232,4 @@ class BaseExcelParser(ABC):
 
         return value
 
-    @staticmethod
-    def _sort_categories(categories: List[Dict]) -> List[Dict]:
-        id_set = {c["idnumber"] for c in categories}
-        sorted_cats = []
-        roots = [c for c in categories if c["parent"] == 0]
-        for root in roots:
-            sorted_cats.append(root)
-            hijos_n1 = [c for c in categories if c["parent"] == root["idnumber"]]
-            for h1 in hijos_n1:
-                sorted_cats.append(h1)
-                hijos_n2 = [c for c in categories if c["parent"] == h1["idnumber"]]
-                for h2 in hijos_n2:
-                    sorted_cats.append(h2)
-                    hijos_n3 = [c for c in categories if c["parent"] == h2["idnumber"]]
-                    sorted_cats.extend(hijos_n3)
-        orphans = [c for c in categories if c not in sorted_cats]
-        sorted_cats.extend(orphans)
-        return sorted_cats
+    _sort_categories = staticmethod(sort_categories)

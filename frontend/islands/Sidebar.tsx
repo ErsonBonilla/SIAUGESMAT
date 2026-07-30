@@ -3,20 +3,43 @@ import { useEffect } from "preact/hooks";
 import type { JSX } from "preact";
 import { removeToken, removeTokenCookie } from "../utils/auth.ts";
 import { getMyProfile, type UserProfile } from "../services/api.ts";
-import { profileSignal, ensureProfile } from "../utils/profile.ts";
-import { UserGroupIcon, BookOpenIcon, FolderIcon, CogIcon } from "../utils/icons.tsx";
+import { ensureProfile, profileSignal } from "../utils/profile.ts";
+import {
+  BookOpenIcon,
+  CogIcon,
+  FolderIcon,
+  UserGroupIcon,
+} from "../utils/icons.tsx";
 import ThemeToggle from "./ThemeToggle.tsx";
 
 const NAV_ITEMS = [
-  { href: "/usuarios", icon: UserGroupIcon, label: "Usuarios", match: "/usuarios" },
+  {
+    href: "/usuarios",
+    icon: UserGroupIcon,
+    label: "Usuarios",
+    match: "/usuarios",
+  },
   { href: "/cursos", icon: BookOpenIcon, label: "Cursos", match: "/cursos" },
-  { href: "/categorias", icon: FolderIcon, label: "Categorías", match: "/categorias" },
-  { href: "/operaciones", icon: CogIcon, label: "Operaciones", match: "/operaciones" },
+  {
+    href: "/categorias",
+    icon: FolderIcon,
+    label: "Categorías",
+    match: "/categorias",
+  },
+  {
+    href: "/operaciones",
+    icon: CogIcon,
+    label: "Operaciones",
+    match: "/operaciones",
+  },
 ];
 
-const navBase = "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium no-underline text-inherit transition-all duration-150";
-const navIdle = "bg-transparent hover:bg-brand-red-100 dark:bg-transparent dark:hover:bg-[var(--bg-tertiary)]";
-const navActive = "font-semibold border border-brand-red-200 bg-brand-red-100 dark:bg-[var(--bg-tertiary)] dark:border-[var(--border-secondary)] text-brand-red-900 dark:text-[var(--text-primary)]";
+const navBase =
+  "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium no-underline text-inherit transition-all duration-150";
+const navIdle =
+  "bg-transparent hover:bg-brand-red-100 dark:bg-transparent dark:hover:bg-[var(--bg-tertiary)]";
+const navActive =
+  "font-semibold border border-brand-red-200 bg-brand-red-100 dark:bg-[var(--bg-tertiary)] dark:border-[var(--border-secondary)] text-brand-red-900 dark:text-[var(--text-primary)]";
 
 interface SidebarProps {
   mobileOpen: boolean;
@@ -46,22 +69,33 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
     }
   };
 
-  const closeMobile = () => { onClose(); };
+  const closeMobile = () => {
+    onClose();
+  };
 
   const isActive = (match: string) => currentPath.value.startsWith(match);
 
   return (
     <>
       <div
-        class={`fixed inset-0 bg-black/40 z-25 md:hidden ${mobileOpen ? "" : "hidden"}`}
+        class={`fixed inset-0 bg-black/40 z-25 md:hidden ${
+          mobileOpen ? "" : "hidden"
+        }`}
         onClick={closeMobile}
       />
 
       <aside
-        class={`w-[220px] h-screen flex flex-col fixed left-0 top-0 z-30 border-r border-[var(--border-secondary)] bg-[var(--navbar-bg)] text-[var(--navbar-text)] ${mobileOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
+        class={`w-[220px] h-screen flex flex-col fixed left-0 top-0 z-30 border-r border-[var(--border-secondary)] bg-[var(--navbar-bg)] text-[var(--navbar-text)] ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        } md:translate-x-0`}
       >
-        <a href="/dashboard" class="flex items-center gap-3 px-5 py-5 font-bold no-underline text-inherit border-b border-[var(--border-secondary)]">
-          <span class="gradient-text text-xl px-3 py-1 rounded-md bg-[var(--bg-tertiary)]">SIAUGESMAT</span>
+        <a
+          href="/dashboard"
+          class="flex items-center gap-3 px-5 py-5 font-bold no-underline text-inherit border-b border-[var(--border-secondary)]"
+        >
+          <span class="gradient-text text-xl px-3 py-1 rounded-md bg-[var(--bg-tertiary)]">
+            SIAUGESMAT
+          </span>
         </a>
 
         <nav class="flex-1 flex flex-col gap-1 px-3 py-3">
@@ -90,7 +124,9 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
                     (e.target as HTMLImageElement).style.display = "none";
                     const parent = (e.target as HTMLElement).parentElement;
                     if (parent) {
-                      const fb = parent.querySelector(".avatar-fallback") as HTMLElement;
+                      const fb = parent.querySelector(
+                        ".avatar-fallback",
+                      ) as HTMLElement;
                       if (fb) fb.style.display = "flex";
                     }
                   }}
@@ -107,10 +143,15 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
             >
               {initial}
             </div>
-            <span class="text-[0.8125rem] font-medium truncate">{displayName}</span>
+            <span class="text-[0.8125rem] font-medium truncate">
+              {displayName}
+            </span>
             <ThemeToggle />
           </div>
-          <button onClick={handleLogout} class="bg-transparent border-none text-inherit cursor-pointer text-xs text-left opacity-60 hover:opacity-100 p-0 font-inherit transition-opacity duration-150">
+          <button
+            onClick={handleLogout}
+            class="bg-transparent border-none text-inherit cursor-pointer text-xs text-left opacity-60 hover:opacity-100 p-0 font-inherit transition-opacity duration-150"
+          >
             Cerrar sesión
           </button>
         </div>

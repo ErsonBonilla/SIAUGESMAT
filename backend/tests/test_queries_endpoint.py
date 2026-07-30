@@ -1,0 +1,58 @@
+import uuid
+from unittest.mock import patch
+
+import pytest
+
+from app.repositories.query_repo import create_query
+
+
+class TestEnqueueQuery:
+    def test_unknown_entity(self, client, auth_headers):
+        resp = client.post("/api/v1/queries/invalid", json={}, headers=auth_headers)
+        assert resp.status_code == 400
+
+    def test_successful_enqueue(self, client, auth_headers, test_db):
+        with patch("app.api.v1.endpoints.queries.execute_query.delay") as mock_delay:
+            resp = client.post("/api/v1/queries/courses", json={}, headers=auth_headers)
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["entity"] == "courses"
+            assert data["status"] == "pending"
+            assert uuid.UUID(data["task_id"])
+            mock_delay.assert_called_once_with(data["task_id"])
+
+    def test_requires_auth(self, client):
+        resp = client.post("/api/v1/queries/courses", json={})
+        assert resp.status_code == 401
+
+
+class TestGetTaskStatus:
+    def test_not_found(self, client, auth_headers):
+        resp = client.get("/api/v1/queries/tasks/nonexistent", headers=auth_headers)
+        assert resp.status_code == 404
+
+    def test_returns_task(self, client, auth_headers, test_db):
+        create_query(test_db, "test-task-id", "courses", {}, "DISTANCIA")
+        resp = client.get("/api/v1/queries/tasks/test-task-id", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["task_id"] == "test-task-id"
+        assert data["status"] == "pending"
+
+
+class TestDownloadCsv:
+    def test_not_found(self, client, auth_headers):
+        resp = client.get("/api/v1/queries/tasks/nonexistent/download", headers=auth_headers)
+        assert resp.status_code == 404
+
+    def test_not_completed(self, client, auth_headers, test_db):
+        create_query(test_db, "test-task-id", "courses", {}, "DISTANCIA")
+        resp = client.get("/api/v1/queries/tasks/test-task-id/download", headers=auth_headers)
+        assert resp.status_code == 409
+
+
+class TestDeleteOld:
+    def test_delete_old(self, client, auth_headers, test_db):
+        resp = client.delete("/api/v1/queries/tasks/old?days=30", headers=auth_headers)
+        assert resp.status_code == 200
+        assert "deleted_tasks" in resp.json()

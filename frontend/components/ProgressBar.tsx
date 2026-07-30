@@ -1,7 +1,14 @@
 // components/ProgressBar.tsx
 
+import { formatEta } from "../utils/date.ts";
+
 const PHASE_ICONS = ["🔄", "📊", "⚡", "📋"];
-const PHASE_LABELS = ["Consultar Moodle", "Analizar datos", "Ejecutar cambios", "Generar reportes"];
+const PHASE_LABELS = [
+  "Consultar Moodle",
+  "Analizar datos",
+  "Ejecutar cambios",
+  "Generar reportes",
+];
 
 interface ProgressBarProps {
   currentPhase: string | null;
@@ -11,19 +18,15 @@ interface ProgressBarProps {
   etaSeconds?: number;
 }
 
-export default function ProgressBar({ currentPhase, currentStep, progressPct, status, etaSeconds }: ProgressBarProps) {
+export default function ProgressBar(
+  { currentPhase, currentStep, progressPct, status, etaSeconds }:
+    ProgressBarProps,
+) {
   const step = currentStep ?? 1;
   const icon = PHASE_ICONS[step - 1] ?? "⏳";
   const phaseLabel = PHASE_LABELS[step - 1] ?? "Procesando";
   const pct = Math.round(progressPct);
   const running = pct < 100;
-
-  function formatEta(seconds: number): string {
-    if (seconds <= 0) return "";
-    if (seconds < 60) return "< 1 min";
-    const mins = Math.ceil(seconds / 60);
-    return `~${mins} min${mins > 1 ? "" : ""} restantes`;
-  }
 
   return (
     <div class="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl p-6 mb-6">
@@ -35,15 +38,19 @@ export default function ProgressBar({ currentPhase, currentStep, progressPct, st
             {icon}
           </span>
           <div>
-            <p class="text-sm font-semibold text-[var(--text-primary)]">{currentPhase ?? "Procesando…"}</p>
-            <p class="text-xs text-[var(--text-secondary)]">{phaseLabel} · Fase {step} de 4</p>
+            <p class="text-sm font-semibold text-[var(--text-primary)]">
+              {currentPhase ?? "Procesando…"}
+            </p>
+            <p class="text-xs text-[var(--text-secondary)]">
+              {phaseLabel} · Fase {step} de 4
+            </p>
           </div>
         </div>
         <div class="flex items-center gap-2">
           <span class="text-2xl font-bold" style="color: var(--brand-red);">
             {pct}%
           </span>
-          {status === "running" && etaSeconds !== undefined && etaSeconds > 0 && (
+          {status === "running" && etaSeconds != null && etaSeconds > 0 && (
             <span class="text-xs text-[var(--text-secondary)] whitespace-nowrap">
               {formatEta(etaSeconds)}
             </span>
@@ -55,7 +62,8 @@ export default function ProgressBar({ currentPhase, currentStep, progressPct, st
           class="h-full rounded-full progress-bar-shimmer"
           style={{
             width: `${pct}%`,
-            transition: "width 0.6s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1))",
+            transition:
+              "width 0.6s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1))",
           }}
         />
       </div>

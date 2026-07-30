@@ -1,5 +1,5 @@
 // routes/jobs/[id].tsx
-import { PageProps } from "$fresh/server.ts";
+import type { PageProps } from "@fresh/core";
 import { requireAuth } from "../../utils/auth-guard.ts";
 import Layout from "../../components/Layout.tsx";
 import JobDetailIsland from "../../islands/JobDetailIsland.tsx";

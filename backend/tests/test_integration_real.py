@@ -24,7 +24,7 @@ import uuid
 import pytest
 
 from app.core.config import settings
-from app.services.moodle import MoodleService
+from app.services.moodle_operations import MoodleService
 
 pytestmark = pytest.mark.integration
 logger = logging.getLogger(__name__)

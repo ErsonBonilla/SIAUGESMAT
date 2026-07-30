@@ -1,5 +1,5 @@
 // services/api/mantenimiento.ts
-import { BASE_URL, authHeaders, handleResponse } from "./core.ts";
+import { authHeaders, BASE_URL, handleResponse } from "./core.ts";
 import type { CsvUploadResponse } from "./types.ts";
 
 export async function uploadVisibilityCsv(
