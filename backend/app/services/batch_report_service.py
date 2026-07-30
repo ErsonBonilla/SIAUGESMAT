@@ -1,14 +1,13 @@
-import csv
 import io
 import logging
 import os
 import tempfile
-import zipfile
 from typing import Dict, List, Optional, Tuple
 
 from app.core.config import settings
 from app.core.entity_config import ENTITY_CONFIG
 from app.db.models import OperationBatch, OperationItem
+from app.services.report_utils import write_csv, create_zip, list_csv_files, get_csv_path
 
 logger = logging.getLogger(__name__)
 
@@ -99,54 +98,21 @@ def save_batch_reports(batch: OperationBatch, items: List[OperationItem]) -> str
 
     for name, (headers, rows) in csvs.items():
         filepath = os.path.join(batch_dir, f"{name}.csv")
-        with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
-            writer = csv.writer(f)
-            writer.writerow(headers)
-            for row in rows:
-                if isinstance(row, dict):
-                    writer.writerow([row.get(h, "") for h in headers])
-                else:
-                    writer.writerow(row)
+        write_csv(filepath, headers, rows)
         logger.info(f"Reporte batch {name}.csv: {len(rows)} filas")
 
-    # Generar ZIP
-    zip_path = batch_dir + ".zip"
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for name in csvs:
-            filepath = os.path.join(batch_dir, f"{name}.csv")
-            if os.path.exists(filepath):
-                zf.write(filepath, f"{name}.csv")
+    create_zip(batch_dir, batch_dir + ".zip")
 
     logger.info(f"Reportes batch guardados en: {batch_dir}")
     return batch_dir
 
 
 def list_batch_reports(batch_id: str) -> List[Dict[str, str]]:
-    """Lista los CSVs individuales disponibles para un batch.
-
-    Returns:
-        [{name, filename, size}, ...]
-    """
-    batch_dir = _batch_dir(batch_id)
-    if not os.path.isdir(batch_dir):
-        return []
-    reports = []
-    for fname in sorted(os.listdir(batch_dir)):
-        if fname.endswith(".csv"):
-            path = os.path.join(batch_dir, fname)
-            name = fname.replace(".csv", "")
-            reports.append({
-                "name": name,
-                "filename": fname,
-                "size": os.path.getsize(path),
-            })
-    return reports
+    return list_csv_files(_batch_dir(batch_id))
 
 
 def get_batch_report_path(batch_id: str, report_name: str) -> Optional[str]:
-    """Retorna la ruta completa a un CSV individual."""
-    path = os.path.join(_batch_dir(batch_id), f"{report_name}.csv")
-    return path if os.path.exists(path) else None
+    return get_csv_path(_batch_dir(batch_id), report_name)
 
 
 def build_batch_report_zip(batch: OperationBatch, items: List[OperationItem]) -> Tuple[str, str]:
