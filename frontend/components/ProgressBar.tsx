@@ -27,6 +27,7 @@ export default function ProgressBar(
   const phaseLabel = PHASE_LABELS[step - 1] ?? "Procesando";
   const pct = Math.round(progressPct);
   const running = pct < 100;
+  const progressColor = `hsl(${pct * 1.2}, 85%, 42%)`;
 
   return (
     <div class="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl p-6 mb-6">
@@ -47,7 +48,7 @@ export default function ProgressBar(
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <span class="text-2xl font-bold" style="color: var(--brand-red);">
+          <span class="text-2xl font-bold" style={{ color: progressColor }}>
             {pct}%
           </span>
           {status === "running" && etaSeconds != null && etaSeconds > 0 && (
@@ -62,8 +63,8 @@ export default function ProgressBar(
           class="h-full rounded-full progress-bar-shimmer"
           style={{
             width: `${pct}%`,
-            transition:
-              "width 0.6s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1))",
+            backgroundColor: progressColor,
+            transition: "width 0.6s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1)), background-color 0.6s ease",
           }}
         />
       </div>
@@ -78,10 +79,8 @@ export default function ProgressBar(
               class="h-1 rounded-full transition-all duration-700"
               style={{
                 width: "21%",
-                backgroundColor: isDone
-                  ? "var(--brand-red)"
-                  : isCurrent
-                  ? "var(--brand-red)"
+                backgroundColor: isDone || isCurrent
+                  ? progressColor
                   : "var(--bg-tertiary)",
                 opacity: isDone ? 1 : isCurrent ? 0.8 : 0.3,
               }}
