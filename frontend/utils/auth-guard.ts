@@ -1,7 +1,7 @@
 import type { FreshContext } from "@fresh/core";
 
-function getCookie(name: string, req: Request): string | null {
-  const cookie = req.headers.get("cookie");
+function getCookie(name: string, headers: Headers | null): string | null {
+  const cookie = headers?.get("cookie");
   if (!cookie) return null;
   for (const part of cookie.split(";")) {
     const [key, ...rest] = part.trim().split("=");
@@ -10,32 +10,28 @@ function getCookie(name: string, req: Request): string | null {
   return null;
 }
 
-function tokenPresent(req: Request): boolean {
-  return getCookie("auth_token", req) !== null;
+function tokenPresent(headers: Headers | null): boolean {
+  return getCookie("auth_token", headers) !== null;
 }
 
 export function requireAuth() {
   return {
-    GET(req: Request, ctx: FreshContext) {
-      if (!tokenPresent(req)) {
-        return new Response("", {
-          status: 302,
-          headers: { Location: "/login" },
-        });
+    GET(ctx: FreshContext) {
+      if (!tokenPresent(ctx.req.headers)) {
+        return ctx.redirect("/login");
       }
+      return { data: {} };
     },
   };
 }
 
 export function redirectIfAuth() {
   return {
-    GET(req: Request, ctx: FreshContext) {
-      if (tokenPresent(req)) {
-        return new Response("", {
-          status: 302,
-          headers: { Location: "/dashboard" },
-        });
+    GET(ctx: FreshContext) {
+      if (tokenPresent(ctx.req.headers)) {
+        return ctx.redirect("/dashboard");
       }
+      return { data: {} };
     },
   };
 }

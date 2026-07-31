@@ -443,7 +443,7 @@ class TestRomanNumeral:
         assert BaseExcelParser._to_roman_numeral("iii") == "III"
 
     def test_out_of_range_fallback(self):
-        assert BaseExcelParser._to_roman_numeral("2025") == "2025"
+        assert BaseExcelParser._to_roman_numeral("2025") == "MMXXV"
         assert BaseExcelParser._to_roman_numeral("0") == "0"
 
     def test_non_numeric_fallback(self):

@@ -13,6 +13,7 @@ RUN deno task build
 
 EXPOSE 3000
 
+ENV PORT=3000
 ENV BACKEND_URL=http://backend:8000/api/v1
 ENV DOCKER_ENV=1
 

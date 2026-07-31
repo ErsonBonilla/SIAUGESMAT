@@ -1,9 +1,11 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { JSX } from "preact";
-import { removeToken, removeTokenCookie } from "../utils/auth.ts";
+import { logout } from "../services/api.ts";
+import { removeToken } from "../utils/auth.ts";
 import { getMyProfile, type UserProfile } from "../services/api.ts";
 import { ensureProfile, profileSignal } from "../utils/profile.ts";
+import { mobileOpenSignal } from "../utils/layout.ts";
 import {
   BookOpenIcon,
   CogIcon,
@@ -41,12 +43,7 @@ const navIdle =
 const navActive =
   "font-semibold border border-brand-red-200 bg-brand-red-100 dark:bg-[var(--bg-tertiary)] dark:border-[var(--border-secondary)] text-brand-red-900 dark:text-[var(--text-primary)]";
 
-interface SidebarProps {
-  mobileOpen: boolean;
-  onClose: () => void;
-}
-
-export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
+export default function Sidebar() {
   const currentPath = useSignal("");
 
   useEffect(() => {
@@ -63,14 +60,14 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
 
   const handleLogout = () => {
     removeToken();
-    removeTokenCookie();
+    logout();
     if (typeof window !== "undefined") {
       window.location.href = "/login";
     }
   };
 
   const closeMobile = () => {
-    onClose();
+    mobileOpenSignal.value = false;
   };
 
   const isActive = (match: string) => currentPath.value.startsWith(match);
@@ -79,14 +76,14 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
     <>
       <div
         class={`fixed inset-0 bg-black/40 z-25 md:hidden ${
-          mobileOpen ? "" : "hidden"
+          mobileOpenSignal.value ? "" : "hidden"
         }`}
         onClick={closeMobile}
       />
 
       <aside
         class={`w-[220px] h-screen flex flex-col fixed left-0 top-0 z-30 border-r border-[var(--border-secondary)] bg-[var(--navbar-bg)] text-[var(--navbar-text)] ${
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
+          mobileOpenSignal.value ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0`}
       >
         <a

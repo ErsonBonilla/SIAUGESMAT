@@ -54,22 +54,13 @@ export const ENTITY_CONSULT_CONFIGS: Record<string, EntityConfig> = {
       { key: "shortname", label: "Shortname" },
       { key: "fullname", label: "Nombre completo" },
       { key: "categoryname", label: "Categoría" },
-      { key: "visible", label: "Visible", render: (v) => v == 1 ? "Sí" : "No" },
+      { key: "visible", label: "Visible", renderKey: "yesNo" },
     ],
   },
   users: {
     title: "Usuarios",
-    searchPlaceholder: "Buscar por username o email...",
+    searchPlaceholder: "Buscar por username, email o nombre (coincidencia exacta)...",
     filters: [
-      {
-        key: "role",
-        label: "Rol",
-        type: "select",
-        options: [
-          { value: "all", label: "Todos los usuarios" },
-          { value: "professor", label: "Profesores (editingteacher)" },
-        ],
-      },
       {
         key: "status",
         label: "Filtro adicional",
@@ -88,10 +79,7 @@ export const ENTITY_CONSULT_CONFIGS: Record<string, EntityConfig> = {
       {
         key: "lastlogin",
         label: "Último login",
-        render: (v) =>
-          typeof v === "number" && v > 0
-            ? new Date(v * 1000).toLocaleString()
-            : "Nunca",
+        renderKey: "lastlogin",
       },
     ],
   },

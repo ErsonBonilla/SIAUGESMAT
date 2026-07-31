@@ -68,21 +68,13 @@ async def _do_query(moodle: MoodleService, qr):
         return await moodle.get_categories(idnumber=search)
 
     elif qr.entity == "users":
-        role = params.get("role", "all")
         status_filter = params.get("status")
         search = params.get("search")
 
-        raw = await moodle.get_users_by_role("editingteacher") if role == "professor" else await moodle.get_all_users()
+        raw = await moodle.search_users(search) if search else []
 
         if status_filter == "never_logged_in":
             raw = [u for u in raw if u.get("lastlogin", 1) == 0]
-        if search:
-            q = search.lower()
-            raw = [u for u in raw
-                   if q in (u.get("username") or "").lower()
-                   or q in (u.get("email") or "").lower()
-                   or q in (u.get("firstname") or "").lower()
-                   or q in (u.get("lastname") or "").lower()]
         return raw
 
     elif qr.entity == "inactive_teachers":
@@ -137,7 +129,7 @@ async def _do_query(moodle: MoodleService, qr):
         raise ValueError(f"Entidad desconocida: {qr.entity}")
 
 
-@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, task_time_limit=600)
+@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, time_limit=3600, soft_time_limit=3540)
 def execute_query(self, task_id: str):
     db = SessionLocal()
     qr = None

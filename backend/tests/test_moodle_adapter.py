@@ -126,7 +126,7 @@ class TestMoodleAdapterFactory:
 
     def test_unsupported_version_raises(self):
         with pytest.raises(ValueError, match="Unsupported"):
-            MoodleAdapterFactory.create("4.0")
+            MoodleAdapterFactory.create("2.7")
 
     def test_unsupported_5x_raises(self):
         with pytest.raises(ValueError, match="Unsupported"):

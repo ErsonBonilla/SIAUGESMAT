@@ -220,7 +220,7 @@ def test_latest_execution(sample_executions):
     # Pero exec4 tiene created_at por defecto, por lo que depende del orden. Vamos a asegurarnos de que exista.
     assert latest is not None
     assert isinstance(latest, LatestExecution)
-    assert latest.execution_id is not None
+    assert latest.id is not None
     assert latest.status in ("completed", "failed", "pending")
 
     # El semáforo de la última (fallida) puede ser gris/rojo dependiendo de la métrica.

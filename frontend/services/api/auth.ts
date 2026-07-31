@@ -32,3 +32,11 @@ export async function getMyProfile(): Promise<UserProfile> {
   });
   return handleResponse<UserProfile>(response);
 }
+
+export async function logout(): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/auth/logout`, { method: "POST" });
+  } catch {
+    // El logout es best-effort; si falla, el cliente limpia el estado local.
+  }
+}

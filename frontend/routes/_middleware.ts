@@ -9,8 +9,8 @@ interface AppState {
  * Middleware global que lee la cookie `theme` y la pasa al estado
  * para que _app.tsx pueda renderizar el tema correcto en SSR.
  */
-export async function handler(req: Request, ctx: FreshContext<AppState>) {
-  const cookies = req.headers.get("cookie") || "";
+export async function handler(ctx: FreshContext<AppState>) {
+  const cookies = ctx.req.headers.get("cookie") || "";
   const themeMatch = cookies.split(";").find((c) =>
     c.trim().startsWith("theme=")
   );

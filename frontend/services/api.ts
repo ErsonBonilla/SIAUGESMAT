@@ -1,5 +1,5 @@
 // services/api.ts — barrel (split: types, core, auth, trabajos, analytics, reportes, operaciones, consultas)
-export { getMyProfile, login } from "./api/auth.ts";
+export { getMyProfile, login, logout } from "./api/auth.ts";
 
 export {
   cancelExecution,

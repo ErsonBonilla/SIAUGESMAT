@@ -9,7 +9,7 @@ Proporciona:
 import logging
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
@@ -208,7 +208,7 @@ async def _check_moodle_permissions(moodle_url: str, token: str) -> int:
 # ---------------------------------------------------------------------------
 
 @router.post("/login", response_model=LoginResponse, summary="Iniciar sesión")
-async def login(request: LoginRequest):
+async def login(request: LoginRequest, response: Response):
     """
     Autentica al usuario contra Moodle y devuelve un token JWT propio.
 
@@ -248,12 +248,31 @@ async def login(request: LoginRequest):
         f"(userid={user_id}, modalidad={request.modalidad})"
     )
 
+    # Cookie HttpOnly+Secure para que el SSR del frontend autorice rutas
+    # protegidas. La misma expiración que el JWT (JWT_EXPIRE_MINUTES).
+    response.set_cookie(
+        key="auth_token",
+        value=access_token,
+        max_age=settings.JWT_EXPIRE_MINUTES * 60,
+        path="/",
+        httponly=True,
+        secure=True,
+        samesite="lax",
+    )
+
     return LoginResponse(
         access_token=access_token,
         user_id=user_id,
         username=request.username,
         modalidad=request.modalidad,
     )
+
+
+@router.post("/logout", summary="Cerrar sesión")
+async def logout(response: Response):
+    """Elimina la cookie de sesión (HttpOnly) del navegador."""
+    response.delete_cookie("auth_token", path="/")
+    return {"status": "ok"}
 
 
 @router.get("/me", response_model=UserProfileResponse, summary="Obtener perfil del usuario autenticado")

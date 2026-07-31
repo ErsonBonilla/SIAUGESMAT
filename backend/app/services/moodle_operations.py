@@ -364,28 +364,31 @@ class MoodleService(MoodleClient):
     # ------------------------------------------------------------------
     # Consultas masivas
     # ------------------------------------------------------------------
-    async def get_all_users(self, page_size: int = 500) -> List[Dict]:
-        warnings.warn(
-            "get_all_users usa core_user_get_users (deprecado desde Moodle 3.8). "
-            "Considere migrar a búsquedas específicas con get_users().",
-            DeprecationWarning, stacklevel=2,
-        )
-        all_users: List[Dict] = []
-        offset = 0
-        while True:
-            batch = await self._request(
-                "core_user_get_users",
-                params={"limit": page_size, "offset": offset},
-            )
-            if isinstance(batch, dict):
-                batch = batch.get("users", [])
-            if not batch:
-                break
-            all_users.extend(batch)
-            if len(batch) < page_size:
-                break
-            offset += page_size
-        return all_users
+    async def search_users(self, term: str) -> List[Dict]:
+        """Busca usuarios por término (coincidencia exacta por campo).
+
+        Usa core_user_get_users (Moodle 3.9), que requiere `criteria` y no
+        soporta paginación ni substring. Consulta username, email, firstname
+        y lastname en paralelo y devuelve la unión deduplicada por id.
+        """
+        term = (term or "").strip()
+        if not term:
+            return []
+        found: Dict[int, Dict] = {}
+        for key in ("username", "email", "firstname", "lastname"):
+            try:
+                result = await self._request(
+                    "core_user_get_users",
+                    params={"criteria[0][key]": key, "criteria[0][value]": term},
+                )
+            except MoodleAPIError:
+                continue
+            users = result.get("users", []) if isinstance(result, dict) else []
+            for user in users:
+                if "lastlogin" not in user:
+                    user["lastlogin"] = user.get("lastaccess", 0)
+                found[int(user["id"])] = user
+        return list(found.values())
 
     async def get_users_by_role(self, role_shortname: str) -> List[Dict]:
         role_id = role_shortname_to_id(role_shortname)

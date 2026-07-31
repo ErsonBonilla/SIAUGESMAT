@@ -1,5 +1,5 @@
 // services/api/core.ts
-import { getToken, removeToken, removeTokenCookie } from "../../utils/auth.ts";
+import { getToken, removeToken } from "../../utils/auth.ts";
 
 export const BASE_URL = typeof Deno !== "undefined"
   ? Deno.env.get("BACKEND_URL")
@@ -14,7 +14,11 @@ export async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     if (response.status === 401) {
       removeToken();
-      removeTokenCookie();
+      try {
+        await fetch(`${BASE_URL}/auth/logout`, { method: "POST" });
+      } catch {
+        // best-effort: el estado local ya se limpió
+      }
       if (typeof window !== "undefined") window.location.href = "/login";
       throw new Error("Sesión expirada. Vuelva a iniciar sesión.");
     }

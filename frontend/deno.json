@@ -4,10 +4,12 @@
     "check": "deno fmt --check && deno lint && deno check main.ts dev.ts fresh.config.ts && deno check routes/ && deno check islands/ && deno check components/ && deno check utils/ && deno check services/ && deno check hooks/",
     "start": "deno run -A --watch=static/,routes/ dev.ts",
     "build": "deno run -A dev.ts build",
-    "preview": "deno run -A main.ts",
+    "preview": "deno serve -A --port $PORT _fresh/server.js",
     "test": "deno test -A tests/"
   },
   "imports": {
+    "fresh": "jsr:@fresh/core@^2.3.3",
+    "fresh/dev": "jsr:@fresh/core@^2.3.3/dev",
     "@fresh/core": "jsr:@fresh/core@^2.3.3",
     "@fresh/core/dev": "jsr:@fresh/core@^2.3.3/dev",
     "@fresh/plugin-tailwind": "jsr:@fresh/plugin-tailwind@^1.0.0",
