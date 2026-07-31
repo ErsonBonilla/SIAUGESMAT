@@ -37,8 +37,8 @@ def process_operation_batch(self, batch_id: str):
         moodle = get_moodle_service(batch.modalidad)
         items = get_pending_items(db, batch_id)
 
-        try:
-            async def _process_all():
+        async def _process_all():
+            try:
                 if batch.entity_type == "categories" and batch.action == "create":
                     await _ensure_root_category(moodle)
 
@@ -72,10 +72,10 @@ def process_operation_batch(self, batch_id: str):
                         )
                         update_item(db, item.id, "failed", translate_error(exc))
                         update_batch_counts(db, batch_id, failed=1)
+            finally:
+                await moodle.close()
 
-            asyncio.run(_process_all())
-        finally:
-            asyncio.run(moodle.close())
+        asyncio.run(_process_all())
 
         complete_batch(db, batch_id)
 

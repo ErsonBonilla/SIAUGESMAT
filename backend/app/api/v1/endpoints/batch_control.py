@@ -5,6 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
 from app.repositories.operation_repo import (
     cancel_batch,
@@ -125,22 +126,6 @@ def list_batch_reports_endpoint(
     return {"batch_id": batch_id, "reports": list_batch_reports(batch_id)}
 
 
-@router.get("/batch/{batch_id}/reports/{report_name}",
-            summary="Descargar un CSV individual de un lote")
-def download_batch_report(
-    batch_id: str, report_name: str,
-    db: Session = Depends(get_db), current_user: UserInToken = Depends(get_current_user),
-):
-    batch = get_batch(db, batch_id)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Lote no encontrado")
-
-    path = get_batch_report_path(batch_id, report_name)
-    if not path:
-        raise HTTPException(status_code=404, detail="Reporte no encontrado")
-    return FileResponse(path=path, media_type="text/csv", filename=f"{report_name}.csv")
-
-
 @router.get("/batch/{batch_id}/reports/download",
             summary="Descargar reportes (ZIP con CSVs)")
 def download_batch_reports(
@@ -162,6 +147,22 @@ def download_batch_reports(
         return FileResponse(path=zip_path, media_type="application/zip", filename=zip_filename)
     return FileResponse(path=zip_path, media_type="application/zip",
                         filename=f"reportes_{batch.action}_{batch.entity_type}_{batch_id[:8]}.zip")
+
+
+@router.get("/batch/{batch_id}/reports/{report_name}",
+            summary="Descargar un CSV individual de un lote")
+def download_batch_report(
+    batch_id: str, report_name: str,
+    db: Session = Depends(get_db), current_user: UserInToken = Depends(get_current_user),
+):
+    batch = get_batch(db, batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+
+    path = get_batch_report_path(batch_id, report_name)
+    if not path:
+        raise HTTPException(status_code=404, detail="Reporte no encontrado")
+    return FileResponse(path=path, media_type="text/csv", filename=f"{report_name}.csv")
 
 
 @router.delete("/batches/old", response_model=DeleteOldBatchesResponse,

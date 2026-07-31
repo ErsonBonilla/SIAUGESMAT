@@ -89,6 +89,8 @@ class TestProcessOperationBatch:
             mock_sl.return_value = db
             process_operation_batch("BATCH_001")
             moodle.delete_courses.assert_called_once_with(["CURSE_001"])
+            mock_complete.assert_called_once()
+            assert mock_complete.call_args[0][1] == "BATCH_001"
 
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")

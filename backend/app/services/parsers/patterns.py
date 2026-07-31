@@ -12,7 +12,8 @@ SHORTNAME_PATTERN = re.compile(
     r"(?P<cod_curso_old>\d+)_s(?P<semestre_old>[IVXLCDM]+)|"
     r"s(?P<semestre_new>[IVXLCDM]+)_(?P<cod_curso_new>\d+)"
     r")_"
-    r"G-(?P<grupo>[^_]+)(?:_(?P<suffix>[^_]+))?$"
+    r"G-(?P<grupo>[^_]+)(?:_(?P<suffix>[^_]+))?$",
+    re.IGNORECASE,
 )
 
 

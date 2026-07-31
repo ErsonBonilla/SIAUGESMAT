@@ -1,3 +1,6 @@
 # tests_e2e — fixtures con datos reales de docentes (protegidos por .gitignore)
 # No deben enviarse al contexto de build de Docker
 backend/tests_e2e/fixtures/
+
+# Archivos de entorno (dev) — la config llega por env de docker-compose, no por archivos
+**/.env
