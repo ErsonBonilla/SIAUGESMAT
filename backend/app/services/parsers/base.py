@@ -87,6 +87,42 @@ class BaseExcelParser(ABC):
         return df
 
     @classmethod
+    def _filter_virtual_rows(cls, df: pd.DataFrame) -> pd.DataFrame:
+        observaciones_col = None
+        for col in df.columns:
+            if cls._normalize_column_name(str(col)) == "observaciones":
+                observaciones_col = col
+                break
+
+        if not observaciones_col:
+            raise ValueError(
+                "No se encontró la columna 'Observaciones' en el archivo. "
+                "Esta columna es obligatoria para procesar la carga académica."
+            )
+
+        before = len(df)
+        mask = df[observaciones_col].astype(str).str.contains(
+            "virtual", case=False, na=False
+        )
+        df = df[~mask].copy()
+        df = df.drop(columns=[observaciones_col])
+
+        descartadas = before - len(df)
+        if descartadas:
+            import logging
+            logging.getLogger(__name__).info(
+                "Observaciones: %d → %d filas (%d descartadas por virtualidad)",
+                before, len(df), descartadas,
+            )
+        else:
+            import logging
+            logging.getLogger(__name__).info(
+                "Observaciones: todas las %d filas continúan", len(df)
+            )
+
+        return df
+
+    @classmethod
     def _parse_program_name(cls, df: pd.DataFrame) -> pd.DataFrame:
         if "cod_programa" not in df.columns and "nombre_programa" in df.columns:
             mask = df["nombre_programa"].str.contains(r"^\d+\s*-\s*", na=False)

@@ -48,6 +48,7 @@ class DistanciaParser(BaseExcelParser):
     def parse(cls, df: pd.DataFrame, modalidad: str) -> Dict[str, Any]:
         df = cls._normalize_columns(df)
         df = cls._filter_confirmed_rows(df)
+        df = cls._filter_virtual_rows(df)
         df = cls._parse_program_name(df)
         df = cls._clean_data(df)
 
