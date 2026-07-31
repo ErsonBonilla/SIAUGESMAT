@@ -1,5 +1,4 @@
 import logging
-import warnings
 from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
@@ -49,7 +48,9 @@ class MoodleService(MoodleClient):
             if str(parent_val) != "0":
                 parent_val = parent_map.get(str(parent_val), 0)
             params[f"categories[{i}][parent]"] = parent_val
-        return await self._request("core_course_create_categories", params)
+        result = await self._request("core_course_create_categories", params)
+        self._categories_cache = None
+        return result
 
     async def get_categories(self, idnumber: Optional[str] = None) -> List[Dict]:
         if self._categories_cache is None:
@@ -63,7 +64,9 @@ class MoodleService(MoodleClient):
             "categories[0][id]": category_id,
             "categories[0][recursive]": 1 if recursive else 0,
         }
-        return await self._request("core_course_delete_categories", params)
+        result = await self._request("core_course_delete_categories", params)
+        self._categories_cache = None
+        return result
 
     async def update_category(self, category_id: int, parent_idnumber: Optional[str] = None,
                                name: Optional[str] = None, idnumber: Optional[str] = None) -> Dict:
@@ -78,7 +81,9 @@ class MoodleService(MoodleClient):
             params["categories[0][name]"] = name
         if idnumber is not None:
             params["categories[0][idnumber]"] = idnumber
-        return await self._request("core_course_update_categories", params)
+        result = await self._request("core_course_update_categories", params)
+        self._categories_cache = None
+        return result
 
     # ------------------------------------------------------------------
     # Cursos
@@ -389,17 +394,6 @@ class MoodleService(MoodleClient):
                     user["lastlogin"] = user.get("lastaccess", 0)
                 found[int(user["id"])] = user
         return list(found.values())
-
-    async def get_users_by_role(self, role_shortname: str) -> List[Dict]:
-        role_id = role_shortname_to_id(role_shortname)
-        assignments = await self._request(
-            "core_role_assign_get_role_assignments",
-            params={"roleid": role_id},
-        )
-        user_ids = list({a["userid"] for a in assignments})
-        if not user_ids:
-            return []
-        return await self.get_users("id", [str(uid) for uid in user_ids])
 
     async def get_courses_by_field(self, field: str, value: str) -> List[Dict]:
         result = await self._request(

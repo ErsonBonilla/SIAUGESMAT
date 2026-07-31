@@ -152,8 +152,12 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Configuración del modelo de Pydantic-settings
     # ------------------------------------------------------------------
+    # Fuente principal: el .env raíz del repositorio (igual que Docker).
+    # backend/.env actúa solo como override de desarrollo (p. ej. DATABASE_URL=localhost).
+    _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+    _BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(str(_REPO_ROOT / ".env"), str(_BACKEND_ROOT / ".env")),
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",

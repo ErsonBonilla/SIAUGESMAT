@@ -12,9 +12,9 @@ services:
     container_name: siaugesmat-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-siaugesmat}
-      POSTGRES_USER: ${POSTGRES_USER:-siaugesmat}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       # Ajustes de rendimiento recomendados para cargas semestrales
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
     volumes:
@@ -22,7 +22,7 @@ services:
     networks:
       - siaugesmat-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-siaugesmat}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -59,51 +59,55 @@ services:
       # FastAPI / Proyecto
       PROJECT_NAME: SIAUGESMAT
       DEBUG: "false"
-      ALLOW_PRESENCIAL: ${ALLOW_PRESENCIAL:-false}
+      ALLOW_PRESENCIAL: ${ALLOW_PRESENCIAL}
 
       # Moodle
-      MOODLE_URL: ${MOODLE_URL:-}
-      MOODLE_ADMIN_TOKEN: ${MOODLE_ADMIN_TOKEN:-}
-      MOODLE_VERSION: ${MOODLE_VERSION:-3.9}
+      MOODLE_URL: ${MOODLE_URL}
+      MOODLE_ADMIN_TOKEN: ${MOODLE_ADMIN_TOKEN}
+      MOODLE_VERSION: ${MOODLE_VERSION}
 
       # Moodle - Configuración por modalidad (lee de .env raíz)
       # Si la var específica no está definida, se usa el fallback genérico
-      MOODLE_URL__PRESENCIAL: ${MOODLE_URL__PRESENCIAL:-}
-      MOODLE_TOKEN__PRESENCIAL: ${MOODLE_TOKEN__PRESENCIAL:-}
-      MOODLE_VERSION__PRESENCIAL: ${MOODLE_VERSION__PRESENCIAL:-}
-      MOODLE_URL__DISTANCIA: ${MOODLE_URL__DISTANCIA:-}
-      MOODLE_TOKEN__DISTANCIA: ${MOODLE_TOKEN__DISTANCIA:-}
-      MOODLE_VERSION__DISTANCIA: ${MOODLE_VERSION__DISTANCIA:-}
+      MOODLE_URL__PRESENCIAL: ${MOODLE_URL__PRESENCIAL}
+      MOODLE_TOKEN__PRESENCIAL: ${MOODLE_TOKEN__PRESENCIAL}
+      MOODLE_VERSION__PRESENCIAL: ${MOODLE_VERSION__PRESENCIAL}
+      MOODLE_URL__DISTANCIA: ${MOODLE_URL__DISTANCIA}
+      MOODLE_TOKEN__DISTANCIA: ${MOODLE_TOKEN__DISTANCIA}
+      MOODLE_VERSION__DISTANCIA: ${MOODLE_VERSION__DISTANCIA}
 
       # Base de datos
-      DATABASE_URL: postgresql://${POSTGRES_USER:-siaugesmat}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-siaugesmat}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 
       # Redis
       REDIS_URL: redis://redis:6379/0
 
       # Rate limiting contra Moodle
-      MOODLE_MAX_REQUESTS_PER_SECOND: ${MOODLE_MAX_REQUESTS_PER_SECOND:-5}
-      MOODLE_BURST_SIZE: ${MOODLE_BURST_SIZE:-10}
+      MOODLE_MAX_REQUESTS_PER_SECOND: ${MOODLE_MAX_REQUESTS_PER_SECOND}
+      MOODLE_BURST_SIZE: ${MOODLE_BURST_SIZE}
 
       # Seguridad JWT
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-cambiar-esta-clave-en-produccion}
-      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-60}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES}
 
       # Umbrales del semáforo de analítica
-      ANALYTICS_ERROR_THRESHOLD_YELLOW: ${ANALYTICS_ERROR_THRESHOLD_YELLOW:-1.0}
-      ANALYTICS_ERROR_THRESHOLD_RED: ${ANALYTICS_ERROR_THRESHOLD_RED:-5.0}
-      ANALYTICS_MAX_DURATION_YELLOW: ${ANALYTICS_MAX_DURATION_YELLOW:-3600}
-      ANALYTICS_MAX_DURATION_RED: ${ANALYTICS_MAX_DURATION_RED:-7200}
+      ANALYTICS_ERROR_THRESHOLD_YELLOW: ${ANALYTICS_ERROR_THRESHOLD_YELLOW}
+      ANALYTICS_ERROR_THRESHOLD_RED: ${ANALYTICS_ERROR_THRESHOLD_RED}
+      ANALYTICS_MAX_DURATION_YELLOW: ${ANALYTICS_MAX_DURATION_YELLOW}
+      ANALYTICS_MAX_DURATION_RED: ${ANALYTICS_MAX_DURATION_RED}
 
       # Subida de archivos
       UPLOAD_DIR: /app/uploads
-      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-50}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB}
 
       # CORS
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8000}
+      CORS_ORIGINS: ${CORS_ORIGINS}
 
       # Job timeout (segundos)
-      JOB_TIMEOUT: ${JOB_TIMEOUT:-28800}
+      JOB_TIMEOUT: ${JOB_TIMEOUT}
+
+      # Umbrales de comparación de cursos (segundos)
+      COURSE_MAX_AGE_SECONDS: ${COURSE_MAX_AGE_SECONDS}
+      COURSE_DISAPPEARED_AGE_SECONDS: ${COURSE_DISAPPEARED_AGE_SECONDS}
 
       # Plantilla de curso para ETL
       DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE}
@@ -139,31 +143,35 @@ services:
           memory: 2g
     environment:
       # Mismas variables que el backend para que el worker pueda operar
-      MOODLE_URL: ${MOODLE_URL:-}
-      MOODLE_ADMIN_TOKEN: ${MOODLE_ADMIN_TOKEN:-}
-      MOODLE_VERSION: ${MOODLE_VERSION:-3.9}
+      MOODLE_URL: ${MOODLE_URL}
+      MOODLE_ADMIN_TOKEN: ${MOODLE_ADMIN_TOKEN}
+      MOODLE_VERSION: ${MOODLE_VERSION}
 
       # Moodle - Configuración por modalidad (lee de .env raíz)
-      MOODLE_URL__PRESENCIAL: ${MOODLE_URL__PRESENCIAL:-}
-      MOODLE_TOKEN__PRESENCIAL: ${MOODLE_TOKEN__PRESENCIAL:-}
-      MOODLE_VERSION__PRESENCIAL: ${MOODLE_VERSION__PRESENCIAL:-}
-      MOODLE_URL__DISTANCIA: ${MOODLE_URL__DISTANCIA:-}
-      MOODLE_TOKEN__DISTANCIA: ${MOODLE_TOKEN__DISTANCIA:-}
-      MOODLE_VERSION__DISTANCIA: ${MOODLE_VERSION__DISTANCIA:-}
+      MOODLE_URL__PRESENCIAL: ${MOODLE_URL__PRESENCIAL}
+      MOODLE_TOKEN__PRESENCIAL: ${MOODLE_TOKEN__PRESENCIAL}
+      MOODLE_VERSION__PRESENCIAL: ${MOODLE_VERSION__PRESENCIAL}
+      MOODLE_URL__DISTANCIA: ${MOODLE_URL__DISTANCIA}
+      MOODLE_TOKEN__DISTANCIA: ${MOODLE_TOKEN__DISTANCIA}
+      MOODLE_VERSION__DISTANCIA: ${MOODLE_VERSION__DISTANCIA}
 
-      DATABASE_URL: postgresql://${POSTGRES_USER:-siaugesmat}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-siaugesmat}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
 
-      MOODLE_MAX_REQUESTS_PER_SECOND: ${MOODLE_MAX_REQUESTS_PER_SECOND:-5}
-      MOODLE_BURST_SIZE: ${MOODLE_BURST_SIZE:-10}
+      MOODLE_MAX_REQUESTS_PER_SECOND: ${MOODLE_MAX_REQUESTS_PER_SECOND}
+      MOODLE_BURST_SIZE: ${MOODLE_BURST_SIZE}
 
       UPLOAD_DIR: /app/uploads
-      JOB_TIMEOUT: ${JOB_TIMEOUT:-28800}
+      JOB_TIMEOUT: ${JOB_TIMEOUT}
+
+      # Umbrales de comparación de cursos (segundos)
+      COURSE_MAX_AGE_SECONDS: ${COURSE_MAX_AGE_SECONDS}
+      COURSE_DISAPPEARED_AGE_SECONDS: ${COURSE_DISAPPEARED_AGE_SECONDS}
 
       DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE}
 
-      ALLOW_PRESENCIAL: ${ALLOW_PRESENCIAL:-false}
-      DEBUG: ${DEBUG:-false}
+      ALLOW_PRESENCIAL: ${ALLOW_PRESENCIAL}
+      DEBUG: ${DEBUG}
 
       REPORT_DIR: /app/reports
 
@@ -190,9 +198,9 @@ services:
     restart: unless-stopped
     command: celery -A app.celery_app beat --loglevel=info
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-siaugesmat}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-siaugesmat}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
-      DEBUG: ${DEBUG:-false}
+      DEBUG: ${DEBUG}
     networks:
       - siaugesmat-net
     depends_on:

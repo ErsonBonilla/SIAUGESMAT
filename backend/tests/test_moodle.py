@@ -129,6 +129,41 @@ async def test_get_categories_by_idnumber(moodle_service):
     assert "criteria" not in params
 
 
+@pytest.mark.asyncio
+async def test_create_categories_invalidates_cache(moodle_service):
+    """Tras crear categorías, el caché debe invalidarse para que la resolución
+    de padres de una categoría recién creada la encuentre (jerarquía correcta)."""
+    service, _ = moodle_service
+
+    def _resp(payload):
+        r = MagicMock()
+        r.json.return_value = payload
+        r.raise_for_status.return_value = None
+        return r
+
+    # (0) get_categories() inicial (orquestador): vacío
+    # (1) create padre -> respuesta OK
+    # (2) get_categories() re-fetch tras invalidar -> ve el padre recién creado
+    # (3) create hijo -> respuesta OK
+    service._client.get.side_effect = [
+        _resp([]),
+        _resp([{"id": 5, "idnumber": "IBA_0992"}]),
+        _resp([{"id": 5, "idnumber": "IBA_0992"}]),
+        _resp([]),
+    ]
+
+    await service.get_categories()
+    await service.create_categories([{
+        "name": "Programa", "idnumber": "IBA_0992", "parent": "0",
+    }])
+    await service.create_categories([{
+        "name": "Semestre I", "idnumber": "IBA_0992_sI", "parent": "IBA_0992",
+    }])
+
+    last_call = service._client.get.call_args_list[-1][1]["params"]
+    assert last_call["categories[0][parent]"] == 5
+
+
 # ---------------------------------------------------------------------------
 # Cursos
 # ---------------------------------------------------------------------------

@@ -127,8 +127,11 @@ def test_login_insufficient_permissions(client):
 # ---------------------------------------------------------------------------
 # PRESENCIAL rechazado en login
 # ---------------------------------------------------------------------------
-def test_login_presencial_rejected(client):
-    """Login con modalidad PRESENCIAL debe ser rechazado con 403."""
+def test_login_presencial_rejected(client, monkeypatch):
+    """Login con modalidad PRESENCIAL debe ser rechazado con 403
+    cuando ALLOW_PRESENCIAL es False (independiente del entorno)."""
+    from app.core.config import settings as app_settings
+    monkeypatch.setattr(app_settings, "ALLOW_PRESENCIAL", False)
     response = client.post(
         "/api/v1/auth/login",
         json={"username": "profesor", "password": "secreta", "modalidad": "PRESENCIAL"},

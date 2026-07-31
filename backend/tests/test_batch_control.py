@@ -108,6 +108,28 @@ class TestDownloadReports:
             )
             assert resp.status_code == 404
 
+    def test_download_zip_reaches_zip_endpoint(self, client, auth_headers, mock_batch, tmp_path):
+        """El endpoint /reports/download debe llegar al ZIP (no a /{report_name})
+        y `settings` debe estar importado (NameError si no)."""
+        zf = tmp_path / "batch.zip"
+        zf.write_bytes(b"zip-data")
+        with (
+            patch("app.api.v1.endpoints.batch_control.get_batch", return_value=mock_batch),
+            patch("app.api.v1.endpoints.batch_control.get_all_batch_items", return_value=[]),
+            patch("app.api.v1.endpoints.batch_control.save_batch_reports"),
+            patch(
+                "app.api.v1.endpoints.batch_control.build_batch_report_zip",
+                return_value=(str(zf), "batch.zip"),
+            ),
+            patch("app.api.v1.endpoints.batch_control.os.path.exists", return_value=False),
+        ):
+            resp = client.get(
+                "/api/v1/operations/batch/test-batch-1/reports/download",
+                headers=auth_headers,
+            )
+            assert resp.status_code == 200
+            assert resp.content == b"zip-data"
+
 
 class TestDeleteOldBatches:
     def test_delete_old(self, client, auth_headers):
