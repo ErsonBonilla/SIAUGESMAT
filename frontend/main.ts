@@ -4,10 +4,11 @@
 /// <reference lib="dom.asynciterable" />
 /// <reference lib="deno.ns" />
 
-import { App } from "@fresh/core";
+import { App, staticFiles } from "@fresh/core";
 import config from "./fresh.config.ts";
 
 const app = new App(config);
+app.use(staticFiles());
 app.fsRoutes();
 
 export { app };

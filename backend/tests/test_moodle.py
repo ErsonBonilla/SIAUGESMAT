@@ -111,18 +111,22 @@ async def test_create_categories(moodle_service):
 
 @pytest.mark.asyncio
 async def test_get_categories_by_idnumber(moodle_service):
-    """Debe construir la búsqueda por idnumber."""
+    """Debe obtener todas las categorías y filtrar por idnumber en Python."""
     service, _ = moodle_service
     fake_response = MagicMock()
-    fake_response.json.return_value = [{"id": 1, "idnumber": "IDE_0105"}]
+    fake_response.json.return_value = [
+        {"id": 1, "idnumber": "IDE_0105"},
+        {"id": 2, "idnumber": "OTHER"},
+    ]
     fake_response.raise_for_status.return_value = None
     service._client.get.return_value = fake_response
 
     result = await service.get_categories(idnumber="IDE_0105")
+    assert len(result) == 1
     assert result[0]["idnumber"] == "IDE_0105"
     params = service._client.get.call_args[1]["params"]
-    assert params["criteria[0][key]"] == "idnumber"
-    assert params["criteria[0][value]"] == "IDE_0105"
+    assert params["wsfunction"] == "core_course_get_categories"
+    assert "criteria" not in params
 
 
 # ---------------------------------------------------------------------------
@@ -181,13 +185,13 @@ async def test_delete_courses(moodle_service):
         [{"id": 1}],
         [{"id": 2}],
     ]
-    fake_del = MagicMock(json=lambda: None, raise_for_status=lambda: None)
-    service._client.get.return_value = fake_del
+    with patch.object(service, "_request", new_callable=AsyncMock) as mock_req:
+        mock_req.return_value = None
+        await service.delete_courses(["DEL1", "DEL2"])
 
-    await service.delete_courses(["DEL1", "DEL2"])
-    last_call = service._client.get.call_args_list[-1][1]["params"]
-    assert last_call["courseids[0]"] == 1
-    assert last_call["courseids[1]"] == 2
+    params = mock_req.call_args[0][1]
+    assert params["courseids[0]"] == 1
+    assert params["courseids[1]"] == 2
 
 
 # ---------------------------------------------------------------------------

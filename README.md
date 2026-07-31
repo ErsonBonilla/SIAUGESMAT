@@ -108,7 +108,7 @@ Procesado por `operations_tasks.py` (Celery). El estado se consulta en `GET /ope
 
 ### Consultas asíncronas
 
-Consulta cursos, categorías, usuarios y docentes inactivos en Moodle sin timeout HTTP (Celery con `task_time_limit=600`).
+Consulta cursos, categorías, usuarios y docentes inactivos en Moodle sin timeout HTTP (Celery con `time_limit=3600`; la consulta de docentes inactivos puede tardar 15–20 min porque recorre todos los cursos SIAUGESMAT).
 
 | Operación | Endpoint |
 |---|---|
@@ -119,8 +119,14 @@ Consulta cursos, categorías, usuarios y docentes inactivos en Moodle sin timeou
 **Entidades disponibles**:
 - `courses` — filtros por shortname, estado (>6 meses sin uso), formato de código (5 o 6 segmentos)
 - `categories` — búsqueda por idnumber
-- `users` — filtros por rol (todos/profesores) y estado (nunca ingresaron)
+- `users` — búsqueda por username/email/nombre (coincidencia exacta; el webservice Moodle no expone búsqueda por substring ni listado completo de usuarios)
 - `inactive_teachers` — docentes (**editingteacher**) que no han accedido a sus cursos desde el inicio de un semestre seleccionado. Consulta todos los cursos SIAUGESMAT en Moodle, obtiene los profesores matriculados con su `lastcourseaccess` y los filtra por la fecha de corte del semestre. Devuelve: nombre del docente, username, correo, curso, programa académico (código de 4 dígitos) y CAT (prefijo de 3 letras). Procesado en lotes paralelos (5 cursos simultáneos).
+
+> **Nota sobre el webservice Moodle:** el servicio web de la universidad no habilita
+> `core_role_assign_get_role_assignments` ni `core_user_search_identity`, por lo que la
+> consulta de usuarios es de coincidencia exacta por campo y la de docentes inactivos
+> recorre los cursos SIAUGESMAT uno a uno. Si la universidad habilita esas funciones
+> (o migra a Moodle 4.x), ambas consultas se vuelven directas y mucho más rápidas.
 
 **Filtros de cursos**: el endpoint `POST /queries/courses` acepta los parámetros `search` (búsqueda por shortname), `status` (`unused_6months` para cursos sin uso > 6 meses) y `pattern` para filtrar por formato de código:
 - `6segments` → `CAL_0852_sIV_5031216_G-1_29114506` (6 segmentos separados por `_`)

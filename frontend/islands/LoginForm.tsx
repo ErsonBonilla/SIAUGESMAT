@@ -1,6 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { login } from "../services/api.ts";
-import { setToken, setTokenCookie } from "../utils/auth.ts";
+import { setToken } from "../utils/auth.ts";
 import {
   BuildingIcon,
   DeviceIcon,
@@ -43,7 +43,6 @@ export default function LoginForm(
         modalidad,
       );
       setToken(data.access_token);
-      setTokenCookie(data.access_token);
       if (typeof window !== "undefined") {
         window.location.href = "/dashboard";
       }
@@ -82,20 +81,22 @@ export default function LoginForm(
   const pillBase =
     "flex items-center gap-2 w-full px-4 py-2.5 rounded-[2rem] border border-[var(--border-secondary)] bg-[var(--bg-primary)] cursor-pointer transition-all duration-200 text-sm";
   const pillHover = "hover:border-[var(--accent)] hover:brightness-95";
-  const pillDisabled = "disabled:opacity-40 disabled:cursor-not-allowed";
 
   return (
     <form onSubmit={handleSubmit} class="flex flex-col gap-4 w-full">
       {showPills && (
         <div class="login-fadeIn flex flex-col gap-3">
-          <button type="button" disabled class={`${pillBase} ${pillDisabled}`}>
+          <button
+            type="button"
+            onClick={() => selectModalidad("PRESENCIAL")}
+            class={`${pillBase} ${pillHover}`}
+          >
             <BuildingIcon
               class="w-5 h-5 shrink-0"
-              style={{ color: "var(--text-muted)" }}
+              style={{ color: "var(--brand-red)" }}
             />
-            <span class="text-[var(--text-muted)]">PRESENCIAL</span>
-            <span class="ml-auto text-[0.6rem] px-1.5 py-0.5 rounded bg-[var(--brand-red-100)] text-[var(--brand-red-900)] whitespace-nowrap">
-              No disponible
+            <span class="font-semibold text-[var(--text-primary)]">
+              PRESENCIAL
             </span>
           </button>
 

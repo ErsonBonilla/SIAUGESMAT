@@ -52,34 +52,6 @@ export function removeToken(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Gestión del token mediante cookies (accesible desde el servidor)
-// ---------------------------------------------------------------------------
-
-/**
- * Crea una cookie con el token JWT para que los handlers del servidor
- * puedan leerla y permitir el acceso a rutas protegidas.
- *
- * La cookie expira en 1 hora, es válida para toda la aplicación
- * (path=/) y utiliza SameSite=Lax para permitir peticiones desde
- * enlaces y formularios sin problemas de seguridad.
- */
-export function setTokenCookie(token: string): void {
-  if (typeof document === "undefined") return;
-  const expires = new Date(Date.now() + 60 * 60 * 1000).toUTCString();
-  document.cookie =
-    `${TOKEN_KEY}=${token}; expires=${expires}; path=/; SameSite=Lax`;
-}
-
-/**
- * Elimina la cookie del token forzando su expiración inmediata.
- */
-export function removeTokenCookie(): void {
-  if (typeof document === "undefined") return;
-  document.cookie =
-    `${TOKEN_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
-}
-
-// ---------------------------------------------------------------------------
 // Utilidades de validación y extracción de datos del token
 // ---------------------------------------------------------------------------
 

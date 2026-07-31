@@ -19,8 +19,17 @@ const PAGE_SIZE = 20;
 export interface Column {
   key: string;
   label: string;
-  render?: (value: unknown, row: Record<string, unknown>) => string;
+  renderKey?: string;
 }
+
+const RENDERERS: Record<
+  string,
+  (value: unknown, row: Record<string, unknown>) => string
+> = {
+  yesNo: (v) => v == 1 ? "Sí" : "No",
+  lastlogin: (v) =>
+    typeof v === "number" && v > 0 ? new Date(v * 1000).toLocaleString() : "Nunca",
+};
 
 export interface Filter {
   key: string;
@@ -257,8 +266,8 @@ export default function QueryTable(
                         key={col.key}
                         class="py-2 px-3 text-[var(--text-primary)]"
                       >
-                        {col.render
-                          ? col.render(row[col.key], row)
+                        {col.renderKey
+                          ? RENDERERS[col.renderKey](row[col.key], row)
                           : String(row[col.key] ?? "—")}
                       </td>
                     ))}

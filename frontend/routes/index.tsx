@@ -8,8 +8,8 @@ import type { FreshContext } from "@fresh/core";
  * - Si no existe, redirige a la página de inicio de sesión.
  */
 export const handler = {
-  GET(req: Request, _ctx: FreshContext) {
-    const cookies = req.headers.get("cookie") || "";
+  GET(ctx: FreshContext) {
+    const cookies = ctx.req.headers.get("cookie") || "";
     const token = cookies.split(";").some((c) =>
       c.trim().startsWith("auth_token=")
     );
