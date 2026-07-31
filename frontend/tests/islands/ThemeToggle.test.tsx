@@ -1,4 +1,4 @@
-import render from "preact-render-to-string";
+import { render } from "preact-render-to-string";
 import { assertEquals, assertStringIncludes } from "@std/assert";
 
 import ThemeToggle from "../../islands/ThemeToggle.tsx";

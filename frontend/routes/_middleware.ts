@@ -15,5 +15,19 @@ export async function handler(ctx: FreshContext<AppState>) {
     c.trim().startsWith("theme=")
   );
   ctx.state.theme = themeMatch ? themeMatch.split("=")[1].trim() : "dark";
-  return await ctx.next();
+
+  const res = await ctx.next();
+  if (res instanceof Response) {
+    const ctype = res.headers.get("content-type") || "";
+    if (ctype.includes("text/html")) {
+      const headers = new Headers(res.headers);
+      headers.set("Cache-Control", "no-store");
+      return new Response(res.body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers,
+      });
+    }
+  }
+  return res;
 }

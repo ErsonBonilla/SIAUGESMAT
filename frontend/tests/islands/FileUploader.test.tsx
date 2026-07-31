@@ -1,4 +1,4 @@
-import render from "preact-render-to-string";
+import { render } from "preact-render-to-string";
 import { assert, assertStringIncludes } from "@std/assert";
 
 import FileUploader from "../../islands/FileUploader.tsx";

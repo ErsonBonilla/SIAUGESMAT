@@ -1,17 +1,7 @@
-import { useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
 import { dismissToast, toasts } from "../utils/toast.ts";
 import { CheckIcon, XMarkIcon } from "../utils/icons.tsx";
 
 export default function ToastContainer() {
-  const mounted = useSignal(false);
-
-  useEffect(() => {
-    mounted.value = true;
-  }, []);
-
-  if (!mounted.value) return null;
-
   return (
     <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 min-w-[280px]">
       {toasts.value.map((t) => (

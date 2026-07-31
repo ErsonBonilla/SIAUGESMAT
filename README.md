@@ -296,7 +296,9 @@ python -m venv .venv
 .venv\Scripts\activate     # Windows
 source .venv/bin/activate  # Linux/macOS
 pip install -r requirements.txt
-copy .env.example .env     # Configurar credenciales
+# Copiar las variables de entorno a la RAÍZ del proyecto (config.py lee el .env raíz)
+# desde la raíz:  copy .env.example .env
+# Opcional: backend/.env solo para overrides de dev (p. ej. DATABASE_URL apuntando a localhost)
 ```
 
 ### 2. Infraestructura
@@ -385,7 +387,7 @@ JOB_TIMEOUT=28800
 MAX_AUTO_DELETE_COURSES=500
 ```
 
-El archivo `.env.example` en la raíz contiene todas las variables con valores de ejemplo. Copiarlo a `backend/.env` y ajustar credenciales reales.
+El archivo `.env.example` en la raíz contiene todas las variables con valores de ejemplo. Para el **despliegue Docker**, los valores se definen en el `.env` raíz (el `docker-compose.yml` solo referencia `${VAR}`). Para el **desarrollo local**, `config.py` lee el `.env` raíz como fuente principal y `backend/.env` como *override* solo para diferencias de dev (p. ej. `DATABASE_URL=postgresql://...@localhost:5432/...`). Los valores no deben duplicarse en el código ni en compose: solo el llamado a la variable.
 
 ---
 
