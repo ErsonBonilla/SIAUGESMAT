@@ -20,6 +20,7 @@ def _base_dataframe(rows: list[dict]) -> pd.DataFrame:
     """Crea un DataFrame con las columnas esperadas por el ETL."""
     for row in rows:
         row.setdefault("Confirma", "ACEPTA")
+        row.setdefault("Observaciones", "")
     return pd.DataFrame(rows, dtype=str)
 
 
@@ -448,6 +449,106 @@ class TestRomanNumeral:
 
     def test_non_numeric_fallback(self):
         assert BaseExcelParser._to_roman_numeral("custom") == "CUSTOM"
+
+
+# ---------------------------------------------------------------------------
+# Escenario 16: filas con "virtual" en Observaciones se ignoran
+# ---------------------------------------------------------------------------
+def test_virtual_rows_ignored():
+    """Filas cuya columna Observaciones mencione virtualidad se ignoran."""
+    df = _base_dataframe([
+        {
+            "CAT": "IDEAD",
+            "Programa": "105 - Test",
+            "Código curso": "202",
+            "Semestre": "1",
+            "Grupo": "01",
+            "Curso": "Matemáticas",
+            "Correo Institucional": "juan.perez@ut.edu.co",
+            "Docente": "Juan Pérez",
+            "Observaciones": "CURSO VIRTUAL",
+        }
+    ])
+
+    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    assert result["courses"] == []
+    assert result["users"] == []
+    assert result["enrolments"] == []
+
+
+def test_virtuality_conjugations_ignored():
+    """Conjugaciones de VIRTUALIDAD y cadenas adyacentes también se ignoran."""
+    variants = [
+        "curso virtual",
+        "Virtual",
+        "VIRTUAL",
+        "virtual",
+        "VIRTUALIDAD",
+        "Virtualidad",
+        "virtualidad",
+        "curso-virtual",
+        "CURSOVIRTUAL",
+        "virtualización",
+        "virtual1",
+    ]
+    for obs in variants:
+        df = _base_dataframe([
+            {
+                "CAT": "IDEAD",
+                "Programa": "105 - Test",
+                "Código curso": "202",
+                "Semestre": "1",
+                "Grupo": "01",
+                "Curso": "Matemáticas",
+                "Correo Institucional": "juan.perez@ut.edu.co",
+                "Docente": "Juan Pérez",
+                "Observaciones": obs,
+            }
+        ])
+        result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+        assert result["courses"] == [], f"Debería ignorarse la fila con: {obs!r}"
+
+
+def test_non_virtual_rows_kept():
+    """Filas sin referencias a virtualidad se procesan normalmente."""
+    df = _base_dataframe([
+        {
+            "CAT": "IDEAD",
+            "Programa": "105 - Test",
+            "Código curso": "202",
+            "Semestre": "1",
+            "Grupo": "01",
+            "Curso": "Matemáticas",
+            "Correo Institucional": "juan.perez@ut.edu.co",
+            "Docente": "Juan Pérez",
+            "Observaciones": "Clase presencial",
+        }
+    ])
+
+    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    assert len(result["courses"]) == 1
+    assert len(result["users"]) == 1
+    assert len(result["enrolments"]) == 1
+
+
+def test_missing_observaciones_column_raises():
+    """Falta la columna Observaciones → ValueError."""
+    df = _base_dataframe([
+        {
+            "CAT": "IDEAD",
+            "Programa": "105 - Test",
+            "Código curso": "202",
+            "Semestre": "1",
+            "Grupo": "01",
+            "Curso": "Matemáticas",
+            "Correo Institucional": "juan.perez@ut.edu.co",
+            "Docente": "Juan Pérez",
+        }
+    ])
+    df = df.drop(columns=["Observaciones"])
+
+    with pytest.raises(ValueError, match="Observaciones"):
+        DistanciaParser.parse(df, modalidad="DISTANCIA")
 
 
 # ---------------------------------------------------------------------------
