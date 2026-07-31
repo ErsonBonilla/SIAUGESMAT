@@ -1,7 +1,7 @@
 // routes/_app.tsx
 import type { PageProps } from "@fresh/core";
 import ErrorBoundary from "../components/ErrorBoundary.tsx";
-import ToastContainer from "../components/Toast.tsx";
+import ToastContainer from "../islands/Toast.tsx";
 import { DARK_THEME_VARS, LIGHT_THEME_VARS } from "../utils/theme.ts";
 
 interface AppState {

@@ -1,26 +1,19 @@
 import { requireAuth } from "../../utils/auth-guard.ts";
-import TabbedPage from "../../components/TabbedPage.tsx";
-import ExecutionList from "../../islands/ExecutionList.tsx";
-import OperationList from "../../islands/OperationList.tsx";
-import { OPERATIONS_TABS } from "../../utils/operations-tabs.ts";
+import Layout from "../../components/Layout.tsx";
+import EjecucionesTabs from "../../islands/EjecucionesTabs.tsx";
 
 export const handler = requireAuth();
 
 export default function OperacionesPage() {
   return (
-    <TabbedPage
-      title="Ejecuciones"
-      description="Historial de todas las ejecuciones del sistema."
-      tabs={OPERATIONS_TABS}
-      renderTab={(key) => {
-        const tab = OPERATIONS_TABS.find((t) => t.key === key)!;
-        return tab.component === "etl" ? <ExecutionList /> : (
-          <OperationList
-            defaultEntity={tab.entity!}
-            defaultAction={tab.action!}
-          />
-        );
-      }}
-    />
+    <Layout title="Ejecuciones">
+      <p
+        class="text-sm text-[var(--text-secondary)] mt-1"
+        style={{ marginTop: "-0.75rem", marginBottom: "1.5rem" }}
+      >
+        Historial de todas las ejecuciones del sistema.
+      </p>
+      <EjecucionesTabs />
+    </Layout>
   );
 }
