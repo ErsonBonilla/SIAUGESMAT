@@ -273,18 +273,12 @@ class MoodleIntegration:
         if existing:
             existing_username = existing.get("username", "")
             if existing_username and existing_username != username_esperado:
-                try:
-                    await self.service.update_users([{
-                        "id": existing["id"],
-                        "username": username_esperado,
-                        "firstname": user.get("firstname", existing.get("firstname", "")),
-                        "lastname": user.get("lastname", existing.get("lastname", "")),
-                    }])
-                    logger.info(f"Usuario actualizado: {existing_username} → {username_esperado}")
-                except Exception as upd_e:
-                    logger.warning(f"No se pudo actualizar username {existing_username} → {username_esperado}: {upd_e}")
-                    return existing_username, False
-            return username_esperado, False
+                logger.info(
+                    f"Usuario encontrado por email {email} con username '{existing_username}' "
+                    f"(esperado '{username_esperado}'). Se conserva el username de Moodle "
+                    f"para preservar historial de cursos."
+                )
+            return existing_username if existing_username else username_esperado, False
 
         if email_personal:
             try:
