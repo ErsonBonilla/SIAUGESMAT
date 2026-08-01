@@ -4,10 +4,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from app.services.parsers.patterns import parse_shortname
 
 
-def parse_sn(shortname: str) -> Optional[Dict[str, str]]:
-    return parse_shortname(shortname)
-
-
 def get_suffix(shortname: str) -> str:
     parsed = parse_shortname(shortname)
     if not parsed:

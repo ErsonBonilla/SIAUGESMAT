@@ -49,7 +49,7 @@ class TestComplete:
             [_nc(sn)],
             [{"course_shortname": sn, "username": "new_prof"}],
             courses_with_teacher={sn: "old_prof"})
-        assert len(r["to_hide"]) >= 1 or sn in r["to_delete"]
+        assert len(r["to_hide"]) >= 1 or any(d.get("shortname") == sn for d in r["to_delete"])
         assert len(r["to_create"]) >= 1
 
     @pytest.mark.asyncio
@@ -59,7 +59,7 @@ class TestComplete:
             [_mc(sn)], [_nc(sn)],
             [{"course_shortname": sn, "username": "p1"}],
             courses_with_teacher={})
-        assert sn in r["to_delete"]
+        assert any(d.get("shortname") == sn for d in r["to_delete"])
         assert any(c["shortname"] == sn for c in r["to_create"])
 
     @pytest.mark.asyncio
@@ -92,7 +92,7 @@ class TestComplete:
             [_mc(sn, timecreated=100000)],
             [_nc("IDE_0105_sI_303_G-01")],
             [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}])
-        assert sn in r["to_delete"]
+        assert any(d.get("shortname") == sn for d in r["to_delete"])
 
     @pytest.mark.asyncio
     async def test_8_disappeared_recent(self):
@@ -101,7 +101,7 @@ class TestComplete:
             [_mc(sn, timecreated=int(time.time()) - 3600)],
             [_nc("IDE_0105_sI_303_G-01")],
             [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}])
-        assert sn in r["to_hide"]
+        assert any(d.get("shortname") == sn for d in r["to_hide"])
 
     @pytest.mark.asyncio
     async def test_9_disappeared_hidden(self):
@@ -110,7 +110,7 @@ class TestComplete:
             [_mc(sn, visible=0, timecreated=int(time.time()) - 3600)],
             [_nc("IDE_0105_sI_303_G-01")],
             [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}])
-        assert sn not in r["to_hide"]
+        assert not any(d.get("shortname") == sn for d in r["to_hide"])
 
     @pytest.mark.asyncio
     async def test_10_cedula_update(self):

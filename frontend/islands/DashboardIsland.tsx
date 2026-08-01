@@ -240,7 +240,7 @@ export default function DashboardIsland() {
                             : latestExec.value.semaphore === "yellow"
                             ? "Advertencias"
                             : latestExec.value.semaphore === "red"
-                            ? "Errores críticos"
+                            ? "Errores"
                             : "Sin datos")
                           : STATUS_LABELS[latestExec.value.status] ||
                             latestExec.value.status}

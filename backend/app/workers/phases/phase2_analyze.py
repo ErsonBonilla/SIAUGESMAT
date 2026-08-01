@@ -9,6 +9,54 @@ from app.workers.phases.base import BasePhase, PhaseContext
 
 logger = logging.getLogger(__name__)
 
+ALERT_ACTION_BY_REASON = {
+    "disappeared_recent": "alert_disappeared_recent",
+    "teacher_change_recent": "alert_teacher_change_recent",
+    "disappeared": "alert_disappeared",
+    "orphan_course": "alert_orphan_course",
+}
+
+
+def persist_plan_logs(db, execution_id: int, comparison: Dict, fullname_map: Dict = None) -> int:
+    """Persiste el plan de acciones de la comparación a ExecutionLog.
+
+    Los logs de comparación se guardan con prefijo ``planned_`` para
+    distinguirlos de las acciones realmente ejecutadas (que escribe
+    ``_log_success`` en fases posteriores) y evitar colisiones en los
+    reportes existentes. Las alertas se persisten con su acción propia.
+
+    Returns:
+        Número de registros persistidos.
+    """
+    count = 0
+    for entry in comparison.get("logs", []):
+        log_repo.save_log(
+            db,
+            execution_id,
+            "2",
+            f"planned_{entry.get('action', 'unknown')}",
+            entry.get("identifier", ""),
+            entry.get("detail"),
+        )
+        count += 1
+    fullname_lookup = fullname_map or {}
+    for alert in comparison.get("alerts", []):
+        action = ALERT_ACTION_BY_REASON.get(alert.get("reason"))
+        if not action:
+            continue
+        detail = {
+            key: alert[key]
+            for key in ("reason", "age_seconds", "old_professor", "new_professor")
+            if alert.get(key) is not None
+        }
+        sn = alert.get("shortname", "")
+        detail["fullname"] = fullname_lookup.get(sn, "")
+        detail.setdefault("professor", alert.get("new_professor") or alert.get("old_professor") or "")
+        log_repo.save_log(db, execution_id, "2", action, sn, detail)
+        count += 1
+    db.commit()
+    return count
+
 
 class AnalyzePhase(BasePhase):
     phase_name = "2"
@@ -79,6 +127,10 @@ class AnalyzePhase(BasePhase):
                 re_upload=ctx.re_upload,
                 courses_with_teacher=ctx.courses_with_teacher,
             )
+
+            persist_plan_logs(db, eid, ctx.comparison, {
+                c.get("shortname", ""): c.get("fullname", "") for c in ctx.existing_courses
+            })
 
             if mode in ("users", "both"):
                 ctx.users_to_create = [

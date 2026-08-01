@@ -2,7 +2,7 @@
 
 **Sistema de Integración y Automatización para la Gestión de Matrículas en Moodle**
 
-Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle 3.9)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 5 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 14 reportes CSV con información detallada, 5 gráficos Plotly profesionales, dashboard de analítica y semáforos de estado en tiempo real.
+Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle 3.9)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 5 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 16 reportes CSV con información detallada, 5 gráficos Plotly profesionales, dashboard de analítica y semáforos de estado en tiempo real.
 
 ---
 
@@ -75,14 +75,14 @@ Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y m
 | **FASE 2** | `AnalyzePhase` | Comparar cursos contra Moodle con matching en 3 niveles (exacto → base key → core key). Determina crear, eliminar, activar, ocultar o renombrar. | 20% → 34% |
 | **FASE 3** | `process_etl_phase` | Ejecutar cambios estructurales vía Celery chords en 2 oleadas: (1) delete, (2) activate, hide, rename, create cursos. | 34% → 62% |
 | **FASE 4** | `process_etl_phase` | Crear usuarios nuevos en Moodle + matricular docentes como editingteacher en sus cursos vía Celery chord. | 65% → 85% |
-| **FASE 5** | `ReportService` | Generar 14 CSVs + 5 gráficos Plotly + ZIP con todo. | 85% → 100% |
+| **FASE 5** | `ReportService` | Generar 16 CSVs + 5 gráficos Plotly + ZIP con todo. | 85% → 100% |
 
 ### Destacados
 
 - **Checkpointing por fase:** si Celery crashea en FASE 3, el retry restaura FASE 1–2 desde BD y reanuda desde FASE 3. Sin re-procesar trabajo ya hecho.
 - **Guard de delete masivo:** si el plan incluye >500 eliminaciones, la ejecución se pausa en `review_required` y requiere confirmación explícita vía `POST /api/v1/jobs/{id}/confirm`. Umbral configurable con `MAX_AUTO_DELETE_COURSES`.
 - **Creación de usuarios:** `createpassword=1` — Moodle genera la contraseña y la envía por email. No se almacena la cédula como password.
-- **Resolución batch de docentes:** 1 sola llamada a `core_user_get_users_by_field` con todos los emails, en vez de N llamadas individuales.
+- **Resolución paralela de docentes:** hasta 10 consultas simultáneas a `core_enrol_get_enrolled_users` con semáforo asyncio, en vez de N llamadas secuenciales.
 - **Compatibilidad Moodle 3.9:** adapter pattern para diferencias entre versiones (sin `enrolment_1`, `templatecourse` como `int`, `createpassword` en vez de `preferences[]`, `categoryid` con fallback multi-nivel).
 
 **Archivos clave:** `workers/tasks.py` (orquestador), `workers/phases/phase1_consult.py`, `phase2_analyze.py`, `phase3_structure.py`, `phase4_people.py`, `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle.py` (MoodleService), `services/moodle_adapter.py`, `services/course_comparison/`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`, `services/metrics_service.py`.
@@ -168,7 +168,7 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | `/operaciones/ejecuciones` | Tabs (Crear/Eliminar Cursos/Usuarios/Categorías) con ExecutionList + OperationList |
 | `/operaciones/historico` | Tabs con gráficos Plotly theme-aware + tabla de datos |
 | `/jobs/{id}` | Detalle de ejecución con progreso en vivo, métricas, errores paginados |
-| `/reportes?execution_id={id}` | Descarga de 14 CSVs + 5 gráficos Plotly |
+| `/reportes?execution_id={id}` | Descarga de 16 CSVs + 5 gráficos Plotly |
 
 ### Islas principales
 
@@ -227,7 +227,7 @@ SIAUGESMAT/
 │   │   ├── scripts/            # bulk_course_visibility.py, diagnostic_sibate.py
 │   │   ├── celery_app.py       # Config Celery + beat schedule
 │   │   └── main.py
-│   ├── tests/                  # ~350 tests (ETL, repos, phases, pipeline, analytics, API)
+│   ├── tests/                  # ~390 tests (ETL, repos, phases, pipeline, analytics, API)
 │   ├── alembic/                # Migraciones de base de datos
 │   ├── reports/                # Reportes generados (CSV, ZIP)
 │   ├── uploads/                # Archivos Excel subidos
@@ -262,7 +262,7 @@ SIAUGESMAT/
 │   ├── fixtures/                #   .xlsx con datos reales
 │   ├── run_test.py              #   Script unificado
 │   └── README.md
-├── .env.example                # Variables de entorno de ejemplo (único, copiar a backend/.env)
+├── .env.example                # Variables de entorno de ejemplo (único, copiar al .env raíz)
 ├── certs/                      # Certificados SSL para HTTPS
 └── README.md
 ```
@@ -385,6 +385,10 @@ MOODLE_BURST_SIZE=10
 DEBUG=false
 JOB_TIMEOUT=28800
 MAX_AUTO_DELETE_COURSES=500
+CHORD_ACTIVE_MINUTES=15
+STUCK_EXECUTION_TIMEOUT=21600
+MOODLE_REQUEST_TIMEOUT=60.0
+MOODLE_MAX_RETRIES=3
 ```
 
 El archivo `.env.example` en la raíz contiene todas las variables con valores de ejemplo. Para el **despliegue Docker**, los valores se definen en el `.env` raíz (el `docker-compose.yml` solo referencia `${VAR}`). Para el **desarrollo local**, `config.py` lee el `.env` raíz como fuente principal y `backend/.env` como *override* solo para diferencias de dev (p. ej. `DATABASE_URL=postgresql://...@localhost:5432/...`). Los valores no deben duplicarse en el código ni en compose: solo el llamado a la variable.
@@ -393,7 +397,7 @@ El archivo `.env.example` en la raíz contiene todas las variables con valores d
 
 ## Tests
 
-### Backend (~350 tests)
+### Backend (~390 tests)
 
 ```bash
 cd backend

@@ -38,7 +38,9 @@ class ReportService:
         "audit_cursos_activados": "11_audit_cursos_activados.csv",
         "audit_usuarios": "12_audit_usuarios.csv",
         "audit_matriculas": "13_audit_matriculas.csv",
-        "audit_errores": "14_audit_errores.csv",
+        "audit_conflictos_identidad": "14_audit_conflictos_identidad.csv",
+        "audit_plan_acciones": "15_audit_plan_acciones.csv",
+        "audit_errores": "16_audit_errores.csv",
     }
 
     @classmethod
@@ -268,6 +270,30 @@ class ReportService:
                 f"{log.detail.get('firstname', '')} {log.detail.get('lastname', '')}".strip(),
                 "Éxito" if log.action == "enrolment_ok" else "Fallido",
                 log.detail.get("reason", ""),
+            ],
+        },
+        {
+            "key": "audit_conflictos_identidad",
+            "headers": ["Username ETL", "Correo", "Nombre ETL", "Nombre Moodle", "Matcheado por"],
+            "match": lambda log: log.action == "user_identity_conflict" and log.detail,
+            "extract": lambda log: [
+                log.identifier or "",
+                log.detail.get("email", ""),
+                log.detail.get("etl_fullname", ""),
+                log.detail.get("moodle_fullname", ""),
+                log.detail.get("matched_by", ""),
+            ],
+        },
+        {
+            "key": "audit_plan_acciones",
+            "headers": ["Shortname", "Acción planificada", "Motivo", "Profesor", "Antigüedad (días)"],
+            "match": lambda log: log.action.startswith("planned_") and log.detail is not None,
+            "extract": lambda log: [
+                log.identifier or "",
+                log.action[len("planned_"):],
+                log.detail.get("reason", ""),
+                log.detail.get("professor", "") or log.detail.get("old_professor", ""),
+                str(round(log.detail.get("age_seconds", 0) / 86400, 1)),
             ],
         },
         # Errores — desde ErrorLog (se procesa aparte en generate_all)

@@ -56,7 +56,7 @@ class TestSerialization:
     def test_sets_to_lists(self):
         result = _serialize_comparison({"to_delete": {"a", "b"}, "logs": []})
         assert set(result["to_delete"]) == {"a", "b"}
-        assert result["logs"] == []
+        assert "logs" not in result
 
     def test_preserves_lists(self):
         result = _serialize_comparison({"to_delete": ["a"], "to_create": []})
@@ -279,7 +279,7 @@ class TestProcessEtlPhase:
             }
             mock_sl.return_value = MagicMock()
             process_etl_phase(1, "3")
-            mock_done.delay.assert_called_once_with(1, "3")
+            mock_done.delay.assert_called_once_with([], 1, "3")
 
     @patch("app.workers.phases.orchestrator._create_phase4_items", return_value={"create_user": 1, "enrol": 0})
     @patch("app.workers.phases.orchestrator._get_pending_items")

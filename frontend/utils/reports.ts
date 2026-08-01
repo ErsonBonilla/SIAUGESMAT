@@ -12,6 +12,8 @@ export const REPORT_LABELS: Record<string, string> = {
   audit_cursos_activados: "Auditoría: Cursos activados",
   audit_usuarios: "Auditoría: Usuarios (nuevos y existentes)",
   audit_matriculas: "Auditoría: Matrículas (exitosas y fallidas)",
+  audit_conflictos_identidad: "Auditoría: Conflictos de identidad",
+  audit_plan_acciones: "Auditoría: Plan de acciones",
   audit_errores: "Auditoría: Errores del proceso",
 };
 

@@ -9,11 +9,11 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.db.models import Execution
+from app.db.models import Execution, ExecutionLog
 from app.integrations.moodle import MoodleIntegration
 from app.workers.phases.base import PhaseContext
 from app.workers.phases.phase1_consult import ConsultPhase
-from app.workers.phases.phase2_analyze import AnalyzePhase
+from app.workers.phases.phase2_analyze import AnalyzePhase, persist_plan_logs
 # Phase3 y Phase4 usan el patrón chord + item_task, no clases phase directas
 
 
@@ -104,6 +104,39 @@ class TestConsultPhase:
             await phase.run(ctx)
         assert ctx.metrics["total_errors"] >= 1
 
+    @pytest.mark.asyncio
+    async def test_resolves_user_by_username_when_email_missing(self, test_db, mock_moodle_service):
+        mock_moodle_service.get_categories.return_value = []
+        mock_moodle_service.get_courses.return_value = []
+        with patch.object(MoodleIntegration, "find_users_by_emails", new=AsyncMock(return_value={})), \
+             patch.object(MoodleIntegration, "find_users_by_usernames",
+                          new=AsyncMock(return_value={
+                              "doc1": {"username": "doc1", "firstname": "Docente", "lastname": "Uno"},
+                          })), \
+             patch.object(MoodleIntegration, "find_users_by_idnumbers", new=AsyncMock(return_value={})):
+            ctx = _make_ctx(test_db, mock_moodle_service)
+            phase = ConsultPhase()
+            await phase.run(ctx)
+
+        assert ctx.username_map == {"doc1": "doc1"}
+
+    @pytest.mark.asyncio
+    async def test_username_match_with_different_name_is_flagged(self, test_db, mock_moodle_service):
+        mock_moodle_service.get_categories.return_value = []
+        mock_moodle_service.get_courses.return_value = []
+        with patch.object(MoodleIntegration, "find_users_by_emails", new=AsyncMock(return_value={})), \
+             patch.object(MoodleIntegration, "find_users_by_usernames",
+                          new=AsyncMock(return_value={
+                              "doc1": {"username": "doc1", "firstname": "Carlos", "lastname": "Andres"},
+                          })), \
+             patch.object(MoodleIntegration, "find_users_by_idnumbers", new=AsyncMock(return_value={})):
+            ctx = _make_ctx(test_db, mock_moodle_service)
+            phase = ConsultPhase()
+            await phase.run(ctx)
+
+        # Nombre ETL "Docente Uno" != Moodle "Carlos Andres" → no se mapea
+        assert ctx.username_map == {}
+
 
 class TestAnalyzePhase:
     @pytest.mark.asyncio
@@ -148,5 +181,96 @@ class TestAnalyzePhase:
             with pytest.raises(Exception, match="Error de análisis"):
                 await phase.run(ctx)
             assert ctx.metrics["total_errors"] >= 1
+
+
+class TestPersistPlanLogs:
+    def test_persists_plan_logs_and_alerts(self, test_db):
+        execution = Execution(
+            filename="test.xlsx",
+            semester="2025A",
+            mode="both",
+            status="pending",
+            modalidad="DISTANCIA",
+            created_at=datetime.now(timezone.utc),
+        )
+        test_db.add(execution)
+        test_db.commit()
+        test_db.refresh(execution)
+
+        comparison = {
+            "logs": [
+                {"action": "course_created", "identifier": "C1",
+                 "detail": {"reason": "new", "professor": "p1"}},
+                {"action": "course_deleted", "identifier": "C2",
+                 "detail": {"reason": "disappeared", "age_seconds": 864000}},
+            ],
+            "alerts": [
+                {"shortname": "C3", "reason": "disappeared_recent",
+                 "age_seconds": 7200},
+                {"shortname": "C4", "reason": "teacher_change_recent",
+                 "old_professor": "p1", "new_professor": "p2"},
+                {"shortname": "C5", "reason": "reason_desconocido"},
+            ],
+        }
+
+        count = persist_plan_logs(test_db, execution.id, comparison)
+
+        assert count == 4
+        logs = (
+            test_db.query(ExecutionLog)
+            .filter(ExecutionLog.execution_id == execution.id)
+            .order_by(ExecutionLog.id)
+            .all()
+        )
+        assert [l.action for l in logs] == [
+            "planned_course_created",
+            "planned_course_deleted",
+            "alert_disappeared_recent",
+            "alert_teacher_change_recent",
+        ]
+        assert logs[0].phase == "2"
+        assert logs[0].identifier == "C1"
+        assert logs[0].detail["reason"] == "new"
+        assert logs[1].identifier == "C2"
+        assert logs[1].detail["age_seconds"] == 864000
+        assert logs[2].identifier == "C3"
+        assert logs[2].detail["age_seconds"] == 7200
+        assert logs[3].identifier == "C4"
+        assert logs[3].detail["new_professor"] == "p2"
+        assert logs[3].detail.get("professor") == "p2"
+        assert logs[3].detail.get("fullname") == ""
+
+    def test_persists_alert_fullname_and_professor_from_map(self, test_db):
+        execution = Execution(
+            filename="test.xlsx", semester="2025A", mode="both",
+            status="pending", modalidad="DISTANCIA",
+            created_at=datetime.now(timezone.utc),
+        )
+        test_db.add(execution)
+        test_db.commit()
+        test_db.refresh(execution)
+
+        comparison = {
+            "alerts": [
+                {"shortname": "C1", "reason": "disappeared_recent",
+                 "age_seconds": 3600},
+                {"shortname": "C2", "reason": "teacher_change_recent",
+                 "old_professor": "oldp", "new_professor": "newp"},
+            ],
+        }
+        fullname_map = {"C1": "Curso Uno", "C2": "Curso Dos"}
+
+        persist_plan_logs(test_db, execution.id, comparison, fullname_map)
+
+        logs = (
+            test_db.query(ExecutionLog)
+            .filter(ExecutionLog.execution_id == execution.id)
+            .order_by(ExecutionLog.id)
+            .all()
+        )
+        assert logs[0].detail["fullname"] == "Curso Uno"
+        assert logs[0].detail.get("professor") == ""
+        assert logs[1].detail["fullname"] == "Curso Dos"
+        assert logs[1].detail["professor"] == "newp"
 
 

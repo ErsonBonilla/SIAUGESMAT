@@ -44,18 +44,36 @@ class MoodleIntegration:
         category_idnumber: str,
         template_id: Optional[int] = None,
         visible: int = 1,
+        recreate: bool = False,
     ) -> bool:
-        """Crea un curso vacío. Si ya existe, lo omite (chulo verde)."""
+        """Crea un curso vacío.
+
+        Si ya existe y ``recreate`` es True, primero lo borra y luego lo crea
+        desde cero (asegura contenido fresco incluso si el borrado previo del
+        plan falló). En caso contrario, si ya existe, lo omite (chulo verde).
+        """
         try:
             existing = await self.service.get_courses(shortname=shortname)
             if existing:
-                if template_id:
-                    logger.info(f"Curso {shortname} ya existe, re-importando template {template_id}")
-                    await self.service.import_course_content(
-                        from_id=template_id,
-                        to_id=int(existing[0]["id"]),
-                    )
-                return True
+                if recreate:
+                    logger.info(f"Curso {shortname} ya existe y requiere recreate: borrando…")
+                    await self.service.delete_courses([shortname])
+                    still = await self.service.get_courses(shortname=shortname)
+                    if still:
+                        self.last_error = (
+                            f"Curso {shortname} no se pudo recrear: "
+                            "el curso existente persiste tras el borrado"
+                        )
+                        logger.error(self.last_error)
+                        return False
+                else:
+                    if template_id:
+                        logger.info(f"Curso {shortname} ya existe, re-importando template {template_id}")
+                        await self.service.import_course_content(
+                            from_id=template_id,
+                            to_id=int(existing[0]["id"]),
+                        )
+                    return True
 
             await self.service.create_courses([{
                 "shortname": shortname,
@@ -192,6 +210,36 @@ class MoodleIntegration:
                 result[email] = u
         return result
 
+    @handle_moodle_errors(log_message="Error al buscar usuarios por username en lote", default_return={})
+    async def find_users_by_usernames(self, usernames: List[str]) -> Dict[str, Dict]:
+        result: Dict[str, Dict] = {}
+        if not usernames:
+            return result
+        clean = [u.strip() for u in usernames if u and u.strip()]
+        if not clean:
+            return result
+        users = await self.service.get_users("username", clean)
+        for u in users:
+            uname = (u.get("username") or "").strip()
+            if uname:
+                result[uname] = u
+        return result
+
+    @handle_moodle_errors(log_message="Error al buscar usuarios por cédula en lote", default_return={})
+    async def find_users_by_idnumbers(self, idnumbers: List[str]) -> Dict[str, Dict]:
+        result: Dict[str, Dict] = {}
+        if not idnumbers:
+            return result
+        clean = [str(c).strip() for c in idnumbers if c and str(c).strip()]
+        if not clean:
+            return result
+        users = await self.service.get_users("idnumber", clean)
+        for u in users:
+            idn = (u.get("idnumber") or "").strip()
+            if idn:
+                result[idn] = u
+        return result
+
     @staticmethod
     def is_user_active(user: Dict) -> bool:
         return not bool(int(user.get("suspended", 0)))
@@ -249,6 +297,18 @@ class MoodleIntegration:
                 return None, False
             if existing_by_personal:
                 return existing_by_personal.get("username", username_esperado), False
+
+        try:
+            existing_by_username = await self.service.get_user_by_username(username_esperado)
+        except Exception as e:
+            if is_moodle_overloaded(e):
+                raise MoodleOverloadedError(extract_error(e)[:200]) from e
+            self.last_error = extract_error(e)
+            logger.exception(f"Error al buscar usuario por username {username_esperado}: {self.last_error}")
+            return None, False
+        if existing_by_username:
+            logger.info(f"Usuario {username_esperado} ya existe en Moodle (por username), no se crea")
+            return existing_by_username.get("username", username_esperado), False
 
         try:
             password = user.get("password", str(user.get("cedula", "")))

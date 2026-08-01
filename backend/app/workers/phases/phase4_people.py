@@ -31,6 +31,7 @@ async def _resolve_course_map(modalidad, all_sns):
     try:
         all_courses = await ms.get_courses()
         course_map = {c["shortname"]: int(c["id"]) for c in all_courses if c.get("shortname")}
+        course_fullname = {c["shortname"]: c.get("fullname", "") for c in all_courses if c.get("shortname")}
         missing = [sn for sn in all_sns if sn and sn not in course_map]
         if missing:
             BATCH = 5
@@ -41,15 +42,17 @@ async def _resolve_course_map(modalidad, all_sns):
                     for c in resolved:
                         if c.get("shortname"):
                             course_map[c["shortname"]] = int(c["id"])
+                            course_fullname[c["shortname"]] = c.get("fullname", "")
                 except Exception:
                     for sn in chunk:
                         try:
                             courses = await ms.get_courses_by_field("shortname", sn)
                             if courses and courses[0].get("id"):
                                 course_map[sn] = int(courses[0]["id"])
+                                course_fullname[sn] = courses[0].get("fullname", "")
                         except Exception:
                             logger.debug(f"No se pudo resolver curso {sn} por field fallback")
-        return course_map
+        return course_map, course_fullname
     finally:
         await ms.close()
 
@@ -58,6 +61,7 @@ async def _resolve_fallback(modalidad, all_sns):
     ms = get_moodle_service(modalidad)
     try:
         fallback_map = {}
+        fallback_fullname = {}
         BATCH = 5
         for i in range(0, len(all_sns), BATCH):
             chunk = all_sns[i:i + BATCH]
@@ -66,15 +70,17 @@ async def _resolve_fallback(modalidad, all_sns):
                 for c in resolved:
                     if c.get("shortname"):
                         fallback_map[c["shortname"]] = int(c["id"])
+                        fallback_fullname[c["shortname"]] = c.get("fullname", "")
             except Exception:
                 for sn in chunk:
                     try:
                         courses = await ms.get_courses_by_field("shortname", sn)
                         if courses and courses[0].get("id"):
                             fallback_map[sn] = int(courses[0]["id"])
+                            fallback_fullname[sn] = courses[0].get("fullname", "")
                     except Exception:
                         logger.debug(f"No se pudo resolver curso {sn} en fallback")
-        return fallback_map
+        return fallback_map, fallback_fullname
     finally:
         await ms.close()
 
@@ -124,16 +130,18 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> D
         batch = create_batch(db, _batch_id("enrol"), "enrolments", "enrol", len(resolved_enrolments), modalidad)
         count = 0
 
+        users_by_username = {u["username"]: u for u in ctx_data.get("users", [])}
+
         all_sns = list({enrol.get("course_shortname", "") for enrol in resolved_enrolments if enrol.get("course_shortname")})
         try:
-            course_map = await _resolve_course_map(modalidad, all_sns)
+            course_map, course_fullname = await _resolve_course_map(modalidad, all_sns)
         except Exception as e:
             logger.warning(f"Error resolviendo course_map global: {e}, intentando por shortname")
             try:
-                course_map = await _resolve_fallback(modalidad, all_sns)
+                course_map, course_fullname = await _resolve_fallback(modalidad, all_sns)
             except Exception as e2:
                 logger.warning(f"Error resolviendo course_map fallback: {e2}, usando map vacío")
-                course_map = {}
+                course_map, course_fullname = {}, {}
 
         for enrol in resolved_enrolments:
             username = enrol.get("username", "")
@@ -142,8 +150,13 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> D
             detail = {
                 "action": "enrol", "execution_id": execution_id, "modalidad": modalidad,
                 "course_shortname": course_sn,
+                "fullname": course_fullname.get(course_sn, ""),
                 "_course_id": course_id,
             }
+            user_data = users_by_username.get(username, {})
+            if user_data:
+                detail["firstname"] = user_data.get("firstname", "")
+                detail["lastname"] = user_data.get("lastname", "")
             add_item(db, batch.batch_id, username, detail)
             count += 1
         counts["enrol"] = count

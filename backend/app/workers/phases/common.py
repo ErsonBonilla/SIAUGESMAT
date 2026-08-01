@@ -13,10 +13,12 @@ from app.db.session import SessionLocal
 from app.db.models import OperationItem
 from app.repositories.execution_repo import (
     clear_checkpoint,
+    clear_chord_active,
     get_execution,
     mark_completed,
     mark_failed,
     save_checkpoint,
+    set_chord_active,
     set_report_dir,
     update_progress,
 )
@@ -25,7 +27,7 @@ from app.repositories.operation_repo import add_item, create_batch
 from app.services.error_messages import translate_error
 from app.services.moodle_operations import MoodleService
 from app.services.reports import ReportService
-from app.workers.phases.item_task import process_etl_item, _refresh_phase_progress
+from app.workers.phases.item_task import process_etl_item
 from app.workers.phases.base import PhaseContext, MoodleOverloadedError
 from app.workers.utils import reset_stuck_items
 
@@ -81,11 +83,23 @@ def _get_pending_items(db, execution_id, phase, sub_phase=None):
     return query.all()
 
 
+def _mark_chord_active(execution_id):
+    """Marca el chord recién lanzado como activo (para el sweeper)."""
+    db = SessionLocal()
+    try:
+        set_chord_active(db, execution_id)
+    except Exception:
+        logger.exception(f"No se pudo marcar chord activo para ejecución {execution_id}")
+    finally:
+        db.close()
+
+
 def _launch_items_chord(execution_id, structure_items):
     if not structure_items:
-        on_phase_items_done.delay(execution_id, "3")
+        on_phase_items_done.delay([], execution_id, "3")
         return
     task_ids = [process_etl_item.si(item.id) for item in structure_items]
+    _mark_chord_active(execution_id)
     chord(task_ids)(on_phase_items_done.s(execution_id=execution_id, phase="3"))
 
 
@@ -98,6 +112,8 @@ def on_phase_items_done(self, results, execution_id, phase):
         execution = get_execution(db, execution_id)
         if not execution or execution.status in ("paused", "cancelled"):
             return
+
+        clear_chord_active(db, execution_id)
 
         stuck = reset_stuck_items(
             db, batch_id_prefix=f"etl_{phase}_%", execution_id=execution_id, increment_attempt=True,
@@ -117,6 +133,7 @@ def on_phase_items_done(self, results, execution_id, phase):
                 logger.warning(f"FASE 4: {len(pending)} items pendientes tras chord, relanzando")
                 task_ids = [process_etl_item.si(item.id) for item in pending]
                 chord(task_ids)(on_phase_items_done.s(execution_id=execution_id, phase="4"))
+                _mark_chord_active(execution_id)
                 return
 
         _sync_metrics_from_items(db, execution_id)
@@ -168,6 +185,10 @@ def on_phase_items_done(self, results, execution_id, phase):
 def on_users_done(self, results, execution_id):
     db = SessionLocal()
     try:
+        execution = get_execution(db, execution_id)
+        if execution and execution.status not in ("paused", "cancelled"):
+            clear_chord_active(db, execution_id)
+
         failed_users = db.query(OperationItem).filter(
             OperationItem.batch_id.like(f"etl_4_users_%_{execution_id}"),
             OperationItem.status == "failed",
@@ -193,12 +214,13 @@ def on_users_done(self, results, execution_id):
             logger.info(f"on_users_done: enrolando {len(enrol_items)} profesor(es)")
             task_ids = [process_etl_item.si(item.id) for item in enrol_items]
             chord(task_ids)(on_phase_items_done.s(execution_id=execution_id, phase="4"))
+            _mark_chord_active(execution_id)
         else:
             logger.info(f"on_users_done: sin enrolamientos pendientes")
-            on_phase_items_done.delay(execution_id, "4")
+            on_phase_items_done.delay([], execution_id, "4")
     except Exception as e:
         logger.exception(f"Error en on_users_done: {e}")
-        on_phase_items_done.delay(execution_id, "4")
+        on_phase_items_done.delay([], execution_id, "4")
     finally:
         db.close()
 
@@ -237,6 +259,11 @@ def _sync_metrics_from_items(db, execution_id):
         existing = ex.metrics or {}
         for key in metrics:
             existing[key] = metrics[key]
+        existing["total_operations"] = sum(metrics.get(k, 0) for k in (
+            "courses_created", "courses_deleted", "courses_activated",
+            "courses_hidden", "courses_renamed", "users_created", "enrolments",
+        ))
+        existing["alerts"] = existing.get("alerts", 0)
         ex.metrics = existing
         from sqlalchemy.orm.attributes import flag_modified
         flag_modified(ex, "metrics")

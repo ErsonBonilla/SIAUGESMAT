@@ -228,7 +228,7 @@ class TestProcessOperationBatch:
             db = MagicMock()
             mock_sl.return_value = db
             process_operation_batch("BATCH_001")
-            mock_update.assert_any_call(db, 1, "failed", "API error")
+            mock_update.assert_any_call(db, 1, "failed", "[unknownerror] API error")
 
 
 class TestEnsureRootCategory:

@@ -5,6 +5,7 @@ from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
+from app.core.config import settings
 from app.db.models import ErrorLog, Execution
 
 
@@ -26,14 +27,6 @@ def create_execution(db: Session, filename: str, semester: str, mode: str,
     db.add(execution)
     db.commit()
     db.refresh(execution)
-    return execution
-
-
-def mark_queued(db: Session, execution_id: int) -> Optional[Execution]:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        execution.status = "queued"
-        db.commit()
     return execution
 
 
@@ -59,6 +52,14 @@ def update_progress(db: Session, execution_id: int, pct: float, phase: str = Non
         execution.progress_updated_at = datetime.now(timezone.utc)
         if step is not None:
             execution.current_step = step
+        db.commit()
+
+
+def touch_heartbeat(db: Session, execution_id: int) -> None:
+    """Actualiza solo progress_updated_at sin cambiar porcentaje ni mensaje."""
+    execution = db.query(Execution).filter(Execution.id == execution_id).first()
+    if execution:
+        execution.progress_updated_at = datetime.now(timezone.utc)
         db.commit()
 
 
@@ -181,6 +182,22 @@ def get_checkpoint(db: Session, execution_id: int) -> Optional[Dict]:
     return dict(execution.phase_checkpoint)
 
 
+def set_chord_active(db: Session, execution_id: int, minutes: int = None) -> None:
+    """Marca un chord de fase como activo hasta una fecha de expiración.
+
+    El sweeper ``recover_stuck_phase`` usa esta marca para relanzar una fase
+    cuyo chord quedó huérfano (worker caído, callback nunca ejecutado).
+    """
+    minutes = settings.CHORD_ACTIVE_MINUTES if minutes is None else minutes
+    expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    save_checkpoint(db, execution_id, "chord_active", expires.isoformat())
+
+
+def clear_chord_active(db: Session, execution_id: int) -> None:
+    """Limpia la marca de chord activo (al iniciar el callback de la fase)."""
+    save_checkpoint(db, execution_id, "chord_active", None)
+
+
 def clear_checkpoint(db: Session, execution_id: int) -> None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
@@ -214,13 +231,6 @@ def increment_metric(db: Session, execution_id: int, metric_name: str, delta: in
 def should_pause(db: Session, execution_id: int) -> bool:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     return execution is not None and execution.status == "paused"
-
-
-def set_celery_task_id(db: Session, execution_id: int, task_id: str) -> None:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        execution.celery_task_id = task_id
-        db.commit()
 
 
 def cancel_execution(db: Session, execution_id: int) -> Tuple[bool, str]:

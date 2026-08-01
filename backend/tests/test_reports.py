@@ -89,6 +89,45 @@ class TestReportGeneration:
         assert len(data) == 3  # header + 2 rows
         assert data[1][0] == "C1"
 
+    def test_audit_conflictos_identidad(self):
+        logs = [
+            _make_log("user_identity_conflict", phase="1", identifier="mbermudez",
+                      detail={"email": "mbermudez@univ.edu",
+                              "etl_fullname": "María Bermúdez",
+                              "moodle_fullname": "Juan Bermúdez",
+                              "matched_by": "username"}),
+            _make_log("user_resolved", phase="1", identifier="otro",
+                      detail={"email": "otro@univ.edu"}),
+        ]
+        _process_report_config(self.tmpdir, "audit_conflictos_identidad", logs)
+        data = self._read_csv("14_audit_conflictos_identidad.csv")
+        assert data is not None
+        assert len(data) == 2  # header + 1 row
+        assert data[1][0] == "mbermudez"
+        assert data[1][1] == "mbermudez@univ.edu"
+        assert data[1][4] == "username"
+
+    def test_audit_plan_acciones(self):
+        logs = [
+            _make_log("planned_course_created", identifier="C1",
+                      detail={"reason": "new", "professor": "p1"}),
+            _make_log("planned_course_deleted", identifier="C2",
+                      detail={"reason": "disappeared", "age_seconds": 864000}),
+            _make_log("course_created", identifier="C3",
+                      detail={"reason": "new"}),
+        ]
+        _process_report_config(self.tmpdir, "audit_plan_acciones", logs)
+        data = self._read_csv("15_audit_plan_acciones.csv")
+        assert data is not None
+        assert len(data) == 3  # header + 2 rows
+        assert data[1][0] == "C1"
+        assert data[1][1] == "course_created"
+        assert data[1][2] == "new"
+        assert data[1][3] == "p1"
+        assert data[2][0] == "C2"
+        assert data[2][1] == "course_deleted"
+        assert data[2][4] == "10.0"
+
 
 class TestReportServiceIntegration:
 

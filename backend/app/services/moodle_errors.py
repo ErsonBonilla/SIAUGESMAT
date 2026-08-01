@@ -89,8 +89,12 @@ class MoodleAPIError(Exception):
     @property
     def spanish_message(self) -> str:
         if self.error_code and self.error_code in self.ERROR_CODES:
-            return self.ERROR_CODES[self.error_code]
-        return str(self.args[0]) if self.args else "Error desconocido de Moodle."
+            msg = self.ERROR_CODES[self.error_code]
+        else:
+            msg = str(self.args[0]) if self.args else "Error desconocido de Moodle."
+        if self.error_code:
+            return f"[{self.error_code}] {msg}"
+        return msg
 
     def __str__(self):
         return self.spanish_message

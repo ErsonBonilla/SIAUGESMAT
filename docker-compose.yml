@@ -58,7 +58,7 @@ services:
     environment:
       # FastAPI / Proyecto
       PROJECT_NAME: SIAUGESMAT
-      DEBUG: "false"
+      DEBUG: ${DEBUG}
       ALLOW_PRESENCIAL: ${ALLOW_PRESENCIAL}
 
       # Moodle
@@ -97,13 +97,21 @@ services:
 
       # Subida de archivos
       UPLOAD_DIR: /app/uploads
-      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB}
 
       # CORS
       CORS_ORIGINS: ${CORS_ORIGINS}
 
       # Job timeout (segundos)
       JOB_TIMEOUT: ${JOB_TIMEOUT}
+
+      # Recuperación de fases atascadas
+      CHORD_ACTIVE_MINUTES: ${CHORD_ACTIVE_MINUTES:-15}
+      STUCK_EXECUTION_TIMEOUT: ${STUCK_EXECUTION_TIMEOUT:-21600}
+      MAX_AUTO_DELETE_COURSES: ${MAX_AUTO_DELETE_COURSES:-500}
+
+      # Timeout y reintentos de red a Moodle
+      MOODLE_REQUEST_TIMEOUT: ${MOODLE_REQUEST_TIMEOUT:-60.0}
+      MOODLE_MAX_RETRIES: ${MOODLE_MAX_RETRIES:-3}
 
       # Umbrales de comparación de cursos (segundos)
       COURSE_MAX_AGE_SECONDS: ${COURSE_MAX_AGE_SECONDS}
@@ -163,6 +171,15 @@ services:
 
       UPLOAD_DIR: /app/uploads
       JOB_TIMEOUT: ${JOB_TIMEOUT}
+
+      # Recuperación de fases atascadas
+      CHORD_ACTIVE_MINUTES: ${CHORD_ACTIVE_MINUTES:-15}
+      STUCK_EXECUTION_TIMEOUT: ${STUCK_EXECUTION_TIMEOUT:-21600}
+      MAX_AUTO_DELETE_COURSES: ${MAX_AUTO_DELETE_COURSES:-500}
+
+      # Timeout y reintentos de red a Moodle
+      MOODLE_REQUEST_TIMEOUT: ${MOODLE_REQUEST_TIMEOUT:-60.0}
+      MOODLE_MAX_RETRIES: ${MOODLE_MAX_RETRIES:-3}
 
       # Umbrales de comparación de cursos (segundos)
       COURSE_MAX_AGE_SECONDS: ${COURSE_MAX_AGE_SECONDS}

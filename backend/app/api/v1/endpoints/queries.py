@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user, get_db
 from app.repositories.query_repo import (
     create_query,
-    delete_old_queries,
     get_query,
 )
 from app.schemas.user import UserInToken
@@ -147,13 +146,3 @@ def download_task_csv(
     if qr.status != "completed":
         raise HTTPException(409, "La consulta aún no ha finalizado")
     return _csv_download(qr)
-
-
-@router.delete("/tasks/old", summary="Eliminar consultas antiguas")
-def delete_old(
-    days: int = Query(30, ge=1),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
-):
-    deleted = delete_old_queries(db, days)
-    return {"deleted_tasks": deleted, "older_than_days": days}

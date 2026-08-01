@@ -13,14 +13,16 @@ from app.repositories.execution_repo import (
     clear_checkpoint,
     get_checkpoint,
     get_execution,
+    increment_metric,
     mark_completed,
     mark_failed,
     save_checkpoint,
+    set_chord_active,
     set_report_dir,
     update_progress,
     should_cancel,
 )
-from app.repositories.log_repo import save_error
+from app.repositories.log_repo import save_error, save_log
 from app.services.error_messages import translate_error
 from app.services.moodle_factory import get_moodle_service
 from app.workers.phases.base import PhaseContext
@@ -41,6 +43,7 @@ def _save_phase_2_data_to_checkpoint(db, eid, etl_data, metrics, phase2_data, mo
     save_checkpoint(db, eid, "phase3_ctx", {
         "courses": etl_data.get("courses", []),
         "users": etl_data.get("users", []),
+        "existing_courses": phase2_data.get("1", {}).get("courses", []),
         "metrics": metrics,
         "modalidad": modalidad,
         "mode": mode,
@@ -90,6 +93,11 @@ def process_etl_phase(self, execution_id: int, phase: str):
                                 logger.info(f"Categoría {cat['idnumber']} ya existe, omitiendo")
                                 continue
                             await ms.create_categories([cat])
+                            save_log(db, execution_id, "3", "category_created", cat["idnumber"], {
+                                "name": cat.get("name", ""),
+                                "parent": cat.get("parent", ""),
+                            })
+                            increment_metric(db, execution_id, "categories_created")
                     finally:
                         await ms.close()
                 try:
@@ -122,7 +130,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
 
             if not comparison:
                 logger.info(f"FASE 3: sin datos de comparación, saltando")
-                on_phase_items_done.delay(execution_id, "3")
+                on_phase_items_done.delay([], execution_id, "3")
                 return
 
             update_progress(db, execution_id, 34, "Resolviendo templates y creando items…", step=3)
@@ -130,7 +138,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
             total = sum(item_counts.values())
             if total == 0:
                 logger.info(f"FASE 3: sin items que procesar")
-                on_phase_items_done.delay(execution_id, "3")
+                on_phase_items_done.delay([], execution_id, "3")
                 return
 
             delete_items = _get_pending_items(db, execution_id, "3", "delete")
@@ -142,7 +150,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
             elif structure_items:
                 _launch_items_chord(execution_id, structure_items)
             else:
-                on_phase_items_done.delay(execution_id, "3")
+                on_phase_items_done.delay([], execution_id, "3")
 
         elif phase == "4":
             update_progress(db, execution_id, 65, "Creando items de personas…", step=4)
@@ -150,7 +158,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
             total = sum(item_counts.values())
             if total == 0:
                 logger.info(f"FASE 4: sin items que procesar")
-                on_phase_items_done.delay(execution_id, "4")
+                on_phase_items_done.delay([], execution_id, "4")
                 return
 
             user_items = _get_pending_items(db, execution_id, "4", sub_phase="create_user")
@@ -158,16 +166,18 @@ def process_etl_phase(self, execution_id: int, phase: str):
 
             if user_items:
                 logger.info(f"FASE 4: creando {len(user_items)} usuario(s)")
+                set_chord_active(db, execution_id)
                 task_ids = [process_etl_item.si(item.id) for item in user_items]
                 chord(task_ids)(on_users_done.s(
                     execution_id=execution_id,
                 ))
             elif enrol_items:
                 logger.info(f"FASE 4: enrolando {len(enrol_items)} profesor(es)")
+                set_chord_active(db, execution_id)
                 task_ids = [process_etl_item.si(item.id) for item in enrol_items]
                 chord(task_ids)(on_phase_items_done.s(execution_id=execution_id, phase="4"))
             else:
-                on_phase_items_done.delay(execution_id, "4")
+                on_phase_items_done.delay([], execution_id, "4")
 
     except Exception as e:
         logger.exception(f"Error en FASE {phase}: {e}")
@@ -224,7 +234,7 @@ def _serialize_comparison(comparison: dict) -> dict:
     result = {}
     for k, v in comparison.items():
         if k == "logs":
-            result[k] = v
+            continue
         elif isinstance(v, set):
             result[k] = list(v)
         elif isinstance(v, list):
@@ -240,12 +250,6 @@ def _is_delete_confirmed(db, execution_id: int) -> bool:
     if not ex or not ex.phase_checkpoint:
         return False
     return ex.phase_checkpoint.get("delete_confirmed", False)
-
-
-def _get_execution_status(db, execution_id: int) -> str:
-    from app.db.models import Execution
-    ex = db.query(Execution).filter(Execution.id == execution_id).first()
-    return ex.status if ex else ""
 
 
 def _require_review(db, execution_id: int, ctx):

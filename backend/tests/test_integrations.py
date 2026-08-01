@@ -16,7 +16,7 @@ from app.services.moodle_errors import MoodleAPIError
 def integration():
     mock_service = AsyncMock()
     mock_service.get_users.return_value = []
-    mock_service.get_user_by_username.return_value = {"username": "testuser", "suspended": "0"}
+    mock_service.get_user_by_username.return_value = None
     mock_service.create_users.return_value = [{"id": 1, "username": "testuser"}]
     mock_service.enrol_users.return_value = {
         "success": True, "enrolled": 1, "failed": 0, "errors": [],
@@ -122,6 +122,10 @@ class TestCreateUserIfNotExists:
     @pytest.mark.asyncio
     async def test_new_user_created(self, integration):
         integration.service.get_users.return_value = []
+        integration.service.get_user_by_username.side_effect = [
+            None,  # no existe por username (lookup previo a crear)
+            {"id": 10, "username": "anita"},  # verificación post-creación
+        ]
         integration.service.create_users.return_value = [
             {"id": 10, "username": "anita"}
         ]
@@ -140,6 +144,10 @@ class TestCreateUserIfNotExists:
     @pytest.mark.asyncio
     async def test_new_user_with_city_and_description(self, integration):
         integration.service.get_users.return_value = []
+        integration.service.get_user_by_username.side_effect = [
+            None,
+            {"id": 10, "username": "anita"},
+        ]
         integration.service.create_users.return_value = [
             {"id": 10, "username": "anita"}
         ]

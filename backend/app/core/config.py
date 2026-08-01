@@ -5,11 +5,9 @@ Utiliza pydantic-settings para cargar variables de entorno desde un archivo .env
 y proporcionar valores tipados y validados a todos los módulos.
 """
 
-import os
 from pathlib import Path
 from typing import Dict, Optional
 
-from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,9 +57,6 @@ class Settings(BaseSettings):
     # Reintentos automáticos ante fallos de red
     MOODLE_MAX_RETRIES: int = 3
 
-    # Tamaño de lote para consultas masivas a Moodle
-    MOODLE_QUERY_BATCH_SIZE: int = 5
-
     # ------------------------------------------------------------------
     # Plantilla genérica para cursos sin PORTAFOLIO
     # ------------------------------------------------------------------
@@ -100,9 +95,6 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     REPORT_DIR: str = str(Path(__file__).resolve().parent.parent.parent / "reports")
 
-    # Tamaño máximo de archivo en megabytes
-    MAX_UPLOAD_SIZE_MB: int = 50
-
     # ------------------------------------------------------------------
     # Trabajos ETL
     # ------------------------------------------------------------------
@@ -113,14 +105,12 @@ class Settings(BaseSettings):
     # este número, la ejecución se detiene y requiere confirmación manual.
     MAX_AUTO_DELETE_COURSES: int = 500
 
-    # Tiempo de espera para considerar un item como "stuck" (minutos)
-    STUCK_ITEM_TIMEOUT_MINUTES: int = 30
+    # Vigencia del marcador "chord activo" (minutos). El sweeper
+    # `recover_stuck_phase` relanza una fase cuando este marcador expira.
+    CHORD_ACTIVE_MINUTES: int = 15
 
     # Tiempo de espera para considerar una ejecución como "stuck" (segundos)
     STUCK_EXECUTION_TIMEOUT: int = 21600                   # 6 horas
-
-    # Días de antigüedad para limpieza automática de lotes
-    DEFAULT_BATCH_CLEANUP_DAYS: int = 30
 
     # ------------------------------------------------------------------
     # Umbrales del semáforo de analítica
@@ -192,6 +182,8 @@ class Settings(BaseSettings):
             errors.append("REDIS_URL no está configurada")
         if not self.JWT_SECRET_KEY:
             errors.append("JWT_SECRET_KEY no está configurada")
+        if not self.CORS_ORIGINS:
+            errors.append("CORS_ORIGINS no está configurada")
         if errors:
             raise ValueError(
                 "Errores de configuración crítica:\n  - " + "\n  - ".join(errors)
