@@ -273,6 +273,7 @@ class MoodleService(MoodleClient):
         params = {}
         for i, user in enumerate(users):
             params[f"users[{i}][username]"] = user["username"]
+            params[f"users[{i}][auth]"] = "manual"
             params[f"users[{i}][firstname]"] = user["firstname"]
             params[f"users[{i}][lastname]"] = user["lastname"]
             params[f"users[{i}][email]"] = user["email"]
