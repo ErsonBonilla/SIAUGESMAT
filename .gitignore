@@ -15,6 +15,9 @@ __pycache__/
 node_modules/
 
 # Archivos de subida de usuarios (cargas académicas)
+# ATENCIÓN: *.xlsx / *.xls / *.csv / *.zip bloquean TODOS los archivos
+# con esas extensiones en cualquier ruta del repo. Son artefactos generados.
+# Si se necesita commitear un CSV/ZIP/XLSX de configuración, añadir !excepción.
 uploads/
 *.xlsx
 *.xls
@@ -42,6 +45,15 @@ Thumbs.db
 
 # Archivos de construcción de Fresh (build output)
 _fresh/
+
+# Herramientas de coverage, linting y build
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+dist/
+build/
+*.egg-info/
 
 # ---------------------------------------------------------------------------
 # tests_e2e — pruebas de integración contra Moodle real

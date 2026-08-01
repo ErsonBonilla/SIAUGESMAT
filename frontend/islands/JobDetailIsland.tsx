@@ -49,7 +49,7 @@ function computeSemaphore(
   const total = execution.metrics?.total_operations ??
     ((execution.metrics?.courses_created || 0) +
       (execution.metrics?.users_created || 0) +
-      (execution.metrics?.enrollments || 0));
+      (execution.metrics?.enrolments || 0));
   if (!total) return { color: "gray", text: "Sin datos" };
   const errorRate = ((execution.errors_count || 0) / total) * 100;
   if (errorRate >= THRESHOLD_RED || (execution.duration_seconds || 0) >= 7200) {

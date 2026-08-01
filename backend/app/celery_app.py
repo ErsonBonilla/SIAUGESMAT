@@ -79,6 +79,10 @@ celery_app.conf.update(
             "task": "app.workers.cleanup_tasks.cleanup_stuck_executions",
             "schedule": 3600.0,
         },
+        "recover-stuck-phase": {
+            "task": "app.workers.cleanup_tasks.recover_stuck_phase",
+            "schedule": 300.0,
+        },
     },
 )
 

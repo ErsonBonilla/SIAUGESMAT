@@ -49,10 +49,3 @@ class TestDownloadCsv:
         create_query(test_db, "test-task-id", "courses", {}, "DISTANCIA")
         resp = client.get("/api/v1/queries/tasks/test-task-id/download", headers=auth_headers)
         assert resp.status_code == 409
-
-
-class TestDeleteOld:
-    def test_delete_old(self, client, auth_headers, test_db):
-        resp = client.delete("/api/v1/queries/tasks/old?days=30", headers=auth_headers)
-        assert resp.status_code == 200
-        assert "deleted_tasks" in resp.json()

@@ -17,7 +17,7 @@ def apply_action(
 ):
     phase = "2"
     if action == "create":
-        to_create.append({"shortname": sn, "professor": professor})
+        to_create.append({"shortname": sn, "professor": professor, **detail})
         logs.append({
             "phase": phase, "action": "course_created",
             "identifier": sn, "detail": detail,
@@ -27,6 +27,7 @@ def apply_action(
             "shortname": sn,
             "professor": professor,
             "template_shortname": detail.get("template_shortname"),
+            **detail,
         })
         logs.append({
             "phase": phase, "action": "course_created_with_template",
@@ -34,16 +35,21 @@ def apply_action(
         })
     elif action == "recreate":
         old_sn = detail.get("old_shortname", sn)
-        to_delete.append(old_sn)
-        to_create.append({"shortname": sn, "professor": professor})
+        to_delete.append({"shortname": old_sn, **detail})
+        to_create.append({
+            "shortname": sn,
+            "professor": professor,
+            "recreate": True,
+            **detail,
+        })
         logs.append({
             "phase": phase, "action": "course_recreated",
             "identifier": sn, "detail": detail,
         })
     elif action == "hide_and_create":
         old_sn = detail.get("old_shortname", sn)
-        to_hide.append(old_sn)
-        to_create.append({"shortname": sn, "professor": professor})
+        to_hide.append({"shortname": old_sn, **detail})
+        to_create.append({"shortname": sn, "professor": professor, **detail})
         alerts.append({
             "shortname": sn,
             "reason": "teacher_change_recent",
@@ -60,10 +66,11 @@ def apply_action(
             "old_shortname": detail["old_shortname"],
             "shortname": sn,
             "professor": professor,
+            "reason": detail.get("reason", ""),
         }
         if detail.get("reactivate"):
             entry["reactivate"] = True
-            to_activate.append(detail["old_shortname"])
+            to_activate.append({"shortname": detail["old_shortname"], **detail})
         to_update.append(entry)
         logs.append({
             "phase": phase, "action": "course_renamed",
@@ -71,13 +78,13 @@ def apply_action(
             "detail": {**detail, "new_shortname": sn},
         })
     elif action == "activate":
-        to_activate.append(sn)
+        to_activate.append({"shortname": sn, **detail})
         logs.append({
             "phase": phase, "action": "course_activated",
             "identifier": sn, "detail": detail,
         })
     elif action == "create_with_alert":
-        to_create.append({"shortname": sn, "professor": professor})
+        to_create.append({"shortname": sn, "professor": professor, **detail})
         alerts.append({
             "shortname": sn,
             "reason": detail["reason"],

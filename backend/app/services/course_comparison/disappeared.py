@@ -30,7 +30,12 @@ def find_disappeared_courses(
 
         age = get_course_age_seconds(existing)
         if age >= settings.COURSE_DISAPPEARED_AGE_SECONDS:
-            to_delete.append(sn)
+            to_delete.append({
+                "shortname": sn,
+                "reason": "disappeared",
+                "age_seconds": age,
+                "fullname": existing.get("fullname", ""),
+            })
             alerts.append({
                 "shortname": sn,
                 "reason": "disappeared",
@@ -43,7 +48,12 @@ def find_disappeared_courses(
                 "detail": {"reason": "disappeared", "age_seconds": age},
             })
         elif not is_course_hidden(existing):
-            to_hide.append(sn)
+            to_hide.append({
+                "shortname": sn,
+                "reason": "disappeared_recent",
+                "age_seconds": age,
+                "fullname": existing.get("fullname", ""),
+            })
             alerts.append({
                 "shortname": sn,
                 "reason": "disappeared_recent",

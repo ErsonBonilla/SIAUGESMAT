@@ -129,13 +129,3 @@ class TestDownloadReports:
             )
             assert resp.status_code == 200
             assert resp.content == b"zip-data"
-
-
-class TestDeleteOldBatches:
-    def test_delete_old(self, client, auth_headers):
-        with patch(
-            "app.api.v1.endpoints.batch_control.delete_old_batches", return_value=3
-        ):
-            resp = client.delete("/api/v1/operations/batches/old?days=30", headers=auth_headers)
-            assert resp.status_code == 200
-            assert resp.json()["deleted_batches"] == 3

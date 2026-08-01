@@ -146,8 +146,10 @@ class TestComparison:
             courses_with_teacher={sn: "prof1"},
         )
 
-        assert sn in result["to_delete"]
+        assert any(d.get("shortname") == sn for d in result["to_delete"])
         assert any(c["shortname"] == sn for c in result["to_create"])
+        assert result["to_delete"][0]["reason"] == "old_course_cleanup"
+        assert result["to_create"][0]["reason"] == "old_course_cleanup"
 
     @pytest.mark.asyncio
     async def test_case_2_same_professor_hidden(self):
@@ -168,7 +170,8 @@ class TestComparison:
             courses_with_teacher={sn: "prof1"},
         )
 
-        assert sn in result["to_activate"]
+        assert any(d.get("shortname") == sn for d in result["to_activate"])
+        assert result["to_activate"][0]["reason"] == "same_professor_hidden"
 
     @pytest.mark.asyncio
     async def test_case_3_different_professor(self):
@@ -190,7 +193,9 @@ class TestComparison:
         )
 
         assert len(result["to_hide"]) >= 1
+        assert result["to_hide"][0]["reason"] == "teacher_change_recent"
         assert any(c["shortname"] == sn for c in result["to_create"])
+        assert any(c["reason"] == "teacher_change_recent" for c in result["to_create"])
 
     @pytest.mark.asyncio
     async def test_case_4_same_core_different_group_rename(self):
@@ -273,7 +278,7 @@ class TestComparison:
 
         # Excel vacío → no se elimina nada (sin programas en scope)
         result = await CourseComparisonService.compare(existing_courses, [], [])
-        assert sn not in result["to_delete"], "Excel vacío no debe eliminar cursos"
+        assert not any(d.get("shortname") == sn for d in result["to_delete"]), "Excel vacío no debe eliminar cursos"
         assert len(result["alerts"]) == 0
 
         # Excel con un curso de OTRO programa → el curso 0105 no se toca
@@ -283,7 +288,7 @@ class TestComparison:
             [_make_new_course(other_sn)],
             [],
         )
-        assert sn not in result2["to_delete"], "Curso de otro programa no debe eliminarse"
+        assert not any(d.get("shortname") == sn for d in result2["to_delete"]), "Curso de otro programa no debe eliminarse"
 
         # Excel con cursos del MISMO programa → si desapareció, se elimina
         same_prog_sn = "IDE_0105_sI_303_G-01"
@@ -292,4 +297,5 @@ class TestComparison:
             [_make_new_course(same_prog_sn)],
             [{"course_shortname": same_prog_sn, "username": "prof1"}],
         )
-        assert sn in result3["to_delete"], "Curso desaparecido del mismo programa debe eliminarse"
+        assert any(d.get("shortname") == sn for d in result3["to_delete"]), "Curso desaparecido del mismo programa debe eliminarse"
+        assert result3["to_delete"][0]["reason"] == "disappeared"

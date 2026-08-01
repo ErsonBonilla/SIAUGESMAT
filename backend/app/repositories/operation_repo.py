@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.db.models import OperationBatch, OperationItem
@@ -46,6 +46,23 @@ def add_item(db: Session, batch_id: str, identifier: str, detail: dict = None,
 
 def get_item(db: Session, item_id: int) -> Optional[OperationItem]:
     return db.query(OperationItem).filter(OperationItem.id == item_id).first()
+
+
+def claim_item(db: Session, item_id: int) -> bool:
+    """Reclama atómicamente un item moviéndolo de pending a processing.
+
+    Usa ``UPDATE ... WHERE status='pending'`` para evitar que dos workers
+    procesen el mismo item tras un relaunch del sweeper.
+    """
+    result = db.execute(
+        text(
+            "UPDATE operation_items SET status = 'processing', updated_at = now() "
+            "WHERE id = :id AND status = 'pending'"
+        ),
+        {"id": item_id},
+    )
+    db.commit()
+    return result.rowcount > 0
 
 
 def update_item(db: Session, item_id: int, status: str, error_message: str = None) -> Optional[OperationItem]:

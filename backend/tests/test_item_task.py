@@ -70,7 +70,8 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.get_item") as mock_get, \
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
              patch("app.workers.phases.item_task.MoodleIntegration"), \
-             patch("app.workers.phases.item_task.update_item") as mock_update:
+             patch("app.workers.phases.item_task.update_item") as mock_update, \
+             patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_get.return_value = _make_item(action="invalid")
             db = MagicMock()
             mock_sl.return_value = db
@@ -88,7 +89,8 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
              patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
              patch("app.workers.phases.item_task.update_item"), \
-             patch("app.workers.phases.item_task._refresh_phase_progress"):
+             patch("app.workers.phases.item_task._refresh_phase_progress"), \
+             patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ = AsyncMock()
             getattr(mock_integ, method).return_value = True
             mock_integ_cls.return_value = mock_integ
@@ -107,7 +109,8 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
              patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
              patch("app.workers.phases.item_task.update_item") as mock_update, \
-             patch("app.workers.phases.item_task._refresh_phase_progress"):
+             patch("app.workers.phases.item_task._refresh_phase_progress"), \
+             patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ = AsyncMock()
             getattr(mock_integ, method).return_value = False
             mock_integ.last_error = f"Error in {method}"
@@ -124,7 +127,8 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
              patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
              patch("app.workers.phases.item_task.update_item"), \
-             patch("app.workers.phases.item_task._refresh_phase_progress"):
+             patch("app.workers.phases.item_task._refresh_phase_progress"), \
+             patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ = AsyncMock()
             mock_integ.rename_course.return_value = True
             mock_integ_cls.return_value = mock_integ
@@ -142,7 +146,8 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
              patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
              patch("app.workers.phases.item_task.update_item"), \
-             patch("app.workers.phases.item_task._refresh_phase_progress"):
+             patch("app.workers.phases.item_task._refresh_phase_progress"), \
+             patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ = AsyncMock()
             mock_integ.create_course.return_value = True
             mock_integ_cls.return_value = mock_integ
@@ -152,7 +157,7 @@ class TestProcessEtlItem:
             process_etl_item(1)
             mock_integ.create_course.assert_called_once_with(
                 shortname="IDENTIFIER_001", fullname="New Course",
-                category_idnumber="CAT_01", template_id=42
+                category_idnumber="CAT_01", template_id=42, recreate=False
             )
 
     def test_create_user_success(self):
@@ -162,7 +167,8 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
              patch("app.workers.phases.item_task.update_item"), \
              patch("app.workers.phases.item_task.save_log"), \
-             patch("app.workers.phases.item_task._refresh_phase_progress"):
+             patch("app.workers.phases.item_task._refresh_phase_progress"), \
+             patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ = AsyncMock()
             mock_integ.create_user_if_not_exists.return_value = ("newuser", True)
             mock_integ_cls.return_value = mock_integ
@@ -179,7 +185,8 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
              patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
              patch("app.workers.phases.item_task.update_item") as mock_update, \
-             patch("app.workers.phases.item_task._refresh_phase_progress"):
+             patch("app.workers.phases.item_task._refresh_phase_progress"), \
+             patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ = AsyncMock()
             mock_integ.create_user_if_not_exists.return_value = (None, False)
             mock_integ.last_error = "User creation failed"
@@ -194,7 +201,8 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
              patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
              patch("app.workers.phases.item_task.update_item"), \
-             patch("app.workers.phases.item_task._refresh_phase_progress"):
+             patch("app.workers.phases.item_task._refresh_phase_progress"), \
+             patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ = AsyncMock()
             mock_integ.enrol_teacher.return_value = {"success": True}
             mock_integ_cls.return_value = mock_integ
@@ -213,7 +221,8 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
              patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
              patch("app.workers.phases.item_task.update_item") as mock_update, \
-             patch("app.workers.phases.item_task._refresh_phase_progress"):
+             patch("app.workers.phases.item_task._refresh_phase_progress"), \
+             patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ = AsyncMock()
             mock_integ.enrol_teacher.return_value = {"success": False}
             mock_integ.last_error = "Enrol failed"
@@ -228,7 +237,8 @@ class TestProcessEtlItem:
         with patch("app.workers.phases.item_task.SessionLocal") as mock_sl, \
              patch("app.workers.phases.item_task.get_item") as mock_get, \
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
-             patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls:
+             patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
+             patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ_cls.return_value = mock_integ
             mock_get.return_value = _make_item()
             mock_sl.return_value = MagicMock()

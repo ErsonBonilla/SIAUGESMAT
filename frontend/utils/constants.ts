@@ -11,7 +11,7 @@ export const SEMAPHORE_COLORS: Record<string, string> = {
 export const SEMAPHORE_TEXTS: Record<string, string> = {
   green: "Ejecución exitosa",
   yellow: "Advertencias",
-  red: "Errores críticos",
+  red: "Errores",
   gray: "Sin ejecuciones",
 };
 

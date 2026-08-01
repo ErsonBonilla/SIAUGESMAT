@@ -34,6 +34,8 @@ const REPORT_GROUPS = [
       "audit_cursos_activados",
       "audit_usuarios",
       "audit_matriculas",
+      "audit_conflictos_identidad",
+      "audit_plan_acciones",
       "audit_errores",
     ],
   },

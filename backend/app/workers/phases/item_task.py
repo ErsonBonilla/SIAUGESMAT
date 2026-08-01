@@ -12,7 +12,7 @@ from app.integrations.moodle import MoodleIntegration
 from app.db.models import OperationItem
 from app.repositories.execution_repo import increment_metric, should_cancel
 from app.repositories.log_repo import save_error, save_log
-from app.repositories.operation_repo import get_item, update_item
+from app.repositories.operation_repo import claim_item, get_item, update_item
 from app.services.error_messages import translate_error
 from app.services.moodle_errors import MoodleOverloadedError, is_moodle_overloaded
 from app.services.moodle_factory import get_moodle_service
@@ -80,8 +80,8 @@ def process_etl_item(self, item_id: int):
         moodle = get_moodle_service(modalidad)
         integration = MoodleIntegration(moodle)
 
-        update_item(db, item.id, "processing")
-        db.commit()
+        if not claim_item(db, item.id):
+            return
 
         async def _execute():
             success = False
@@ -104,6 +104,7 @@ def process_etl_item(self, item_id: int):
                         fullname=detail.get("fullname", ""),
                         category_idnumber=detail.get("category_idnumber", ""),
                         template_id=detail.get("template_id"),
+                        recreate=detail.get("recreate", False),
                     )
                 elif action == "create_user":
                     username, created = await integration.create_user_if_not_exists({
@@ -141,10 +142,11 @@ def process_etl_item(self, item_id: int):
                 _log_success(db, execution_id, action, identifier, detail)
             else:
                 error = integration.last_error or f"Error desconocido ({action}:{identifier})"
+                if action == "enrol":
+                    _log_enrol_failure(db, execution_id, identifier, detail, error)
                 update_item(db, item.id, "failed", error)
                 _handle_error(execution_id, action, identifier, error, db=db)
             db.commit()
-            _refresh_phase_progress(execution_id, db=db)
 
         try:
             asyncio.run(_execute())
@@ -158,10 +160,22 @@ def process_etl_item(self, item_id: int):
             update_item(db, item.id, "failed", translate_error(e))
             _handle_error(execution_id, action, identifier, translate_error(e), db=db)
             db.commit()
-            _refresh_phase_progress(execution_id, db=db)
 
     except MoodleOverloadedError:
-        raise
+        if self.request.retries >= self.max_retries:
+            error_msg = "Agotados reintentos por sobrecarga de Moodle"
+            try:
+                update_item(db, item.id, "failed", error_msg)
+                if execution_id:
+                    _handle_error(execution_id, action, identifier, error_msg, db=db)
+                db.commit()
+                logger.error(
+                    f"Item {item_id} marcado failed tras agotar reintentos por sobrecarga"
+                )
+            except Exception as exc:
+                logger.exception(f"Error marcando failed item {item_id} tras sobrecarga: {exc}")
+        else:
+            raise
     except Exception as e:
         logger.exception(f"Error crítico en item {item_id}: {e}")
         try:
@@ -231,9 +245,26 @@ def _log_success(db, execution_id, action, identifier, detail):
     }.get(action, action)
     log_detail = {}
     if action == "rename":
-        log_detail = {"old_shortname": detail.get("old_shortname", "")}
+        log_detail = {
+            "old_shortname": detail.get("old_shortname", ""),
+            "old_fullname": detail.get("old_fullname", ""),
+            "new_fullname": detail.get("fullname", ""),
+        }
     elif action == "enrol":
-        log_detail = {"course": detail.get("course_shortname", "")}
+        log_detail = {
+            "course": detail.get("course_shortname", ""),
+            "fullname": detail.get("fullname", ""),
+            "firstname": detail.get("firstname", ""),
+            "lastname": detail.get("lastname", ""),
+        }
+    elif action in ("delete", "activate", "hide", "create"):
+        for key in (
+            "reason", "old_shortname", "old_professor", "professor",
+            "template_shortname", "age_seconds", "recreate", "fullname",
+            "category_idnumber", "firstname", "lastname",
+        ):
+            if key in detail:
+                log_detail[key] = detail.get(key)
     if log_action != "user_created":
         save_log(db, execution_id, phase, log_action, identifier, log_detail)
 
@@ -251,3 +282,32 @@ def _handle_error(execution_id, action, identifier, error_msg, db):
     except Exception:
         logger.exception(f"Error manejando fallo ETL para {identifier}")
     # Nota: No cerramos db porque la sesión pertenece al caller
+
+
+def _normalize_enrol_reason(error_msg: str) -> str:
+    """Normaliza el motivo de un fallo de matriculación para el reporte.
+
+    Los reportes inc_usuarios_inactivos y audit_matriculas esperan reasons
+    como ``user_not_found``/``user_inactive``, pero los fallos llegan como
+    mensajes en español o warningcodes de la API de Moodle.
+    """
+    m = (error_msg or "").lower()
+    if "usuario no encontrado" in m or "user not found" in m:
+        return "user_not_found"
+    if "curso no encontrado" in m or "course not found" in m:
+        return "course_not_found"
+    if "inactive" in m or "suspendid" in m or "no activo" in m or "usernotactive" in m:
+        return "user_inactive"
+    if "alreadyenrolled" in m or "ya matriculado" in m:
+        return "already_enrolled"
+    return (error_msg or "").strip() or "unknown"
+
+
+def _log_enrol_failure(db, execution_id, identifier, detail, error_msg):
+    if not execution_id:
+        return
+    save_log(db, execution_id, "4", "enrolment_failed", identifier, {
+        "course": detail.get("course_shortname", ""),
+        "fullname": detail.get("fullname", ""),
+        "reason": _normalize_enrol_reason(error_msg),
+    })

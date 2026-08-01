@@ -52,7 +52,7 @@ class DistanciaParser(BaseExcelParser):
         df = cls._parse_program_name(df)
         df = cls._clean_data(df)
 
-        categories_map, courses, users, enrolments = cls._process_rows(df, modalidad)
+        categories_map, courses, users, enrolments, duplicates = cls._process_rows(df, modalidad)
         users_list = list(users.values())
         categories_list = cls._sort_categories(list(categories_map.values()))
 
@@ -61,16 +61,18 @@ class DistanciaParser(BaseExcelParser):
             "courses": courses,
             "users": users_list,
             "enrolments": enrolments,
+            "duplicates": duplicates,
         }
 
     @classmethod
     def _process_rows(
         cls, df: pd.DataFrame, modalidad: str
-    ) -> Tuple[Dict, List, Dict, List]:
+    ) -> Tuple[Dict, List, Dict, List, List]:
         categories_map: Dict = {}
         courses: List = []
         users: Dict = {}
         enrolments: List = []
+        duplicates: List = []
 
         categories_map[modalidad] = {
             "name": "IDEAD",
@@ -98,10 +100,10 @@ class DistanciaParser(BaseExcelParser):
 
             cls._process_teacher(
                 row, course_data["shortname"], cedula, nombre_cat,
-                users, enrolments,
+                users, enrolments, duplicates,
             )
 
-        return categories_map, courses, users, enrolments
+        return categories_map, courses, users, enrolments, duplicates
 
     @staticmethod
     def _sanitize_group(grupo: str) -> str:
@@ -199,7 +201,7 @@ class DistanciaParser(BaseExcelParser):
     @classmethod
     def _process_teacher(
         cls, row, shortname: str, cedula: str, nombre_cat: str,
-        users: Dict, enrolments: List,
+        users: Dict, enrolments: List, duplicates: List,
     ):
         email = str(row.get("email_docente", "")).strip().lower()
         nombre_docente = str(row.get("nombre_docente", "")).strip()
@@ -228,6 +230,11 @@ class DistanciaParser(BaseExcelParser):
                 logger.warning(
                     "Email duplicado detectado: %s. Se conservan datos del primer registro.", email
                 )
+                duplicates.append({
+                    "email": email,
+                    "username": username,
+                    "course_shortname": shortname,
+                })
             enrolments.append({
                 "username": username,
                 "course_shortname": shortname,

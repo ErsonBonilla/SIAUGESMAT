@@ -10,7 +10,6 @@ from app.core.dependencies import get_current_user, get_db
 from app.repositories.operation_repo import (
     cancel_batch,
     delete_batch,
-    delete_old_batches,
     get_all_batch_items,
     get_batch,
     get_batch_items,
@@ -18,7 +17,7 @@ from app.repositories.operation_repo import (
     pause_batch,
     resume_batch,
 )
-from app.schemas.operations import BatchStatusResponse, DeleteOldBatchesResponse, OperationItemOut
+from app.schemas.operations import BatchStatusResponse, OperationItemOut
 from app.schemas.user import UserInToken
 from app.services.batch_report_service import (
     build_batch_report_zip,
@@ -163,13 +162,3 @@ def download_batch_report(
     if not path:
         raise HTTPException(status_code=404, detail="Reporte no encontrado")
     return FileResponse(path=path, media_type="text/csv", filename=f"{report_name}.csv")
-
-
-@router.delete("/batches/old", response_model=DeleteOldBatchesResponse,
-               summary="Eliminar lotes antiguos")
-def delete_old(
-    days: int = Query(30, ge=1), db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
-):
-    deleted = delete_old_batches(db, days)
-    return DeleteOldBatchesResponse(deleted_batches=deleted, older_than_days=days)

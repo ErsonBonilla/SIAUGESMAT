@@ -9,7 +9,8 @@ from app.celery_app import celery_app
 from app.core.config import settings
 from app.db.models import OperationItem
 from app.db.session import SessionLocal
-from app.repositories.execution_repo import get_execution
+from app.repositories.execution_repo import clear_chord_active, get_execution, set_chord_active
+from app.repositories.log_repo import save_log
 from app.repositories.operation_repo import add_item, create_batch
 from app.services.moodle_factory import get_moodle_service
 from app.workers.phases.item_task import process_etl_item, _refresh_phase_progress
@@ -40,6 +41,8 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> D
 
     counts: Dict[str, int] = {}
     courses = {c["shortname"]: c for c in ctx_data.get("courses", [])}
+    existing_by_sn = {c["shortname"]: c for c in ctx_data.get("existing_courses", [])}
+    users_by_username = {u["username"]: u for u in ctx_data.get("users", [])}
 
     def _batch_id(suffix):
         return f"etl_3_{suffix}_{execution_id}"
@@ -73,7 +76,12 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> D
             detail = {
                 "action": "rename", "execution_id": execution_id, "modalidad": modalidad,
                 "old_shortname": item.get("old_shortname", sn),
+                "old_fullname": existing_by_sn.get(item.get("old_shortname", sn), {}).get("fullname", ""),
                 "fullname": course_data.get("fullname", sn),
+                "reason": item.get("reason", ""),
+                "professor": item.get("professor", ""),
+                "reactivate": item.get("reactivate", False),
+                "age_seconds": item.get("age_seconds"),
             }
             add_item(db, batch.batch_id, sn, detail)
             count += 1
@@ -108,7 +116,13 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> D
                             except Exception:
                                 _create_template_cache[fallback] = None
                         template_id = _create_template_cache.get(fallback) if fallback else None
-                    return sn, course_data, template_id
+                        if template and template.startswith("PORTAFOLIO_"):
+                            save_log(db, execution_id, "3", "template_not_found", sn, {
+                                "fullname": course_data.get("fullname", ""),
+                                "template_shortname": template,
+                                "fallback": fallback if template_id else "",
+                            })
+                    return sn, course_data, template_id, item
 
                 return await asyncio.gather(*[_resolve_single(item) for item in create_items])
             finally:
@@ -118,17 +132,28 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> D
             resolved = asyncio.run(_resolve_templates())
         except Exception as e:
             logger.warning(f"Error resolviendo templates: {e}, se usarán sin template")
-            resolved = [(item["shortname"], courses.get(item["shortname"], {}), None) for item in create_items]
+            resolved = [
+                (item["shortname"], courses.get(item["shortname"], {}), None, item)
+                for item in create_items
+            ]
 
         batch = create_batch(db, _batch_id("create"), "courses", "create", len(create_items), modalidad)
         count = 0
-        for (sn, course_data, template_id) in resolved:
+        for (sn, course_data, template_id, item) in resolved:
             detail = {
                 "action": "create", "execution_id": execution_id, "modalidad": modalidad,
                 "fullname": course_data.get("fullname", sn),
                 "category_idnumber": course_data.get("category_idnumber", ""),
                 "template_id": template_id,
             }
+            for key, value in item.items():
+                if key in ("shortname", "template_shortname"):
+                    continue
+                detail.setdefault(key, value)
+            prof = users_by_username.get(item.get("professor", ""), {})
+            if prof:
+                detail.setdefault("firstname", prof.get("firstname", ""))
+                detail.setdefault("lastname", prof.get("lastname", ""))
             add_item(db, batch.batch_id, sn, detail)
             count += 1
         counts["create"] = count
@@ -139,7 +164,19 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> D
 
 def _launch_delete_chord(execution_id, delete_items):
     task_ids = [process_etl_item.si(item.id) for item in delete_items]
+    _mark_delete_chord_active(execution_id)
     chord(task_ids)(on_delete_items_done.s(execution_id=execution_id))
+
+
+def _mark_delete_chord_active(execution_id):
+    """Marca el chord de deletes como activo (para el sweeper)."""
+    db = SessionLocal()
+    try:
+        set_chord_active(db, execution_id)
+    except Exception:
+        logger.exception(f"No se pudo marcar chord de deletes activo para ejecución {execution_id}")
+    finally:
+        db.close()
 
 
 @celery_app.task(bind=True, autoretry_for=(MoodleOverloadedError,), max_retries=3,
@@ -150,6 +187,8 @@ def on_delete_items_done(self, results, execution_id):
         execution = get_execution(db, execution_id)
         if not execution or execution.status in ("paused", "cancelled"):
             return
+
+        clear_chord_active(db, execution_id)
 
         reset_stuck_items(
             db, batch_id_prefix="etl_3_%", execution_id=execution_id, increment_attempt=True,
@@ -184,7 +223,7 @@ def on_delete_items_done(self, results, execution_id):
             from app.workers.phases.common import _launch_items_chord
             _launch_items_chord(execution_id, structure_items)
         else:
-            on_phase_items_done.delay(execution_id, "3")
+            on_phase_items_done.delay([], execution_id, "3")
     except Exception as e:
         logger.exception(f"Error en on_delete_items_done: {e}")
         raise

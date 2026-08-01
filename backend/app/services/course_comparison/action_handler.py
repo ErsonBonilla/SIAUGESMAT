@@ -8,7 +8,6 @@ from app.services.course_comparison.utils import (
     get_course_professor,
     get_suffix,
     is_course_hidden,
-    parse_sn,
 )
 from app.services.parsers.patterns import parse_shortname
 

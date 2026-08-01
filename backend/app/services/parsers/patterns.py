@@ -29,11 +29,3 @@ def parse_shortname(shortname: str) -> Optional[Dict[str, str]]:
         "grupo": m.group("grupo"),
         "suffix": m.group("suffix"),
     }
-
-
-def get_semestre(m: Match) -> str:
-    return m.group("semestre_new") or m.group("semestre_old") or ""
-
-
-def get_cod_curso(m: Match) -> str:
-    return m.group("cod_curso_new") or m.group("cod_curso_old") or ""
