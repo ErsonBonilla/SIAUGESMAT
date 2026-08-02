@@ -102,31 +102,15 @@ async def _fix_users_batch(ms, users: list) -> tuple:
 # ---------------------------------------------------------------------------
 # App DB helpers
 # ---------------------------------------------------------------------------
-def _get_recent_enrolled_usernames(days: int = 15) -> list:
-    """Usernames con enrolment_ok en los ultimos N dias."""
+def _get_all_known_usernames() -> list:
+    """Todos los usernames procesados por el app (enrol+create, sin limite de tiempo)."""
     db = SessionLocal()
     try:
         rows = db.execute(text(
             "SELECT DISTINCT identifier FROM execution_logs "
-            "WHERE action = 'enrolment_ok' "
-            "AND created_at > NOW() - :interval * INTERVAL '1 day' "
+            "WHERE action IN ('enrolment_ok', 'user_created_createpassword') "
             "ORDER BY identifier"
-        ), {"interval": days}).fetchall()
-        return [r[0] for r in rows]
-    finally:
-        db.close()
-
-
-def _get_recent_created_usernames(days: int = 15) -> list:
-    """Usernames con user_created_createpassword en los ultimos N dias."""
-    db = SessionLocal()
-    try:
-        rows = db.execute(text(
-            "SELECT DISTINCT identifier FROM execution_logs "
-            "WHERE action = 'user_created_createpassword' "
-            "AND created_at > NOW() - :interval * INTERVAL '1 day' "
-            "ORDER BY identifier"
-        ), {"interval": days}).fetchall()
+        )).fetchall()
         return [r[0] for r in rows]
     finally:
         db.close()
@@ -242,13 +226,27 @@ async def _delete_users(ms, user_ids: list) -> bool:
         return False
 
 
+async def _find_users_by_email(ms, email: str) -> list:
+    """Busca TODOS los usuarios con un email (incluye los que NO estan en los logs del app)."""
+    try:
+        result = await ms._request("core_user_get_users_by_field", {
+            "field": "email",
+            "values[0]": email,
+        }, use_post=True, timeout=30.0)
+        if isinstance(result, list):
+            return result
+    except Exception:
+        pass
+    return []
+
+
 async def _dedup_flow(ms, fix: bool, days: int):
-    usernames = _get_recent_enrolled_usernames(days)
+    usernames = _get_all_known_usernames()
     if not usernames:
-        print("   No hay usernames recientes en los logs del app.\n")
+        print("   No hay usernames en los logs del app.\n")
         return
 
-    print(f"   {len(usernames)} usernames unicos enrolados en los ultimos {days} dias.\n")
+    print(f"   {len(usernames)} usernames unicos en todo el historial del app.\n")
     print(f"   Consultando Moodle en lotes de {BATCH_SIZE}...\n")
 
     all_users: list = []
@@ -276,6 +274,21 @@ async def _dedup_flow(ms, fix: bool, days: int):
     for u in all_users:
         email = (u.get("email") or "").strip().lower()
         by_email.setdefault(email, []).append(u)
+
+    # Para cada email, buscar en Moodle TODOS los usuarios (incluyendo los
+    # que el app nunca toco, como el usuario original que fue duplicado por error).
+    print(f"   Verificando duplicados por email en Moodle ({len(by_email)} emails)...\n")
+    i = 0
+    for email in list(by_email.keys()):
+        i += 1
+        if i % 200 == 0:
+            print(f"   [{i}/{len(by_email)}] verificados")
+        try:
+            all_for_email = await _find_users_by_email(ms, email)
+            if len(all_for_email) > len(by_email[email]):
+                by_email[email] = all_for_email
+        except Exception:
+            continue
 
     dups = {e: us for e, us in by_email.items() if len(us) > 1}
     if not dups:
