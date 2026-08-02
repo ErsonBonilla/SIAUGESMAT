@@ -4,9 +4,9 @@ Runner unificado para pruebas reales contra Moodle 3.9.
 
 Uso:
     cd backend
-    python tests_e2e/run_test.py tests_e2e/fixtures/bajocalima.xlsx
-    python tests_e2e/run_test.py tests_e2e/fixtures/ibague.xlsx --mode users
-    python tests_e2e/run_test.py tests_e2e/fixtures/uraba.xlsx --mode both --confirm
+    python e2e/run_test.py e2e/fixtures/bajocalima.xlsx
+    python e2e/run_test.py e2e/fixtures/ibague.xlsx --mode users
+    python e2e/run_test.py e2e/fixtures/uraba.xlsx --mode both --confirm
 
 Flujo:
     1. Genera token JWT automáticamente
