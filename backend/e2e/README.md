@@ -11,16 +11,16 @@ Scripts para probar el pipeline ETL completo contra la instancia real de Moodle 
 
 ```bash
 # Modo seguro — solo usuarios (no toca cursos)
-python tests_e2e/run_test.py tests_e2e/fixtures/ibague.xlsx
+python e2e/run_test.py e2e/fixtures/ibague.xlsx
 
 # Modo users + courses — requiere confirmación de delete masivo
-python tests_e2e/run_test.py tests_e2e/fixtures/ibague.xlsx --mode both
+python e2e/run_test.py e2e/fixtures/ibague.xlsx --mode both
 
 # Con confirmación automática del delete masivo
-python tests_e2e/run_test.py tests_e2e/fixtures/ibague.xlsx --mode both --confirm
+python e2e/run_test.py e2e/fixtures/ibague.xlsx --mode both --confirm
 
 # Semestre personalizado
-python tests_e2e/run_test.py tests_e2e/fixtures/uraba.xlsx --semester 2026B --mode users
+python e2e/run_test.py e2e/fixtures/uraba.xlsx --semester 2026B --mode users
 ```
 
 ## Fixtures disponibles

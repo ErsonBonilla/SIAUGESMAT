@@ -21,7 +21,7 @@ node_modules/
 uploads/
 *.xlsx
 *.xls
-!backend/tests_e2e/fixtures/*.xlsx
+!backend/e2e/fixtures/*.xlsx
 
 # Reportes generados por el backend (CSVs y ZIPs)
 reports/
@@ -56,7 +56,7 @@ build/
 *.egg-info/
 
 # ---------------------------------------------------------------------------
-# tests_e2e — pruebas de integración contra Moodle real
+# e2e — pruebas de integración contra Moodle real
 # Los *.xlsx en fixtures contienen datos reales de docentes.
 # Los scripts .py y README.md se comitean.
 # ---------------------------------------------------------------------------
