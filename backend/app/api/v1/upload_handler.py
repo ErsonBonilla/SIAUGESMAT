@@ -1,13 +1,16 @@
 import logging
 import uuid
 
-from fastapi import HTTPException
-from fastapi import UploadFile
+from fastapi import HTTPException, UploadFile
 
 from app.core.entity_config import ENTITY_CONFIG
 from app.repositories.operation_repo import add_item, create_batch
 from app.schemas.operations import CsvUploadResponse
-from app.services.csv_validator import validate_and_parse_csv, validate_categories_csv, validate_users_csv
+from app.services.csv_validator import (
+    validate_and_parse_csv,
+    validate_categories_csv,
+    validate_users_csv,
+)
 from app.workers.operations_tasks import process_operation_batch
 
 logger = logging.getLogger(__name__)
@@ -23,12 +26,12 @@ async def handle_visibility_upload(file: UploadFile, db, current_user, visibilit
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:
-        raise HTTPException(400, "El archivo no es un texto UTF-8 válido")
+        raise HTTPException(400, "El archivo no es un texto UTF-8 válido") from None
 
     try:
         identifiers = validate_and_parse_csv(text, config["column"], config["label_plural"])
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
     batch_id = str(uuid.uuid4())
     create_batch(db, batch_id, "courses", "visibility", len(identifiers), current_user.modalidad)
@@ -60,7 +63,7 @@ async def handle_upload(file: UploadFile, db, current_user, entity_type, action,
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:
-        raise HTTPException(400, "El archivo no es un texto UTF-8 válido")
+        raise HTTPException(400, "El archivo no es un texto UTF-8 válido") from None
 
     try:
         is_create_users = entity_type == "users" and action == "create"
@@ -74,7 +77,7 @@ async def handle_upload(file: UploadFile, db, current_user, entity_type, action,
         else:
             identifiers = validate_and_parse_csv(text, config["column"], config["label_plural"])
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
     batch_id = str(uuid.uuid4())
     create_batch(db, batch_id, entity_type, action, len(identifiers), current_user.modalidad)

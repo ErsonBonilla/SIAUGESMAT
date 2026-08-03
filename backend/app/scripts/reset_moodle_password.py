@@ -47,7 +47,7 @@ async def _get_user(ms, username: str) -> dict | None:
           f"auth={u.get('auth','?')} suspended={u.get('suspended','?')} "
           f"confirmed={u.get('confirmed','?')}")
     failed = prefs.get("login_failed_count_since_success", "0")
-    locked  = prefs.get("login_lockout", None)
+    locked  = prefs.get("login_lockout")
     print(f"  login_failed_count_since_success = {failed}")
     if locked:
         print(f"  login_lockout = {locked} (LOCKED)")
@@ -88,7 +88,7 @@ async def _verify_login(base_url: str, username: str, password: str) -> bool:
     """
     Realiza un POST de login interactivo contra Moodle.
     Retorna True si el login fue exitoso.
-    
+
     Moodle 3.9+ puede redirigir a login?testsession=ID incluso tras login
     exitoso; se sigue la cadena de redirecciones acumulando cookies.
     """

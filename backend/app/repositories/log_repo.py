@@ -1,4 +1,3 @@
-from typing import List
 
 from sqlalchemy.orm import Session
 
@@ -30,7 +29,7 @@ def save_error(db: Session, execution_id: int, err_type: str,
     db.flush()
 
 
-def get_execution_logs(db: Session, execution_id: int, limit: int = 100, offset: int = 0) -> List[ExecutionLog]:
+def get_execution_logs(db: Session, execution_id: int, limit: int = 100, offset: int = 0) -> list[ExecutionLog]:
     return db.query(ExecutionLog).filter(
         ExecutionLog.execution_id == execution_id
     ).order_by(ExecutionLog.created_at.desc()).offset(offset).limit(limit).all()

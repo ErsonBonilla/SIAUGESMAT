@@ -6,4 +6,4 @@ Este paquete se mantiene como puente para los workers y tests existentes.
 from app.pipeline.course_comparison import CourseComparisonService
 from app.services.parsers.patterns import SIAUGESMAT_PATTERN
 
-__all__ = ["CourseComparisonService", "SIAUGESMAT_PATTERN"]
+__all__ = ["SIAUGESMAT_PATTERN", "CourseComparisonService"]

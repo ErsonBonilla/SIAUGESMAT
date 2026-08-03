@@ -5,8 +5,9 @@ Verifica la lógica de alto nivel: creación condicional de usuarios,
 matriculación de profesores y detección de usuarios activos.
 """
 
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from app.integrations.moodle import MoodleIntegration
 from app.services.moodle_errors import MoodleAPIError

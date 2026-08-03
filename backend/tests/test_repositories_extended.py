@@ -4,31 +4,32 @@ Pruebas unitarias para los repositorios de QueryResult, OperationBatch y Operati
 Verifica que las funciones CRUD de query_repo y operation_repo funcionan correctamente.
 """
 
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
 
 from app.db.models import QueryResult
+from app.repositories.operation_repo import (
+    add_item,
+    complete_batch,
+    create_batch,
+    delete_old_batches,
+    get_all_batch_items,
+    get_batch,
+    get_batch_items,
+    get_batch_status,
+    get_pending_items,
+    list_batches,
+    update_batch_counts,
+    update_item,
+)
 from app.repositories.query_repo import (
-    get_query,
     create_query,
-    set_query_running,
+    delete_old_queries,
+    get_query,
     set_query_completed,
     set_query_failed,
-    delete_old_queries,
-)
-from app.repositories.operation_repo import (
-    get_batch,
-    get_pending_items,
-    create_batch,
-    add_item,
-    update_item,
-    update_batch_counts,
-    complete_batch,
-    get_batch_status,
-    get_batch_items,
-    get_all_batch_items,
-    delete_old_batches,
-    list_batches,
+    set_query_running,
 )
 
 
@@ -73,7 +74,7 @@ class TestQueryRepo:
         qr = QueryResult(
             task_id="old-1", entity="courses", params={}, status="completed",
             modalidad="DISTANCIA",
-            created_at=datetime.now(timezone.utc).replace(year=2000),
+            created_at=datetime.now(UTC).replace(year=2000),
         )
         test_db.add(qr)
         test_db.commit()
@@ -85,8 +86,7 @@ class TestQueryRepo:
 class TestOperationRepo:
     @pytest.fixture
     def batch(self, test_db):
-        b = create_batch(test_db, "batch-1", "users", "create", 3, "DISTANCIA")
-        return b
+        return create_batch(test_db, "batch-1", "users", "create", 3, "DISTANCIA")
 
     def test_create_and_get_batch(self, test_db, batch):
         assert batch.batch_id == "batch-1"
@@ -162,10 +162,10 @@ class TestOperationRepo:
         assert len(all_items) == 1
 
     def test_list_batches(self, test_db, batch):
-        total, items = list_batches(test_db)
+        total, _items = list_batches(test_db)
         assert total >= 1
 
-        total_f, items_f = list_batches(test_db, entity_type="users", action="create")
+        total_f, _items_f = list_batches(test_db, entity_type="users", action="create")
         assert total_f >= 1
 
     def test_list_batches_empty_filter(self, test_db, batch):
@@ -173,7 +173,7 @@ class TestOperationRepo:
         assert total == 0
 
     def test_delete_old_batches(self, test_db, batch):
-        batch.created_at = datetime.now(timezone.utc).replace(year=2000)
+        batch.created_at = datetime.now(UTC).replace(year=2000)
         test_db.commit()
         deleted = delete_old_batches(test_db, days=30)
         assert deleted >= 1

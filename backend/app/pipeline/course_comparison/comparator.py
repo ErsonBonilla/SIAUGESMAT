@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any
 
 from app.pipeline.course_comparison.action_handler import (
     handle_different_professor,
@@ -35,15 +35,15 @@ class CourseComparisonService:
     @classmethod
     async def compare(
         cls,
-        existing_courses: List[Dict],
-        new_courses: List[Dict],
-        new_enrolments: List[Dict],
+        existing_courses: list[dict],
+        new_courses: list[dict],
+        new_enrolments: list[dict],
         re_upload: bool = False,
-        courses_with_teacher: Dict[str, str] = None,
+        courses_with_teacher: dict[str, str] = None,
         *,
         max_age_seconds: int = DEFAULT_COURSE_MAX_AGE_SECONDS,
         disappeared_age_seconds: int = DEFAULT_COURSE_DISAPPEARED_AGE_SECONDS,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if courses_with_teacher is None:
             courses_with_teacher = {}
         siaugesmat_courses = [
@@ -57,19 +57,19 @@ class CourseComparisonService:
 
         enrolment_index = build_enrolment_map(new_enrolments)
 
-        to_create: List[Dict] = []
-        to_delete: List[str] = []
-        to_activate: List[str] = []
-        to_hide: List[str] = []
-        to_update: List[Dict] = []
-        alerts: List[Dict] = []
-        logs: List[Dict] = []
+        to_create: list[dict] = []
+        to_delete: list[str] = []
+        to_activate: list[str] = []
+        to_hide: list[str] = []
+        to_update: list[dict] = []
+        alerts: list[dict] = []
+        logs: list[dict] = []
 
         new_shortnames = set()
         new_base_keys = set()
 
-        new_groups_by_core: Dict[Tuple[str, ...], set] = {}
-        new_program_codes: Set[str] = set()
+        new_groups_by_core: dict[tuple[str, ...], set] = {}
+        new_program_codes: set[str] = set()
         for course in new_courses:
             parsed = parse_shortname(course["shortname"])
             if parsed:

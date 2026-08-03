@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,8 +12,8 @@ from app.workers.phases.orchestrator import (
     _require_review,
     _restore_checkpoint,
     _restore_progress_checkpoint,
-    _save_phase_checkpoint,
     _save_phase_2_data_to_checkpoint,
+    _save_phase_checkpoint,
     _serialize_comparison,
     process_etl_phase,
 )
@@ -27,7 +27,7 @@ def execution(test_db):
         mode="both",
         status="pending",
         modalidad="DISTANCIA",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     test_db.add(ex)
     test_db.commit()

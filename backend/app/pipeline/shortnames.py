@@ -1,6 +1,5 @@
 """Parsing puro de shortnames de cursos SIAUGESMAT (núcleo del pipeline)."""
 import re
-from typing import Dict, Optional
 
 SIAUGESMAT_PATTERN = re.compile(
     r"^[A-Z]{3}_\d{4}_(?:\d+_s[IVXLCDM]+|s[IVXLCDM]+_\d+)_G-[^_]+(?:_[^_]+)?$",
@@ -18,7 +17,7 @@ SHORTNAME_PATTERN = re.compile(
 )
 
 
-def parse_shortname(shortname: str) -> Optional[Dict[str, str]]:
+def parse_shortname(shortname: str) -> dict[str, str] | None:
     m = SHORTNAME_PATTERN.match(shortname)
     if not m:
         return None

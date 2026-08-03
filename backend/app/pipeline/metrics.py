@@ -3,9 +3,8 @@
 Los umbrales se reciben por parámetro (dict de floats), nunca se leen
 settings ni la base de datos aquí.
 """
-from typing import Dict, Optional
 
-Thresholds = Dict[str, float]
+Thresholds = dict[str, float]
 
 MESSAGES = {
     "red": "Se superaron umbrales críticos de error o duración.",
@@ -14,7 +13,7 @@ MESSAGES = {
 }
 
 
-def calculate_error_rate(metrics: Optional[Dict], errors_count: Optional[int]) -> float:
+def calculate_error_rate(metrics: dict | None, errors_count: int | None) -> float:
     """Porcentaje de error de una ejecución.
 
     Si `metrics` no trae ``total_operations`` se estima sumando cursos,

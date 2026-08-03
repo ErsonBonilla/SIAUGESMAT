@@ -1,4 +1,3 @@
-from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -8,13 +7,13 @@ class NovedadItem(BaseModel):
     base_key: str
     old_shortname: str
     new_shortname: str
-    old_prof_cedula: Optional[str] = None
-    new_prof_cedula: Optional[str] = None
+    old_prof_cedula: str | None = None
+    new_prof_cedula: str | None = None
     old_prof_name: str = ""
     new_prof_name: str = ""
     course_fullname: str = ""
     action: str = ""
-    target_course_id: Optional[int] = None
+    target_course_id: int | None = None
 
 
 class NovedadesResponse(BaseModel):
@@ -22,4 +21,4 @@ class NovedadesResponse(BaseModel):
     previous_execution_id: int
     previous_filename: str
     total_compared: int
-    novedades: List[NovedadItem]
+    novedades: list[NovedadItem]

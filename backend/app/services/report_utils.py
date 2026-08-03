@@ -2,12 +2,11 @@ import csv
 import logging
 import os
 import zipfile
-from typing import Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
 
-def write_csv(filepath: str, headers: List[str], rows: List[Union[Dict, List]]):
+def write_csv(filepath: str, headers: list[str], rows: list[dict | list]):
     with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
         writer.writerow(headers)
@@ -18,7 +17,7 @@ def write_csv(filepath: str, headers: List[str], rows: List[Union[Dict, List]]):
                 writer.writerow(row)
 
 
-def create_zip(directory: str, zip_path: str, extensions: Tuple[str, ...] = (".csv",)):
+def create_zip(directory: str, zip_path: str, extensions: tuple[str, ...] = (".csv",)):
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for root, _, files in os.walk(directory):
             for file in files:
@@ -27,7 +26,7 @@ def create_zip(directory: str, zip_path: str, extensions: Tuple[str, ...] = (".c
                     zf.write(file_path, os.path.relpath(file_path, directory))
 
 
-def list_csv_files(directory: str) -> List[Dict[str, str]]:
+def list_csv_files(directory: str) -> list[dict[str, str]]:
     if not os.path.isdir(directory):
         return []
     reports = []
@@ -43,6 +42,6 @@ def list_csv_files(directory: str) -> List[Dict[str, str]]:
     return reports
 
 
-def get_csv_path(directory: str, report_name: str) -> Optional[str]:
+def get_csv_path(directory: str, report_name: str) -> str | None:
     path = os.path.join(directory, f"{report_name}.csv")
     return path if os.path.exists(path) else None

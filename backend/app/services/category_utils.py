@@ -1,7 +1,6 @@
-from typing import Dict, List
 
 
-def sort_categories(categories: List[Dict]) -> List[Dict]:
+def sort_categories(categories: list[dict]) -> list[dict]:
     sorted_cats = []
     roots = [c for c in categories if not c.get("parent")]
     for root in roots:

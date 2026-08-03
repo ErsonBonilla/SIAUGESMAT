@@ -10,21 +10,21 @@ import logging
 import os
 import shutil
 import time
-from datetime import datetime
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
+from typing import ClassVar
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import Execution, ExecutionLog
-from app.services.report_utils import write_csv, create_zip
+from app.services.report_utils import create_zip, write_csv
 
 logger = logging.getLogger(__name__)
 
 
 class ReportService:
 
-    REPORT_NAMES = {
+    REPORT_NAMES: ClassVar[dict[str, str]] = {
         "resumen_ejecutivo": "01_resumen_ejecutivo.csv",
         "inc_usuarios_inactivos": "02_inc_usuarios_inactivos.csv",
         "inc_cursos_recientes": "03_inc_cursos_recientes.csv",
@@ -51,7 +51,7 @@ class ReportService:
         Returns:
             Ruta al directorio donde se almacenaron los reportes.
         """
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         report_dir = os.path.join(
             settings.REPORT_DIR, f"exec_{execution_id}_{timestamp}"
         )
@@ -95,7 +95,7 @@ class ReportService:
         return report_dir
 
     @classmethod
-    def get_report_path(cls, report_dir: str, report_name: str) -> Optional[str]:
+    def get_report_path(cls, report_dir: str, report_name: str) -> str | None:
         filename = cls.REPORT_NAMES.get(report_name)
         if not filename:
             return None
@@ -103,12 +103,12 @@ class ReportService:
         return path if os.path.exists(path) else None
 
     @classmethod
-    def get_zip_path(cls, report_dir: str) -> Optional[str]:
+    def get_zip_path(cls, report_dir: str) -> str | None:
         zip_path = report_dir + ".zip"
         return zip_path if os.path.exists(zip_path) else None
 
     @classmethod
-    def list_reports(cls, report_dir: str) -> List[Dict[str, str]]:
+    def list_reports(cls, report_dir: str) -> list[dict[str, str]]:
         reports = []
         for name, filename in cls.REPORT_NAMES.items():
             path = os.path.join(report_dir, filename)
@@ -123,7 +123,7 @@ class ReportService:
     # ------------------------------------------------------------------
     # Configuración de reportes (data-driven)
     # ------------------------------------------------------------------
-    REPORT_CONFIGS = [
+    REPORT_CONFIGS: ClassVar[list[dict]] = [
         # INICIENCIAS —— 4 reportes
         {
             "key": "inc_usuarios_inactivos",
@@ -310,8 +310,7 @@ class ReportService:
         for entry in os.listdir(parent):
             path = os.path.join(parent, entry)
             # Limpiar directorios de reportes (exec_*) y sus ZIPs
-            if entry.startswith("exec_") and os.path.isdir(path):
-                if os.path.getmtime(path) < cutoff:
+            if entry.startswith("exec_") and os.path.isdir(path) and os.path.getmtime(path) < cutoff:
                     shutil.rmtree(path, ignore_errors=True)
                     logger.info("Reportes antiguos eliminados: %s", path)
                     # También eliminar el ZIP si existe
@@ -320,8 +319,8 @@ class ReportService:
                         os.remove(zip_path)
 
     @classmethod
-    def _write_resumen_ejecutivo(cls, report_dir: str, logs: List[ExecutionLog], execution=None):
-        counts: Dict[str, int] = {}
+    def _write_resumen_ejecutivo(cls, report_dir: str, logs: list[ExecutionLog], execution=None):
+        counts: dict[str, int] = {}
         for log in logs:
             key = log.action
             counts[key] = counts.get(key, 0) + 1
@@ -357,7 +356,7 @@ class ReportService:
             if val > 0:
                 rows.append([label, str(val)])
         # Tasa de error
-        total_ops = sum(v for k, v in counts.items() if k.startswith("course_") or k.startswith("enrolment_"))
+        total_ops = sum(v for k, v in counts.items() if k.startswith(("course_", "enrolment_")))
         total_errs = counts.get("enrolment_failed", 0)
         rate = round(total_errs / total_ops * 100, 1) if total_ops > 0 else 0
         rows.append(["Tasa de error (%)", str(rate)])

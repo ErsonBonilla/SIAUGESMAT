@@ -1,8 +1,10 @@
+from typing import ClassVar
+
 from app.services.parsers.base import BaseExcelParser
 
 
 class ParserFactory:
-    _registry = {}
+    _registry: ClassVar[dict] = {}
 
     @classmethod
     def register(cls, modalidad: str, parser_cls):

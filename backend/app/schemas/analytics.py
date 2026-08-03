@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import BaseModel
+
 
 class SemesterMetrics(BaseModel):
     semester: str
@@ -11,7 +12,7 @@ class SemesterMetrics(BaseModel):
     total_enrollments: int
     total_errors: int
     avg_duration_seconds: float
-    last_completed: Optional[datetime] = None
+    last_completed: datetime | None = None
 
 class SemaphoreStatus(BaseModel):
     semester: str
@@ -25,12 +26,12 @@ class LatestExecution(BaseModel):
     semester: str
     filename: str
     status: str
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    duration_seconds: Optional[float] = None
-    metrics: Optional[Dict[str, Any]] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    duration_seconds: float | None = None
+    metrics: dict[str, Any] | None = None
     errors_count: int
     error_rate: float
     semaphore: str
-    moodle_version: Optional[str] = None
-    modalidad: Optional[str] = None
+    moodle_version: str | None = None
+    modalidad: str | None = None

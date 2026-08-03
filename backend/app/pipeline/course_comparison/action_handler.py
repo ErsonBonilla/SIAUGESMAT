@@ -1,4 +1,3 @@
-from typing import Dict, List, Optional, Tuple
 
 from app.pipeline.course_comparison.thresholds import DEFAULT_COURSE_MAX_AGE_SECONDS
 from app.pipeline.course_comparison.utils import (
@@ -10,12 +9,12 @@ from app.pipeline.shortnames import parse_shortname
 
 
 def handle_same_professor(
-    existing: Dict,
+    existing: dict,
     sn: str,
     professor: str,
     *,
     max_age_seconds: int = DEFAULT_COURSE_MAX_AGE_SECONDS,
-) -> Tuple[str, Dict]:
+) -> tuple[str, dict]:
     age = get_course_age_seconds(existing)
     existing_sn = existing.get("shortname", "")
     needs_rename = existing_sn != sn
@@ -52,15 +51,15 @@ def handle_same_professor(
 
 
 def handle_different_professor(
-    existing: Dict,
+    existing: dict,
     sn: str,
     new_prof: str,
-    old_prof: Optional[str],
+    old_prof: str | None,
     should_hide_existing: bool = False,
     re_upload: bool = False,
     *,
     max_age_seconds: int = DEFAULT_COURSE_MAX_AGE_SECONDS,
-) -> Tuple[str, Dict]:
+) -> tuple[str, dict]:
     age = get_course_age_seconds(existing)
     detail = {
         "reason": "teacher_change",
@@ -77,20 +76,19 @@ def handle_different_professor(
     if age >= max_age_seconds:
         detail["reason"] = "teacher_change_old"
         return "recreate", detail
-    else:
-        detail["reason"] = "teacher_change_recent"
-        if should_hide_existing:
-            return "hide_and_create", detail
-        return "recreate", detail
+    detail["reason"] = "teacher_change_recent"
+    if should_hide_existing:
+        return "hide_and_create", detail
+    return "recreate", detail
 
 
 def handle_same_core_different_group(
-    same_core_courses: List[Dict],
-    parsed_new: Dict,
+    same_core_courses: list[dict],
+    parsed_new: dict,
     sn: str,
     professor: str,
-    new_groups_by_core: Dict[Tuple[str, ...], set],
-) -> Tuple[str, Dict]:
+    new_groups_by_core: dict[tuple[str, ...], set],
+) -> tuple[str, dict]:
     core_key = (parsed_new["cod_prog"], parsed_new["cod_curso"], parsed_new["semestre"])
     new_groups = new_groups_by_core.get(core_key, set())
 
@@ -127,12 +125,11 @@ def handle_same_core_different_group(
                 "group_new": new_group,
                 "template_shortname": template,
             }
-        else:
-            return "create", {
-                "reason": "different_professor_new_group",
-                "professor": professor,
-                "group_origin": existing_group,
-                "group_new": new_group,
-            }
+        return "create", {
+            "reason": "different_professor_new_group",
+            "professor": professor,
+            "group_origin": existing_group,
+            "group_new": new_group,
+        }
 
     return "create", {"reason": "new", "professor": professor}

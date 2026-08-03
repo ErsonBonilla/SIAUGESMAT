@@ -58,7 +58,7 @@ async def main():
     for i in range(0, len(resolved), args.batch):
         chunk = resolved[i:i + args.batch]
         params = {}
-        for j, (cid, sn) in enumerate(chunk):
+        for j, (cid, _) in enumerate(chunk):
             params[f"courses[{j}][id]"] = cid
             params[f"courses[{j}][visible]"] = visible
         try:

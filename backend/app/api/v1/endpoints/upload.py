@@ -5,6 +5,7 @@ Endpoints de subida de archivos Excel (carga académica).
 import logging
 import os
 import uuid
+from datetime import UTC
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
 from app.repositories.execution_repo import create_execution
-from app.schemas.upload import UploadResponse, SemesterResponse
+from app.schemas.upload import SemesterResponse, UploadResponse
 from app.schemas.user import UserInToken
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ ALLOWED_MODES = {"courses", "users", "both"}
             summary="Obtener el semestre actual según la fecha del servidor")
 def get_current_semester():
     from datetime import datetime
-    now = datetime.now()
+    now = datetime.now(UTC)
     period = "A" if now.month <= 6 else "B"
     return SemesterResponse(semester=f"{now.year}{period}")
 
@@ -88,7 +89,7 @@ async def upload_excel(
     except OSError:
         logger.exception("Error al guardar el archivo")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail="No se pudo guardar el archivo.")
+                            detail="No se pudo guardar el archivo.") from None
 
     moodle_config = settings.get_moodle_config(modalidad)
     execution = create_execution(db, unique_name, semester, mode,

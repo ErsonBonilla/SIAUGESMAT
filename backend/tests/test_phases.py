@@ -5,15 +5,17 @@ Cada fase se prueba de forma aislada con un PhaseContext sintético
 y un MoodleService/AuthIntegration mockeado.
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from app.db.models import Execution, ExecutionLog
 from app.integrations.moodle import MoodleIntegration
 from app.workers.phases.base import PhaseContext
 from app.workers.phases.phase1_consult import ConsultPhase
 from app.workers.phases.phase2_analyze import AnalyzePhase, persist_plan_logs
+
 # Phase3 y Phase4 usan el patrón chord + item_task, no clases phase directas
 
 
@@ -24,7 +26,7 @@ def _make_ctx(test_db, mock_moodle, mode="both"):
         mode=mode,
         status="pending",
         modalidad="DISTANCIA",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     test_db.add(execution)
     test_db.commit()
@@ -191,7 +193,7 @@ class TestPersistPlanLogs:
             mode="both",
             status="pending",
             modalidad="DISTANCIA",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         test_db.add(execution)
         test_db.commit()
@@ -222,7 +224,7 @@ class TestPersistPlanLogs:
             .order_by(ExecutionLog.id)
             .all()
         )
-        assert [l.action for l in logs] == [
+        assert [log.action for log in logs] == [
             "planned_course_created",
             "planned_course_deleted",
             "alert_disappeared_recent",
@@ -244,7 +246,7 @@ class TestPersistPlanLogs:
         execution = Execution(
             filename="test.xlsx", semester="2025A", mode="both",
             status="pending", modalidad="DISTANCIA",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         test_db.add(execution)
         test_db.commit()

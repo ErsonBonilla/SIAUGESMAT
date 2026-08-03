@@ -6,12 +6,12 @@ en `celery_app.py`. No se ejecutan bajo demanda.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from app.celery_app import celery_app
 from app.core.config import settings
-from app.db.session import SessionLocal
 from app.db.models import Execution
+from app.db.session import SessionLocal
 from app.repositories.execution_repo import delete_old_pending_executions
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ def cleanup_stuck_executions():
     """Marca como 'failed' ejecuciones 'running'/'queued' sin cambios por más de 6h."""
     db = SessionLocal()
     try:
-        cutoff = datetime.now(timezone.utc)
+        cutoff = datetime.now(UTC)
         stuck = db.query(Execution).filter(
             Execution.status.in_(["running", "queued"]),
         ).all()
@@ -61,6 +61,8 @@ def cleanup_stuck_executions():
 
 
 def _relaunch_phase4(db, eid: int) -> None:
+    from celery import chord
+
     from app.workers.phases.common import (
         _get_pending_items,
         _mark_chord_active,
@@ -68,7 +70,6 @@ def _relaunch_phase4(db, eid: int) -> None:
         on_users_done,
     )
     from app.workers.phases.item_task import process_etl_item
-    from celery import chord
 
     pending_users = _get_pending_items(db, eid, "4", sub_phase="create_user")
     if pending_users:
@@ -98,14 +99,14 @@ def recover_stuck_phase():
       (marcador `chord_active` expirado/ausente) y no hay items procesándose
       recientemente, relanza el chord de la fase.
     """
+    from app.db.models import OperationItem
     from app.workers.phases.common import _get_pending_items, _items_exist_for_execution
     from app.workers.phases.phase3_structure import on_delete_items_done
-    from app.workers.utils import reset_stuck_items, STUCK_ITEM_TIMEOUT_MINUTES
-    from app.db.models import OperationItem
+    from app.workers.utils import STUCK_ITEM_TIMEOUT_MINUTES, reset_stuck_items
 
     db = SessionLocal()
     try:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         executions = db.query(Execution).filter(Execution.status == "running").all()
         for ex in executions:
             eid = ex.id
@@ -155,7 +156,7 @@ def recover_stuck_phase():
                     heartbeat = ex.progress_updated_at or ex.created_at
                     stale = (
                         heartbeat is not None
-                        and (now - heartbeat.replace(tzinfo=timezone.utc) if heartbeat.tzinfo is None else (now - heartbeat))
+                        and (now - heartbeat.replace(tzinfo=UTC) if heartbeat.tzinfo is None else (now - heartbeat))
                         >= timedelta(minutes=STUCK_ITEM_TIMEOUT_MINUTES)
                     )
                     if stale:

@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,7 @@ async def detect(
     semester: str,
     modalidad: str,
     new_file_path: str,
-) -> Tuple[Dict[str, Any], Optional[str]]:
+) -> tuple[dict[str, Any], str | None]:
     new_data = ETLService.process(new_file_path, modalidad)
     new_courses = new_data.get("courses", [])
 

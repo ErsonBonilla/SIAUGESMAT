@@ -5,14 +5,16 @@ Verifica que el flujo completo (consulta → análisis → ejecución)
 funciona con un Moodle simulado y datos sintéticos.
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
+
+import pytest
 
 from app.db.models import Execution
 from app.integrations.moodle import MoodleIntegration
 from app.workers.phases.base import PhaseContext
 from app.workers.phases.phase1_consult import ConsultPhase
+
 # Phase3 y Phase4 usan el patrón chord + item_task, no clases phase directas
 
 
@@ -24,7 +26,7 @@ def integration_execution(test_db):
         mode="both",
         status="pending",
         modalidad="DISTANCIA",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     test_db.add(ex)
     test_db.commit()

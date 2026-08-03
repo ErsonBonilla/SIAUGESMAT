@@ -5,11 +5,10 @@ duplicación entre moodle_adapter.py y moodle.py.
 """
 
 import logging
-from typing import Dict
 
 logger = logging.getLogger(__name__)
 
-ROLE_MAPPING: Dict[str, int] = {
+ROLE_MAPPING: dict[str, int] = {
     "student": 5,
     "editingteacher": 3,
     "teacher": 4,

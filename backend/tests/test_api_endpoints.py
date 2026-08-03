@@ -214,29 +214,28 @@ class TestReportsEndpoint:
 
     def test_list_reports(self, client, auth_headers, test_db):
         """Listar reportes de una ejecución debe retornar 200."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(settings, "REPORT_DIR", tmpdir):
-                # Crear directorio simulado de reportes
-                report_dir = os.path.join(tmpdir, "exec_1_20250101_120000")
-                os.makedirs(report_dir)
-                # Crear CSVs simulados con nombres reales
-                for name in ReportService.REPORT_NAMES.values():
-                    open(os.path.join(report_dir, name), "w").close()
+        with tempfile.TemporaryDirectory() as tmpdir, patch.object(settings, "REPORT_DIR", tmpdir):
+            # Crear directorio simulado de reportes
+            report_dir = os.path.join(tmpdir, "exec_1_20250101_120000")
+            os.makedirs(report_dir)
+            # Crear CSVs simulados con nombres reales
+            for name in ReportService.REPORT_NAMES.values():
+                open(os.path.join(report_dir, name), "w").close()
 
-                exec = Execution(
-                    filename="test.xlsx", semester="2025B", mode="both",
-                    status="completed", modalidad="DISTANCIA",
-                    report_dir=report_dir,
-                )
-                test_db.add(exec)
-                test_db.commit()
+            exec = Execution(
+                filename="test.xlsx", semester="2025B", mode="both",
+                status="completed", modalidad="DISTANCIA",
+                report_dir=report_dir,
+            )
+            test_db.add(exec)
+            test_db.commit()
 
-                response = client.get(
-                    f"{self.REPORTS_URL}/{exec.id}/reports", headers=auth_headers,
-                )
-                assert response.status_code == status.HTTP_200_OK
-                data = response.json()
-                assert len(data["reports"]) == len(ReportService.REPORT_NAMES)
+            response = client.get(
+                f"{self.REPORTS_URL}/{exec.id}/reports", headers=auth_headers,
+            )
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert len(data["reports"]) == len(ReportService.REPORT_NAMES)
 
     def test_list_reports_no_reports(self, client, auth_headers, test_db):
         """Ejecución sin reportes debe retornar 404."""
@@ -254,29 +253,28 @@ class TestReportsEndpoint:
 
     def test_download_zip(self, client, auth_headers, test_db):
         """Descargar ZIP de reportes debe retornar 200."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(settings, "REPORT_DIR", tmpdir):
-                report_dir = os.path.join(tmpdir, "exec_2_20250101_120000")
-                os.makedirs(report_dir)
-                open(os.path.join(report_dir, "test.csv"), "w").close()
-                zip_path = report_dir + ".zip"
-                import zipfile
-                with zipfile.ZipFile(zip_path, "w") as zf:
-                    zf.write(os.path.join(report_dir, "test.csv"), "test.csv")
+        with tempfile.TemporaryDirectory() as tmpdir, patch.object(settings, "REPORT_DIR", tmpdir):
+            report_dir = os.path.join(tmpdir, "exec_2_20250101_120000")
+            os.makedirs(report_dir)
+            open(os.path.join(report_dir, "test.csv"), "w").close()
+            zip_path = report_dir + ".zip"
+            import zipfile
+            with zipfile.ZipFile(zip_path, "w") as zf:
+                zf.write(os.path.join(report_dir, "test.csv"), "test.csv")
 
-                exec = Execution(
-                    filename="test.xlsx", semester="2025B", mode="both",
-                    status="completed", modalidad="DISTANCIA",
-                    report_dir=report_dir,
-                )
-                test_db.add(exec)
-                test_db.commit()
+            exec = Execution(
+                filename="test.xlsx", semester="2025B", mode="both",
+                status="completed", modalidad="DISTANCIA",
+                report_dir=report_dir,
+            )
+            test_db.add(exec)
+            test_db.commit()
 
-                response = client.get(
-                    f"{self.REPORTS_URL}/{exec.id}/reports/download", headers=auth_headers,
-                )
-                assert response.status_code == status.HTTP_200_OK
-                assert response.headers["content-type"] == "application/zip"
+            response = client.get(
+                f"{self.REPORTS_URL}/{exec.id}/reports/download", headers=auth_headers,
+            )
+            assert response.status_code == status.HTTP_200_OK
+            assert response.headers["content-type"] == "application/zip"
 
 
 # ---------------------------------------------------------------------------

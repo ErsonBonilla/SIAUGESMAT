@@ -1,7 +1,6 @@
 import uuid
 from unittest.mock import patch
 
-
 from app.repositories.query_repo import create_query
 
 

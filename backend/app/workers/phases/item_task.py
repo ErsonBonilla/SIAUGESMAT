@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import func
 
@@ -150,7 +150,7 @@ def process_etl_item(self, item_id: int):
         except Exception as e:
             if is_moodle_overloaded(e):
                 db.commit()
-                raise MoodleOverloadedError(str(e)[:200])
+                raise MoodleOverloadedError(str(e)[:200]) from e
             update_item(db, item.id, "failed", translate_error(e))
             _handle_error(execution_id, action, identifier, translate_error(e), db=db)
             db.commit()
@@ -163,7 +163,7 @@ def process_etl_item(self, item_id: int):
                 if execution_id:
                     _handle_error(execution_id, action, identifier, error_msg, db=db)
                 db.commit()
-                logger.error(
+                logger.exception(
                     f"Item {item_id} marcado failed tras agotar reintentos por sobrecarga"
                 )
             except Exception as exc:
@@ -211,7 +211,7 @@ def _refresh_phase_progress(execution_id, db):
         ex = db.query(Execution).filter(Execution.id == execution_id).first()
         if ex and (ex.progress_pct is None or pct > ex.progress_pct):
             ex.progress_pct = pct
-            ex.progress_updated_at = datetime.now(timezone.utc)
+            ex.progress_updated_at = datetime.now(UTC)
             db.commit()
     except Exception as e:
         logger.exception(f"Error actualizando progreso para ejecución {execution_id}: {e}")

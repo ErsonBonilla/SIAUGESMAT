@@ -1,4 +1,7 @@
-import asyncio, sys, re
+import asyncio
+import re
+import sys
+
 sys.path.insert(0, "/app")
 
 from app.core.config import settings

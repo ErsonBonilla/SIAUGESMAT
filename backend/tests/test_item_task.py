@@ -1,3 +1,4 @@
+import contextlib
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -242,7 +243,5 @@ class TestProcessEtlItem:
             mock_integ_cls.return_value = mock_integ
             mock_get.return_value = _make_item()
             mock_sl.return_value = MagicMock()
-            try:
+            with contextlib.suppress(Exception):
                 process_etl_item(1)
-            except Exception:
-                pass

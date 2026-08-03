@@ -1,0 +1,46 @@
+# Configuración de ruff para el backend SIAUGESMAT.
+# Requiere ruff>=0.6 (probado con 0.16.1).
+target-version = "py312"
+line-length = 100
+
+[lint]
+select = [
+  "E",      # pycodestyle (errores)
+  "F",      # pyflakes (imports/usos no resueltos)
+  "W",      # pycodestyle (warnings)
+  "I",      # isort (orden de imports)
+  "UP",     # pyupgrade (sintaxis moderna)
+  "B",      # flake8-bugbear (bugs probables)
+  "SIM",    # flake8-simplify (simplificaciones)
+  "C4",     # flake8-comprehensions
+  "RUF",    # reglas propias de ruff
+  "DTZ",    # datetime con timezone
+]
+ignore = [
+  "E501",   # longitud de línea: no priorizada (el formatter la normaliza)
+  "E402",   # imports lazy/dentro de función: patrón deliberado (evita ciclos en workers)
+  "BLE001", # except amplio intencional en tareas/callbacks de Celery
+  "RUF013", # Optional implícito por default None (estilo del proyecto)
+  "RUF001", # unicode ambiguo en literales: falsos positivos con texto en español
+  "RUF003", # unicode ambiguo en comentarios: ídem
+  "TRY401", # logger.exception con f-string: el contexto se mantiene en el mensaje
+  "S110",   # except:pass controlado (degradación/cleanup)
+  "S112",   # except:continue controlado (procesamiento por lotes)
+]
+
+[lint.flake8-bugbear]
+extend-immutable-calls = [
+  "fastapi.Depends",
+  "fastapi.Query",
+  "fastapi.Path",
+  "fastapi.Header",
+  "fastapi.Body",
+  "fastapi.Cookie",
+  "fastapi.File",
+  "fastapi.Form",
+  "fastapi.security.OAuth2PasswordRequestForm",
+  "fastapi.security.HTTPBearer",
+]
+
+[lint.per-file-ignores]
+"tests/**" = ["S101"]   # assert como patrón de test

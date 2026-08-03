@@ -4,8 +4,9 @@ Pruebas unitarias para MoodleIntegration.
 Verifica la capa de orquestación de alto nivel con un MoodleService mockeado.
 """
 
-import pytest
 from unittest.mock import AsyncMock
+
+import pytest
 
 from app.integrations.moodle import MoodleIntegration
 from app.services.moodle_operations import MoodleService

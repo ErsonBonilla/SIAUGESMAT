@@ -3,12 +3,11 @@
 Helpers compartidos para indexar cursos por su shortname parseado.
 Sin I/O: operan solo sobre dicts recibidos por parámetro.
 """
-from typing import Dict, List, Tuple
 
 from app.pipeline.shortnames import parse_shortname
 
 
-def build_base_key(parsed: Dict) -> Tuple[str, ...]:
+def build_base_key(parsed: dict) -> tuple[str, ...]:
     return (
         parsed["cat_prefix"],
         parsed["cod_prog"],
@@ -18,12 +17,12 @@ def build_base_key(parsed: Dict) -> Tuple[str, ...]:
     )
 
 
-def build_base_key_str(parsed: Dict) -> str:
+def build_base_key_str(parsed: dict) -> str:
     return f"{parsed['cat_prefix']}_{parsed['cod_prog']}_s{parsed['semestre']}_{parsed['cod_curso']}_G-{parsed['grupo']}"
 
 
-def index_courses(courses: List[Dict]) -> Dict[str, List[Dict]]:
-    index: Dict[str, List[Dict]] = {}
+def index_courses(courses: list[dict]) -> dict[str, list[dict]]:
+    index: dict[str, list[dict]] = {}
     for c in courses:
         sn = c.get("shortname", "")
         parsed = parse_shortname(sn)
@@ -36,5 +35,5 @@ def index_courses(courses: List[Dict]) -> Dict[str, List[Dict]]:
     return index
 
 
-def build_enrolment_map(enrolments: List[Dict]) -> Dict[str, str]:
+def build_enrolment_map(enrolments: list[dict]) -> dict[str, str]:
     return {e["course_shortname"]: e.get("username", "") for e in enrolments if e.get("course_shortname")}

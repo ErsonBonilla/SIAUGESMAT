@@ -7,23 +7,22 @@ Los umbrales del semáforo se configuran en las variables de entorno.
 """
 
 import logging
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.core.dependencies import get_current_user, get_db
+from app.schemas.analytics import (
+    LatestExecution,
+    SemaphoreStatus,
+    SemesterMetrics,
+)
+from app.schemas.user import UserInToken
 from app.services.metrics_service import (
     get_history_metrics,
     get_latest_execution_data,
     get_semaphore_status,
 )
-from app.core.dependencies import get_current_user, get_db
-from app.schemas.analytics import (
-    LatestExecution,
-    SemesterMetrics,
-    SemaphoreStatus,
-)
-from app.schemas.user import UserInToken
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +31,7 @@ router = APIRouter()
 
 @router.get(
     "/history",
-    response_model=List[SemesterMetrics],
+    response_model=list[SemesterMetrics],
     summary="Obtener métricas históricas por semestre",
 )
 async def get_history(
@@ -42,7 +41,7 @@ async def get_history(
         le=50,
         description="Número máximo de semestres a devolver",
     ),
-    modalidad: Optional[str] = Query(
+    modalidad: str | None = Query(
         None,
         description="Filtrar por modalidad (PRESENCIAL, DISTANCIA)",
     ),
@@ -62,7 +61,7 @@ async def get_history(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al recuperar el histórico de ejecuciones.",
-        )
+        ) from None
 
 
 @router.get(
@@ -71,11 +70,11 @@ async def get_history(
     summary="Obtener el estado del semáforo de la última ejecución",
 )
 async def get_semaphore(
-    semester: Optional[str] = Query(
+    semester: str | None = Query(
         None,
         description="Semestre a evaluar; si se omite se usa el último registrado.",
     ),
-    modalidad: Optional[str] = Query(
+    modalidad: str | None = Query(
         None,
         description="Filtrar por modalidad (PRESENCIAL, DISTANCIA)",
     ),
@@ -97,7 +96,7 @@ async def get_semaphore(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al calcular el estado del semáforo.",
-        )
+        ) from None
 
 
 @router.get(
@@ -106,7 +105,7 @@ async def get_semaphore(
     summary="Obtener un resumen de la ejecución más reciente",
 )
 async def get_latest_execution(
-    modalidad: Optional[str] = Query(
+    modalidad: str | None = Query(
         None,
         description="Filtrar por modalidad (PRESENCIAL, DISTANCIA)",
     ),
@@ -124,10 +123,10 @@ async def get_latest_execution(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
-        )
+        ) from e
     except Exception:
         logger.exception("Error al obtener la última ejecución")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error al recuperar la última ejecución.",
-        )
+        ) from None

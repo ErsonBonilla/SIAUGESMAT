@@ -47,7 +47,7 @@ async def _get_users_batch(ms, usernames: list, timeout: float = 60.0) -> list:
         if isinstance(result, list):
             return result
     except Exception as e:
-        logger.error(f"Error en get_users_batch: {e}")
+        logger.exception(f"Error en get_users_batch: {e}")
     return []
 
 
@@ -62,7 +62,7 @@ async def _find_user_by_username(ms, username: str) -> dict | None:
             users = result.get("users", [])
             return users[0] if users else None
     except Exception as e:
-        logger.error(f"Error buscando usuario {username}: {e}")
+        logger.exception(f"Error buscando usuario {username}: {e}")
     return None
 
 
@@ -74,7 +74,7 @@ async def _update_user_username(ms, user_id: int, username: str) -> bool:
         }, use_post=True, timeout=30.0)
         return True
     except Exception as e:
-        logger.error(f"  Fallo al renombrar id={user_id} -> {username}: {e}")
+        logger.exception(f"  Fallo al renombrar id={user_id} -> {username}: {e}")
         return False
 
 
@@ -86,7 +86,7 @@ async def _update_user_auth(ms, user_id: int, auth: str = "manual") -> bool:
         }, use_post=True, timeout=30.0)
         return True
     except Exception as e:
-        logger.error(f"  Fallo al fijar auth={auth} para id={user_id}: {e}")
+        logger.exception(f"  Fallo al fijar auth={auth} para id={user_id}: {e}")
         return False
 
 
@@ -99,7 +99,7 @@ async def _update_batch_auth(ms, users: list) -> tuple:
         await ms._request("core_user_update_users", params, use_post=True, timeout=90.0)
         return len(users), 0
     except Exception as e:
-        logger.error(f"  Fallo en lote de {len(users)} usuarios: {e}")
+        logger.exception(f"  Fallo en lote de {len(users)} usuarios: {e}")
         ok = fail = 0
         for user in users:
             if await _update_user_auth(ms, user["id"]):
@@ -125,7 +125,7 @@ async def _create_user(ms, username: str, email: str, firstname: str,
         if isinstance(result, list) and result:
             return result[0]
     except Exception as e:
-        logger.error(f"  Fallo al crear usuario {username}: {e}")
+        logger.exception(f"  Fallo al crear usuario {username}: {e}")
     return None
 
 
@@ -153,7 +153,7 @@ async def _enrol_user(ms, user_id: int, course_id: int, role_id: int = 3) -> boo
         }, use_post=True, timeout=30.0)
         return True
     except Exception as e:
-        logger.error(f"  Fallo al matricular userid={user_id} en courseid={course_id}: {e}")
+        logger.exception(f"  Fallo al matricular userid={user_id} en courseid={course_id}: {e}")
         return False
 
 
@@ -164,7 +164,7 @@ async def _delete_user_by_id(ms, user_id: int) -> bool:
         }, use_post=True, timeout=30.0)
         return True
     except Exception as e:
-        logger.error(f"  Fallo al eliminar userid={user_id}: {e}")
+        logger.exception(f"  Fallo al eliminar userid={user_id}: {e}")
         return False
 
 
@@ -176,7 +176,7 @@ def load_pairs() -> list:
         print(f"ERROR: No se encontro {DATA_FILE}")
         sys.exit(1)
     pairs = []
-    with open(DATA_FILE, "r", encoding="utf-8-sig") as f:
+    with open(DATA_FILE, encoding="utf-8-sig") as f:
         for line in f:
             line = line.strip()
             if not line:

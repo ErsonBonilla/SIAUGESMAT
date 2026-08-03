@@ -1,7 +1,18 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import analytics, auth, charts, jobs, operations, queries, reports, upload
-from app.api.v1.endpoints import batch_control, batch_listing, novedades
+from app.api.v1.endpoints import (
+    analytics,
+    auth,
+    batch_control,
+    batch_listing,
+    charts,
+    jobs,
+    novedades,
+    operations,
+    queries,
+    reports,
+    upload,
+)
 
 router = APIRouter()
 

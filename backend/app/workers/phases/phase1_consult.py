@@ -1,5 +1,4 @@
 import logging
-from typing import Dict
 
 from app.pipeline.users import (
     index_teachers,
@@ -115,7 +114,7 @@ class ConsultPhase(BasePhase):
             )
             update_progress(db, eid, 14, "Análisis de datos completado")
 
-            courses_with_teacher: Dict[str, str] = {}
+            courses_with_teacher: dict[str, str] = {}
             if mode in ("courses", "both"):
                 teacher_index = index_teachers(etl_data["users"], etl_data["enrolments"])
 

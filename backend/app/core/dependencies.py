@@ -14,6 +14,8 @@ from app.core.security import decode_access_token
 from app.db.session import get_db as get_db
 from app.schemas.user import UserInToken
 
+__all__ = ["get_current_user", "get_db"]
+
 # Esquema de autenticación HTTP Bearer para Swagger y dependencias
 bearer_scheme = HTTPBearer()
 
@@ -60,11 +62,11 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido o expirado.",
-        )
+        ) from None
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido: ID de usuario no numérico.",
-        )
+        ) from None
 
     return UserInToken(user_id=user_id_int, username=username, modalidad=modalidad)

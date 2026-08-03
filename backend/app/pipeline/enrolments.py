@@ -1,19 +1,18 @@
 """Transformaciones sobre matrículas y creación de usuarios (FASE 2) — puras."""
-from typing import Dict, List
 
-Enrolment = Dict[str, object]
-User = Dict[str, object]
+Enrolment = dict[str, object]
+User = dict[str, object]
 
 
 def resolve_enrolments(
-    enrolments: List[Enrolment],
-    username_map: Dict[str, str],
-) -> List[Enrolment]:
+    enrolments: list[Enrolment],
+    username_map: dict[str, str],
+) -> list[Enrolment]:
     """Reemplaza el username ETL por el username Moodle resuelto.
 
     Los usuarios sin resolución conservan su username ETL original.
     """
-    resolved: List[Enrolment] = []
+    resolved: list[Enrolment] = []
     for enr in enrolments:
         resolved_username = username_map.get(enr["username"], enr["username"])
         resolved.append({**enr, "username": resolved_username})
@@ -21,9 +20,9 @@ def resolve_enrolments(
 
 
 def users_to_create(
-    etl_users: List[User],
-    username_map: Dict[str, str],
-) -> List[User]:
+    etl_users: list[User],
+    username_map: dict[str, str],
+) -> list[User]:
     """Usuarios ETL sin resolver en Moodle y con email institucional."""
     return [
         u for u in etl_users

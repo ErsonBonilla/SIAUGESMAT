@@ -60,9 +60,8 @@ def _module_import_paths(tree: ast.Module) -> list:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             paths.extend(alias.name for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.level == 0:
-            if node.module:
-                paths.append(node.module)
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            paths.append(node.module)
     return paths
 
 

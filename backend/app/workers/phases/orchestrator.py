@@ -232,7 +232,7 @@ def _serialize_comparison(comparison: dict) -> dict:
     for k, v in comparison.items():
         if k == "logs":
             continue
-        elif isinstance(v, set):
+        if isinstance(v, set):
             result[k] = list(v)
         elif isinstance(v, list):
             result[k] = v

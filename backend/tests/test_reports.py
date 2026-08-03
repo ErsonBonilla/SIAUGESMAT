@@ -8,6 +8,7 @@ import csv
 import os
 import tempfile
 import zipfile
+from typing import ClassVar
 from unittest.mock import patch
 
 from app.core.config import settings
@@ -45,7 +46,7 @@ class TestReportGeneration:
         path = os.path.join(self.tmpdir, filename)
         if not os.path.exists(path):
             return None
-        with open(path, "r", encoding="utf-8-sig") as f:
+        with open(path, encoding="utf-8-sig") as f:
             reader = csv.reader(f)
             return list(reader)
 
@@ -147,7 +148,7 @@ class TestReportServiceIntegration:
             errors_count = 0
             moodle_version = "3.9"
             modalidad = "DISTANCIA"
-            metrics = {
+            metrics: ClassVar[dict] = {
                 "categories_created": 1, "courses_created": 1,
                 "courses_deleted": 0, "courses_activated": 0,
                 "users_created": 0, "enrolments": 1,

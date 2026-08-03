@@ -9,7 +9,7 @@ gestión de usuarios y matriculación.
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from app.core.config import settings
 from app.services.moodle_error_handler import extract_error, handle_moodle_errors
@@ -42,7 +42,7 @@ class MoodleIntegration:
         shortname: str,
         fullname: str,
         category_idnumber: str,
-        template_id: Optional[int] = None,
+        template_id: int | None = None,
         visible: int = 1,
         recreate: bool = False,
     ) -> bool:
@@ -186,7 +186,7 @@ class MoodleIntegration:
     # ------------------------------------------------------------------
     # Usuarios (FASE 3)
     # ------------------------------------------------------------------
-    async def find_user_by_email(self, email: str) -> Optional[Dict]:
+    async def find_user_by_email(self, email: str) -> dict | None:
         users = await self.service.get_users("email", [email])
         if len(users) > 1:
             logger.warning(
@@ -196,8 +196,8 @@ class MoodleIntegration:
         return users[0] if users else None
 
     @handle_moodle_errors(log_message="Error al buscar usuarios por email en lote", default_return={})
-    async def find_users_by_emails(self, emails: List[str]) -> Dict[str, Dict]:
-        result: Dict[str, Dict] = {}
+    async def find_users_by_emails(self, emails: list[str]) -> dict[str, dict]:
+        result: dict[str, dict] = {}
         if not emails:
             return result
         clean = [e.strip().lower() for e in emails if e and e.strip()]
@@ -211,8 +211,8 @@ class MoodleIntegration:
         return result
 
     @handle_moodle_errors(log_message="Error al buscar usuarios por username en lote", default_return={})
-    async def find_users_by_usernames(self, usernames: List[str]) -> Dict[str, Dict]:
-        result: Dict[str, Dict] = {}
+    async def find_users_by_usernames(self, usernames: list[str]) -> dict[str, dict]:
+        result: dict[str, dict] = {}
         if not usernames:
             return result
         clean = [u.strip() for u in usernames if u and u.strip()]
@@ -226,8 +226,8 @@ class MoodleIntegration:
         return result
 
     @handle_moodle_errors(log_message="Error al buscar usuarios por cédula en lote", default_return={})
-    async def find_users_by_idnumbers(self, idnumbers: List[str]) -> Dict[str, Dict]:
-        result: Dict[str, Dict] = {}
+    async def find_users_by_idnumbers(self, idnumbers: list[str]) -> dict[str, dict]:
+        result: dict[str, dict] = {}
         if not idnumbers:
             return result
         clean = [str(c).strip() for c in idnumbers if c and str(c).strip()]
@@ -241,10 +241,10 @@ class MoodleIntegration:
         return result
 
     @staticmethod
-    def is_user_active(user: Dict) -> bool:
+    def is_user_active(user: dict) -> bool:
         return not bool(int(user.get("suspended", 0)))
 
-    async def create_user_if_not_exists(self, user: Dict) -> Tuple[Optional[str], bool]:
+    async def create_user_if_not_exists(self, user: dict) -> tuple[str | None, bool]:
         """
         Localiza o crea un usuario en Moodle.
 
@@ -342,7 +342,7 @@ class MoodleIntegration:
 
     @handle_moodle_errors(log_message="", default_return={"success": False, "reason": "Error del servidor Moodle"})
     async def enrol_teacher(self, username: str, course_shortname: str,
-                             course_map=None, courses=None) -> Dict[str, Any]:
+                             course_map=None, courses=None) -> dict[str, Any]:
         result = await self.service.enrol_users([{
             "username": username,
             "course_shortname": course_shortname,

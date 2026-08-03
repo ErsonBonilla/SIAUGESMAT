@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -45,7 +45,7 @@ async def list_charts(
     db: Session = Depends(get_db),
     current_user: UserInToken = Depends(get_current_user),
 ):
-    execution, logs = _get_execution_and_logs(execution_id, db)
+    execution, _logs = _get_execution_and_logs(execution_id, db)
     return {
         "execution_id": execution_id,
         "moodle_version": execution.moodle_version,
@@ -68,7 +68,7 @@ async def get_chart_data(
     theme: str = Query("light", description="Tema: light | dark"),
     db: Session = Depends(get_db),
     current_user: UserInToken = Depends(get_current_user),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     if chart_name not in CHART_ENDPOINTS:
         raise HTTPException(
             status_code=404,

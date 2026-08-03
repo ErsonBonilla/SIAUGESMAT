@@ -5,9 +5,9 @@ Define las tablas `executions` y `error_logs` utilizadas para el
 seguimiento de los procesos ETL y el registro de errores.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, JSON, String, Text
+from sqlalchemy import JSON, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -41,7 +41,7 @@ class Execution(Base):
     modalidad = Column(String(20), nullable=True, index=True)
     phase_checkpoint = Column(JSON, nullable=True)
     celery_task_id = Column(String(255), nullable=True, index=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), index=True)
 
     errors = relationship("ErrorLog", back_populates="execution", cascade="all, delete-orphan")
     logs = relationship("ExecutionLog", back_populates="execution", cascade="all, delete-orphan")
@@ -58,7 +58,7 @@ class ErrorLog(Base):
     type = Column(String(50), nullable=False)
     identifier = Column(String(255), nullable=True)
     message = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
     execution = relationship("Execution", back_populates="errors")
 
@@ -81,7 +81,7 @@ class ExecutionLog(Base):
     action = Column(String(50), nullable=False)
     identifier = Column(String(255), nullable=True)
     detail = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
     execution = relationship("Execution", back_populates="logs")
 
@@ -106,7 +106,7 @@ class OperationBatch(Base):
     completed = Column(Integer, default=0)
     failed = Column(Integer, default=0)
     modalidad = Column(String(20), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc), index=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), index=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     items = relationship("OperationItem", back_populates="batch", cascade="all, delete-orphan")
@@ -130,8 +130,8 @@ class OperationItem(Base):
     attempt = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
     detail = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
     batch = relationship("OperationBatch", back_populates="items")
 
@@ -157,7 +157,7 @@ class QueryResult(Base):
     error_message = Column(Text, nullable=True)
     total_count = Column(Integer, default=0)
     modalidad = Column(String(20), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     def __repr__(self) -> str:
