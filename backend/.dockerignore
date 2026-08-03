@@ -1,10 +1,32 @@
+# --- Artefactos de desarrollo / build ---
 __pycache__/
 *.pyc
 *.pyo
-.env
-.git/
-*.md
-tests/
-e2e/
 .venv/
 venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Archivos de entorno y credenciales ---
+.env
+*.env
+!.env.example
+
+# --- Archivos de configuración solo-de-desarrollo ---
+pytest.ini
+ruff.toml
+requirements-dev.txt
+
+# --- Código de prueba ---
+tests/
+e2e/
+
+# --- Datos de runtime (los manejan los volúmenes de compose) ---
+uploads/
+reports/
+
+# --- Misc ---
+.git/
+*.md
+.DS_Store

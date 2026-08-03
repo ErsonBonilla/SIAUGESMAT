@@ -1,7 +1,15 @@
+# --- Artefactos de build / runtime ---
 _fresh/
 node_modules/
-.git/
-*.md
+
+# --- Código de prueba ---
 tests/
 *.test.ts
 *.test.tsx
+
+# --- Misc ---
+.git/
+*.md
+.DS_Store
+*.log
+.env
