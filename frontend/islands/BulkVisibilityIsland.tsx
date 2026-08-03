@@ -1,6 +1,12 @@
 import { useSignal } from "@preact/signals";
 import { useBatchUpload } from "../hooks/useBatchUpload.ts";
-import { cancelBatch, getBatchStatus, pauseBatch, resumeBatch, uploadVisibilityCsv } from "../services/api.ts";
+import {
+  cancelBatch,
+  getBatchStatus,
+  pauseBatch,
+  resumeBatch,
+  uploadVisibilityCsv,
+} from "../services/api.ts";
 import { SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import OperationHistorySection from "../components/OperationHistorySection.tsx";
@@ -13,7 +19,6 @@ export default function BulkVisibilityIsland() {
   const PAGE_SIZE = 20;
 
   const {
-    file,
     uploading,
     error,
     batchId,

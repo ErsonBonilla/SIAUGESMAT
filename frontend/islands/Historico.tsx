@@ -44,6 +44,7 @@ export default function Historico() {
       <div class="flex gap-4 mb-6">
         {(["history", "comparison"] as const).map((v) => (
           <button
+            type="button"
             key={v}
             onClick={() => (view.value = v)}
             class={`px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors duration-200 ${

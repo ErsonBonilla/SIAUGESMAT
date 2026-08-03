@@ -1,4 +1,4 @@
-import type { ComponentChildren, JSX } from "preact";
+import type { JSX } from "preact";
 
 interface HubCardProps {
   icon: (props: { class?: string }) => JSX.Element;

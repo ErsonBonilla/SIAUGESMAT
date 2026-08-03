@@ -91,6 +91,7 @@ export default function ReportsSection({ executionId }: ReportsSectionProps) {
   return (
     <div class="bg-[var(--bg-primary)] border border-[var(--border-primary)] rounded-2xl p-6 mb-6">
       <button
+        type="button"
         onClick={() => (open.value = !open.value)}
         class="w-full flex items-center justify-between gap-2 text-left cursor-pointer bg-transparent border-none p-0"
       >
@@ -140,6 +141,7 @@ export default function ReportsSection({ executionId }: ReportsSectionProps) {
                 <div class="space-y-1 stagger-list">
                   {groupReports.map((r) => (
                     <button
+                      type="button"
                       key={r.name}
                       onClick={() => handleDownload(r.name, r.filename)}
                       class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition cursor-pointer border-none report-row"

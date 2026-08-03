@@ -6,7 +6,7 @@ import {
   startProcess,
   uploadFile,
 } from "../services/api.ts";
-import { ExclamationCircleIcon, SpinnerIcon } from "../utils/icons.tsx";
+import { SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 
 export default function FileUploader() {

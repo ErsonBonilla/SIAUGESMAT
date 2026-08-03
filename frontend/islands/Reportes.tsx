@@ -84,6 +84,7 @@ export default function Reportes({ executionId }: Props) {
               Descargar reportes
             </h2>
             <button
+              type="button"
               onClick={() =>
                 handleDownload(
                   getReportDownloadUrl(executionId),
@@ -107,6 +108,7 @@ export default function Reportes({ executionId }: Props) {
               const isDownloading = downloading.value === r.filename;
               return (
                 <button
+                  type="button"
                   onClick={() =>
                     handleDownload(
                       getReportFileUrl(executionId, r.name),

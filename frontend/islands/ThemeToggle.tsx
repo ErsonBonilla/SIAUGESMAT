@@ -22,7 +22,9 @@ export default function ThemeToggle() {
       newDark ? "dark" : "light"
     }; expires=${expires}; path=/; SameSite=Lax`;
     darkSignal.value = newDark;
-    (window as any).__THEME__ = newDark ? "dark" : "light";
+    (window as unknown as { __THEME__: string }).__THEME__ = newDark
+      ? "dark"
+      : "light";
   };
 
   return (

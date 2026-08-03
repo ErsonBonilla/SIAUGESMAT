@@ -3,7 +3,7 @@ import { useEffect } from "preact/hooks";
 import type { JSX } from "preact";
 import { logout } from "../services/api.ts";
 import { removeToken } from "../utils/auth.ts";
-import { getMyProfile, type UserProfile } from "../services/api.ts";
+import { getMyProfile } from "../services/api.ts";
 import { ensureProfile, profileSignal } from "../utils/profile.ts";
 import { mobileOpenSignal } from "../utils/layout.ts";
 import {
@@ -146,6 +146,7 @@ export default function Sidebar() {
             <ThemeToggle />
           </div>
           <button
+            type="button"
             onClick={handleLogout}
             class="bg-transparent border-none text-inherit cursor-pointer text-xs text-left opacity-60 hover:opacity-100 p-0 font-inherit transition-opacity duration-150"
           >

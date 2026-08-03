@@ -20,8 +20,16 @@ interface BatchProgressTableProps {
 }
 
 export default function BatchProgressTable(
-  { batchStatus, batchId, labelSingular, labelPlural, onPause, onResume, onCancel, pagination }:
-    BatchProgressTableProps,
+  {
+    batchStatus,
+    batchId,
+    labelSingular,
+    labelPlural,
+    onPause,
+    onResume,
+    onCancel,
+    pagination,
+  }: BatchProgressTableProps,
 ) {
   return (
     <div class="mt-6 bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6">
@@ -64,7 +72,9 @@ export default function BatchProgressTable(
         return (
           <>
             <ProgressBar
-              currentPhase={running ? `Procesando ${labelPlural}...` : `${labelSingular} procesados`}
+              currentPhase={running
+                ? `Procesando ${labelPlural}...`
+                : `${labelSingular} procesados`}
               currentStep={running ? 1 : 4}
               progressPct={running ? pct : 100}
               status={running ? "running" : "completed"}
@@ -84,20 +94,34 @@ export default function BatchProgressTable(
         );
       })()}
 
-      {(batchStatus.pending > 0 || batchStatus.processing > 0 || batchStatus.paused > 0) && (
+      {(batchStatus.pending > 0 || batchStatus.processing > 0 ||
+        batchStatus.paused > 0) && (
         <div class="flex justify-end gap-2 mt-3">
-          {(batchStatus.pending > 0 || batchStatus.processing > 0) && onPause && (
-            <button type="button" onClick={onPause} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-400 hover:bg-amber-500 text-white transition">
-              ⏸ Pausa
-            </button>
-          )}
+          {(batchStatus.pending > 0 || batchStatus.processing > 0) && onPause &&
+            (
+              <button
+                type="button"
+                onClick={onPause}
+                class="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-400 hover:bg-amber-500 text-white transition"
+              >
+                ⏸ Pausa
+              </button>
+            )}
           {batchStatus.paused > 0 && onResume && (
-            <button type="button" onClick={onResume} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition">
+            <button
+              type="button"
+              onClick={onResume}
+              class="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition"
+            >
               ▶ Reanudar
             </button>
           )}
           {onCancel && (
-            <button type="button" onClick={onCancel} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition">
+            <button
+              type="button"
+              onClick={onCancel}
+              class="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition"
+            >
               ✖ Cancelar
             </button>
           )}

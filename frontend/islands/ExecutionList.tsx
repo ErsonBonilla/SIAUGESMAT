@@ -77,11 +77,6 @@ export default function ExecutionList() {
     load();
   }, []);
 
-  const totalPages = useComputed(() => Math.ceil(total.value / PAGE_SIZE));
-  const currentPage = useComputed(() =>
-    Math.floor(offset.value / PAGE_SIZE) + 1
-  );
-
   function applyFilters() {
     offset.value = 0;
     load();
@@ -269,6 +264,7 @@ export default function ExecutionList() {
           </select>
         </div>
         <button
+          type="button"
           onClick={applyFilters}
           class="px-4 py-1.5 bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white rounded text-sm hover:brightness-110"
         >
@@ -276,6 +272,7 @@ export default function ExecutionList() {
         </button>
         {hasFilters.value && (
           <button
+            type="button"
             onClick={clearFilters}
             class="px-4 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded text-sm hover:bg-[var(--border-secondary)]"
           >
@@ -363,6 +360,7 @@ export default function ExecutionList() {
                         {exec.status === "completed" && (
                           <>
                             <button
+                              type="button"
                               onClick={() => handleDownloadZip(exec.id)}
                               disabled={downloading.value !== null}
                               class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium disabled:opacity-50"
@@ -404,6 +402,7 @@ export default function ExecutionList() {
                           <>
                             <span class="text-[var(--text-muted)] mx-1">|</span>
                             <button
+                              type="button"
                               onClick={() => handleProcess(exec.id)}
                               disabled={processing.value !== null}
                               class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium disabled:opacity-50"
@@ -427,6 +426,7 @@ export default function ExecutionList() {
                           <>
                             <span class="text-[var(--text-muted)] mx-1">|</span>
                             <button
+                              type="button"
                               onClick={() => handleDelete(exec.id)}
                               disabled={deleting.value !== null}
                               class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium disabled:opacity-50"
@@ -446,6 +446,7 @@ export default function ExecutionList() {
                           <>
                             <span class="text-[var(--text-muted)] mx-1">|</span>
                             <button
+                              type="button"
                               onClick={() => handleConfirm(exec.id)}
                               disabled={confirming.value !== null}
                               class="text-[var(--brand-orange)] hover:text-[var(--brand-orange)] text-sm font-semibold disabled:opacity-50"
@@ -465,6 +466,7 @@ export default function ExecutionList() {
                           <>
                             <span class="text-[var(--text-muted)] mx-1">|</span>
                             <button
+                              type="button"
                               onClick={() => handleResume(exec.id)}
                               disabled={resuming.value !== null}
                               class="text-[var(--brand-orange)] hover:text-[var(--brand-orange)] text-sm font-semibold disabled:opacity-50"
@@ -484,6 +486,7 @@ export default function ExecutionList() {
                           <>
                             <span class="text-[var(--text-muted)] mx-1">|</span>
                             <button
+                              type="button"
                               onClick={() => handlePause(exec.id)}
                               disabled={pausing.value !== null}
                               class="text-[var(--accent)] hover:text-[var(--accent)] text-sm font-medium disabled:opacity-50"
@@ -505,6 +508,7 @@ export default function ExecutionList() {
                           <>
                             <span class="text-[var(--text-muted)] mx-1">|</span>
                             <button
+                              type="button"
                               onClick={() => handleCancel(exec.id)}
                               disabled={cancelling.value !== null}
                               class="text-red-500 hover:text-red-600 text-sm font-medium disabled:opacity-50"

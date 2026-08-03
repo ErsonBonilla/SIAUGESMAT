@@ -82,7 +82,9 @@ export default function HistoricoOperaciones({ entityType, action }: Props) {
           .map((m) => ({
             name: m.name,
             x: months,
-            y: data.value.map((d) => (d as any)[m.key]),
+            y: data.value.map((d) =>
+              (d as unknown as Record<string, number>)[m.key]
+            ),
             type: "bar",
             marker: { color: m.color },
           }));
@@ -137,6 +139,7 @@ export default function HistoricoOperaciones({ entityType, action }: Props) {
       <div class="flex gap-4 mb-6">
         {(["history", "table"] as const).map((v) => (
           <button
+            type="button"
             key={v}
             onClick={() => (view.value = v)}
             class={`px-4 py-2 rounded-lg text-sm font-medium cursor-pointer transition-colors ${
@@ -196,7 +199,9 @@ export default function HistoricoOperaciones({ entityType, action }: Props) {
                               : "text-[var(--brand-green)]"
                           }`}
                         >
-                          {(d as any)[m.key]}
+                          {String(
+                            (d as unknown as Record<string, unknown>)[m.key],
+                          )}
                         </td>
                       ))}
                     </tr>

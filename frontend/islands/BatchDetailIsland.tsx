@@ -4,15 +4,12 @@ import { useEffect } from "preact/hooks";
 import {
   cancelBatch,
   getBatchStatus,
+  type OperationBatchStatus,
   pauseBatch,
   resumeBatch,
-  type OperationBatchStatus,
 } from "../services/api.ts";
 import { formatDateTime, formatDuration } from "../utils/date.ts";
-import {
-  batchActionLabel,
-  batchEntityLabel,
-} from "../utils/batch-labels.ts";
+import { batchActionLabel, batchEntityLabel } from "../utils/batch-labels.ts";
 import BatchReportsSection from "../components/BatchReportsSection.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
@@ -42,7 +39,9 @@ export default function BatchDetailIsland({ batchId }: Props) {
       status.value = st;
       offset.value = st.offset;
     } catch (e) {
-      errorMsg.value = e instanceof Error ? e.message : "Error al cargar el lote.";
+      errorMsg.value = e instanceof Error
+        ? e.message
+        : "Error al cargar el lote.";
     } finally {
       loading.value = false;
     }
@@ -138,7 +137,8 @@ export default function BatchDetailIsland({ batchId }: Props) {
 
   const durationSeconds = s.completed_at
     ? s.created_at
-      ? (new Date(s.completed_at).getTime() - new Date(s.created_at).getTime()) /
+      ? (new Date(s.completed_at).getTime() -
+        new Date(s.created_at).getTime()) /
         1000
       : null
     : null;
@@ -162,8 +162,7 @@ export default function BatchDetailIsland({ batchId }: Props) {
               Lote {batchId.slice(0, 12)}...
             </h2>
             <p class="text-sm text-[var(--text-secondary)]">
-              {batchEntityLabel(s.entity_type)} ·{" "}
-              {batchActionLabel(s.action)}
+              {batchEntityLabel(s.entity_type)} · {batchActionLabel(s.action)}
               {s.modalidad ? ` · ${s.modalidad}` : ""}
             </p>
           </div>
@@ -214,7 +213,9 @@ export default function BatchDetailIsland({ batchId }: Props) {
           <ProgressBar
             currentPhase={isPaused.value
               ? "Lote pausado"
-              : `Procesando ${batchEntityLabel(s.entity_type).toLowerCase()}...`}
+              : `Procesando ${
+                batchEntityLabel(s.entity_type).toLowerCase()
+              }...`}
             currentStep={1}
             progressPct={isPaused.value ? Math.min(99, pct) : pct}
             status={isPaused.value ? "paused" : "running"}
@@ -254,22 +255,40 @@ export default function BatchDetailIsland({ batchId }: Props) {
 
       <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
         {[
-          { label: "Total", value: s.total, color: "text-[var(--text-primary)]" },
+          {
+            label: "Total",
+            value: s.total,
+            color: "text-[var(--text-primary)]",
+          },
           {
             label: "Completados",
             value: s.completed,
             color: "text-[var(--brand-green)]",
           },
-          { label: "Fallidos", value: s.failed, color: "text-[var(--brand-red)]" },
-          { label: "Pendientes", value: pendingCount, color: "text-yellow-600" },
-          { label: "Cancelados", value: s.cancelled, color: "text-[var(--text-muted)]" },
+          {
+            label: "Fallidos",
+            value: s.failed,
+            color: "text-[var(--brand-red)]",
+          },
+          {
+            label: "Pendientes",
+            value: pendingCount,
+            color: "text-yellow-600",
+          },
+          {
+            label: "Cancelados",
+            value: s.cancelled,
+            color: "text-[var(--text-muted)]",
+          },
         ].map((m) => (
           <div
             key={m.label}
             class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-4 text-center"
           >
             <div class={`text-2xl font-bold ${m.color}`}>{m.value}</div>
-            <div class="text-xs text-[var(--text-secondary)] mt-1">{m.label}</div>
+            <div class="text-xs text-[var(--text-secondary)] mt-1">
+              {m.label}
+            </div>
           </div>
         ))}
       </div>
@@ -282,7 +301,8 @@ export default function BatchDetailIsland({ batchId }: Props) {
 
       <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6">
         <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-4">
-          Detalle de operaciones ({offset.value + 1}–{offset.value + s.details.length} de {s.total})
+          Detalle de operaciones ({offset.value + 1}–{offset.value +
+            s.details.length} de {s.total})
         </h3>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -301,7 +321,10 @@ export default function BatchDetailIsland({ batchId }: Props) {
             </thead>
             <tbody>
               {s.details.map((d) => (
-                <tr key={d.identifier} class="border-b border-[var(--border-primary)]">
+                <tr
+                  key={d.identifier}
+                  class="border-b border-[var(--border-primary)]"
+                >
                   <td class="py-2 px-2 font-medium text-[var(--text-primary)] font-mono text-xs">
                     {d.identifier}
                   </td>
@@ -322,16 +345,25 @@ export default function BatchDetailIsland({ batchId }: Props) {
                       </span>
                     )}
                     {d.status === "pending" && (
-                      <span class="text-[var(--text-muted)] text-xs">Pendiente</span>
+                      <span class="text-[var(--text-muted)] text-xs">
+                        Pendiente
+                      </span>
                     )}
                     {d.status === "paused" && (
-                      <span class="text-[var(--text-muted)] text-xs">Pausado</span>
+                      <span class="text-[var(--text-muted)] text-xs">
+                        Pausado
+                      </span>
                     )}
                     {d.status === "cancelled" && (
-                      <span class="text-[var(--text-muted)] text-xs">Cancelado</span>
+                      <span class="text-[var(--text-muted)] text-xs">
+                        Cancelado
+                      </span>
                     )}
                   </td>
-                  <td class="py-2 px-2 text-xs text-[var(--text-muted)] max-w-xs truncate" title={d.error_message ?? ""}>
+                  <td
+                    class="py-2 px-2 text-xs text-[var(--text-muted)] max-w-xs truncate"
+                    title={d.error_message ?? ""}
+                  >
                     {d.error_message || "—"}
                   </td>
                 </tr>
@@ -349,10 +381,16 @@ export default function BatchDetailIsland({ batchId }: Props) {
       </div>
 
       <div class="mt-6 flex gap-4">
-        <a href="/operaciones/ejecuciones" class="gradient-text hover:underline text-sm">
+        <a
+          href="/operaciones/ejecuciones"
+          class="gradient-text hover:underline text-sm"
+        >
           ← Volver a ejecuciones
         </a>
-        <a href="/operaciones/historico" class="gradient-text hover:underline text-sm">
+        <a
+          href="/operaciones/historico"
+          class="gradient-text hover:underline text-sm"
+        >
           Ver histórico
         </a>
       </div>

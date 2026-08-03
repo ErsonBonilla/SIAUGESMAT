@@ -37,7 +37,10 @@ export function getBatchReportUrl(batchId: string): string {
   return `${BASE_URL}/operations/batch/${batchId}/reports/download`;
 }
 
-export function getBatchReportFileUrl(batchId: string, reportName: string): string {
+export function getBatchReportFileUrl(
+  batchId: string,
+  reportName: string,
+): string {
   return `${BASE_URL}/operations/batch/${batchId}/reports/${reportName}`;
 }
 
@@ -115,7 +118,9 @@ export async function cancelBatch(batchId: string) {
       headers: { ...authHeaders() },
     },
   );
-  return handleResponse<{ batch_id: string; cancelled: number; message: string }>(
+  return handleResponse<
+    { batch_id: string; cancelled: number; message: string }
+  >(
     response,
   );
 }

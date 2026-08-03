@@ -20,6 +20,7 @@ export default function Pagination(
       <span>Página {currentPage} de {totalPages} ({total} {label})</span>
       <div class="flex gap-2">
         <button
+          type="button"
           disabled={offset === 0}
           onClick={() => onPageChange(Math.max(0, offset - pageSize))}
           class="px-3 py-1 border border-[var(--border-secondary)] rounded disabled:opacity-40 hover:bg-[var(--bg-tertiary)] bg-[var(--bg-primary)] text-[var(--text-primary)]"
@@ -27,6 +28,7 @@ export default function Pagination(
           Anterior
         </button>
         <button
+          type="button"
           disabled={offset + pageSize >= total}
           onClick={() => onPageChange(offset + pageSize)}
           class="px-3 py-1 border border-[var(--border-secondary)] rounded disabled:opacity-40 hover:bg-[var(--bg-tertiary)] bg-[var(--bg-primary)] text-[var(--text-primary)]"

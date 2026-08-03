@@ -92,6 +92,7 @@ export default function SemesterComparison(
 
         {semesterA.value && semesterB.value && (
           <button
+            type="button"
             onClick={handleSwap}
             class="px-3 py-2 border border-[var(--border-secondary)] rounded-lg bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary)] transition text-sm text-[var(--text-secondary)] mt-6"
             title="Intercambiar semestres"

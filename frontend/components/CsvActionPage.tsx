@@ -13,7 +13,6 @@ export default function CsvActionPage({ entity, action }: Props) {
   return (
     <Layout title={config.title}>
       <CsvUploader
-        title={config.title}
         description={config.description}
         uploadEndpoint={config.endpoint}
         labelSingular={config.singular}

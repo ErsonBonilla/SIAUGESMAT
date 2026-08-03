@@ -56,7 +56,6 @@ export default function CrearUsuarios() {
       </div>
 
       <CsvUploader
-        title={config.desc}
         description={`Subí un archivo CSV con las columnas 'username', 'firstname', 'lastname' y 'email' ${config.help}`}
         uploadEndpoint={config.endpoint}
         labelSingular="usuario"

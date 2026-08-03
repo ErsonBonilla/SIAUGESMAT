@@ -14,11 +14,7 @@ import {
   type SemesterMetrics,
 } from "../services/api.ts";
 import { profileSignal } from "../utils/profile.ts";
-import {
-  SEMAPHORE_COLORS,
-  STATUS_COLORS,
-  STATUS_LABELS,
-} from "../utils/constants.ts";
+import { SEMAPHORE_COLORS, STATUS_LABELS } from "../utils/constants.ts";
 import {
   CheckIcon,
   ClockIcon,
