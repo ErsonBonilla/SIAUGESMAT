@@ -1,13 +1,18 @@
 import logging
 import secrets
 import time
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from tenacity import before_log, retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
-from app.services.moodle_errors import MoodleAPIError, MoodleOverloadedError, _is_retryable_error, is_moodle_overloaded
+from app.services.moodle_errors import (
+    MoodleAPIError,
+    MoodleOverloadedError,
+    _is_retryable_error,
+    is_moodle_overloaded,
+)
 from app.services.rate_limiter import RedisRateLimiter
 
 logger = logging.getLogger(__name__)
@@ -30,7 +35,7 @@ def generate_moodle_password(length: int = 14) -> str:
 class MoodleClient:
     """Cliente HTTP base para la API REST de Moodle con rate limiting y reintentos."""
 
-    def __init__(self, token: str, base_url: str, version: Optional[str] = None):
+    def __init__(self, token: str, base_url: str, version: str | None = None):
         if not token:
             raise ValueError("token es requerido para MoodleClient")
         if not base_url:
@@ -51,7 +56,7 @@ class MoodleClient:
         self._client = httpx.AsyncClient(timeout=settings.MOODLE_REQUEST_TIMEOUT)
 
     async def _request(self, wsfunction: str, params: dict[str, Any], use_post: bool = False,
-                       timeout: Optional[float] = None) -> Any:
+                       timeout: float | None = None) -> Any:
         _t0 = time.monotonic()
         await self._rate_limiter.acquire()
         return await self._request_with_retry(wsfunction, params, use_post, timeout, _t0)
@@ -64,7 +69,7 @@ class MoodleClient:
         reraise=True,
     )
     async def _request_with_retry(self, wsfunction: str, params: dict[str, Any],
-                                   use_post: bool, timeout: Optional[float],
+                                   use_post: bool, timeout: float | None,
                                    _t0: float) -> Any:
         payload = {
             "wstoken": self._token,

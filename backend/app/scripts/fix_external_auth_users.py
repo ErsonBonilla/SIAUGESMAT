@@ -20,7 +20,7 @@ Ejemplos:
 import argparse
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
 
@@ -75,7 +75,7 @@ async def _fix_user_auth(ms, user: dict) -> bool:
         })
         return True
     except Exception as e:
-        logger.error(f"  Fallo al reparar {user.get('username')} (id={user['id']}): {e}")
+        logger.exception(f"  Fallo al reparar {user.get('username')} (id={user['id']}): {e}")
         return False
 
 
@@ -88,7 +88,7 @@ async def _fix_users_batch(ms, users: list) -> tuple:
         await ms._request("core_user_update_users", params, use_post=True, timeout=90.0)
         return len(users), 0
     except Exception as e:
-        logger.error(f"  Fallo en lote de {len(users)} usuarios: {e}")
+        logger.exception(f"  Fallo en lote de {len(users)} usuarios: {e}")
         # Fallback: uno por uno
         ok = fail = 0
         for user in users:
@@ -118,7 +118,7 @@ def _get_all_known_usernames() -> list:
 
 def _get_recent_enrolled_usernames(days: int) -> list:
     """Usernames enrolados o creados por el app en los ultimos `days` dias."""
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    since = datetime.now(UTC) - timedelta(days=days)
     db = SessionLocal()
     try:
         rows = db.execute(text(
@@ -238,7 +238,7 @@ async def _delete_users(ms, user_ids: list) -> bool:
         await ms._request("core_user_delete_users", params, use_post=True, timeout=60.0)
         return True
     except Exception as e:
-        logger.error(f"  Error al eliminar usuarios: {e}")
+        logger.exception(f"  Error al eliminar usuarios: {e}")
         return False
 
 

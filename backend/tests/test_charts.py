@@ -1,5 +1,6 @@
 import os
 import tempfile
+from typing import ClassVar
 
 from app.services.charts import ChartService
 
@@ -17,7 +18,7 @@ def _make_log(action: str, phase: str = "2", identifier: str = "",
 class FakeExec:
     id = 1
     semester = "2025B"
-    metrics = {
+    metrics: ClassVar[dict] = {
         "categories_created": 2,
         "courses_created": 5,
         "courses_deleted": 1,

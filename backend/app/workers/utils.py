@@ -1,7 +1,6 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -32,11 +31,11 @@ def run_moodle_async(moodle, coro):
 
 def reset_stuck_items(
     db: Session,
-    batch_id_prefix: Optional[str] = None,
-    execution_id: Optional[str] = None,
+    batch_id_prefix: str | None = None,
+    execution_id: str | None = None,
     increment_attempt: bool = False,
     cutoff_minutes: int = STUCK_ITEM_TIMEOUT_MINUTES,
-) -> List[OperationItem]:
+) -> list[OperationItem]:
     """Resetea items stuck en 'processing' más allá del timeout.
 
     Args:
@@ -51,7 +50,7 @@ def reset_stuck_items(
     """
     query = db.query(OperationItem).filter(
         OperationItem.status == "processing",
-        OperationItem.updated_at < datetime.now(timezone.utc) - timedelta(minutes=cutoff_minutes),
+        OperationItem.updated_at < datetime.now(UTC) - timedelta(minutes=cutoff_minutes),
     )
     if batch_id_prefix:
         like_pattern = batch_id_prefix
@@ -59,7 +58,7 @@ def reset_stuck_items(
             like_pattern = f"{like_pattern}%_{execution_id}"
         query = query.filter(OperationItem.batch_id.like(like_pattern))
 
-    stuck: List[OperationItem] = query.all()
+    stuck: list[OperationItem] = query.all()
     for item in stuck:
         item.status = "pending"
         item.error_message = "Reintentando tras timeout por crash"

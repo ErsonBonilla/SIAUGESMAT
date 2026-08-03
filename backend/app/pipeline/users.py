@@ -5,13 +5,12 @@ cédula) se reciben ya consultados y se devuelven eventos en lugar de persistir
 logs directamente.
 """
 import unicodedata
-from typing import Dict, List, Tuple
 
 from app.pipeline.course_index import build_base_key
 from app.pipeline.shortnames import parse_shortname
 
-User = Dict[str, object]
-Event = Tuple[str, str, Dict[str, object]]
+User = dict[str, object]
+Event = tuple[str, str, dict[str, object]]
 
 
 def normalize_name(name: str) -> str:
@@ -40,12 +39,12 @@ def names_differ(etl_name: str, moodle_name: str) -> bool:
 
 
 def resolve_users(
-    etl_users: List[User],
-    institutional_map: Dict[str, User],
-    personal_map: Dict[str, User],
-    username_index: Dict[str, User],
-    idnumber_index: Dict[str, User],
-) -> Tuple[Dict[str, str], List[Event]]:
+    etl_users: list[User],
+    institutional_map: dict[str, User],
+    personal_map: dict[str, User],
+    username_index: dict[str, User],
+    idnumber_index: dict[str, User],
+) -> tuple[dict[str, str], list[Event]]:
     """Resuelve cada usuario ETL a un username de Moodle.
 
     Prioridad de matching: email institucional → email personal → username →
@@ -57,8 +56,8 @@ def resolve_users(
       eventos: lista de (tipo, identifier, detail), con tipo ∈
         {"user_identity_conflict", "user_resolved"}.
     """
-    username_map: Dict[str, str] = {}
-    events: List[Event] = []
+    username_map: dict[str, str] = {}
+    events: list[Event] = []
 
     for user in etl_users:
         email_lookup = user.get("email", "").strip().lower()
@@ -111,9 +110,9 @@ def resolve_users(
 
 
 def index_teachers(
-    users: List[User],
-    enrolments: List[Dict[str, str]],
-) -> Dict[str, Dict[str, Dict[object, List[str]]]]:
+    users: list[User],
+    enrolments: list[dict[str, str]],
+) -> dict[str, dict[str, dict[object, list[str]]]]:
     """Construye índices de docentes por curso y por base_key.
 
     Cada índice agrupa emails, usernames e idnumbers de los docentes de cada
@@ -151,8 +150,8 @@ def index_teachers(
 
 def lookup_teacher_candidates(
     shortname: str,
-    teacher_index: Dict[str, Dict[str, Dict[object, List[str]]]],
-) -> Tuple[List[str], List[str], List[str]]:
+    teacher_index: dict[str, dict[str, dict[object, list[str]]]],
+) -> tuple[list[str], list[str], list[str]]:
     """Recupera (emails, usernames, idnumbers) candidatos para un curso.
 
     Busca primero por shortname exacto; si no hay emails, cae a la base_key

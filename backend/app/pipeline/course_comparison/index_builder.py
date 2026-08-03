@@ -1,15 +1,14 @@
-from typing import Dict, List, Tuple
 
 from app.pipeline.course_comparison.utils import build_base_key
 from app.pipeline.shortnames import parse_shortname
 
 
-def build_shortname_index(courses: List[Dict]) -> Dict[str, Dict]:
+def build_shortname_index(courses: list[dict]) -> dict[str, dict]:
     return {c.get("shortname", ""): c for c in courses if c.get("shortname")}
 
 
-def build_base_key_index(courses: List[Dict]) -> Dict[Tuple[str, ...], List[Dict]]:
-    index: Dict[Tuple[str, ...], List[Dict]] = {}
+def build_base_key_index(courses: list[dict]) -> dict[tuple[str, ...], list[dict]]:
+    index: dict[tuple[str, ...], list[dict]] = {}
     for c in courses:
         sn = c.get("shortname", "")
         parsed = parse_shortname(sn)
@@ -19,8 +18,8 @@ def build_base_key_index(courses: List[Dict]) -> Dict[Tuple[str, ...], List[Dict
     return index
 
 
-def build_core_index(courses: List[Dict]) -> Dict[Tuple[str, ...], List[Dict]]:
-    index: Dict[Tuple[str, ...], List[Dict]] = {}
+def build_core_index(courses: list[dict]) -> dict[tuple[str, ...], list[dict]]:
+    index: dict[tuple[str, ...], list[dict]] = {}
     for c in courses:
         sn = c.get("shortname", "")
         parsed = parse_shortname(sn)

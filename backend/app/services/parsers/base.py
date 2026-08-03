@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Tuple
+from typing import Any, ClassVar
 
 import pandas as pd
 
@@ -7,9 +7,9 @@ from app.services.category_utils import sort_categories
 
 
 class BaseExcelParser(ABC):
-    CANONICAL_MAP: Dict[str, str] = {}
+    CANONICAL_MAP: ClassVar[dict[str, str]] = {}
     IGNORE_PREFIXES = ("total_", "horas_")
-    IGNORE_EXACT = {"categoria", "tipo_programa", "tipo_vinculacion", "nivel", "perfil_del_curso"}
+    IGNORE_EXACT: ClassVar[set[str]] = {"categoria", "tipo_programa", "tipo_vinculacion", "nivel", "perfil_del_curso"}
 
     @classmethod
     @abstractmethod
@@ -18,7 +18,7 @@ class BaseExcelParser(ABC):
 
     @classmethod
     @abstractmethod
-    def parse(cls, df: pd.DataFrame, modalidad: str) -> Dict[str, Any]:
+    def parse(cls, df: pd.DataFrame, modalidad: str) -> dict[str, Any]:
         ...
 
     @staticmethod
@@ -35,8 +35,7 @@ class BaseExcelParser(ABC):
         name = re.sub(r"\s+", "_", name)
         name = re.sub(r"[^a-z0-9_]", "", name)
         name = re.sub(r"_+", "_", name)
-        name = name.strip("_")
-        return name
+        return name.strip("_")
 
     @classmethod
     def _normalize_columns(cls, df: pd.DataFrame) -> pd.DataFrame:
@@ -149,14 +148,13 @@ class BaseExcelParser(ABC):
     def _clean_program_name(raw: str) -> str:
         import re
         cleaned = re.sub(r"[\d-]", "", raw)
-        cleaned = re.sub(r"\s+", " ", cleaned).strip()
-        return cleaned
+        return re.sub(r"\s+", " ", cleaned).strip()
 
     # ----------------------------------------------------------------
     # Conjuntos para partición de nombres colombianos
     # Convención: [APELLIDO(S)] [NOMBRE(S)]
     # ----------------------------------------------------------------
-    _GIVEN_NAMES: set[str] = {
+    _GIVEN_NAMES: ClassVar[set[str]] = {
         "ADIELA", "ADOLFO", "ADRIANA", "AGUSTIN", "AGUSTÍN", "AINHOA",
         "ALBA", "ALBEIRO", "ALBERTO", "ALEJANDRA", "ALEJANDRO", "ALEXANDER",
         "ALFREDO", "ALICIA", "ALVARO", "ÁLVARO", "AMALIA", "AMANDA",
@@ -197,12 +195,12 @@ class BaseExcelParser(ABC):
         "YANETH", "YENIFER", "YENNY", "YOLANDA", "YOLIMA", "ZULMA",
     }
 
-    _SURNAME_PARTICLES: set[str] = {
+    _SURNAME_PARTICLES: ClassVar[set[str]] = {
         "DE", "DEL", "E", "LA", "LAS", "LOS", "VAN", "VON", "Y",
     }
 
     @staticmethod
-    def _split_name(full_name: str) -> Tuple[str, str]:
+    def _split_name(full_name: str) -> tuple[str, str]:
         import re
 
         cleaned = re.sub(r"\s+", " ", full_name).strip().upper()

@@ -1,6 +1,6 @@
 from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
 
 
 class CsvUploadResponse(BaseModel):
@@ -16,7 +16,7 @@ class OperationItemOut(BaseModel):
 
     identifier: str
     status: str
-    error_message: Optional[str] = None
+    error_message: str | None = None
     attempt: int
 
 
@@ -31,12 +31,12 @@ class BatchStatusResponse(BaseModel):
     completed: int
     failed: int
     cancelled: int = 0
-    modalidad: Optional[str] = None
-    created_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    modalidad: str | None = None
+    created_at: datetime | None = None
+    completed_at: datetime | None = None
     offset: int = 0
     limit: int = 100
-    details: List[OperationItemOut]
+    details: list[OperationItemOut]
 
 
 class BatchListOut(BaseModel):
@@ -51,12 +51,12 @@ class BatchListOut(BaseModel):
     paused: int = 0
     modalidad: str
     created_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
 
 class BatchListResponse(BaseModel):
     total: int
-    items: List[BatchListOut]
+    items: list[BatchListOut]
 
 
 class OperationMonthlyMetrics(BaseModel):
@@ -70,7 +70,7 @@ class OperationMonthlyMetrics(BaseModel):
 
 
 class OperationsAnalyticsResponse(BaseModel):
-    history: List[OperationMonthlyMetrics]
+    history: list[OperationMonthlyMetrics]
 
 
 class DeleteOldBatchesResponse(BaseModel):

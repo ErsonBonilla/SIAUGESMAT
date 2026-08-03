@@ -1,7 +1,7 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+import pytest
 
 from app.services.moodle_client import MoodleClient
 from app.services.moodle_errors import MoodleAPIError, MoodleOverloadedError
@@ -98,9 +98,8 @@ class TestRequest:
         async def _call(*a, **kw):
             return await unwrapped(c, *a, **kw)
         mock_method = AsyncMock(side_effect=_call)
-        with patch.object(c, '_request_with_retry', mock_method):
-            with pytest.raises(MoodleAPIError, match="Respuesta inesperada"):
-                await c._request("core_course_get_courses", {})
+        with patch.object(c, '_request_with_retry', mock_method), pytest.raises(MoodleAPIError, match="Respuesta inesperada"):
+            await c._request("core_course_get_courses", {})
 
     @pytest.mark.asyncio
     async def test_rate_limiter_called(self, client):

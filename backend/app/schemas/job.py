@@ -5,8 +5,7 @@ Define los modelos de datos utilizados en las respuestas de los endpoints
 de gestión de ejecuciones y errores.
 """
 
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
@@ -19,8 +18,8 @@ class ErrorOut(BaseModel):
     id: int
     execution_id: int
     type: str
-    identifier: Optional[str] = None
-    message: Optional[str] = None
+    identifier: str | None = None
+    message: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -36,20 +35,20 @@ class ExecutionOut(BaseModel):
     semester: str
     mode: str
     status: str
-    metrics: Optional[Dict[str, int]] = None
+    metrics: dict[str, int] | None = None
     errors_count: int = 0
-    current_phase: Optional[str] = None
-    progress_pct: Optional[float] = None
-    progress_updated_at: Optional[datetime] = None
-    current_step: Optional[int] = None
-    eta_seconds: Optional[float] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    duration_seconds: Optional[float] = None
-    moodle_version: Optional[str] = None
-    modalidad: Optional[str] = None
-    report_dir: Optional[str] = None
-    celery_task_id: Optional[str] = None
+    current_phase: str | None = None
+    progress_pct: float | None = None
+    progress_updated_at: datetime | None = None
+    current_step: int | None = None
+    eta_seconds: float | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    duration_seconds: float | None = None
+    moodle_version: str | None = None
+    modalidad: str | None = None
+    report_dir: str | None = None
+    celery_task_id: str | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -58,7 +57,7 @@ class ExecutionOut(BaseModel):
     def compute_eta(self):
         if self.status == "running" and self.progress_pct is not None and self.started_at:
             pct = self.progress_pct
-            elapsed = (datetime.now(timezone.utc) - self.started_at).total_seconds()
+            elapsed = (datetime.now(UTC) - self.started_at).total_seconds()
             if elapsed > 5 and pct > 0:
                 rate = pct / elapsed
                 if rate > 0:
@@ -70,7 +69,7 @@ class ExecutionOut(BaseModel):
 class ExecutionList(BaseModel):
     """Lista paginada de ejecuciones."""
     total: int
-    items: List[ExecutionOut]
+    items: list[ExecutionOut]
 
 
 # ---------------------------------------------------------------------------

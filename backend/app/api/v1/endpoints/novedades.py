@@ -69,7 +69,7 @@ async def compare_novedades(
     except OSError:
         logger.exception("Error al guardar el archivo")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail="No se pudo guardar el archivo.")
+                            detail="No se pudo guardar el archivo.") from None
 
     result, error = await detect_novedades(db, semester, modalidad, file_path)
     if error:

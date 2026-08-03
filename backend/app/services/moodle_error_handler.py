@@ -1,6 +1,7 @@
 import logging
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable
+from typing import Any
 
 from app.services.moodle_errors import MoodleOverloadedError, is_moodle_overloaded
 

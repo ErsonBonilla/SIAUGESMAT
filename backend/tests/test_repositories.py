@@ -5,20 +5,21 @@ Verifica que las funciones de acceso a datos (execution_repo, log_repo)
 crean y actualizan correctamente las entidades en base de datos.
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from app.db.models import Execution, ErrorLog, ExecutionLog
+import pytest
+
+from app.db.models import ErrorLog, Execution, ExecutionLog
 from app.repositories.execution_repo import (
     get_execution,
-    update_progress,
-    mark_running,
+    is_reupload,
     mark_completed,
     mark_failed,
+    mark_running,
     set_report_dir,
-    is_reupload,
+    update_progress,
 )
-from app.repositories.log_repo import save_log, save_error
+from app.repositories.log_repo import save_error, save_log
 
 
 @pytest.fixture
@@ -29,7 +30,7 @@ def execution(test_db):
         mode="both",
         status="pending",
         modalidad="DISTANCIA",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     test_db.add(ex)
     test_db.commit()
@@ -102,7 +103,7 @@ class TestExecutionRepo:
             mode="both",
             status="completed",
             modalidad=execution.modalidad,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         test_db.add(prev)
         test_db.commit()
@@ -115,7 +116,7 @@ class TestExecutionRepo:
             mode="both",
             status="failed",
             modalidad=execution.modalidad,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         test_db.add(prev)
         test_db.commit()

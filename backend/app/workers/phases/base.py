@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Set
+from typing import Any
 
 from app.integrations.moodle import MoodleIntegration
 from app.services.moodle_errors import MoodleOverloadedError as MoodleOverloadedError
 from app.services.moodle_operations import MoodleService
+
+__all__ = ["MoodleOverloadedError", "PhaseContext"]
 
 
 class PhaseContext:
@@ -14,7 +16,7 @@ class PhaseContext:
         execution,
         mode: str,
         semester: str,
-        etl_data: Dict[str, Any],
+        etl_data: dict[str, Any],
         moodle_service: MoodleService,
         integration: MoodleIntegration,
     ):
@@ -27,24 +29,24 @@ class PhaseContext:
         self.moodle_service = moodle_service
         self.integration = integration
 
-        self.existing_cat_idnumbers: Set[str] = set()
-        self.all_categories_map: Dict[str, Dict] = {}
-        self.existing_courses: List[Dict] = []
-        self.username_map: Dict[str, str] = {}
-        self.courses_with_teacher: Dict[str, str] = {}
-        self.course_teacher_map: Dict[str, str] = {}
+        self.existing_cat_idnumbers: set[str] = set()
+        self.all_categories_map: dict[str, dict] = {}
+        self.existing_courses: list[dict] = []
+        self.username_map: dict[str, str] = {}
+        self.courses_with_teacher: dict[str, str] = {}
+        self.course_teacher_map: dict[str, str] = {}
 
         self.re_upload: bool = False
-        self.missing_categories: List[Dict] = []
-        self.categories_to_relocate: List[Dict] = []
-        self.comparison: Dict[str, Any] = {}
-        self.users_to_create: List[Dict] = []
-        self.resolved_enrolments: List[Dict] = []
+        self.missing_categories: list[dict] = []
+        self.categories_to_relocate: list[dict] = []
+        self.comparison: dict[str, Any] = {}
+        self.users_to_create: list[dict] = []
+        self.resolved_enrolments: list[dict] = []
 
-        self.structure_progress: Dict[str, Any] = {}
-        self.people_progress: Dict[str, Any] = {}
+        self.structure_progress: dict[str, Any] = {}
+        self.people_progress: dict[str, Any] = {}
 
-        self.metrics: Dict[str, int] = {
+        self.metrics: dict[str, int] = {
             "categories_created": 0,
             "courses_created": 0,
             "courses_deleted": 0,

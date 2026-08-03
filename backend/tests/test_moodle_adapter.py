@@ -67,7 +67,7 @@ class TestMoodle3Adapter:
                 {"type": "manual", "id": 1},
             ],
         })
-        with pytest.raises(ValueError, match="Enrolment .self. no encontrado"):
+        with pytest.raises(ValueError, match="Enrolment 'self' no encontrado"):
             await adapter.enable_self_enrolment(500, call_ws)
 
     @pytest.mark.asyncio

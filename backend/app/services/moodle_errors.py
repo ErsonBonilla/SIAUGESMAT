@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import ClassVar
 
 import httpx
 
@@ -24,9 +24,8 @@ def is_moodle_overloaded(e: BaseException) -> bool:
             inner = e.last_attempt.exception() or inner
         except Exception:
             logger.debug("No se pudo obtener last_attempt.exception()")
-    if isinstance(inner, MoodleAPIError):
-        if inner.error_code in ("invalidrecord", "storedfilenotcreated", "invalidcoursemodule"):
-            return True
+    if isinstance(inner, MoodleAPIError) and inner.error_code in ("invalidrecord", "storedfilenotcreated", "invalidcoursemodule"):
+        return True
     msg = str(e).lower()
     return any(kw in msg for kw in ("gateway time-out", "connect error", "read timeout", "connection refused"))
 
@@ -58,7 +57,7 @@ class MoodleAPIError(Exception):
         "valueofparamelementnotset",
     })
 
-    ERROR_CODES: dict[str, str] = {
+    ERROR_CODES: ClassVar[dict[str, str]] = {
         "invalidparameter": "Parámetro inválido enviado a Moodle.",
         "invalidtoken": "Token de autenticación inválido. Verifique la configuración.",
         "accessexception": "No tiene permisos para realizar esta operación en Moodle.",
@@ -81,7 +80,7 @@ class MoodleAPIError(Exception):
         "group_not_found": "El grupo no existe en Moodle.",
     }
 
-    def __init__(self, message: str, error_code: Optional[str] = None):
+    def __init__(self, message: str, error_code: str | None = None):
         super().__init__(message)
         self.error_code = error_code
 

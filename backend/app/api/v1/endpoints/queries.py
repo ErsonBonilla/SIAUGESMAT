@@ -6,7 +6,7 @@ import csv
 import io
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -62,7 +62,7 @@ ENTITY_CSV_EXTRACT = {
         r.get("course_name", ""), r.get("course_shortname", ""),
         r.get("program", ""), r.get("cat", ""),
         "Nunca" if r.get("last_access", 0) == 0
-        else datetime.fromtimestamp(r["last_access"]).strftime("%Y-%m-%d %H:%M"),
+        else datetime.fromtimestamp(r["last_access"], tz=UTC).strftime("%Y-%m-%d %H:%M"),
     ],
 }
 

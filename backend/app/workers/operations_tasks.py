@@ -205,7 +205,7 @@ async def _ensure_root_category(moodle: MoodleService):
             }])
             logger.info(f"Categoría raíz {settings.ROOT_CATEGORY_NAME} (DISTANCIA) creada automáticamente")
     except MoodleAPIError as e:
-        logger.error(f"Error al crear categoría raíz {settings.ROOT_CATEGORY_NAME}: {e}")
+        logger.exception(f"Error al crear categoría raíz {settings.ROOT_CATEGORY_NAME}: {e}")
         raise
 
 

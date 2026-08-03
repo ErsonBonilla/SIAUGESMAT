@@ -1,4 +1,3 @@
-from typing import Dict, List, Set, Tuple
 
 from app.pipeline.course_comparison.thresholds import (
     DEFAULT_COURSE_DISAPPEARED_AGE_SECONDS,
@@ -12,15 +11,15 @@ from app.pipeline.shortnames import parse_shortname
 
 
 def find_disappeared_courses(
-    existing_by_shortname: Dict[str, Dict],
-    existing_by_base_key: Dict[Tuple[str, ...], List[Dict]],
+    existing_by_shortname: dict[str, dict],
+    existing_by_base_key: dict[tuple[str, ...], list[dict]],
     new_shortnames: set,
     new_base_keys: set,
-    new_program_codes: Set[str],
-    to_delete: List[str],
-    to_hide: List[str],
-    alerts: List[Dict],
-    logs: List[Dict],
+    new_program_codes: set[str],
+    to_delete: list[str],
+    to_hide: list[str],
+    alerts: list[dict],
+    logs: list[dict],
     *,
     disappeared_age_seconds: int = DEFAULT_COURSE_DISAPPEARED_AGE_SECONDS,
 ):

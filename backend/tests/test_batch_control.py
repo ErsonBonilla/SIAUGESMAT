@@ -1,19 +1,19 @@
-﻿from unittest.mock import patch
+﻿from datetime import UTC
+from unittest.mock import patch
 
 import pytest
 
 
-
 @pytest.fixture
 def mock_batch():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     class MockBatch:
         batch_id = "test-batch-1"
         entity_type = "course"
         action = "create"
         modalidad = "DISTANCIA"
-        created_at = datetime.now(timezone.utc)
+        created_at = datetime.now(UTC)
         completed_at = None
     return MockBatch()
 

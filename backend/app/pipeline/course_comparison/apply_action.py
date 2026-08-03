@@ -1,19 +1,18 @@
-from typing import Dict, List, Optional
 
 
 def apply_action(
     action: str,
-    detail: Dict,
+    detail: dict,
     sn: str,
     professor: str,
-    parsed_new: Optional[Dict],
-    to_create: List,
-    to_delete: List,
-    to_activate: List,
-    to_hide: List,
-    to_update: List,
-    alerts: List,
-    logs: List,
+    parsed_new: dict | None,
+    to_create: list,
+    to_delete: list,
+    to_activate: list,
+    to_hide: list,
+    to_update: list,
+    alerts: list,
+    logs: list,
 ):
     phase = "2"
     if action == "create":

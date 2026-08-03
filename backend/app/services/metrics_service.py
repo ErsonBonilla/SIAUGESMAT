@@ -7,7 +7,6 @@ y retornan el resumen de la última ejecución.
 """
 
 import logging
-from typing import Dict, List, Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -21,14 +20,14 @@ from app.pipeline.metrics import (
 )
 from app.schemas.analytics import (
     LatestExecution,
-    SemesterMetrics,
     SemaphoreStatus,
+    SemesterMetrics,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def _get_semaphore_thresholds() -> Dict[str, float]:
+def _get_semaphore_thresholds() -> dict[str, float]:
     """Obtiene los umbrales configurables desde las variables de entorno."""
     return {
         "error_rate_yellow": settings.ANALYTICS_ERROR_THRESHOLD_YELLOW,
@@ -39,8 +38,8 @@ def _get_semaphore_thresholds() -> Dict[str, float]:
 
 
 def get_history_metrics(
-    db: Session, limit: int = 10, modalidad: Optional[str] = None
-) -> List[SemesterMetrics]:
+    db: Session, limit: int = 10, modalidad: str | None = None
+) -> list[SemesterMetrics]:
     """
     Retorna una lista de métricas agregadas por semestre,
     ordenadas del más reciente al más antiguo.
@@ -83,11 +82,11 @@ def get_history_metrics(
     executions = detail_query.all()
 
     # Agrupar ejecuciones por semestre
-    grouped: Dict[str, List[Execution]] = {}
+    grouped: dict[str, list[Execution]] = {}
     for ex in executions:
         grouped.setdefault(ex.semester, []).append(ex)
 
-    results: List[SemesterMetrics] = []
+    results: list[SemesterMetrics] = []
     for row in aggregate:
         semester = row.semester
         execs = grouped.get(semester, [])
@@ -120,7 +119,7 @@ def get_history_metrics(
 
 
 def get_semaphore_status(
-    db: Session, semester: Optional[str] = None, modalidad: Optional[str] = None
+    db: Session, semester: str | None = None, modalidad: str | None = None
 ) -> SemaphoreStatus:
     """
     Calcula el estado del semáforo para el último proceso completado
@@ -187,7 +186,7 @@ def get_semaphore_status(
     )
 
 
-def get_latest_execution_data(db: Session, modalidad: Optional[str] = None) -> LatestExecution:
+def get_latest_execution_data(db: Session, modalidad: str | None = None) -> LatestExecution:
     """
     Obtiene un resumen completo de la ejecución más reciente,
     incluyendo métricas y estado del semáforo.

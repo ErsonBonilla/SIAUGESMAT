@@ -9,7 +9,7 @@ Pruebas unitarias de las mejoras M1-M4:
 - M4: recreate atómico (borrar + crear) propagado hasta create_course.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -264,7 +264,7 @@ class TestItemTaskOverloadExhaustion:
              patch.object(process_etl_item, "max_retries", 3):
             mock_integ_cls.return_value = mock_integ
             mock_sl.return_value = MagicMock()
-            with pytest.raises(Exception):
+            with pytest.raises(MoodleOverloadedError):
                 process_etl_item(1)  # aún hay reintentos: se relanza para retry de Celery
         for call in mock_update.call_args_list:
             assert "Agotados reintentos" not in str(call)
@@ -280,7 +280,7 @@ class TestChordActiveMarker:
 
         ex = Execution(
             filename="test.xlsx", semester="2025A", status="running",
-            modalidad="DISTANCIA", created_at=datetime.now(timezone.utc),
+            modalidad="DISTANCIA", created_at=datetime.now(UTC),
         )
         test_db.add(ex)
         test_db.commit()
@@ -291,7 +291,7 @@ class TestChordActiveMarker:
         active_ts = ex.phase_checkpoint.get("chord_active")
         assert isinstance(active_ts, str)
         future = datetime.fromisoformat(active_ts)
-        assert future > datetime.now(timezone.utc)
+        assert future > datetime.now(UTC)
 
         clear_chord_active(test_db, ex.id)
         test_db.refresh(ex)
@@ -304,7 +304,7 @@ class TestChordActiveMarker:
 
         ex = Execution(
             filename="test.xlsx", semester="2025A", status="running",
-            modalidad="DISTANCIA", created_at=datetime.now(timezone.utc),
+            modalidad="DISTANCIA", created_at=datetime.now(UTC),
         )
         test_db.add(ex)
         test_db.commit()
@@ -313,7 +313,7 @@ class TestChordActiveMarker:
         set_chord_active(test_db, ex.id)
         test_db.refresh(ex)
         ts = datetime.fromisoformat(ex.phase_checkpoint["chord_active"])
-        expected = datetime.now(timezone.utc) + timedelta(minutes=settings.CHORD_ACTIVE_MINUTES)
+        expected = datetime.now(UTC) + timedelta(minutes=settings.CHORD_ACTIVE_MINUTES)
         assert abs((ts - expected).total_seconds()) < 5
 
 
@@ -325,7 +325,7 @@ class TestRecoverStuckPhase:
         from app.db.models import Execution
         ex = Execution(
             filename="test.xlsx", semester="2025A", status=status,
-            modalidad="DISTANCIA", created_at=datetime.now(timezone.utc),
+            modalidad="DISTANCIA", created_at=datetime.now(UTC),
             phase_checkpoint=checkpoint or {},
         )
         test_db.add(ex)
@@ -355,7 +355,7 @@ class TestRecoverStuckPhase:
         assert mock_relaunch.call_args.args[1] == ex.id
 
     def test_skips_relaunch_when_chord_active(self, test_db):
-        future = (datetime.now(timezone.utc) + timedelta(minutes=30)).isoformat()
+        future = (datetime.now(UTC) + timedelta(minutes=30)).isoformat()
         self._make_execution(test_db, checkpoint={"chord_active": future})
         with patch("app.workers.phases.common._get_pending_items") as mock_get, \
              patch("app.workers.phases.phase3_structure.on_delete_items_done") as mock_cb:
@@ -381,7 +381,7 @@ class TestRecoverStuckPhase:
         mock_chord.assert_called_once()
 
     def test_relaunches_phase12_when_stale_and_no_items(self, test_db):
-        old = datetime.now(timezone.utc) - timedelta(minutes=40)
+        old = datetime.now(UTC) - timedelta(minutes=40)
         ex = self._make_execution(test_db, checkpoint={"_retry_count": 0})
         ex.progress_updated_at = old
         ex.created_at = old
@@ -399,7 +399,7 @@ class TestRecoverStuckPhase:
         assert args[0] == ex.id
 
     def test_skips_relaunch_phase12_when_heartbeat_recent(self, test_db):
-        fresh = datetime.now(timezone.utc) - timedelta(minutes=5)
+        fresh = datetime.now(UTC) - timedelta(minutes=5)
         ex = self._make_execution(test_db, checkpoint={"_retry_count": 0})
         ex.progress_updated_at = fresh
         ex.created_at = fresh
@@ -414,7 +414,7 @@ class TestRecoverStuckPhase:
         mock_file.delay.assert_not_called()
 
     def test_skips_relaunch_phase12_when_retry_exceeded(self, test_db):
-        old = datetime.now(timezone.utc) - timedelta(minutes=40)
+        old = datetime.now(UTC) - timedelta(minutes=40)
         ex = self._make_execution(test_db, checkpoint={"_retry_count": 3})
         ex.progress_updated_at = old
         ex.created_at = old

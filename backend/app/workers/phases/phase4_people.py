@@ -1,7 +1,6 @@
 import logging
 import uuid
 from functools import wraps
-from typing import Dict
 
 from app.repositories.operation_repo import add_item, create_batch
 from app.services.moodle_factory import get_moodle_service
@@ -81,7 +80,7 @@ async def _resolve_fallback(modalidad, all_sns):
         await ms.close()
 
 
-async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> Dict[str, int]:
+async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> dict[str, int]:
     if _items_exist_for_execution(db, execution_id, "4"):
         pending = _get_pending_counts(db, execution_id, "4")
         if pending:
@@ -93,7 +92,7 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> D
         logger.info(f"Lock FASE 4 ya tomado para ejecución {execution_id}, otro worker crea los items")
         return {}
 
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
     users_to_create = ctx_data.get("users_to_create", [])
     resolved_enrolments = ctx_data.get("resolved_enrolments", [])
 

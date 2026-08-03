@@ -1,3 +1,4 @@
+import contextlib
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -67,10 +68,8 @@ class TestProcessEtlFile:
             mock_get_ex.return_value = mock_ex
             mock_db = MagicMock()
             mock_sl.return_value = mock_db
-            try:
+            with contextlib.suppress(Exception):
                 process_etl_file(1, "/tmp/test.xlsx", "2025A")
-            except Exception:
-                pass
             mock_fail.assert_not_called()
             mock_db.close.assert_called_once()
 

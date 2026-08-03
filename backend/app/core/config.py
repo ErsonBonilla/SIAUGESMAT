@@ -6,7 +6,6 @@ y proporcionar valores tipados y validados a todos los módulos.
 """
 
 from pathlib import Path
-from typing import Dict, Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -39,12 +38,12 @@ class Settings(BaseSettings):
     ALLOW_PRESENCIAL: bool = False
 
     # Configuración por modalidad (opcional, sobreescribe la base)
-    MOODLE_URL__PRESENCIAL: Optional[str] = None
-    MOODLE_TOKEN__PRESENCIAL: Optional[str] = None
-    MOODLE_VERSION__PRESENCIAL: Optional[str] = None
-    MOODLE_URL__DISTANCIA: Optional[str] = None
-    MOODLE_TOKEN__DISTANCIA: Optional[str] = None
-    MOODLE_VERSION__DISTANCIA: Optional[str] = None
+    MOODLE_URL__PRESENCIAL: str | None = None
+    MOODLE_TOKEN__PRESENCIAL: str | None = None
+    MOODLE_VERSION__PRESENCIAL: str | None = None
+    MOODLE_URL__DISTANCIA: str | None = None
+    MOODLE_TOKEN__DISTANCIA: str | None = None
+    MOODLE_VERSION__DISTANCIA: str | None = None
 
     # Rate limiting para la API de Moodle
     MOODLE_MAX_REQUESTS_PER_SECOND: int = 5         # llamadas por segundo
@@ -153,7 +152,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    def get_moodle_config(self, modalidad: str) -> Dict[str, str]:
+    def get_moodle_config(self, modalidad: str) -> dict[str, str]:
         suffix = modalidad.strip().upper()
 
         def _get(*keys: str) -> str:

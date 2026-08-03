@@ -6,7 +6,7 @@ from app.pipeline.course_comparison.action_handler import (
 )
 
 __all__ = [
-    "handle_same_professor",
     "handle_different_professor",
     "handle_same_core_different_group",
+    "handle_same_professor",
 ]

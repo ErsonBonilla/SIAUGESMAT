@@ -10,11 +10,10 @@ Proporciona:
 import logging
 import os
 from contextvars import ContextVar
-from typing import Optional
 
 from pythonjsonlogger import jsonlogger
 
-_context_vars: ContextVar[dict] = ContextVar("execution_context", default={})
+_context_vars: ContextVar[dict | None] = ContextVar("execution_context", default=None)
 
 
 class ExecutionContextFilter(logging.Filter):
@@ -23,10 +22,10 @@ class ExecutionContextFilter(logging.Filter):
     de cada tarea Celery. Thread-safe (contextvars)."""
 
     @staticmethod
-    def set_context(execution_id: Optional[int] = None,
-                    item_id: Optional[int] = None,
-                    action: Optional[str] = None,
-                    phase: Optional[str] = None):
+    def set_context(execution_id: int | None = None,
+                    item_id: int | None = None,
+                    action: str | None = None,
+                    phase: str | None = None):
         _context_vars.set({
             "execution_id": execution_id,
             "item_id": item_id,
@@ -39,7 +38,7 @@ class ExecutionContextFilter(logging.Filter):
         _context_vars.set({})
 
     def filter(self, record: logging.LogRecord) -> bool:
-        for key, value in _context_vars.get().items():
+        for key, value in (_context_vars.get() or {}).items():
             if value is not None:
                 setattr(record, key, value)
         return True

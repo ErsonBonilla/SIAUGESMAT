@@ -35,16 +35,17 @@ if _is_sqlite:
 os.environ.setdefault("JWT_SECRET_KEY", "clave-secreta-de-prueba")
 os.environ.setdefault("MOODLE_ADMIN_TOKEN", "token-de-prueba")
 
+from unittest.mock import AsyncMock, patch
+
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from unittest.mock import AsyncMock, patch
 
-from app.db.base import Base
-from app.db.models import Execution, ErrorLog   # noqa: F401  # asegura que los modelos se registren
-from app.main import app
-from app.core.security import create_access_token
 from app.core.dependencies import get_db
+from app.core.security import create_access_token
+from app.db.base import Base
+from app.db.models import ErrorLog, Execution  # noqa: F401  # asegura que los modelos se registren
+from app.main import app
 
 # ---------------------------------------------------------------------------
 # Configuración de la base de datos basada en archivo para pruebas

@@ -12,8 +12,8 @@ from unittest.mock import patch
 import pytest
 
 from app.db.session import SessionLocal
-
 from app.workers.phases.phase4_people import _create_phase4_items, _create_phase4_items_async
+
 
 def _make_ctx_data(users=None, enrolments=None):
     return {
@@ -32,7 +32,7 @@ class TestAdvisoryLock:
     def test_deterministic_lock_id(self):
         """Mismo execution_id + phase produce siempre el mismo lock_id."""
         import hashlib
-        key = "etl_lock_1_4".encode()
+        key = b"etl_lock_1_4"
         expected = int(hashlib.sha256(key).hexdigest(), 16) % (2**63)
 
         # Forzar el cálculo igual que en _acquire_advisory_lock

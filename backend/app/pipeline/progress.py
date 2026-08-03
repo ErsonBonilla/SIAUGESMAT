@@ -1,7 +1,6 @@
 """Cálculo de progreso por fases (item_task) — transformaciones puras."""
-from typing import Union
 
-Number = Union[int, float]
+Number = int | float
 
 
 def compute_phase_progress(

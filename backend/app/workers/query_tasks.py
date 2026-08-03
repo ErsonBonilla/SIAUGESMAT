@@ -6,7 +6,7 @@ import asyncio
 import logging
 import re
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 
 from app.celery_app import celery_app
 from app.db.session import SessionLocal
@@ -40,7 +40,7 @@ def _semester_to_cutoff(semester: str) -> int:
         month, day = 1, 1
     else:
         month, day = 7, 1
-    return int(datetime(year, month, day).timestamp())
+    return int(datetime(year, month, day, tzinfo=UTC).timestamp())
 
 
 async def _do_query(moodle: MoodleService, qr):
@@ -63,11 +63,11 @@ async def _do_query(moodle: MoodleService, qr):
             raw = [c for c in raw if (c.get("shortname") or "").count("_") == 4]
         return raw
 
-    elif qr.entity == "categories":
+    if qr.entity == "categories":
         search = params.get("search")
         return await moodle.get_categories(idnumber=search)
 
-    elif qr.entity == "users":
+    if qr.entity == "users":
         status_filter = params.get("status")
         search = params.get("search")
 
@@ -77,7 +77,7 @@ async def _do_query(moodle: MoodleService, qr):
             raw = [u for u in raw if u.get("lastlogin", 1) == 0]
         return raw
 
-    elif qr.entity == "inactive_teachers":
+    if qr.entity == "inactive_teachers":
         semester = params.get("semester", "")
         if not semester or len(semester) != 5 or semester[-1] not in ("A", "B"):
             raise ValueError("Se requiere un semestre válido (ej. 2026A).")
@@ -125,8 +125,7 @@ async def _do_query(moodle: MoodleService, qr):
 
         return results
 
-    else:
-        raise ValueError(f"Entidad desconocida: {qr.entity}")
+    raise ValueError(f"Entidad desconocida: {qr.entity}")
 
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=30, time_limit=3600, soft_time_limit=3540)
@@ -150,7 +149,7 @@ def execute_query(self, task_id: str):
         logger.exception(f"Fallo en query {task_id}")
         set_query_failed(db, task_id, str(exc))
         if self.request.retries < self.max_retries:
-            raise self.retry(exc=exc, countdown=2 ** self.request.retries)
+            raise self.retry(exc=exc, countdown=2 ** self.request.retries) from exc
 
     finally:
         db.close()

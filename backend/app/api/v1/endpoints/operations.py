@@ -3,10 +3,10 @@ import logging
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
+from app.api.v1.upload_handler import handle_upload, handle_visibility_upload
 from app.core.dependencies import get_current_user, get_db
 from app.schemas.operations import CsvUploadResponse
 from app.schemas.user import UserInToken
-from app.api.v1.upload_handler import handle_upload, handle_visibility_upload
 
 logger = logging.getLogger(__name__)
 

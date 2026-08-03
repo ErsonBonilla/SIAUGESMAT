@@ -1,5 +1,4 @@
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
@@ -9,7 +8,7 @@ from app.core.config import settings
 from app.db.models import ErrorLog, Execution
 
 
-def get_execution(db: Session, execution_id: int) -> Optional[Execution]:
+def get_execution(db: Session, execution_id: int) -> Execution | None:
     return db.query(Execution).filter(Execution.id == execution_id).first()
 
 
@@ -22,7 +21,7 @@ def create_execution(db: Session, filename: str, semester: str, mode: str,
         status="pending",
         moodle_version=moodle_version,
         modalidad=modalidad,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
     db.add(execution)
     db.commit()
@@ -36,7 +35,7 @@ def atomic_mark_queued(db: Session, execution_id: int, task_id: str, allowed_sta
             "UPDATE executions SET status = 'queued', started_at = :now, celery_task_id = :task_id "
             "WHERE id = :id AND status IN :allowed_statuses"
         ),
-        {"now": datetime.now(timezone.utc), "task_id": task_id, "id": execution_id,
+        {"now": datetime.now(UTC), "task_id": task_id, "id": execution_id,
          "allowed_statuses": allowed_statuses},
     )
     db.commit()
@@ -49,7 +48,7 @@ def update_progress(db: Session, execution_id: int, pct: float, phase: str = Non
         if phase is not None:
             execution.current_phase = phase
         execution.progress_pct = pct
-        execution.progress_updated_at = datetime.now(timezone.utc)
+        execution.progress_updated_at = datetime.now(UTC)
         if step is not None:
             execution.current_step = step
         db.commit()
@@ -59,28 +58,28 @@ def touch_heartbeat(db: Session, execution_id: int) -> None:
     """Actualiza solo progress_updated_at sin cambiar porcentaje ni mensaje."""
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
-        execution.progress_updated_at = datetime.now(timezone.utc)
+        execution.progress_updated_at = datetime.now(UTC)
         db.commit()
 
 
-def mark_running(db: Session, execution_id: int) -> Optional[Execution]:
+def mark_running(db: Session, execution_id: int) -> Execution | None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.status = "running"
-        execution.started_at = datetime.now(timezone.utc)
+        execution.started_at = datetime.now(UTC)
         execution.progress_pct = 0
         db.commit()
     return execution
 
 
 def mark_completed(db: Session, execution_id: int, metrics: dict,
-                   errors_count: int, duration_seconds: float) -> Optional[Execution]:
+                   errors_count: int, duration_seconds: float) -> Execution | None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.status = "completed"
         execution.metrics = metrics
         execution.errors_count = errors_count
-        execution.completed_at = datetime.now(timezone.utc)
+        execution.completed_at = datetime.now(UTC)
         execution.duration_seconds = round(duration_seconds, 2)
         execution.current_phase = "Procesamiento completado"
         execution.progress_pct = 100
@@ -88,11 +87,11 @@ def mark_completed(db: Session, execution_id: int, metrics: dict,
     return execution
 
 
-def mark_failed(db: Session, execution_id: int, duration_seconds: float) -> Optional[Execution]:
+def mark_failed(db: Session, execution_id: int, duration_seconds: float) -> Execution | None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.status = "failed"
-        execution.completed_at = datetime.now(timezone.utc)
+        execution.completed_at = datetime.now(UTC)
         execution.duration_seconds = round(duration_seconds, 2)
         db.commit()
     return execution
@@ -107,7 +106,7 @@ def delete_execution(db: Session, execution_id: int) -> None:
 
 def list_executions(db: Session, semester: str = None, status: str = None, mode: str = None,
                     moodle_version: str = None, modalidad: str = None,
-                    limit: int = 20, offset: int = 0) -> Tuple[int, List[Execution]]:
+                    limit: int = 20, offset: int = 0) -> tuple[int, list[Execution]]:
     query = db.query(Execution)
     if semester:
         query = query.filter(Execution.semester == semester)
@@ -124,7 +123,7 @@ def list_executions(db: Session, semester: str = None, status: str = None, mode:
     return total, executions
 
 
-def get_execution_errors(db: Session, execution_id: int, limit: int, offset: int) -> List[ErrorLog]:
+def get_execution_errors(db: Session, execution_id: int, limit: int, offset: int) -> list[ErrorLog]:
     return (
         db.query(ErrorLog)
         .filter(ErrorLog.execution_id == execution_id)
@@ -152,7 +151,7 @@ def is_reupload(db: Session, semester: str, modalidad: str, exclude_id: int) -> 
 
 
 def delete_old_pending_executions(db: Session, hours: int = 24) -> int:
-    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
     old = db.query(Execution).filter(
         Execution.status == "pending",
         Execution.created_at < cutoff,
@@ -175,7 +174,7 @@ def save_checkpoint(db: Session, execution_id: int, phase: str, data: dict) -> N
         db.commit()
 
 
-def get_checkpoint(db: Session, execution_id: int) -> Optional[Dict]:
+def get_checkpoint(db: Session, execution_id: int) -> dict | None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if not execution or not execution.phase_checkpoint:
         return None
@@ -189,7 +188,7 @@ def set_chord_active(db: Session, execution_id: int, minutes: int = None) -> Non
     cuyo chord quedó huérfano (worker caído, callback nunca ejecutado).
     """
     minutes = settings.CHORD_ACTIVE_MINUTES if minutes is None else minutes
-    expires = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    expires = datetime.now(UTC) + timedelta(minutes=minutes)
     save_checkpoint(db, execution_id, "chord_active", expires.isoformat())
 
 
@@ -206,7 +205,7 @@ def clear_checkpoint(db: Session, execution_id: int) -> None:
         db.commit()
 
 
-def pause_execution(db: Session, execution_id: int) -> Tuple[bool, str]:
+def pause_execution(db: Session, execution_id: int) -> tuple[bool, str]:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if not execution or execution.status != "running":
         return False, ""
@@ -233,16 +232,16 @@ def should_pause(db: Session, execution_id: int) -> bool:
     return execution is not None and execution.status == "paused"
 
 
-def cancel_execution(db: Session, execution_id: int) -> Tuple[bool, str]:
+def cancel_execution(db: Session, execution_id: int) -> tuple[bool, str]:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if not execution or execution.status not in ("running", "paused", "queued"):
         return False, ""
     task_id = execution.celery_task_id or ""
     execution.status = "cancelled"
     execution.current_phase = f"{execution.current_phase or ''} (cancelado)"
-    execution.completed_at = datetime.now(timezone.utc)
+    execution.completed_at = datetime.now(UTC)
     execution.duration_seconds = round(
-        (datetime.now(timezone.utc) - execution.started_at).total_seconds()
+        (datetime.now(UTC) - execution.started_at).total_seconds()
     ) if execution.started_at else 0
     db.commit()
     return True, task_id

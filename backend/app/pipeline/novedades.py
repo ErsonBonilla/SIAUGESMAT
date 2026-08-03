@@ -4,18 +4,18 @@ Compara el estado anterior y el nuevo de cursos/docentes y emite las
 novedades (cambio de profesor, curso eliminado, curso nuevo) sin tocar
 la base de datos ni el filesystem.
 """
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 from app.pipeline.course_index import build_enrolment_map, index_courses
 
-Novedad = Dict[str, Any]
+Novedad = dict[str, Any]
 
 
-def _build_user_map(users: List[Dict]) -> Dict[str, Dict]:
+def _build_user_map(users: list[dict]) -> dict[str, dict]:
     return {u.get("cedula", ""): u for u in users if u.get("cedula")}
 
 
-def _resolve_prof_name(username: str, users: List[Dict]) -> str:
+def _resolve_prof_name(username: str, users: list[dict]) -> str:
     if not username:
         return ""
     for u in users:
@@ -26,16 +26,16 @@ def _resolve_prof_name(username: str, users: List[Dict]) -> str:
     return username
 
 
-def _new_prof_name(new_suffix: str, user_map_new: Dict[str, Dict], username: str) -> str:
+def _new_prof_name(new_suffix: str, user_map_new: dict[str, dict], username: str) -> str:
     prof_user = user_map_new.get(new_suffix, {})
     full = f"{prof_user.get('firstname', '')} {prof_user.get('lastname', '')}".strip()
     return full or username
 
 
 def detect_novedades(
-    old_data: Dict[str, Any],
-    new_data: Dict[str, Any],
-) -> Tuple[List[Novedad], Dict[str, int]]:
+    old_data: dict[str, Any],
+    new_data: dict[str, Any],
+) -> tuple[list[Novedad], dict[str, int]]:
     """Compara dos cargas ETL y detecta novedades de cursos.
 
     Retorna (novedades, stats), donde stats incluye ``total_compared``.
@@ -61,7 +61,7 @@ def detect_novedades(
 
     common_keys = set(old_index.keys()) & set(new_index.keys())
 
-    novedades: List[Novedad] = []
+    novedades: list[Novedad] = []
 
     # Cambio de profesor en cursos que existen en ambas cargas
     for bk in common_keys:

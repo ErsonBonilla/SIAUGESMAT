@@ -1,5 +1,4 @@
 import logging
-from typing import Dict
 
 from app.core.config import settings
 from app.pipeline.categories import classify_categories
@@ -14,7 +13,7 @@ from app.workers.phases.base import BasePhase, PhaseContext
 logger = logging.getLogger(__name__)
 
 
-def persist_plan_logs(db, execution_id: int, comparison: Dict, fullname_map: Dict = None) -> int:
+def persist_plan_logs(db, execution_id: int, comparison: dict, fullname_map: dict = None) -> int:
     """Persiste el plan de acciones de la comparación a ExecutionLog.
 
     Los logs de comparación se guardan con prefijo ``planned_`` para

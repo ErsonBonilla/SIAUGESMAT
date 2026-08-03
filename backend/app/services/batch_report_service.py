@@ -4,12 +4,11 @@ import logging
 import os
 import tempfile
 import zipfile
-from typing import Dict, List, Optional, Tuple
 
 from app.core.config import settings
 from app.core.entity_config import ENTITY_CONFIG
 from app.db.models import OperationBatch, OperationItem
-from app.services.report_utils import write_csv, create_zip, list_csv_files, get_csv_path
+from app.services.report_utils import create_zip, get_csv_path, list_csv_files, write_csv
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +19,7 @@ def _batch_dir(batch_id: str) -> str:
     return os.path.join(REPORT_BASE, batch_id)
 
 
-def _build_rows(batch: OperationBatch, items: List[OperationItem]) -> Dict[str, list]:
+def _build_rows(batch: OperationBatch, items: list[OperationItem]) -> dict[str, list]:
     """Returns {csv_name: (headers, rows)} for each CSV to generate."""
     config = ENTITY_CONFIG.get(batch.entity_type, ENTITY_CONFIG["courses"])
 
@@ -59,7 +58,7 @@ def _build_rows(batch: OperationBatch, items: List[OperationItem]) -> Dict[str, 
     elif batch.entity_type == "users" and batch.action == "create":
         base_headers += ["firstname", "lastname", "email", "rol"]
 
-    csvs: Dict[str, tuple] = {}
+    csvs: dict[str, tuple] = {}
 
     if all_rows:
         csvs["resultados"] = (base_headers, all_rows)
@@ -88,7 +87,7 @@ def _build_rows(batch: OperationBatch, items: List[OperationItem]) -> Dict[str, 
     return csvs
 
 
-def save_batch_reports(batch: OperationBatch, items: List[OperationItem]) -> str:
+def save_batch_reports(batch: OperationBatch, items: list[OperationItem]) -> str:
     """Genera y persiste CSVs individuales en disco.
 
     Returns:
@@ -109,15 +108,15 @@ def save_batch_reports(batch: OperationBatch, items: List[OperationItem]) -> str
     return batch_dir
 
 
-def list_batch_reports(batch_id: str) -> List[Dict[str, str]]:
+def list_batch_reports(batch_id: str) -> list[dict[str, str]]:
     return list_csv_files(_batch_dir(batch_id))
 
 
-def get_batch_report_path(batch_id: str, report_name: str) -> Optional[str]:
+def get_batch_report_path(batch_id: str, report_name: str) -> str | None:
     return get_csv_path(_batch_dir(batch_id), report_name)
 
 
-def build_batch_report_zip(batch: OperationBatch, items: List[OperationItem]) -> Tuple[str, str]:
+def build_batch_report_zip(batch: OperationBatch, items: list[OperationItem]) -> tuple[str, str]:
     """Genera ZIP temporal para descarga (compatibilidad con endpoint legacy)."""
     csvs = _build_rows(batch, items)
 

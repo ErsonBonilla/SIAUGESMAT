@@ -1,7 +1,6 @@
 import hashlib
 import logging
-from datetime import datetime, timezone
-from typing import Dict
+from datetime import UTC, datetime
 
 from celery import chord
 from sqlalchemy import text as sql_text
@@ -46,12 +45,12 @@ def _items_exist_for_execution(db, execution_id, phase):
     ).first() is not None
 
 
-def _get_pending_counts(db, execution_id: int, phase: str) -> Dict[str, int]:
+def _get_pending_counts(db, execution_id: int, phase: str) -> dict[str, int]:
     items = db.query(OperationItem).filter(
         OperationItem.batch_id.like(f"etl_{phase}_%_{execution_id}"),
         OperationItem.status == "pending",
     ).all()
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
     for item in items:
         action = (item.detail or {}).get("action", "unknown")
         counts[action] = counts.get(action, 0) + 1
@@ -94,7 +93,7 @@ def _launch_items_chord(execution_id, structure_items):
 @celery_app.task(bind=True, autoretry_for=(MoodleOverloadedError,), max_retries=3,
                   default_retry_delay=10, retry_backoff=True, retry_backoff_max=60)
 def on_phase_items_done(self, results, execution_id, phase):
-    _cb_entered = datetime.now(timezone.utc)
+    _cb_entered = datetime.now(UTC)
     db = SessionLocal()
     try:
         execution = get_execution(db, execution_id)
@@ -127,13 +126,13 @@ def on_phase_items_done(self, results, execution_id, phase):
         _sync_metrics_from_items(db, execution_id)
 
         if phase == "3":
-            save_checkpoint(db, execution_id, "3", {"completed": True, "at": datetime.now(timezone.utc).isoformat()})
+            save_checkpoint(db, execution_id, "3", {"completed": True, "at": datetime.now(UTC).isoformat()})
             update_progress(db, execution_id, 62, "FASE 3 completada, lanzando FASE 4", step=3)
             logger.info(f"FASE 3 completada para ejecución {execution_id}")
             celery_app.send_task("app.workers.phases.orchestrator.process_etl_phase", args=[execution_id, "4"])
 
         elif phase == "4":
-            save_checkpoint(db, execution_id, "4", {"completed": True, "at": datetime.now(timezone.utc).isoformat()})
+            save_checkpoint(db, execution_id, "4", {"completed": True, "at": datetime.now(UTC).isoformat()})
             update_progress(db, execution_id, 85, "Generando reportes…", step=5)
             report_ok = True
             try:
@@ -146,7 +145,7 @@ def on_phase_items_done(self, results, execution_id, phase):
                 report_ok = False
 
             update_progress(db, execution_id, 95, "Finalizando…")
-            _cb_done = datetime.now(timezone.utc)
+            _cb_done = datetime.now(UTC)
             metrics = execution.metrics or {}
             mark_completed(
                 db, execution_id, metrics,
@@ -162,7 +161,7 @@ def on_phase_items_done(self, results, execution_id, phase):
         try:
             db.rollback()
             save_error(db, execution_id, "critical", None, translate_error(e))
-            mark_failed(db, execution_id, (datetime.now(timezone.utc) - _cb_entered).total_seconds() if execution.started_at else 0)
+            mark_failed(db, execution_id, (datetime.now(UTC) - _cb_entered).total_seconds() if execution.started_at else 0)
         except Exception:
             logger.exception(f"Error marcando fallido on_phase_items_done (fase {phase})")
     finally:

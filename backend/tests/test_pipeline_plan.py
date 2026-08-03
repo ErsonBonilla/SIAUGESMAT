@@ -36,7 +36,7 @@ class TestPlanLogEntries:
                  "old_professor": "p1", "new_professor": "p2"},
             ],
         })
-        action, sn, detail = entries[0]
+        action, _sn, detail = entries[0]
         assert action == "alert_teacher_change_recent"
         assert detail["professor"] == "p2"
         assert detail["old_professor"] == "p1"

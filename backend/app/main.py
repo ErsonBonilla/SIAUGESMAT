@@ -15,10 +15,11 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1 import router as v1_router
 from app.core.config import settings
-from app.db.session import init_db
 
 # Configuración de logging estructurado (JSON en producción)
 from app.core.logging_config import setup_logging
+from app.db.session import init_db
+
 setup_logging(debug=settings.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -36,13 +37,13 @@ async def lifespan(app: FastAPI):
     try:
         settings.validate_critical()
     except ValueError as e:
-        logger.error(f"Error de configuración: {e}")
+        logger.exception(f"Error de configuración: {e}")
         raise
     try:
         init_db()
         logger.info("Base de datos inicializada correctamente")
     except Exception as e:
-        logger.error(f"Error al inicializar la base de datos: {e}")
+        logger.exception(f"Error al inicializar la base de datos: {e}")
         raise
     yield
     # Cierre

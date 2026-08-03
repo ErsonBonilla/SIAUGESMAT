@@ -1,6 +1,5 @@
 import logging
 import time
-from typing import Dict
 
 from app.celery_app import celery_app
 from app.core.config import settings
@@ -68,7 +67,7 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
         moodle_service = get_moodle_service(execution.modalidad or "")
         integration = MoodleIntegration(moodle_service)
 
-        async def _run_pipeline() -> Dict[str, int]:
+        async def _run_pipeline() -> dict[str, int]:
             # Refrescar execution para PhaseContext
             current_exec = get_execution(db, execution_id) or execution
             ctx = PhaseContext(

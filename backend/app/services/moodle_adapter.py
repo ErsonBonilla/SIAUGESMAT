@@ -7,16 +7,19 @@ de Moodle (3.x) en los web services que cambian entre versiones.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any, ClassVar
 
 from app.services.roles import role_shortname_to_id as role_shortname_to_id
+
+__all__ = ["Moodle3Adapter", "MoodleAdapter", "MoodleAdapterFactory", "role_shortname_to_id"]
 
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Tipo para la función de llamada WS (MoodleService._request)
 # ---------------------------------------------------------------------------
-WSFunc = Callable[[str, Dict[str, Any]], Any]
+WSFunc = Callable[[str, dict[str, Any]], Any]
 
 
 # ---------------------------------------------------------------------------
@@ -29,18 +32,18 @@ class MoodleAdapter(ABC):
     """
 
     @abstractmethod
-    async def enable_self_enrolment(self, course_id: int, call_ws: WSFunc) -> Dict:
+    async def enable_self_enrolment(self, course_id: int, call_ws: WSFunc) -> dict:
         """Activa la auto-matriculación en un curso."""
 
     @abstractmethod
     async def get_courses(
-        self, shortname: Optional[str], call_ws: WSFunc
-    ) -> List[Dict]:
+        self, shortname: str | None, call_ws: WSFunc
+    ) -> list[dict]:
         """Obtiene cursos, con opciones específicas de versión."""
 
     @abstractmethod
     def build_create_course_enrolment_params(
-        self, params: Dict, course: Dict, index: int
+        self, params: dict, course: dict, index: int
     ) -> None:
         """Agrega parámetros de matriculación a la creación de un curso."""
 
@@ -55,7 +58,7 @@ class Moodle3Adapter(MoodleAdapter):
     - customfields debe solicitarse explícitamente en get_courses.
     """
 
-    async def enable_self_enrolment(self, course_id: int, call_ws: WSFunc) -> Dict:
+    async def enable_self_enrolment(self, course_id: int, call_ws: WSFunc) -> dict:
         enrols = await call_ws(
             "core_enrol_get_course_enrolment_methods",
             {"courseid": course_id},
@@ -69,8 +72,8 @@ class Moodle3Adapter(MoodleAdapter):
         return existing[0]
 
     async def get_courses(
-        self, shortname: Optional[str], call_ws: WSFunc
-    ) -> List[Dict]:
+        self, shortname: str | None, call_ws: WSFunc
+    ) -> list[dict]:
         if shortname:
             result = await call_ws("core_course_get_courses_by_field", {
                 "field": "shortname",
@@ -83,7 +86,7 @@ class Moodle3Adapter(MoodleAdapter):
         return result
 
     def build_create_course_enrolment_params(
-        self, params: Dict, course: Dict, index: int
+        self, params: dict, course: dict, index: int
     ) -> None:
         pass  # Moodle 3.9 no acepta enrolment_1 como parametro de core_course_create_courses
 
@@ -96,7 +99,7 @@ class MoodleAdapterFactory:
     Crea el adaptador correspondiente según la versión de Moodle.
     """
 
-    _adapters: Dict[str, type] = {
+    _adapters: ClassVar[dict[str, type]] = {
         "3.8": Moodle3Adapter,
         "3.9": Moodle3Adapter,
         "4.0": Moodle3Adapter,

@@ -69,7 +69,7 @@ def validate_users_csv(content: str, default_role: str = None) -> list[dict]:
                 try:
                     resolve_role(csv_role)
                 except (ValueError, KeyError):
-                    raise ValueError(f"Fila {row_num}: rol inválido '{csv_role}'")
+                    raise ValueError(f"Fila {row_num}: rol inválido '{csv_role}'") from None
                 user["role1"] = csv_role
 
         fpc_field = next((n for n in reader.fieldnames if n.strip().lower() == "forcepasswordchange"), None)

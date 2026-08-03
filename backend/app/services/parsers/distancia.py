@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, ClassVar
 
 import pandas as pd
 
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class DistanciaParser(BaseExcelParser):
-    CANONICAL_MAP: Dict[str, str] = {
+    CANONICAL_MAP: ClassVar[dict[str, str]] = {
         "cat": "nombre_cat",
         "programa": "nombre_programa",
         "semestre": "semestre",
@@ -45,7 +45,7 @@ class DistanciaParser(BaseExcelParser):
         return pd.read_excel(file_path, dtype=str)
 
     @classmethod
-    def parse(cls, df: pd.DataFrame, modalidad: str) -> Dict[str, Any]:
+    def parse(cls, df: pd.DataFrame, modalidad: str) -> dict[str, Any]:
         df = cls._normalize_columns(df)
         df = cls._filter_confirmed_rows(df)
         df = cls._filter_virtual_rows(df)
@@ -67,12 +67,12 @@ class DistanciaParser(BaseExcelParser):
     @classmethod
     def _process_rows(
         cls, df: pd.DataFrame, modalidad: str
-    ) -> Tuple[Dict, List, Dict, List, List]:
-        categories_map: Dict = {}
-        courses: List = []
-        users: Dict = {}
-        enrolments: List = []
-        duplicates: List = []
+    ) -> tuple[dict, list, dict, list, list]:
+        categories_map: dict = {}
+        courses: list = []
+        users: dict = {}
+        enrolments: list = []
+        duplicates: list = []
 
         categories_map[modalidad] = {
             "name": "IDEAD",
@@ -142,7 +142,7 @@ class DistanciaParser(BaseExcelParser):
     def _build_course_data(
         row, cat_prefix: str, cod_prog: str, semestre_romano: str,
         grupo: str, cedula: str,
-    ) -> Dict:
+    ) -> dict:
         cod_curso = str(row.get("cod_curso", "")).strip()
         nombre_curso = str(row.get("nombre_curso", "")).strip()
         cedula_suffix = f"_{cedula}" if cedula else ""
@@ -167,7 +167,7 @@ class DistanciaParser(BaseExcelParser):
 
     @classmethod
     def _ensure_categories(
-        cls, categories_map: Dict, modalidad: str,
+        cls, categories_map: dict, modalidad: str,
         cat_prefix: str, cod_prog: str, semestre_romano: str,
         nombre_cat: str, row,
     ):
@@ -201,7 +201,7 @@ class DistanciaParser(BaseExcelParser):
     @classmethod
     def _process_teacher(
         cls, row, shortname: str, cedula: str, nombre_cat: str,
-        users: Dict, enrolments: List, duplicates: List,
+        users: dict, enrolments: list, duplicates: list,
     ):
         email = str(row.get("email_docente", "")).strip().lower()
         nombre_docente = str(row.get("nombre_docente", "")).strip()

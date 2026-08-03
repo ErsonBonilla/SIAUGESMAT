@@ -5,17 +5,18 @@ Verifica el cálculo de métricas agregadas por semestre, el estado del semáfor
 y el resumen de la última ejecución, utilizando la base de datos en memoria.
 """
 
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
 
 from app.db.models import Execution
-from app.services.metrics_service import (
-    get_history_metrics,
-    get_semaphore_status,
-    get_latest_execution_data,
-)
 from app.schemas.analytics import (
     LatestExecution,
+)
+from app.services.metrics_service import (
+    get_history_metrics,
+    get_latest_execution_data,
+    get_semaphore_status,
 )
 
 
@@ -41,8 +42,8 @@ def sample_executions(test_db):
             "total_operations": 320
         },
         errors_count=2,
-        started_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=timezone.utc),
-        completed_at=datetime(2025, 3, 1, 10, 30, 0, tzinfo=timezone.utc),
+        started_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
+        completed_at=datetime(2025, 3, 1, 10, 30, 0, tzinfo=UTC),
         duration_seconds=1800.0,
     )
     exec2 = Execution(
@@ -58,8 +59,8 @@ def sample_executions(test_db):
             "total_operations": 20
         },
         errors_count=0,
-        started_at=datetime(2025, 3, 15, 8, 0, 0, tzinfo=timezone.utc),
-        completed_at=datetime(2025, 3, 15, 8, 5, 0, tzinfo=timezone.utc),
+        started_at=datetime(2025, 3, 15, 8, 0, 0, tzinfo=UTC),
+        completed_at=datetime(2025, 3, 15, 8, 5, 0, tzinfo=UTC),
         duration_seconds=300.0,
     )
     exec3 = Execution(
@@ -75,8 +76,8 @@ def sample_executions(test_db):
             "total_operations": 430
         },
         errors_count=10,
-        started_at=datetime(2024, 9, 1, 10, 0, 0, tzinfo=timezone.utc),
-        completed_at=datetime(2024, 9, 1, 12, 0, 0, tzinfo=timezone.utc),
+        started_at=datetime(2024, 9, 1, 10, 0, 0, tzinfo=UTC),
+        completed_at=datetime(2024, 9, 1, 12, 0, 0, tzinfo=UTC),
         duration_seconds=7200.0,
     )
     exec4 = Execution(
@@ -86,7 +87,7 @@ def sample_executions(test_db):
         status="failed",
         metrics={"users_created": 5},
         errors_count=1,
-        started_at=datetime(2025, 4, 1, 10, 0, 0, tzinfo=timezone.utc),
+        started_at=datetime(2025, 4, 1, 10, 0, 0, tzinfo=UTC),
         duration_seconds=None,
     )
     test_db.add_all([exec1, exec2, exec3, exec4])
@@ -162,8 +163,8 @@ def test_semaphore_yellow(sample_executions):
         status="completed",
         metrics={"courses_created": 100, "users_created": 0, "enrollments": 0, "total_operations": 100},
         errors_count=2,
-        started_at=datetime(2025, 6, 1, 10, 0, 0, tzinfo=timezone.utc),
-        completed_at=datetime(2025, 6, 1, 11, 0, 0, tzinfo=timezone.utc),
+        started_at=datetime(2025, 6, 1, 10, 0, 0, tzinfo=UTC),
+        completed_at=datetime(2025, 6, 1, 11, 0, 0, tzinfo=UTC),
         duration_seconds=3600.0,
     )
     sample_executions.add(exec_yellow)
@@ -188,8 +189,8 @@ def test_semaphore_red(sample_executions):
         status="completed",
         metrics={"total_operations": 100},
         errors_count=6,  # 6%
-        started_at=datetime(2025, 6, 1, 10, 0, 0, tzinfo=timezone.utc),
-        completed_at=datetime(2025, 6, 1, 10, 10, 0, tzinfo=timezone.utc),
+        started_at=datetime(2025, 6, 1, 10, 0, 0, tzinfo=UTC),
+        completed_at=datetime(2025, 6, 1, 10, 10, 0, tzinfo=UTC),
         duration_seconds=600.0,
     )
     sample_executions.add(exec_red)

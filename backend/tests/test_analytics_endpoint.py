@@ -1,7 +1,6 @@
 from unittest.mock import patch
 
-
-from app.schemas.analytics import SemaphoreStatus, LatestExecution
+from app.schemas.analytics import LatestExecution, SemaphoreStatus
 
 
 class TestGetHistory:

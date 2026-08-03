@@ -105,7 +105,7 @@ def test_apartado_maps_to_uraba_prefix():
 
     cats = result["categories"]
     # La categoría raíz es la modalidad (por defecto DISTANCIA)
-    root = [c for c in cats if c["parent"] == 0][0]
+    root = next(c for c in cats if c["parent"] == 0)
     assert root["idnumber"] == "DISTANCIA"
     # URA es hija de DISTANCIA
     ural = [c for c in cats if c["idnumber"] == "URA"]

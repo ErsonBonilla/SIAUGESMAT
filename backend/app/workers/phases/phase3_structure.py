@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from typing import Dict
 
 from celery import chord
 
@@ -29,7 +28,7 @@ from app.workers.utils import _run_async, reset_stuck_items
 logger = logging.getLogger(__name__)
 
 
-def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> Dict[str, int]:
+def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> dict[str, int]:
     if _items_exist_for_execution(db, execution_id, "3"):
         pending = _get_pending_counts(db, execution_id, "3")
         if pending:
@@ -41,7 +40,7 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> D
         logger.info(f"Lock FASE 3 ya tomado para ejecución {execution_id}, otro worker crea los items")
         return {}
 
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
     courses = {c["shortname"]: c for c in ctx_data.get("courses", [])}
     existing_by_sn = {c["shortname"]: c for c in ctx_data.get("existing_courses", [])}
     users_by_username = {u["username"]: u for u in ctx_data.get("users", [])}

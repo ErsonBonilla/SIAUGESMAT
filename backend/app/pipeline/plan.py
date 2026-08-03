@@ -3,7 +3,6 @@
 Convierte el resultado de la comparación en entradas de log listas para
 persistir, sin tocar la base de datos.
 """
-from typing import Dict, List, Optional, Tuple
 
 ALERT_ACTION_BY_REASON = {
     "disappeared_recent": "alert_disappeared_recent",
@@ -12,13 +11,13 @@ ALERT_ACTION_BY_REASON = {
     "orphan_course": "alert_orphan_course",
 }
 
-Entry = Tuple[str, str, Optional[Dict[str, object]]]
+Entry = tuple[str, str, dict[str, object] | None]
 
 
 def plan_log_entries(
-    comparison: Dict,
-    fullname_map: Optional[Dict[str, str]] = None,
-) -> List[Entry]:
+    comparison: dict,
+    fullname_map: dict[str, str] | None = None,
+) -> list[Entry]:
     """Deriva las entradas de log (action, identifier, detail) del plan.
 
     Los logs de comparación se emiten con prefijo ``planned_`` para
@@ -28,7 +27,7 @@ def plan_log_entries(
     Las alertas con motivo desconocido se descartan.
     """
     fullname_lookup = fullname_map or {}
-    entries: List[Entry] = []
+    entries: list[Entry] = []
 
     for entry in comparison.get("logs", []):
         entries.append((

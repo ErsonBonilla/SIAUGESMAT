@@ -5,7 +5,6 @@ persistir en los items (detail) y propagarse al log de auditoría.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 
-
 from app.db.models import OperationItem
 from app.workers.phases.item_task import _log_success
 from app.workers.phases.phase3_structure import _create_phase3_items

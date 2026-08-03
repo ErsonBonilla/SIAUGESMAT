@@ -1,14 +1,13 @@
 """Clasificación de categorías (FASE 2) — transformaciones puras."""
-from typing import Dict, List, Tuple
 
-Category = Dict[str, object]
+Category = dict[str, object]
 
 
 def classify_categories(
-    etl_categories: List[Category],
+    etl_categories: list[Category],
     existing_idnumbers: set,
-    all_categories_map: Dict[str, Category],
-) -> Tuple[List[Category], List[Dict[str, object]]]:
+    all_categories_map: dict[str, Category],
+) -> tuple[list[Category], list[dict[str, object]]]:
     """Separa las categorías ETL en `missing` (a crear) y `relocate`.
 
     Una categoría existente se marca para reubicar cuando su parent actual en
@@ -16,8 +15,8 @@ def classify_categories(
 
     Retorna (missing_categories, categories_to_relocate).
     """
-    missing: List[Category] = []
-    relocate: List[Dict[str, object]] = []
+    missing: list[Category] = []
+    relocate: list[dict[str, object]] = []
 
     id_to_idnumber = {v["id"]: k for k, v in all_categories_map.items()}
 

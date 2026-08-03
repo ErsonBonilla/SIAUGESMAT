@@ -5,15 +5,15 @@ Se verifica la correcta construcción de parámetros, el manejo de respuestas
 exitosas, errores y reintentos, utilizando un cliente HTTP simulado.
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+import pytest
 from tenacity import RetryError
 
+from app.services.moodle_adapter import MoodleAdapter
 from app.services.moodle_errors import MoodleAPIError
 from app.services.moodle_operations import MoodleService
-from app.services.moodle_adapter import MoodleAdapter
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ async def test_request_moodle_error(moodle_service):
         await service._request("core_course_get_courses", {})
     # La excepción original está en exc_info.value.__cause__
     assert isinstance(exc_info.value.__cause__, MoodleAPIError)
-    
+
 # ---------------------------------------------------------------------------
 # Reintentos ante error HTTP
 # ---------------------------------------------------------------------------
@@ -306,9 +306,9 @@ async def test_enrol_users(moodle_service):
                 json=lambda: [{"username": "teacher1", "id": 10}],
                 raise_for_status=lambda: None,
             )
-        elif wsfunction == "enrol_manual_enrol_users":
+        if wsfunction == "enrol_manual_enrol_users":
             return MagicMock(json=lambda: None, raise_for_status=lambda: None)
-        return MagicMock(json=lambda: {}, raise_for_status=lambda: None)
+        return MagicMock(json=dict, raise_for_status=lambda: None)
 
     service._client.get.side_effect = mock_get
 

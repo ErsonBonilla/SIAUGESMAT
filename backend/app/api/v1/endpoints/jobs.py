@@ -4,15 +4,15 @@ Endpoints de gestión de ejecuciones (jobs) del proceso ETL.
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
+from app.celery_app import celery_app
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
-from app.celery_app import celery_app
 from app.repositories.execution_repo import (
     atomic_mark_queued,
     cancel_execution,
@@ -89,7 +89,7 @@ async def start_process(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No se pudo encolar la tarea de procesamiento.",
-        )
+        ) from None
 
     # Atomic: check status + update + save task_id en un solo UPDATE
     ALLOWED = ("pending", "failed", "queued", "review_required", "paused")
@@ -189,7 +189,6 @@ async def delete_execution_endpoint(
     )
     delete_execution(db, execution_id)
     logger.info(f"Ejecución {execution_id} eliminada por {current_user.username}")
-    return None
 
 
 @router.post(
@@ -234,7 +233,7 @@ async def confirm_mass_delete(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="No se pudo encolar la tarea de procesamiento.",
-        )
+        ) from None
 
     # 3. Actualizar DB en un solo commit atómico
     if execution.phase_checkpoint is None:
@@ -245,7 +244,7 @@ async def confirm_mass_delete(
     execution.current_phase = "Eliminación masiva confirmada"
     execution.progress_pct = 30
     execution.celery_task_id = job.id
-    execution.started_at = datetime.now(timezone.utc)
+    execution.started_at = datetime.now(UTC)
     db.commit()
 
     logger.info(
