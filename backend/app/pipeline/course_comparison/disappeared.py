@@ -8,7 +8,7 @@ from app.pipeline.course_comparison.utils import (
     get_course_age_seconds,
     is_course_hidden,
 )
-from app.services.parsers.patterns import parse_shortname
+from app.pipeline.shortnames import parse_shortname
 
 
 def find_disappeared_courses(

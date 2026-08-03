@@ -8,7 +8,7 @@ import unicodedata
 from typing import Dict, List, Tuple
 
 from app.pipeline.course_index import build_base_key
-from app.services.parsers.patterns import parse_shortname
+from app.pipeline.shortnames import parse_shortname
 
 User = Dict[str, object]
 Event = Tuple[str, str, Dict[str, object]]

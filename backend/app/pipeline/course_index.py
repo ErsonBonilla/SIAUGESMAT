@@ -5,7 +5,7 @@ Sin I/O: operan solo sobre dicts recibidos por parámetro.
 """
 from typing import Dict, List, Tuple
 
-from app.services.parsers.patterns import parse_shortname
+from app.pipeline.shortnames import parse_shortname
 
 
 def build_base_key(parsed: Dict) -> Tuple[str, ...]:

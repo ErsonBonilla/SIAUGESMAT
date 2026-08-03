@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple
 
 from app.pipeline.course_comparison.utils import build_base_key
-from app.services.parsers.patterns import parse_shortname
+from app.pipeline.shortnames import parse_shortname
 
 
 def build_shortname_index(courses: List[Dict]) -> Dict[str, Dict]:

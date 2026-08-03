@@ -1,31 +1,12 @@
-import re
-from typing import Dict, Optional
+"""Shim de compatibilidad: re-exporta el parsing de shortnames desde el núcleo puro.
 
-SIAUGESMAT_PATTERN = re.compile(
-    r"^[A-Z]{3}_\d{4}_(?:\d+_s[IVXLCDM]+|s[IVXLCDM]+_\d+)_G-[^_]+(?:_[^_]+)?$",
-    re.IGNORECASE,
+La implementación vive en app.pipeline.shortnames. Este módulo se mantiene
+como puente para workers, tests y servicios existentes.
+"""
+from app.pipeline.shortnames import (
+    SIAUGESMAT_PATTERN,
+    SHORTNAME_PATTERN,
+    parse_shortname,
 )
 
-SHORTNAME_PATTERN = re.compile(
-    r"^(?P<cat_prefix>[A-Z]+)_(?P<cod_prog>\d{4})_"
-    r"(?:"
-    r"(?P<cod_curso_old>\d+)_s(?P<semestre_old>[IVXLCDM]+)|"
-    r"s(?P<semestre_new>[IVXLCDM]+)_(?P<cod_curso_new>\d+)"
-    r")_"
-    r"G-(?P<grupo>[^_]+)(?:_(?P<suffix>[^_]+))?$",
-    re.IGNORECASE,
-)
-
-
-def parse_shortname(shortname: str) -> Optional[Dict[str, str]]:
-    m = SHORTNAME_PATTERN.match(shortname)
-    if not m:
-        return None
-    return {
-        "cat_prefix": m.group("cat_prefix"),
-        "cod_prog": m.group("cod_prog"),
-        "semestre": m.group("semestre_new") or m.group("semestre_old") or "",
-        "cod_curso": m.group("cod_curso_new") or m.group("cod_curso_old") or "",
-        "grupo": m.group("grupo"),
-        "suffix": m.group("suffix"),
-    }
+__all__ = ["SIAUGESMAT_PATTERN", "SHORTNAME_PATTERN", "parse_shortname"]

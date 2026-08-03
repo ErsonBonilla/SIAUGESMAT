@@ -25,7 +25,7 @@ from app.pipeline.course_comparison.utils import (
     get_suffix,
     is_course_hidden,
 )
-from app.services.parsers.patterns import SIAUGESMAT_PATTERN, parse_shortname
+from app.pipeline.shortnames import SIAUGESMAT_PATTERN, parse_shortname
 
 logger = logging.getLogger(__name__)
 
