@@ -4,6 +4,7 @@ import { Bars3Icon, XMarkIcon } from "../utils/icons.tsx";
 export default function MobileMenuButton() {
   return (
     <button
+      type="button"
       class="bg-transparent border-none text-inherit cursor-pointer p-2 -ml-2 flex items-center"
       onClick={() => (mobileOpenSignal.value = !mobileOpenSignal.value)}
       aria-label={mobileOpenSignal.value ? "Cerrar menú" : "Abrir menú"}

@@ -27,7 +27,19 @@
   },
   "compilerOptions": {
     "jsx": "react-jsx",
-    "jsxImportSource": "preact"
+    "jsxImportSource": "preact",
+    "lib": [
+      "deno.window",
+      "deno.ns",
+      "dom",
+      "dom.iterable",
+      "dom.asynciterable"
+    ]
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-window"]
+    }
   },
   "nodeModulesDir": "auto"
 }

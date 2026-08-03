@@ -13,6 +13,7 @@ export default function UsuariosConsultas() {
     <div class="max-w-6xl mx-auto">
       <div class="flex gap-1 mb-6 bg-[var(--bg-tertiary)] rounded-lg p-1 w-fit">
         <button
+          type="button"
           onClick={() => mode.value = "normal"}
           class={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
             mode.value === "normal"
@@ -23,6 +24,7 @@ export default function UsuariosConsultas() {
           Consulta normal
         </button>
         <button
+          type="button"
           onClick={() => mode.value = "inactive"}
           class={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
             mode.value === "inactive"

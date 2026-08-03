@@ -1,7 +1,14 @@
-import { useSignal, useComputed } from "@preact/signals";
+import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { getQueryExportUrl, getQueryTaskStatus, queryEntities, downloadReport, type InactiveTeacherRow, type QueryTaskStatus } from "../services/api.ts";
-import { SpinnerIcon, DownloadIcon } from "../utils/icons.tsx";
+import {
+  downloadReport,
+  getQueryExportUrl,
+  getQueryTaskStatus,
+  type InactiveTeacherRow,
+  queryEntities,
+  type QueryTaskStatus,
+} from "../services/api.ts";
+import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
 import SemesterPicker from "../components/SemesterPicker.tsx";
@@ -75,7 +82,7 @@ export default function InactiveTeachersQuery() {
         if (status.status === "running") {
           started.value = true;
         } else if (status.status === "completed") {
-          data.value = (status.result || []) as InactiveTeacherRow[];
+          data.value = (status.result || []) as unknown as InactiveTeacherRow[];
           totalItems.value = data.value.length;
           pageOffset.value = 0;
           loading.value = false;
@@ -119,6 +126,7 @@ export default function InactiveTeachersQuery() {
         </div>
 
         <button
+          type="button"
           onClick={startQuery}
           disabled={loading.value || !semester.value}
           class="px-3 py-1.5 bg-[var(--brand-green)] text-white rounded text-sm hover:brightness-90 disabled:opacity-60 self-start mt-6"
@@ -138,8 +146,9 @@ export default function InactiveTeachersQuery() {
         <div class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <SpinnerIcon class="animate-spin h-4 w-4" />
           <span>
-            Consultando Moodle (procesando {taskStatus.value?.total_count || 0} cursos)...
-            puede tardar varios minutos.
+            Consultando Moodle (procesando {taskStatus.value?.total_count || 0}
+            {" "}
+            cursos)... puede tardar varios minutos.
           </span>
         </div>
       )}
@@ -149,11 +158,19 @@ export default function InactiveTeachersQuery() {
       {!loading.value && !error.value && data.value.length > 0 && (
         <div class="flex items-center justify-between">
           <span class="text-xs text-[var(--text-secondary)]">
-            {pageOffset.value + 1}–{Math.min(pageOffset.value + PAGE_SIZE, totalItems.value)} de {totalItems.value} resultado{totalItems.value !== 1 ? "s" : ""}
+            {pageOffset.value + 1}–{Math.min(
+              pageOffset.value + PAGE_SIZE,
+              totalItems.value,
+            )} de {totalItems.value}{" "}
+            resultado{totalItems.value !== 1 ? "s" : ""}
           </span>
           {exportUrl && (
             <button
-              onClick={() => downloadReport(exportUrl, "docentes_inactivos.csv").catch(() => {})}
+              type="button"
+              onClick={() =>
+                downloadReport(exportUrl, "docentes_inactivos.csv").catch(
+                  () => {},
+                )}
               class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded text-sm font-medium no-underline hover:bg-[var(--border-secondary)] transition cursor-pointer"
             >
               <DownloadIcon class="w-4 h-4" />
@@ -198,13 +215,24 @@ export default function InactiveTeachersQuery() {
                     <td class="py-2 px-3 text-[var(--text-primary)] font-medium">
                       {row.teacher_name || "—"}
                     </td>
-                    <td class="py-2 px-3 text-[var(--text-primary)]">{row.username}</td>
-                    <td class="py-2 px-3 text-[var(--text-primary)]">{row.email}</td>
-                    <td class="py-2 px-3 text-[var(--text-primary)] max-w-xs truncate" title={row.course_name}>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">
+                      {row.username}
+                    </td>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">
+                      {row.email}
+                    </td>
+                    <td
+                      class="py-2 px-3 text-[var(--text-primary)] max-w-xs truncate"
+                      title={row.course_name}
+                    >
                       {row.course_name}
                     </td>
-                    <td class="py-2 px-3 text-[var(--text-primary)]">{row.program || "—"}</td>
-                    <td class="py-2 px-3 text-[var(--text-primary)]">{row.cat || "—"}</td>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">
+                      {row.program || "—"}
+                    </td>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">
+                      {row.cat || "—"}
+                    </td>
                     <td class="py-2 px-3 text-[var(--text-primary)]">
                       {formatLastAccess(row.last_access)}
                     </td>
@@ -221,7 +249,9 @@ export default function InactiveTeachersQuery() {
           pageSize={PAGE_SIZE}
           total={totalItems.value}
           label="resultados"
-          onPageChange={(o) => { pageOffset.value = o; }}
+          onPageChange={(o) => {
+            pageOffset.value = o;
+          }}
         />
       )}
     </div>

@@ -11,10 +11,7 @@ import {
   resumeBatch,
 } from "../services/api.ts";
 import { STATUS_COLORS, STATUS_LABELS } from "../utils/constants.ts";
-import {
-  batchActionLabel,
-  batchEntityLabel,
-} from "../utils/batch-labels.ts";
+import { batchActionLabel, batchEntityLabel } from "../utils/batch-labels.ts";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
@@ -122,11 +119,6 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
     }
   }
 
-  const totalPages = useComputed(() => Math.ceil(total.value / PAGE_SIZE));
-  const currentPage = useComputed(() =>
-    Math.floor(offset.value / PAGE_SIZE) + 1
-  );
-
   function applyFilters() {
     offset.value = 0;
     load();
@@ -189,6 +181,7 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
           </select>
         </div>
         <button
+          type="button"
           onClick={applyFilters}
           class="px-4 py-1.5 bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white rounded text-sm hover:brightness-110"
         >
@@ -196,6 +189,7 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
         </button>
         {hasFilters.value && (
           <button
+            type="button"
             onClick={() => {
               if (!isLocked) {
                 filterEntity.value = "";
@@ -297,6 +291,7 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                           {statusFromBatch(b) !== "completed" &&
                             (b.paused || 0) === 0 && (
                             <button
+                              type="button"
                               onClick={() => handlePause(b.batch_id)}
                               disabled={actionLoading.value === b.batch_id}
                               class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:brightness-90 disabled:opacity-40"
@@ -308,6 +303,7 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                           )}
                           {(b.paused || 0) > 0 && (
                             <button
+                              type="button"
                               onClick={() => handleResume(b.batch_id)}
                               disabled={actionLoading.value === b.batch_id}
                               class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:brightness-90 disabled:opacity-40"
@@ -318,6 +314,7 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                             </button>
                           )}
                           <button
+                            type="button"
                             onClick={() => handleDelete(b.batch_id)}
                             disabled={actionLoading.value === b.batch_id}
                             class="px-2 py-1 text-xs rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:brightness-90 disabled:opacity-40"
@@ -328,6 +325,7 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                           </button>
                           {statusFromBatch(b) === "completed" && (
                             <button
+                              type="button"
                               onClick={() =>
                                 downloadReport(
                                   getBatchReportUrl(b.batch_id),

@@ -6,7 +6,7 @@ export const profileSignal = signal<UserProfile | null>(null);
 
 let fetchPromise: Promise<void> | null = null;
 
-export async function ensureProfile(fetcher: () => Promise<UserProfile>) {
+export function ensureProfile(fetcher: () => Promise<UserProfile>) {
   if (profileSignal.value) return;
   if (fetchPromise) return fetchPromise;
   fetchPromise = fetcher().then((p) => {

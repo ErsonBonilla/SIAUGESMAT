@@ -18,10 +18,7 @@ import {
 } from "../services/api.ts";
 import { formatDateTime, formatDuration } from "../utils/date.ts";
 import { toast } from "../utils/toast.ts";
-import {
-  MODE_LABELS,
-  STATUS_LABELS,
-} from "../utils/constants.ts";
+import { MODE_LABELS, STATUS_LABELS } from "../utils/constants.ts";
 
 const ERROR_TYPE_LABELS: Record<string, string> = {
   "1": "FASE 1 — Consulta",
@@ -103,7 +100,9 @@ export default function JobDetailIsland({ executionId }: Props) {
         const exec = await getExecution(executionId);
         execution.value = exec;
         if (!runningStatuses.includes(exec.status)) clearInterval(interval);
-        if (exec.errors_count > errors.value.length && errorOffset.value === 0) {
+        if (
+          exec.errors_count > errors.value.length && errorOffset.value === 0
+        ) {
           const fresh = await getExecutionErrors(
             executionId,
             ERRORS_PAGE_SIZE,
@@ -120,7 +119,11 @@ export default function JobDetailIsland({ executionId }: Props) {
 
   const fetchErrorsPage = async (offset: number) => {
     try {
-      const page = await getExecutionErrors(executionId, ERRORS_PAGE_SIZE, offset);
+      const page = await getExecutionErrors(
+        executionId,
+        ERRORS_PAGE_SIZE,
+        offset,
+      );
       if (page.length > 0) {
         errors.value = page;
         errorOffset.value = offset;
@@ -236,6 +239,7 @@ export default function JobDetailIsland({ executionId }: Props) {
             </div>
           </div>
           <button
+            type="button"
             onClick={async () => {
               if (
                 !window.confirm(
@@ -276,6 +280,7 @@ export default function JobDetailIsland({ executionId }: Props) {
           {exec.status === "running" && (
             <div class="flex justify-end mt-3">
               <button
+                type="button"
                 onClick={async () => {
                   pausing.value = true;
                   try {
@@ -301,6 +306,7 @@ export default function JobDetailIsland({ executionId }: Props) {
           {exec.status === "paused" && (
             <div class="flex justify-end mt-3">
               <button
+                type="button"
                 onClick={async () => {
                   resuming.value = true;
                   try {
@@ -326,6 +332,7 @@ export default function JobDetailIsland({ executionId }: Props) {
           {["running", "paused", "queued"].includes(exec.status) && (
             <div class="flex justify-end mt-3">
               <button
+                type="button"
                 onClick={async () => {
                   if (
                     !window.confirm(
@@ -415,28 +422,43 @@ export default function JobDetailIsland({ executionId }: Props) {
       {errors.value.length > 0 && (
         <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 mb-6">
           <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-4">
-            Errores registrados ({errorOffset.value + 1}–{errorOffset.value + errors.value.length} de {exec.errors_count ?? 0})
+            Errores registrados ({errorOffset.value + 1}–{errorOffset.value +
+              errors.value.length} de {exec.errors_count ?? 0})
           </h3>
           <div class="overflow-x-auto">
             <table class="w-full text-sm">
               <thead>
                 <tr class="border-b border-[var(--border-primary)]">
-                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">Fase</th>
-                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">Identificador</th>
-                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">Mensaje</th>
-                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">Fecha</th>
+                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">
+                    Fase
+                  </th>
+                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">
+                    Identificador
+                  </th>
+                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">
+                    Mensaje
+                  </th>
+                  <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">
+                    Fecha
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {errors.value.map((err) => (
-                  <tr key={err.id} class="border-b border-[var(--border-primary)]">
+                  <tr
+                    key={err.id}
+                    class="border-b border-[var(--border-primary)]"
+                  >
                     <td class="py-2 px-2 text-xs font-medium text-[var(--brand-red)] whitespace-nowrap">
                       {ERROR_TYPE_LABELS[err.type] || err.type}
                     </td>
                     <td class="py-2 px-2 text-xs text-[var(--text-secondary)] font-mono">
                       {err.identifier || "—"}
                     </td>
-                    <td class="py-2 px-2 text-sm text-[var(--text-secondary)] max-w-xs truncate" title={err.message ?? ""}>
+                    <td
+                      class="py-2 px-2 text-sm text-[var(--text-secondary)] max-w-xs truncate"
+                      title={err.message ?? ""}
+                    >
                       {err.message || "—"}
                     </td>
                     <td class="py-2 px-2 text-xs text-[var(--text-muted)] whitespace-nowrap">

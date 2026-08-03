@@ -55,7 +55,7 @@ export default function MetricsChart(
   { data, metrics, selectedSemesters }: MetricsChartProps,
 ) {
   const dark = useComputed(() => darkSignal.value);
-  const { canvasRef, createChart } = useChart(dark.value);
+  const { canvasRef, createChart } = useChart();
 
   useEffect(() => {
     if (!data || data.length === 0) return;

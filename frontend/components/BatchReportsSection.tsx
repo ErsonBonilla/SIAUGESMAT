@@ -1,4 +1,8 @@
-import { downloadReport, getBatchReportFileUrl, getBatchReportUrl } from "../services/api.ts";
+import {
+  downloadReport,
+  getBatchReportFileUrl,
+  getBatchReportUrl,
+} from "../services/api.ts";
 
 const BATCH_REPORT_LABELS: Record<string, string> = {
   resultados: "Resultados",

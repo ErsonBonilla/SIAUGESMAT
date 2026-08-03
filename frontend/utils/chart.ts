@@ -51,7 +51,7 @@ export function createGradient(
   return gradient;
 }
 
-export function useChart(dark = false) {
+export function useChart() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
 
@@ -64,114 +64,6 @@ export function useChart(dark = false) {
     if (!canvasRef.current) return;
     const ctx = canvasRef.current.getContext("2d");
     if (!ctx) return;
-
-    const gridColor = dark
-      ? "rgba(255, 255, 255, 0.08)"
-      : "rgba(0, 0, 0, 0.07)";
-    const tickColor = dark ? "rgba(255, 255, 255, 0.6)" : "rgba(0, 0, 0, 0.5)";
-    const titleColor = dark ? "rgba(255, 255, 255, 0.8)" : "rgba(0, 0, 0, 0.7)";
-
-    const defaults = {
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: {
-          duration: 800,
-          easing: "easeOutQuart" as const,
-        },
-        plugins: {
-          legend: {
-            position: "bottom" as const,
-            labels: {
-              usePointStyle: true,
-              pointStyle: "circle",
-              padding: 16,
-              font: { size: 12, weight: "500" as const },
-              color: tickColor,
-            },
-          },
-          tooltip: {
-            cornerRadius: 8,
-            padding: 12,
-            titleFont: { weight: "600" as const, size: 13 },
-            bodyFont: { size: 12 },
-            backgroundColor: dark
-              ? "rgba(30, 30, 30, 0.95)"
-              : "rgba(255, 255, 255, 0.95)",
-            titleColor: dark ? "#fff" : "#111",
-            bodyColor: dark ? "#ccc" : "#333",
-            borderColor: dark
-              ? "rgba(255, 255, 255, 0.1)"
-              : "rgba(0, 0, 0, 0.1)",
-            borderWidth: 1,
-            boxPadding: 4,
-            callbacks: {
-              label: (context: {
-                dataset: { label?: string };
-                parsed: { y: number };
-                dataIndex: number;
-                chart: { data: { datasets: { data: number[] }[] } };
-              }) => {
-                const label = context.dataset.label || "";
-                const value = context.parsed.y;
-                let total = 0;
-                for (const ds of context.chart.data.datasets) {
-                  total += ds.data[context.dataIndex] as number;
-                }
-                return `${label}: ${value}`;
-              },
-              afterBody: (
-                contexts: {
-                  chart: { data: { datasets: { data: number[] }[] } };
-                  dataIndex: number;
-                }[],
-              ) => {
-                if (!contexts.length) return;
-                const idx = contexts[0].dataIndex;
-                let total = 0;
-                for (const ds of contexts[0].chart.data.datasets) {
-                  total += ds.data[idx] as number;
-                }
-                return `Total: ${total}`;
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            stacked: true,
-            grid: { display: false },
-            ticks: { color: tickColor, font: { size: 11 } },
-            title: {
-              display: true,
-              text: "Semestre",
-              color: titleColor,
-              font: { size: 12, weight: "500" as const },
-            },
-          },
-          y: {
-            stacked: true,
-            beginAtZero: true,
-            ticks: {
-              stepSize: 1,
-              color: tickColor,
-              font: { size: 11 },
-            },
-            title: {
-              display: true,
-              text: "Cantidad",
-              color: titleColor,
-              font: { size: 12, weight: "500" as const },
-            },
-            grid: {
-              color: gridColor,
-              drawBorder: false,
-              borderDash: [3, 3] as [number, number],
-            },
-          },
-        },
-      },
-    };
 
     chartRef.current?.destroy();
     chartRef.current = new Chart(ctx, config) as Chart;

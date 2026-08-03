@@ -1,4 +1,4 @@
-import { useSignal, useComputed } from "@preact/signals";
+import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import {
   downloadReport,
@@ -7,10 +7,7 @@ import {
   queryEntities,
   type QueryTaskStatus,
 } from "../services/api.ts";
-import {
-  DownloadIcon,
-  SpinnerIcon,
-} from "../utils/icons.tsx";
+import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
 
@@ -28,7 +25,9 @@ const RENDERERS: Record<
 > = {
   yesNo: (v) => v == 1 ? "Sí" : "No",
   lastlogin: (v) =>
-    typeof v === "number" && v > 0 ? new Date(v * 1000).toLocaleString() : "Nunca",
+    typeof v === "number" && v > 0
+      ? new Date(v * 1000).toLocaleString()
+      : "Nunca",
 };
 
 export interface Filter {
@@ -40,7 +39,6 @@ export interface Filter {
 
 interface QueryTableProps {
   entity: string;
-  title: string;
   columns: Column[];
   filters?: Filter[];
   searchPlaceholder?: string;
@@ -48,7 +46,7 @@ interface QueryTableProps {
 }
 
 export default function QueryTable(
-  { entity, title, columns, filters, searchPlaceholder, searchKey = "search" }:
+  { entity, columns, filters, searchPlaceholder, searchKey = "search" }:
     QueryTableProps,
 ) {
   const data = useSignal<Record<string, unknown>[]>([]);
@@ -191,6 +189,7 @@ export default function QueryTable(
 
         {exportUrl && data.value.length > 0 && (
           <button
+            type="button"
             onClick={() => {
               downloadReport(exportUrl, "consulta.csv").catch(() => {});
             }}
@@ -225,7 +224,10 @@ export default function QueryTable(
 
       {!loading.value && !error.value && data.value.length > 0 && (
         <div class="text-xs text-[var(--text-secondary)] mb-2">
-          {pageOffset.value + 1}–{Math.min(pageOffset.value + PAGE_SIZE, totalItems.value)} de {totalItems.value} resultado{totalItems.value !== 1 ? "s" : ""}
+          {pageOffset.value + 1}–{Math.min(
+            pageOffset.value + PAGE_SIZE,
+            totalItems.value,
+          )} de {totalItems.value} resultado{totalItems.value !== 1 ? "s" : ""}
         </div>
       )}
 

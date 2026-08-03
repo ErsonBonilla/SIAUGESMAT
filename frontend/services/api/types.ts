@@ -208,5 +208,3 @@ export interface NovedadesResponse {
   total_compared: number;
   novedades: NovedadItem[];
 }
-
-

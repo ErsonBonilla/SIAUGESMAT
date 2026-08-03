@@ -59,7 +59,8 @@ export const ENTITY_CONSULT_CONFIGS: Record<string, EntityConfig> = {
   },
   users: {
     title: "Usuarios",
-    searchPlaceholder: "Buscar por username, email o nombre (coincidencia exacta)...",
+    searchPlaceholder:
+      "Buscar por username, email o nombre (coincidencia exacta)...",
     filters: [
       {
         key: "status",

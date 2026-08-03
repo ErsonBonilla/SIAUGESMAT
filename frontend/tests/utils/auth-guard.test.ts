@@ -6,8 +6,8 @@ function makeCtx(cookie?: string) {
   if (cookie) headers.set("cookie", cookie);
   const ctx = {
     req: { headers },
-    next: async () => undefined,
-  } as any;
+    next: () => undefined,
+  } as unknown as Parameters<ReturnType<typeof requireAuth>["GET"]>[0];
   ctx.redirect = (path: string, status = 302) =>
     new Response("", { status, headers: { Location: path } });
   return ctx;
