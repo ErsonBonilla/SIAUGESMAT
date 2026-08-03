@@ -1,6 +1,9 @@
 import logging
-from typing import Dict, List
+from typing import Dict
 
+from app.pipeline.categories import classify_categories
+from app.pipeline.enrolments import resolve_enrolments, users_to_create
+from app.pipeline.plan import plan_log_entries
 from app.repositories import log_repo
 from app.repositories.execution_repo import is_reupload, update_progress
 from app.services.course_comparison import CourseComparisonService
@@ -8,13 +11,6 @@ from app.services.error_messages import translate_error
 from app.workers.phases.base import BasePhase, PhaseContext
 
 logger = logging.getLogger(__name__)
-
-ALERT_ACTION_BY_REASON = {
-    "disappeared_recent": "alert_disappeared_recent",
-    "teacher_change_recent": "alert_teacher_change_recent",
-    "disappeared": "alert_disappeared",
-    "orphan_course": "alert_orphan_course",
-}
 
 
 def persist_plan_logs(db, execution_id: int, comparison: Dict, fullname_map: Dict = None) -> int:
@@ -29,30 +25,8 @@ def persist_plan_logs(db, execution_id: int, comparison: Dict, fullname_map: Dic
         Número de registros persistidos.
     """
     count = 0
-    for entry in comparison.get("logs", []):
-        log_repo.save_log(
-            db,
-            execution_id,
-            "2",
-            f"planned_{entry.get('action', 'unknown')}",
-            entry.get("identifier", ""),
-            entry.get("detail"),
-        )
-        count += 1
-    fullname_lookup = fullname_map or {}
-    for alert in comparison.get("alerts", []):
-        action = ALERT_ACTION_BY_REASON.get(alert.get("reason"))
-        if not action:
-            continue
-        detail = {
-            key: alert[key]
-            for key in ("reason", "age_seconds", "old_professor", "new_professor")
-            if alert.get(key) is not None
-        }
-        sn = alert.get("shortname", "")
-        detail["fullname"] = fullname_lookup.get(sn, "")
-        detail.setdefault("professor", alert.get("new_professor") or alert.get("old_professor") or "")
-        log_repo.save_log(db, execution_id, "2", action, sn, detail)
+    for action, identifier, detail in plan_log_entries(comparison, fullname_map):
+        log_repo.save_log(db, execution_id, "2", action, identifier, detail)
         count += 1
     db.commit()
     return count
@@ -70,39 +44,16 @@ class AnalyzePhase(BasePhase):
         update_progress(db, eid, 16, "Analizando datos…", step=2)
 
         try:
-            resolved_enrolments: List[Dict] = []
-            for enr in etl_data["enrolments"]:
-                resolved_username = ctx.username_map.get(enr["username"], enr["username"])
-                resolved_enrolments.append({
-                    **enr,
-                    "username": resolved_username,
-                })
+            resolved_enrolments = resolve_enrolments(
+                etl_data["enrolments"], ctx.username_map,
+            )
             ctx.resolved_enrolments = resolved_enrolments
 
-            ctx.missing_categories = []
-            ctx.categories_to_relocate = []
-
-            # Construir mapa idnumber → id numérico para resolver parents
-            id_to_idnumber = {v["id"]: k for k, v in ctx.all_categories_map.items()}
-
-            for cat in etl_data["categories"]:
-                idn = cat.get("idnumber", "")
-                if idn not in ctx.existing_cat_idnumbers:
-                    ctx.missing_categories.append(cat)
-                else:
-                    existing = ctx.all_categories_map.get(idn, {})
-                    actual_parent_id = existing.get("parent", 0)
-                    expected_parent_idn = cat.get("parent", "")
-                    actual_parent_idn = id_to_idnumber.get(actual_parent_id, "")
-
-                    if expected_parent_idn and str(expected_parent_idn) != "0" and actual_parent_idn != expected_parent_idn:
-                        ctx.categories_to_relocate.append({
-                            "idnumber": idn,
-                            "moodle_id": existing.get("id"),
-                            "expected_parent_idn": expected_parent_idn,
-                            "actual_parent_idn": actual_parent_idn or "root",
-                            "cat_data": cat,
-                        })
+            ctx.missing_categories, ctx.categories_to_relocate = classify_categories(
+                etl_data["categories"],
+                ctx.existing_cat_idnumbers,
+                ctx.all_categories_map,
+            )
 
             if ctx.missing_categories:
                 log_repo.save_log(db, eid, "2", "categories_missing", detail={
@@ -133,11 +84,7 @@ class AnalyzePhase(BasePhase):
             })
 
             if mode in ("users", "both"):
-                ctx.users_to_create = [
-                    u for u in etl_data["users"]
-                    if u["username"] not in ctx.username_map
-                    and u.get("email", "").endswith("@ut.edu.co")
-                ]
+                ctx.users_to_create = users_to_create(etl_data["users"], ctx.username_map)
 
             ctx.metrics["alerts"] = len(ctx.comparison.get("alerts", []))
 

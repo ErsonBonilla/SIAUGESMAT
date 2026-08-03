@@ -11,22 +11,15 @@ import {
   resumeBatch,
 } from "../services/api.ts";
 import { STATUS_COLORS, STATUS_LABELS } from "../utils/constants.ts";
+import {
+  batchActionLabel,
+  batchEntityLabel,
+} from "../utils/batch-labels.ts";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
 
 const PAGE_SIZE = 20;
-
-const ENTITY_LABELS: Record<string, string> = {
-  courses: "Cursos",
-  categories: "Categorías",
-  users: "Usuarios",
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  create: "Creación",
-  delete: "Eliminación",
-};
 
 function statusFromBatch(b: OperationBatchOut): string {
   if (b.completed_at) return "completed";
@@ -273,10 +266,10 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                         {b.batch_id.slice(0, 12)}
                       </td>
                       <td class="py-3 px-2">
-                        {ENTITY_LABELS[b.entity_type] || b.entity_type}
+                        {batchEntityLabel(b.entity_type)}
                       </td>
                       <td class="py-3 px-2">
-                        {ACTION_LABELS[b.action] || b.action}
+                        {batchActionLabel(b.action)}
                       </td>
                       <td class="py-3 px-2 text-center">{b.total}</td>
                       <td class="py-3 px-2 text-center text-[var(--brand-green)]">
@@ -333,16 +326,24 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                               ? "..."
                               : "Eliminar"}
                           </button>
-                          <button
-                            onClick={() =>
-                              downloadReport(
-                                getBatchReportUrl(b.batch_id),
-                                `reportes_${b.batch_id.slice(0, 8)}.zip`,
-                              )}
-                            class="gradient-text hover:brightness-110 text-sm font-medium ml-1 cursor-pointer bg-transparent border-none p-0 font-inherit"
+                          {statusFromBatch(b) === "completed" && (
+                            <button
+                              onClick={() =>
+                                downloadReport(
+                                  getBatchReportUrl(b.batch_id),
+                                  `reportes_${b.batch_id.slice(0, 8)}.zip`,
+                                )}
+                              class="gradient-text hover:brightness-110 text-sm font-medium ml-1 cursor-pointer bg-transparent border-none p-0 font-inherit"
+                            >
+                              Reportes
+                            </button>
+                          )}
+                          <a
+                            href={`/operaciones/lotes/${b.batch_id}`}
+                            class="gradient-text hover:brightness-110 text-sm font-medium ml-1"
                           >
-                            CSV
-                          </button>
+                            Detalle
+                          </a>
                         </div>
                       </td>
                     </tr>

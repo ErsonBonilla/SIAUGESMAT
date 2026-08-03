@@ -1,40 +1,24 @@
 import logging
-import unicodedata
-from typing import Dict, List
+from typing import Dict
 
+from app.pipeline.users import (
+    index_teachers,
+    lookup_teacher_candidates,
+    names_differ,
+    normalize_name,
+    resolve_users,
+)
 from app.repositories import log_repo
 from app.repositories.execution_repo import touch_heartbeat, update_progress
 from app.services.course_comparison import SIAUGESMAT_PATTERN
-from app.services.parsers.patterns import parse_shortname
 from app.services.error_messages import translate_error
 from app.workers.phases.base import BasePhase, PhaseContext
 
 logger = logging.getLogger(__name__)
 
-
-def _normalize_name(name: str) -> str:
-    """Normaliza un nombre para comparación: minúsculas y sin tildes."""
-    text = "".join(
-        c for c in unicodedata.normalize("NFD", name)
-        if unicodedata.category(c) != "Mn"
-    ).lower()
-    return " ".join(text.split())
-
-
-def _names_differ(etl_name: str, moodle_name: str) -> bool:
-    """Detecta si dos nombres de persona difieren significativamente."""
-    a = _normalize_name(etl_name)
-    b = _normalize_name(moodle_name)
-    if not a or not b:
-        return False
-    if a == b:
-        return False
-    tokens_a = set(a.split())
-    tokens_b = set(b.split())
-    if not tokens_a or not tokens_b:
-        return True
-    overlap = len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
-    return overlap < 0.5
+# Re-export público del núcleo puro (los tests importan estos helpers aquí).
+_normalize_name = normalize_name
+_names_differ = names_differ
 
 
 class ConsultPhase(BasePhase):
@@ -72,7 +56,6 @@ class ConsultPhase(BasePhase):
 
             update_progress(db, eid, 10, "Consultando usuarios…")
 
-            username_map: Dict[str, str] = {}
             etl_users = etl_data["users"]
 
             all_institutional = {u["email"] for u in etl_users if u.get("email")}
@@ -93,51 +76,22 @@ class ConsultPhase(BasePhase):
                 [u.get("cedula", "") for u in etl_users if u.get("cedula")]
             )
 
-            for user in etl_users:
-                email_lookup = user.get("email", "").strip().lower()
-                personal_lookup = (user.get("email_personal") or "").strip().lower()
-                uname = user.get("username", "")
-                cedula = user.get("cedula", "")
-
-                moodle_user = institutional_map.get(email_lookup)
-                matched_by = "email"
-                if not moodle_user:
-                    moodle_user = personal_map.get(personal_lookup)
-                    matched_by = "email_personal"
-                if not moodle_user:
-                    moodle_user = username_index.get(uname)
-                    matched_by = "username"
-                if not moodle_user:
-                    moodle_user = idnumber_index.get(str(cedula))
-                    matched_by = "cedula"
-                if not moodle_user:
+            username_map, user_events = resolve_users(
+                etl_users,
+                institutional_map,
+                personal_map,
+                username_index,
+                idnumber_index,
+            )
+            for tipo, identifier, detail in user_events:
+                if tipo == "user_resolved" and mode not in ("users", "both"):
                     continue
-
-                resolved_username = moodle_user.get("username", "")
-                if matched_by in ("username", "cedula"):
-                    etl_name = f"{user.get('firstname') or ''} {user.get('lastname') or ''}".strip()
-                    moodle_name = f"{moodle_user.get('firstname') or ''} {moodle_user.get('lastname') or ''}".strip()
-                    if _names_differ(etl_name, moodle_name):
-                        log_repo.save_log(db, eid, "1", "user_identity_conflict", uname, {
-                            "email": email_lookup,
-                            "etl_fullname": etl_name,
-                            "moodle_fullname": moodle_name,
-                            "matched_by": matched_by,
-                        })
-                        logger.warning(
-                            f"Conflicto de identidad {uname}: ETL='{etl_name}' vs "
-                            f"Moodle='{moodle_name}' (match por {matched_by})"
-                        )
-                        continue
-
-                username_map[user["username"]] = resolved_username
-                if mode in ("users", "both"):
-                    log_repo.save_log(
-                        db, eid, "1", "user_resolved",
-                        resolved_username,
-                        {"email": user.get("email"),
-                         "firstname": user.get("firstname", ""),
-                         "lastname": user.get("lastname", "")},
+                log_repo.save_log(db, eid, "1", tipo, identifier, detail)
+                if tipo == "user_identity_conflict":
+                    logger.warning(
+                        f"Conflicto de identidad {identifier}: ETL='{detail['etl_fullname']}' "
+                        f"vs Moodle='{detail['moodle_fullname']}' "
+                        f"(match por {detail['matched_by']})"
                     )
             ctx.username_map = username_map
 
@@ -163,48 +117,14 @@ class ConsultPhase(BasePhase):
 
             courses_with_teacher: Dict[str, str] = {}
             if mode in ("courses", "both"):
-                teacher_emails_by_course: Dict[str, List[str]] = {}
-                teacher_emails_by_base_key: Dict[tuple, List[str]] = {}
-                teacher_usernames_by_course: Dict[str, List[str]] = {}
-                teacher_usernames_by_base_key: Dict[tuple, List[str]] = {}
-                teacher_idnumbers_by_course: Dict[str, List[str]] = {}
-                teacher_idnumbers_by_base_key: Dict[tuple, List[str]] = {}
-                users_by_username = {u["username"]: u for u in etl_data["users"]}
-                for enr in etl_data["enrolments"]:
-                    sn = enr["course_shortname"]
-                    user = users_by_username.get(enr["username"])
-                    if user:
-                        emails = [e for e in [user.get("email"), user.get("email_personal")] if e]
-                        teacher_emails_by_course.setdefault(sn, []).extend(emails)
-                        teacher_usernames_by_course.setdefault(sn, []).append(enr["username"])
-                        cedula = user.get("cedula", "")
-                        if cedula:
-                            teacher_idnumbers_by_course.setdefault(sn, []).append(cedula)
-                        parsed = parse_shortname(sn)
-                        if parsed:
-                            bk = (parsed["cat_prefix"], parsed["cod_prog"], parsed["semestre"],
-                                  parsed["cod_curso"], parsed["grupo"])
-                            teacher_emails_by_base_key.setdefault(bk, []).extend(emails)
-                            teacher_usernames_by_base_key.setdefault(bk, []).append(enr["username"])
-                            if cedula:
-                                teacher_idnumbers_by_base_key.setdefault(bk, []).append(cedula)
+                teacher_index = index_teachers(etl_data["users"], etl_data["enrolments"])
 
                 import asyncio
                 sem = asyncio.Semaphore(10)
 
                 async def _fetch_teacher(c, idx):
                     sn = c.get("shortname", "")
-                    emails = teacher_emails_by_course.get(sn, [])
-                    usernames = teacher_usernames_by_course.get(sn, [])
-                    idnumbers = teacher_idnumbers_by_course.get(sn, [])
-                    if not emails:
-                        parsed = parse_shortname(sn)
-                        if parsed:
-                            bk = (parsed["cat_prefix"], parsed["cod_prog"], parsed["semestre"],
-                                  parsed["cod_curso"], parsed["grupo"])
-                            emails = teacher_emails_by_base_key.get(bk, [])
-                            usernames = teacher_usernames_by_base_key.get(bk, [])
-                            idnumbers = teacher_idnumbers_by_base_key.get(bk, [])
+                    emails, usernames, idnumbers = lookup_teacher_candidates(sn, teacher_index)
                     async with sem:
                         teachers = await moodle_service.get_enrolled_teachers(
                             int(c["id"]), emails, teacher_usernames=usernames,

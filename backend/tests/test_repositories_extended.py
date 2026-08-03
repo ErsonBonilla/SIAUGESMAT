@@ -145,6 +145,7 @@ class TestOperationRepo:
         assert status["completed"] == 1
         assert status["failed"] == 1
         assert status["pending"] == 0
+        assert status["cancelled"] == 0
 
     def test_get_batch_items_paginated(self, test_db, batch):
         add_item(test_db, "batch-1", "user1")

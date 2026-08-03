@@ -1,20 +1,15 @@
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import Execution
-from app.services.course_comparison.utils import build_enrolment_map, index_courses
+from app.pipeline.novedades import detect_novedades
 from app.services.etl import ETLService
-from app.services.moodle_factory import get_moodle_service
 
 logger = logging.getLogger(__name__)
-
-
-def _build_user_map(users: List[Dict]) -> Dict[str, Dict]:
-    return {u.get("cedula", ""): u for u in users if u.get("cedula")}
 
 
 async def detect(
@@ -25,8 +20,6 @@ async def detect(
 ) -> Tuple[Dict[str, Any], Optional[str]]:
     new_data = ETLService.process(new_file_path, modalidad)
     new_courses = new_data.get("courses", [])
-    new_enrolments = new_data.get("enrolments", [])
-    new_users = new_data.get("users", [])
 
     if not new_courses:
         return {}, "El archivo nuevo no contiene cursos."
@@ -49,126 +42,13 @@ async def detect(
         return {}, f"El archivo de la ejecución anterior ({previous.filename}) ya no existe en el servidor."
 
     old_data = ETLService.process(old_file_path, modalidad)
-    old_courses = old_data.get("courses", [])
 
-    old_index = index_courses(old_courses)
-    new_index = index_courses(new_courses)
-
-    enrolment_map_old = build_enrolment_map(old_data.get("enrolments", []))
-    enrolment_map_new = build_enrolment_map(new_enrolments)
-    user_map_new = _build_user_map(new_users)
-
-    common_keys = set(old_index.keys()) & set(new_index.keys())
-
-    moodle_service = get_moodle_service(modalidad)
-
-    novedades: List[Dict] = []
-
-    # Cambio de profesor en cursos que existen en ambas cargas
-    for bk in common_keys:
-        old_course = old_index[bk][0]
-        new_course = new_index[bk][0]
-
-        old_suffix = (old_course["_parsed"].get("suffix") or "").strip()
-        new_suffix = (new_course["_parsed"].get("suffix") or "").strip()
-
-        if old_suffix == new_suffix:
-            continue
-
-        old_sn = old_course["shortname"]
-        new_sn = new_course["shortname"]
-
-        old_username = _find_username_for_course(old_sn, enrolment_map_old, old_data.get("users", []))
-        new_username = _find_username_for_course(new_sn, enrolment_map_new, new_users)
-
-        old_prof_name = _resolve_prof_name(old_username, old_data.get("users", []))
-        new_prof_user = user_map_new.get(new_suffix, {})
-        new_prof_name = new_prof_user.get("firstname", "") + " " + new_prof_user.get("lastname", "")
-        new_prof_name = new_prof_name.strip() or new_username
-
-        action = "cambio_profesor"
-
-        novedades.append({
-            "id": f"nov_{bk}",
-            "base_key": bk,
-            "old_shortname": old_sn,
-            "new_shortname": new_sn,
-            "old_prof_cedula": old_suffix or None,
-            "new_prof_cedula": new_suffix or None,
-            "old_prof_name": old_prof_name,
-            "new_prof_name": new_prof_name,
-            "course_fullname": new_course.get("fullname", ""),
-            "action": action,
-            "target_course_id": None,
-        })
-
-    # Cursos que desaparecieron (en old pero no en new)
-    for bk, courses in old_index.items():
-        if bk in new_index:
-            continue
-        old_course = courses[0]
-        old_sn = old_course["shortname"]
-        old_suffix = (old_course["_parsed"].get("suffix") or "").strip()
-        old_username = _find_username_for_course(old_sn, enrolment_map_old, old_data.get("users", []))
-        old_prof_name = _resolve_prof_name(old_username, old_data.get("users", []))
-        novedades.append({
-            "id": f"des_{bk}",
-            "base_key": bk,
-            "old_shortname": old_sn,
-            "new_shortname": "",
-            "old_prof_cedula": old_suffix or None,
-            "new_prof_cedula": None,
-            "old_prof_name": old_prof_name,
-            "new_prof_name": "",
-            "course_fullname": old_course.get("fullname", ""),
-            "action": "curso_eliminado",
-            "target_course_id": None,
-        })
-
-    # Cursos nuevos (en new pero no en old)
-    for bk, courses in new_index.items():
-        if bk in old_index:
-            continue
-        new_course = courses[0]
-        new_sn = new_course["shortname"]
-        new_suffix = (new_course["_parsed"].get("suffix") or "").strip()
-        new_username = _find_username_for_course(new_sn, enrolment_map_new, new_users)
-        new_prof_user = user_map_new.get(new_suffix, {})
-        new_prof_name = new_prof_user.get("firstname", "") + " " + new_prof_user.get("lastname", "")
-        new_prof_name = new_prof_name.strip() or new_username
-        novedades.append({
-            "id": f"new_{bk}",
-            "base_key": bk,
-            "old_shortname": "",
-            "new_shortname": new_sn,
-            "old_prof_cedula": None,
-            "new_prof_cedula": new_suffix or None,
-            "old_prof_name": "",
-            "new_prof_name": new_prof_name,
-            "course_fullname": new_course.get("fullname", ""),
-            "action": "curso_nuevo",
-            "target_course_id": None,
-        })
+    novedades, stats = detect_novedades(old_data, new_data)
 
     return {
         "semester": semester,
         "previous_execution_id": previous.id,
         "previous_filename": previous.filename,
-        "total_compared": len(common_keys) + len(old_index) + len(new_index),
+        "total_compared": stats["total_compared"],
         "novedades": novedades,
     }, None
-
-
-def _find_username_for_course(shortname: str, enrolment_map: Dict[str, str], users: List[Dict]) -> str:
-    return enrolment_map.get(shortname, "")
-
-
-def _resolve_prof_name(username: str, users: List[Dict]) -> str:
-    if not username:
-        return ""
-    for u in users:
-        if u.get("username") == username:
-            first = u.get("firstname", "")
-            last = u.get("lastname", "")
-            return f"{first} {last}".strip()
-    return username

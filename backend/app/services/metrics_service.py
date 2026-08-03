@@ -15,6 +15,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import Execution
+from app.pipeline.metrics import (
+    calculate_error_rate,
+    semaphore_color,
+    semaphore_message,
+)
 from app.schemas.analytics import (
     LatestExecution,
     SemesterMetrics,
@@ -32,20 +37,6 @@ def _get_semaphore_thresholds() -> Dict[str, float]:
         "max_duration_yellow": settings.ANALYTICS_MAX_DURATION_YELLOW,
         "max_duration_red": settings.ANALYTICS_MAX_DURATION_RED,
     }
-
-
-def _calculate_error_rate(execution: Execution) -> float:
-    """Calcula el porcentaje de error de una ejecución."""
-    total = (
-        (execution.metrics or {}).get("total_operations", 0)
-        or (
-            (execution.metrics or {}).get("courses_created", 0)
-            + (execution.metrics or {}).get("users_created", 0)
-            + (execution.metrics or {}).get("enrolments", 0)
-        )
-    )
-    errors = execution.errors_count or 0
-    return (errors / total * 100.0) if total > 0 else 0.0
 
 
 def get_history_metrics(
@@ -182,19 +173,11 @@ def get_semaphore_status(
             )
         semester = execution.semester
 
-    error_rate = _calculate_error_rate(execution)
+    error_rate = calculate_error_rate(execution.metrics, execution.errors_count)
     duration = execution.duration_seconds or 0.0
 
-    # Determinar color del semáforo
-    if error_rate >= thresholds["error_rate_red"] or duration >= thresholds["max_duration_red"]:
-        color = "red"
-        message = "Se superaron umbrales críticos de error o duración."
-    elif error_rate >= thresholds["error_rate_yellow"] or duration >= thresholds["max_duration_yellow"]:
-        color = "yellow"
-        message = "Se superaron umbrales de advertencia."
-    else:
-        color = "green"
-        message = "Proceso exitoso."
+    color = semaphore_color(error_rate, duration, thresholds)
+    message = semaphore_message(color)
 
     return SemaphoreStatus(
         semester=semester,
@@ -227,20 +210,14 @@ def get_latest_execution_data(db: Session, modalidad: Optional[str] = None) -> L
     if not execution:
         raise ValueError("No hay ejecuciones registradas en la base de datos.")
 
-    error_rate = _calculate_error_rate(execution)
+    error_rate = calculate_error_rate(execution.metrics, execution.errors_count)
     thresholds = _get_semaphore_thresholds()
     duration = execution.duration_seconds or 0.0
 
-    if execution.status in ("queued", "running", "pending"):
-        semaphore = "yellow"
-    elif execution.status == "review_required":
-        semaphore = "yellow"
-    elif error_rate >= thresholds["error_rate_red"] or duration >= thresholds["max_duration_red"]:
-        semaphore = "red"
-    elif error_rate >= thresholds["error_rate_yellow"] or duration >= thresholds["max_duration_yellow"]:
+    if execution.status in ("queued", "running", "pending", "review_required"):
         semaphore = "yellow"
     else:
-        semaphore = "green"
+        semaphore = semaphore_color(error_rate, duration, thresholds)
 
     return LatestExecution(
         id=execution.id,

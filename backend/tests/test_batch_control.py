@@ -15,10 +15,15 @@ from app.repositories.operation_repo import (
 
 @pytest.fixture
 def mock_batch():
+    from datetime import datetime, timezone
+
     class MockBatch:
         batch_id = "test-batch-1"
         entity_type = "course"
         action = "create"
+        modalidad = "DISTANCIA"
+        created_at = datetime.now(timezone.utc)
+        completed_at = None
     return MockBatch()
 
 
@@ -33,7 +38,7 @@ class TestGetBatchStatus:
             patch("app.api.v1.endpoints.batch_control.get_batch", return_value=mock_batch),
             patch("app.api.v1.endpoints.batch_control.get_batch_status", return_value={
                 "total": 10, "pending": 2, "processing": 0, "paused": 0,
-                "completed": 8, "failed": 0,
+                "completed": 8, "failed": 0, "cancelled": 0,
             }),
             patch("app.api.v1.endpoints.batch_control.get_batch_items", return_value=[]),
         ):

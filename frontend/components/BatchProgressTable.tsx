@@ -1,16 +1,8 @@
 import { CheckIcon, SpinnerIcon, XMarkIcon } from "../utils/icons.tsx";
-import { downloadReport, getBatchReportUrl, getBatchReportFileUrl } from "../services/api.ts";
 import type { OperationBatchStatus } from "../services/api.ts";
+import BatchReportsSection from "./BatchReportsSection.tsx";
 import Pagination from "./Pagination.tsx";
 import ProgressBar from "./ProgressBar.tsx";
-
-const BATCH_REPORT_LABELS: Record<string, string> = {
-  resultados: "Resultados",
-  fallidos: "Fallidos",
-  creados: "Creados",
-  no_encontrados: "No encontrados",
-  resumen: "Resumen",
-};
 
 interface BatchProgressTableProps {
   batchStatus: OperationBatchStatus;
@@ -28,7 +20,7 @@ interface BatchProgressTableProps {
 }
 
 export default function BatchProgressTable(
-  { batchStatus, batchId, labelSingular, labelPlural, pagination }:
+  { batchStatus, batchId, labelSingular, labelPlural, onPause, onResume, onCancel, pagination }:
     BatchProgressTableProps,
 ) {
   return (
@@ -78,41 +70,14 @@ export default function BatchProgressTable(
               status={running ? "running" : "completed"}
             />
             {!running && (
-              <div class="mt-4 space-y-2">
-                <div class="flex items-center justify-between">
-                  <span class="text-sm font-semibold text-[var(--text-primary)]">
-                    Reportes
-                  </span>
-                  <button
-                    onClick={() =>
-                      downloadReport(
-                        getBatchReportUrl(batchId),
-                        `reportes_${batchId.slice(0, 8)}.zip`,
-                      )}
-                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white text-xs font-medium hover:brightness-110 transition cursor-pointer"
-                  >
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" class="w-3.5 h-3.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    ZIP
-                  </button>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                  {["resultados", "fallidos", "creados", "no_encontrados", "resumen"].map((name) => (
-                    <button
-                      key={name}
-                      onClick={() =>
-                        downloadReport(
-                          getBatchReportFileUrl(batchId, name),
-                          `${name}.csv`,
-                        )}
-                      class="px-2.5 py-1 rounded border border-[var(--border-secondary)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] transition cursor-pointer bg-[var(--bg-primary)]"
-                    >
-                      {BATCH_REPORT_LABELS[name] ?? name}.csv
-                    </button>
-                  ))}
-                </div>
+              <div class="mt-4">
+                <BatchReportsSection batchId={batchId} />
+                <a
+                  href={`/operaciones/lotes/${batchId}`}
+                  class="mt-3 inline-block text-sm gradient-text hover:underline"
+                >
+                  Ver detalle completo →
+                </a>
               </div>
             )}
           </>
@@ -122,17 +87,17 @@ export default function BatchProgressTable(
       {(batchStatus.pending > 0 || batchStatus.processing > 0 || batchStatus.paused > 0) && (
         <div class="flex justify-end gap-2 mt-3">
           {(batchStatus.pending > 0 || batchStatus.processing > 0) && onPause && (
-            <button onClick={onPause} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-400 hover:bg-amber-500 text-white transition">
+            <button type="button" onClick={onPause} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-400 hover:bg-amber-500 text-white transition">
               ⏸ Pausa
             </button>
           )}
           {batchStatus.paused > 0 && onResume && (
-            <button onClick={onResume} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition">
+            <button type="button" onClick={onResume} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition">
               ▶ Reanudar
             </button>
           )}
           {onCancel && (
-            <button onClick={onCancel} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition">
+            <button type="button" onClick={onCancel} class="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition">
               ✖ Cancelar
             </button>
           )}

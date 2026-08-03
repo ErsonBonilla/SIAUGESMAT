@@ -30,6 +30,10 @@ class BatchStatusResponse(BaseModel):
     paused: int = 0
     completed: int
     failed: int
+    cancelled: int = 0
+    modalidad: Optional[str] = None
+    created_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     offset: int = 0
     limit: int = 100
     details: List[OperationItemOut]
