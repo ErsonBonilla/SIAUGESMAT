@@ -32,7 +32,10 @@ def is_moodle_overloaded(e: BaseException) -> bool:
 
 
 def _is_retryable_error(exception: BaseException) -> bool:
-    """Solo reintenta errores HTTP 5xx (servidor) o errores de Moodle retryables."""
+    """Solo reintenta errores HTTP 5xx (servidor), errores de Moodle retryables
+    y la sobrecarga transitoria de Moodle."""
+    if isinstance(exception, MoodleOverloadedError):
+        return True
     if isinstance(exception, httpx.HTTPStatusError):
         return exception.response.status_code >= 500
     if isinstance(exception, httpx.HTTPError):

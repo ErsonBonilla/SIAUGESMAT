@@ -60,12 +60,8 @@ export default function ProgressBar(
       </div>
       <div class="w-full h-2.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
         <div
-          class="h-full rounded-full progress-bar-shimmer"
-          style={{
-            width: `${pct}%`,
-            backgroundColor: progressColor,
-            transition: "width 0.6s var(--ease-smooth, cubic-bezier(0.4, 0, 0.2, 1)), background-color 0.6s ease",
-          }}
+          class="h-full rounded-full progress-bar"
+          style={{ width: `${pct}%` }}
         />
       </div>
       <div class="flex justify-between gap-1 mt-2">

@@ -193,6 +193,7 @@ def process_etl_item(self, item_id: int):
 
 def _refresh_phase_progress(execution_id, db):
     from app.db.models import Execution, OperationItem
+    from app.pipeline.progress import compute_phase_progress
     try:
         phase3_total = db.query(func.count(OperationItem.id)).filter(
             OperationItem.batch_id.like(f"etl_3_%_{execution_id}")
@@ -202,24 +203,17 @@ def _refresh_phase_progress(execution_id, db):
             OperationItem.status.in_(["completed", "failed"]),
         ).scalar() or 0
 
-        if phase3_total > 0 and phase3_done < phase3_total:
-            pct = 34.0 + (phase3_done / phase3_total) * 28.0
-        else:
-            phase4_total = db.query(func.count(OperationItem.id)).filter(
-                OperationItem.batch_id.like(f"etl_4_%_{execution_id}")
-            ).scalar() or 0
-            phase4_done = db.query(func.count(OperationItem.id)).filter(
-                OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
-                OperationItem.status.in_(["completed", "failed"]),
-            ).scalar() or 0
-            if phase4_total > 0:
-                pct = 65.0 + (phase4_done / phase4_total) * 20.0
-            else:
-                total = phase3_total + phase4_total
-                done = phase3_done + phase4_done
-                pct = 34.0 + (done / max(total, 1)) * 28.0
+        phase4_total = db.query(func.count(OperationItem.id)).filter(
+            OperationItem.batch_id.like(f"etl_4_%_{execution_id}")
+        ).scalar() or 0
+        phase4_done = db.query(func.count(OperationItem.id)).filter(
+            OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
+            OperationItem.status.in_(["completed", "failed"]),
+        ).scalar() or 0
 
-        pct = round(pct, 1)
+        pct = compute_phase_progress(
+            phase3_total, phase3_done, phase4_total, phase4_done,
+        )
         ex = db.query(Execution).filter(Execution.id == execution_id).first()
         if ex and (ex.progress_pct is None or pct > ex.progress_pct):
             ex.progress_pct = pct

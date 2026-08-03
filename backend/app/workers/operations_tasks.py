@@ -86,25 +86,64 @@ def process_operation_batch(self, batch_id: str):
         db.close()
 
 
+_DELETE_NOT_FOUND_MESSAGE = {
+    "users": "Usuario no encontrado en Moodle. Se omite (ya no existía).",
+    "courses": "Curso no encontrado en Moodle. Se omite (ya no existía).",
+    "categories": "Categoría no encontrada en Moodle. Se omite (ya no existía).",
+}
+
+
+async def _entity_exists(moodle, entity_type: str, identifier: str) -> bool:
+    if entity_type == "users":
+        return await moodle.get_user_by_username(identifier) is not None
+    if entity_type == "courses":
+        return bool(await moodle.get_courses(shortname=identifier))
+    if entity_type == "categories":
+        return bool(await moodle.get_categories(idnumber=identifier))
+    return True
+
+
+async def _delete_entity(moodle, entity_type: str, identifier: str) -> str:
+    """Elimina la entidad en Moodle de forma idempotente.
+
+    Devuelve ``"deleted"`` si el borrado se concretó (o ya no existía tras un
+    error transitorio) y ``"not_found"`` si la entidad no existía al inicio.
+
+    Si la llamada a Moodle lanza una excepción, verifica si la entidad sigue
+    existiendo: si ya no existe, el borrado sí se concretó (p. ej. timeout con
+    respuesta perdida) y se trata como éxito; solo se re-lanza la excepción
+    cuando la entidad sigue presente (fallo real).
+    """
+    try:
+        if entity_type == "users":
+            result = await moodle.delete_users([identifier])
+            return "deleted" if result is not None else "not_found"
+        if entity_type == "courses":
+            result = await moodle.delete_courses([identifier])
+            return "deleted" if result is not None else "not_found"
+        if entity_type == "categories":
+            cats = await moodle.get_categories(idnumber=identifier)
+            if not cats:
+                return "not_found"
+            await moodle.delete_category(int(cats[0]["id"]))
+            return "deleted"
+        return "deleted"
+    except Exception:
+        if await _entity_exists(moodle, entity_type, identifier):
+            raise
+        return "deleted"
+
+
 async def _process_single_item(item, batch, moodle, db):
     update_item(db, item.id, "processing")
+    note = None
 
     if batch.action == "delete":
-        if batch.entity_type == "courses":
-            result = await moodle.delete_courses([item.identifier])
-            if result is None:
-                raise ValueError("Curso no encontrado en Moodle. Verifique el shortname.")
-
-        elif batch.entity_type == "categories":
-            cats = await moodle.get_categories(idnumber=item.identifier)
-            if not cats:
-                raise ValueError("Categoría no encontrada en Moodle. Verifique el idnumber.")
-            await moodle.delete_category(int(cats[0]["id"]))
-
-        elif batch.entity_type == "users":
-            result = await moodle.delete_users([item.identifier])
-            if result is None:
-                raise ValueError("Usuario no encontrado en Moodle. Verifique el username.")
+        outcome = await _delete_entity(moodle, batch.entity_type, item.identifier)
+        if outcome == "not_found":
+            note = _DELETE_NOT_FOUND_MESSAGE.get(
+                batch.entity_type, "Entidad no encontrada en Moodle. Se omite (ya no existía)."
+            )
 
     elif batch.action == "create":
         if batch.entity_type == "users":
@@ -154,7 +193,7 @@ async def _process_single_item(item, batch, moodle, db):
                 raise ValueError(f"Curso no encontrado en Moodle: {item.identifier}")
             await moodle.update_courses([{"id": int(courses[0]["id"]), "visible": visible}])
 
-    update_item(db, item.id, "completed")
+    update_item(db, item.id, "completed", note)
     update_batch_counts(db, batch.batch_id, completed=1)
 
 

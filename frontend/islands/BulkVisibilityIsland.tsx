@@ -27,6 +27,9 @@ export default function BulkVisibilityIsland() {
     onFetchStatus: (id) => getBatchStatus(id, detailOffset.value, PAGE_SIZE),
     onUploadSuccess: () => {
       refreshKey.value++;
+      if (typeof window !== "undefined" && batchId.value) {
+        window.location.href = `/operaciones/lotes/${batchId.value}`;
+      }
     },
     onBatchComplete: () => {
       refreshKey.value++;

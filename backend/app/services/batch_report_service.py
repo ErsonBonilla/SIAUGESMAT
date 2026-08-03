@@ -45,12 +45,12 @@ def _build_rows(batch: OperationBatch, items: List[OperationItem]) -> Dict[str, 
 
         if item.status == "failed":
             failed_rows.append(row)
-            if batch.action == "delete" and item.error_message:
-                msg_lower = item.error_message.lower()
-                if any(w in msg_lower for w in ("no encontrad", "not found", "notfound")):
-                    not_found_rows.append(row)
         if item.status == "completed":
             success_rows.append(row)
+        if batch.action == "delete" and item.error_message:
+            msg_lower = item.error_message.lower()
+            if any(w in msg_lower for w in ("no encontrad", "not found", "notfound", "no existía")):
+                not_found_rows.append(row)
 
     action_verb = "Eliminación" if batch.action == "delete" else "Creación"
     base_headers = ["identificador", "estado", "error", "intentos"]

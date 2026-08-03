@@ -103,6 +103,7 @@ def get_batch_status(db: Session, batch_id: str) -> dict:
         "paused": base_q.filter_by(status="paused").count(),
         "completed": base_q.filter_by(status="completed").count(),
         "failed": base_q.filter_by(status="failed").count(),
+        "cancelled": base_q.filter_by(status="cancelled").count(),
     }
 
 

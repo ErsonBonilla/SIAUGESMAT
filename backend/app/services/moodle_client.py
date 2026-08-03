@@ -61,6 +61,7 @@ class MoodleClient:
         stop=stop_after_attempt(settings.MOODLE_MAX_RETRIES),
         wait=wait_exponential(multiplier=1, min=1, max=10),
         before=before_log(logger, logging.WARNING),
+        reraise=True,
     )
     async def _request_with_retry(self, wsfunction: str, params: dict[str, Any],
                                    use_post: bool, timeout: Optional[float],

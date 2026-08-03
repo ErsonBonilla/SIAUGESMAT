@@ -103,6 +103,10 @@ export interface OperationBatchStatus {
   paused: number;
   completed: number;
   failed: number;
+  cancelled: number;
+  modalidad: string | null;
+  created_at: string | null;
+  completed_at: string | null;
   offset: number;
   limit: number;
   details: OperationItemOut[];

@@ -48,6 +48,8 @@ def get_batch_status_endpoint(
         batch_id=batch.batch_id, entity_type=batch.entity_type, action=batch.action,
         total=st["total"], pending=st["pending"], processing=st["processing"],
         paused=st["paused"], completed=st["completed"], failed=st["failed"],
+        cancelled=st["cancelled"], modalidad=batch.modalidad,
+        created_at=batch.created_at, completed_at=batch.completed_at,
         offset=offset, limit=limit,
         details=[OperationItemOut(
             identifier=i.identifier, status=i.status,

@@ -2,7 +2,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.moodle_errors import MoodleAPIError
+from app.services.error_messages import translate_error
+from app.services.moodle_errors import MoodleAPIError, MoodleOverloadedError
 from app.workers.operations_tasks import (
     _ensure_root_category,
     _format_moodle_error,
@@ -94,7 +95,7 @@ class TestProcessOperationBatch:
 
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
-    def test_delete_course_not_found(self, mock_pending, mock_complete):
+    def test_delete_course_not_found_idempotent(self, mock_pending, mock_complete):
         with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
              patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
              patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
@@ -110,7 +111,80 @@ class TestProcessOperationBatch:
             db = MagicMock()
             mock_sl.return_value = db
             process_operation_batch("BATCH_001")
-            mock_update.assert_any_call(db, 1, "failed", "Curso no encontrado en Moodle. Verifique el shortname.")
+            mock_update.assert_any_call(
+                db, 1, "completed", "Curso no encontrado en Moodle. Se omite (ya no existía)."
+            )
+
+    @patch("app.workers.operations_tasks.complete_batch")
+    @patch("app.workers.operations_tasks.get_pending_items")
+    def test_delete_user_transient_error_but_deleted(self, mock_pending, mock_complete):
+        """Error transitorio al borrar pero la entidad ya no existe → completed."""
+        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
+             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
+             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
+             patch("app.workers.operations_tasks.update_item") as mock_update, \
+             patch("app.workers.operations_tasks.update_batch_counts"):
+            batch = _make_batch(entity_type="users", action="delete")
+            mock_get_batch.return_value = batch
+            item = _make_item("user1")
+            mock_pending.return_value = [item]
+            moodle = _make_moodle()
+            moodle.delete_users = AsyncMock(
+                side_effect=MoodleOverloadedError("gateway time-out")
+            )
+            moodle.get_user_by_username = AsyncMock(return_value=None)
+            mock_get_ms.return_value = moodle
+            db = MagicMock()
+            mock_sl.return_value = db
+            process_operation_batch("BATCH_001")
+            mock_update.assert_any_call(db, 1, "completed", None)
+
+    @patch("app.workers.operations_tasks.complete_batch")
+    @patch("app.workers.operations_tasks.get_pending_items")
+    def test_delete_user_transient_error_still_exists(self, mock_pending, mock_complete):
+        """Error transitorio y la entidad sigue existiendo → failed."""
+        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
+             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
+             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
+             patch("app.workers.operations_tasks.update_item") as mock_update, \
+             patch("app.workers.operations_tasks.update_batch_counts"):
+            batch = _make_batch(entity_type="users", action="delete")
+            mock_get_batch.return_value = batch
+            item = _make_item("user1")
+            mock_pending.return_value = [item]
+            moodle = _make_moodle()
+            moodle.delete_users = AsyncMock(
+                side_effect=MoodleOverloadedError("gateway time-out")
+            )
+            moodle.get_user_by_username = AsyncMock(return_value={"id": 1})
+            mock_get_ms.return_value = moodle
+            db = MagicMock()
+            mock_sl.return_value = db
+            process_operation_batch("BATCH_001")
+            exc = MoodleOverloadedError("gateway time-out")
+            mock_update.assert_any_call(db, 1, "failed", translate_error(exc))
+
+    @patch("app.workers.operations_tasks.complete_batch")
+    @patch("app.workers.operations_tasks.get_pending_items")
+    def test_delete_user_not_found_idempotent(self, mock_pending, mock_complete):
+        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
+             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
+             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
+             patch("app.workers.operations_tasks.update_item") as mock_update, \
+             patch("app.workers.operations_tasks.update_batch_counts"):
+            batch = _make_batch(entity_type="users", action="delete")
+            mock_get_batch.return_value = batch
+            item = _make_item("user1")
+            mock_pending.return_value = [item]
+            moodle = _make_moodle()
+            moodle.delete_users = AsyncMock(return_value=None)
+            mock_get_ms.return_value = moodle
+            db = MagicMock()
+            mock_sl.return_value = db
+            process_operation_batch("BATCH_001")
+            mock_update.assert_any_call(
+                db, 1, "completed", "Usuario no encontrado en Moodle. Se omite (ya no existía)."
+            )
 
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
@@ -224,6 +298,7 @@ class TestProcessOperationBatch:
             mock_pending.return_value = [item]
             moodle = _make_moodle()
             moodle.delete_courses = AsyncMock(side_effect=MoodleAPIError("API error", "unknownerror"))
+            moodle.get_courses = AsyncMock(return_value=[{"id": 1}])
             mock_get_ms.return_value = moodle
             db = MagicMock()
             mock_sl.return_value = db

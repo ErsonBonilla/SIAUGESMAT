@@ -34,6 +34,11 @@ export default function CsvUploader(
     storageKey: `batch_${uploadEndpoint}`,
     doUpload: (f) => uploadCsvFile(uploadEndpoint, f),
     onFetchStatus: (id) => getBatchStatus(id, detailOffset.value, PAGE_SIZE),
+    onUploadSuccess: () => {
+      if (typeof window !== "undefined" && batchId.value) {
+        window.location.href = `/operaciones/lotes/${batchId.value}`;
+      }
+    },
   });
 
   const handleDetailPageChange = (newOffset: number) => {
