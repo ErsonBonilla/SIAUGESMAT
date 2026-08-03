@@ -16,6 +16,7 @@ Aplicación full-stack para la Universidad del Tolima que automatiza la carga ma
 | **Cola de tareas** | Redis 7 + Celery (+ Celery Beat para tareas periódicas) |
 | **Integración Moodle** | API REST (versiones 3.8 a 5.x) vía adapter pattern + rate limiting |
 | **Reportes** | CSV + gráficos Plotly (PNG, HTML interactivo, JSON) |
+| **Calidad de código** | Backend: ruff + vulture; Frontend: `deno task check` (fmt + lint + typecheck) + CI en GitHub Actions |
 
 ---
 
@@ -59,6 +60,8 @@ Los colores de la marca se definen en `utils/theme.ts` como `DARK_THEME_VARS` y 
 
 **Backend:** Endpoints → Repositories (datos) + Workers (Celery) → Phases (ETL) → MoodleService + MoodleIntegration. Las fases implementan el patrón Pipeline con Shared Context (`PhaseContext`). Los repositorios son funciones puras (no clases) que reciben `db` como primer parámetro.
 
+**Núcleo puro (`app/pipeline/`):** todas las transformaciones de negocio que no requieren I/O viven en `app/pipeline/` — un paquete 100 % puro (sin DB, HTTP, settings ni Celery), verificado por AST en `tests/test_pipeline_purity.py`. Incluye `shortnames.py` (parsing de códigos), `course_index.py`, `course_comparison/` (comparador de cursos con umbrales inyectables), `novedades.py`, `metrics.py`, `plan.py`, `progress.py`, `categories.py`, `users.py` y `enrolments.py`. Los módulos de `app/services/` que antes vivían en el núcleo ahora son *shims* de compatibilidad que re-exportan desde `pipeline/` (p. ej. `services/parsers/patterns.py` → `pipeline/shortnames.py`).
+
 **Frontend:** Islands Architecture sobre Preact + Signals. Las islas (`islands/`) manejan fetch y estado. Los componentes (`components/`) son presentacionales puros. Los utils (`utils/`) contienen señales globales (`darkSignal`, `profileSignal`), constantes compartidas (`STATUS_COLORS`, `DARK_VARS`) y helpers.
 
 ---
@@ -85,7 +88,7 @@ Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y m
 - **Resolución paralela de docentes:** hasta 10 consultas simultáneas a `core_enrol_get_enrolled_users` con semáforo asyncio, en vez de N llamadas secuenciales.
 - **Compatibilidad Moodle 3.9:** adapter pattern para diferencias entre versiones (sin `enrolment_1`, `templatecourse` como `int`, `createpassword` en vez de `preferences[]`, `categoryid` con fallback multi-nivel).
 
-**Archivos clave:** `workers/tasks.py` (orquestador), `workers/phases/phase1_consult.py`, `phase2_analyze.py`, `phase3_structure.py`, `phase4_people.py`, `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle.py` (MoodleService), `services/moodle_adapter.py`, `services/course_comparison/`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`, `services/metrics_service.py`.
+**Archivos clave:** `workers/tasks.py` (orquestador), `workers/utils.py` (runner async compartido `run_moodle_async`), `workers/phases/phase1_consult.py`, `phase2_analyze.py`, `phase3_structure.py`, `phase4_people.py`, `pipeline/` (núcleo puro), `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle.py` (MoodleService), `services/moodle_adapter.py`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`, `services/metrics_service.py`.
 
 ---
 
@@ -205,12 +208,15 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 
 ```
 SIAUGESMAT/
+├── .github/workflows/ci.yml     # GitHub Actions: backend (ruff/vulture/pytest) + frontend (deno check/test/build)
 ├── backend/
 │   ├── app/
 │   │   ├── api/v1/endpoints/   # auth, jobs, upload, analytics, reports, charts, operations, queries, batch_control, batch_listing, novedades
 │   │   ├── core/               # config.py, security.py, dependencies.py, entity_config.py
 │   │   ├── db/                 # models.py, session.py, base.py
 │   │   ├── integrations/       # moodle.py (MoodleIntegration — orquestación alto nivel)
+│   │   ├── pipeline/           # Núcleo puro (sin I/O): shortnames, course_index, course_comparison/,
+│   │   │                       #   novedades, metrics, plan, progress, categories, users, enrolments
 │   │   ├── repositories/       # execution_repo, log_repo, query_repo, operation_repo (CRUD puro)
 │   │   ├── schemas/            # Pydantic schemas (job, analytics, operations, upload, user, novedades)
 │   │   ├── services/           # moodle.py (MoodleService), metrics_service.py, etl.py, reports.py,
@@ -219,19 +225,21 @@ SIAUGESMAT/
 │   │   │                       # moodle_errors.py, moodle_error_handler.py, moodle_factory.py,
 │   │   │                       # moodle_adapter.py, moodle_operations.py, batch_report_service.py,
 │   │   │                       # category_utils.py, error_messages.py
-│   │   │                       # parsers/ (DistanciaParser, patterns), course_comparison/,
-│   │   │                       # novedades_service.py
+│   │   │                       # parsers/ (DistanciaParser, patterns→pipeline/shortnames), course_comparison/ (shim→pipeline)
 │   │   ├── workers/            # tasks.py (ETL), phases/ (phase1_consult, phase2_analyze, phase3_structure,
 │   │   │                       #   phase4_people, item_task, orchestrator, common, base)
 │   │   │                       # operations_tasks.py, query_tasks.py, cleanup_tasks.py, utils.py
 │   │   ├── scripts/            # bulk_course_visibility.py, diagnostic_sibate.py
 │   │   ├── celery_app.py       # Config Celery + beat schedule
 │   │   └── main.py
-│   ├── tests/                  # ~390 tests (ETL, repos, phases, pipeline, analytics, API)
+│   ├── tests/                  # ~495 tests (ETL, repos, phases, pipeline, analytics, API, workers)
 │   ├── alembic/                # Migraciones de base de datos
 │   ├── reports/                # Reportes generados (CSV, ZIP)
 │   ├── uploads/                # Archivos Excel subidos
-│   └── requirements.txt
+│   ├── requirements.txt        # Dependencias de producción (sin pytest)
+│   ├── requirements-dev.txt    # Dev: -r requirements.txt + ruff, vulture, pytest, pytest-asyncio
+│   ├── ruff.toml               # Configuración de ruff (py312, reglas seleccionadas/ignoradas)
+│   └── Dockerfile
 ├── frontend/
 │   ├── components/             # Button, Input, Card, Layout, ProgressBar, Toast, ErrorBox, Pagination,
 │   │                           # LoadingSkeleton, KpiCard, MiniBarChart, YearNav, SemesterPicker,
@@ -254,7 +262,7 @@ SIAUGESMAT/
 │   │                           # auth.ts, auth-guard.ts, date.ts, icons.tsx, toast.ts, reports.ts,
 │   │                           # entity-configs.ts
 │   ├── static/                 # styles.css, main.css, SIAUGESMAT.ico
-│   ├── deno.json               # Configuración Fresh + dependencias
+│   ├── deno.json               # Configuración Fresh + tareas (check, test, build) + lint rules + lib DOM
 │   └── deno.lock               # Lock de dependencias Deno
 ├── docker-compose.yml          # 7 servicios: db, redis, backend, worker, beat, frontend, nginx
 ├── docker-compose.override.yml  # Puertos expuestos + volume mount para desarrollo
@@ -295,7 +303,9 @@ cd backend
 python -m venv .venv
 .venv\Scripts\activate     # Windows
 source .venv/bin/activate  # Linux/macOS
-pip install -r requirements.txt
+# Para desarrollo instalar requirements-dev.txt (incluye ruff, vulture y pytest).
+# La imagen Docker de producción instala solo requirements.txt.
+pip install -r requirements-dev.txt
 # Copiar las variables de entorno a la RAÍZ del proyecto (config.py lee el .env raíz)
 # desde la raíz:  copy .env.example .env
 # Opcional: backend/.env solo para overrides de dev (p. ej. DATABASE_URL apuntando a localhost)
@@ -395,17 +405,42 @@ El archivo `.env.example` en la raíz contiene todas las variables con valores d
 
 ---
 
-## Tests
+## Tests y calidad de código
 
-### Backend (~390 tests)
+### Backend (~495 tests)
 
 ```bash
 cd backend
-pytest -v
-pytest --cov=app          # con cobertura
+pytest -v                          # suite completa
+pytest --deselect tests/test_moodle.py   # sin Redis local (los tests de cache de MoodleService)
 ```
 
-Cubre: parser ETL, repositorios, fases del pipeline, integración, endpoints API, analítica, workers, tareas Celery, cliente Moodle, adaptadores y más.
+> Los tests de `tests/test_moodle.py` (cache de `MoodleService`) requieren un Redis alcanzable
+> (`REDIS_URL`). En CI se levanta un servicio Redis y corre la suite completa.
+
+Cubre: parser ETL, repositorios, fases del pipeline, núcleo puro, integración, endpoints API, analítica, workers, tareas Celery, cliente Moodle, adaptadores y más.
+
+### Frontend (Fresh/Deno)
+
+```bash
+cd frontend
+deno task test           # 60 tests (utils, services, islands)
+```
+
+### Verificación estática
+
+```bash
+# Backend — lint + código muerto + pureza del núcleo pipeline
+cd backend
+ruff check app tests
+vulture app --min-confidence 70
+pytest tests/test_pipeline_purity.py -v
+
+# Frontend — formato + lint + typecheck (equivalente a deno task check)
+cd frontend
+deno task check
+deno task build
+```
 
 ### End-to-end (contra Moodle real)
 
@@ -417,6 +452,17 @@ python e2e/run_test.py e2e/fixtures/ibague.xlsx
 # Modo completo con confirmación de delete masivo
 python e2e/run_test.py e2e/fixtures/uraba.xlsx --mode both --confirm
 ```
+
+---
+
+## Integración continua (GitHub Actions)
+
+El flujo de CI en `.github/workflows/ci.yml` corre en cada push a `main` y en cada PR:
+
+| Job | Pasos |
+|---|---|
+| **backend** | Python 3.12 + servicio Redis → `ruff check app tests` → `vulture app --min-confidence 70` → `pytest` (suite completa, incl. tests de cache de Moodle) |
+| **frontend** | Deno 2.5.6 → `deno task check` (fmt + lint + typecheck) → `deno task test` → `deno task build` |
 
 ---
 
