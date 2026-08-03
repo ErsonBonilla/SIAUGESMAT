@@ -6,7 +6,7 @@ from app.pipeline.course_comparison.utils import (
     get_course_professor,
     is_course_hidden,
 )
-from app.services.parsers.patterns import parse_shortname
+from app.pipeline.shortnames import parse_shortname
 
 
 def handle_same_professor(

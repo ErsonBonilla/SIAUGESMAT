@@ -7,7 +7,7 @@ from app.pipeline.course_index import (
     build_enrolment_map,
     index_courses,
 )
-from app.services.parsers.patterns import parse_shortname
+from app.pipeline.shortnames import parse_shortname
 
 __all__ = [
     "build_base_key",
