@@ -4,9 +4,9 @@ Compara el estado anterior y el nuevo de cursos/docentes y emite las
 novedades (cambio de profesor, curso eliminado, curso nuevo) sin tocar
 la base de datos ni el filesystem.
 """
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
-from app.services.course_comparison.utils import build_enrolment_map, index_courses
+from app.pipeline.course_index import build_enrolment_map, index_courses
 
 Novedad = Dict[str, Any]
 

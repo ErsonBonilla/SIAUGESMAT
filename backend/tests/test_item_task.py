@@ -184,7 +184,7 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.get_item") as mock_get, \
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
              patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
-             patch("app.workers.phases.item_task.update_item") as mock_update, \
+             patch("app.workers.phases.item_task.update_item"), \
              patch("app.workers.phases.item_task._refresh_phase_progress"), \
              patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ = AsyncMock()
@@ -220,7 +220,7 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.get_item") as mock_get, \
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
              patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
-             patch("app.workers.phases.item_task.update_item") as mock_update, \
+             patch("app.workers.phases.item_task.update_item"), \
              patch("app.workers.phases.item_task._refresh_phase_progress"), \
              patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ = AsyncMock()

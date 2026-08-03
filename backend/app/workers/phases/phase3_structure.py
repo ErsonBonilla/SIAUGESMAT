@@ -1,28 +1,30 @@
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
 from typing import Dict
 
 from celery import chord
 
 from app.celery_app import celery_app
 from app.core.config import settings
-from app.db.models import OperationItem
 from app.db.session import SessionLocal
-from app.repositories.execution_repo import clear_chord_active, get_execution, set_chord_active
+from app.repositories.execution_repo import (
+    clear_chord_active,
+    get_execution,
+    set_chord_active,
+)
 from app.repositories.log_repo import save_log
 from app.repositories.operation_repo import add_item, create_batch
 from app.services.moodle_factory import get_moodle_service
-from app.workers.phases.item_task import process_etl_item, _refresh_phase_progress
 from app.workers.phases.common import (
+    MoodleOverloadedError,
     _acquire_advisory_lock,
+    _get_pending_counts,
     _get_pending_items,
     _items_exist_for_execution,
-    _get_pending_counts,
     on_phase_items_done,
-    MoodleOverloadedError,
 )
-from app.workers.utils import reset_stuck_items
+from app.workers.phases.item_task import _refresh_phase_progress, process_etl_item
+from app.workers.utils import _run_async, reset_stuck_items
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> D
         if pending:
             logger.info(f"Items FASE 3 ya existen con {sum(pending.values())} pendientes, retomando")
             return pending
-        logger.info(f"Items FASE 3 ya existen y todos procesados, saltando creación")
+        logger.info("Items FASE 3 ya existen y todos procesados, saltando creación")
         return {}
     if not _acquire_advisory_lock(db, execution_id, "3"):
         logger.info(f"Lock FASE 3 ya tomado para ejecución {execution_id}, otro worker crea los items")
@@ -129,7 +131,7 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> D
                 await ms.close()
 
         try:
-            resolved = asyncio.run(_resolve_templates())
+            resolved = _run_async(_resolve_templates())
         except Exception as e:
             logger.warning(f"Error resolviendo templates: {e}, se usarán sin template")
             resolved = [

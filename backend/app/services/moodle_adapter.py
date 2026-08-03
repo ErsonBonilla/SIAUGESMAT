@@ -9,7 +9,7 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional
 
-from app.services.roles import resolve_role, role_shortname_to_id
+from app.services.roles import role_shortname_to_id as role_shortname_to_id
 
 logger = logging.getLogger(__name__)
 

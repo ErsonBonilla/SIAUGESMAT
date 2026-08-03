@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.core.security import create_access_token
-from app.schemas.user import TokenResponse, UserInToken
+from app.schemas.user import UserInToken
 from app.services.moodle_errors import MoodleAPIError
 from app.services.moodle_factory import get_moodle_service
 
@@ -300,7 +300,7 @@ async def get_my_profile(current_user: UserInToken = Depends(get_current_user)):
     except MoodleAPIError as e:
         logger.exception(f"Error al obtener perfil de {current_user.username}: {e}")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="No se pudo obtener el perfil del usuario")
-    except Exception as e:
+    except Exception:
         logger.exception("Error inesperado al obtener perfil")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno")
     finally:

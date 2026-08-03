@@ -6,7 +6,7 @@ matriculación de profesores y detección de usuarios activos.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 from app.integrations.moodle import MoodleIntegration
 from app.services.moodle_errors import MoodleAPIError

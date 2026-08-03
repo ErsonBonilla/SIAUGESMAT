@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -9,6 +10,24 @@ from app.db.models import OperationItem
 logger = logging.getLogger(__name__)
 
 STUCK_ITEM_TIMEOUT_MINUTES = 30
+
+
+def _run_async(coro):
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    return loop.run_until_complete(coro)
+
+
+def run_moodle_async(moodle, coro):
+    """Ejecuta un coroutine y garantiza el cierre del servicio Moodle."""
+    async def _run_and_close():
+        try:
+            return await coro
+        finally:
+            await moodle.close()
+    return _run_async(_run_and_close())
 
 
 def reset_stuck_items(

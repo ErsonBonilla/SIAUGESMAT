@@ -7,13 +7,12 @@ funciona con un Moodle simulado y datos sintéticos.
 
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 from app.db.models import Execution
 from app.integrations.moodle import MoodleIntegration
 from app.workers.phases.base import PhaseContext
 from app.workers.phases.phase1_consult import ConsultPhase
-from app.workers.phases.phase2_analyze import AnalyzePhase
 # Phase3 y Phase4 usan el patrón chord + item_task, no clases phase directas
 
 

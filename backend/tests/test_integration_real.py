@@ -17,7 +17,6 @@ Ejecución:
   pytest -v                         # todos los tests
 """
 
-import asyncio
 import logging
 import uuid
 
@@ -314,7 +313,7 @@ class TestRealMoodleCursoConTemplate:
                 categoryid=cat_id,
                 visible=1,
             )
-            assert r and r.get("id"), f"duplicate_course falló"
+            assert r and r.get("id"), "duplicate_course falló"
 
             await ms.delete_courses([sn])
             cats = await ms.get_categories(idnumber=cat_idn)

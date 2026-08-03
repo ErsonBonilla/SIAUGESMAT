@@ -11,7 +11,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 
 from app.core.security import decode_access_token
-from app.db.session import get_db
+from app.db.session import get_db as get_db
 from app.schemas.user import UserInToken
 
 # Esquema de autenticación HTTP Bearer para Swagger y dependencias

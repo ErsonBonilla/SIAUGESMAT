@@ -1,4 +1,4 @@
-import asyncio, os, sys, re
+import asyncio, sys, re
 sys.path.insert(0, "/app")
 
 from app.core.config import settings
@@ -21,7 +21,7 @@ async def check():
     print(f"\n... y {len(sib_moodle) - 10} mas")
 
     # 2. Get ALL courses from Moodle (any prefix) to see total
-    print(f"\n=== TOTAL CURSOS EN MOODLE ===")
+    print("\n=== TOTAL CURSOS EN MOODLE ===")
     print(f"Total cursos en Moodle: {len(all_courses)}")
 
     # 3. Count by prefix

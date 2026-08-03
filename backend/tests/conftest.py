@@ -45,7 +45,6 @@ from app.db.models import Execution, ErrorLog   # noqa: F401  # asegura que los 
 from app.main import app
 from app.core.security import create_access_token
 from app.core.dependencies import get_db
-from app.services.moodle_operations import MoodleService
 
 # ---------------------------------------------------------------------------
 # Configuración de la base de datos basada en archivo para pruebas

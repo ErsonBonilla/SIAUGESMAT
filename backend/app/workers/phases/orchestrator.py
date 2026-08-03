@@ -1,7 +1,4 @@
-import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import Dict
 
 from celery import chord
 
@@ -10,17 +7,13 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.integrations.moodle import MoodleIntegration
 from app.repositories.execution_repo import (
-    clear_checkpoint,
     get_checkpoint,
     get_execution,
     increment_metric,
-    mark_completed,
     mark_failed,
     save_checkpoint,
     set_chord_active,
-    set_report_dir,
     update_progress,
-    should_cancel,
 )
 from app.repositories.log_repo import save_error, save_log
 from app.services.error_messages import translate_error
@@ -33,8 +26,12 @@ from app.workers.phases.common import (
     on_users_done,
 )
 from app.workers.phases.item_task import process_etl_item
-from app.workers.phases.phase3_structure import _create_phase3_items, _launch_delete_chord
+from app.workers.phases.phase3_structure import (
+    _create_phase3_items,
+    _launch_delete_chord,
+)
 from app.workers.phases.phase4_people import _create_phase4_items
+from app.workers.utils import _run_async
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +98,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
                     finally:
                         await ms.close()
                 try:
-                    asyncio.run(_create_cats())
+                    _run_async(_create_cats())
                 except Exception as e:
                     logger.exception(f"Error creando categorías: {e}")
                     save_error(db, execution_id, "3", None, translate_error(e))
@@ -123,13 +120,13 @@ def process_etl_phase(self, execution_id: int, phase: str):
                     finally:
                         await ms.close()
                 try:
-                    asyncio.run(_relocate_cats())
+                    _run_async(_relocate_cats())
                 except Exception as e:
                     logger.exception(f"Error reubicando categorías: {e}")
                     save_error(db, execution_id, "3", None, translate_error(e))
 
             if not comparison:
-                logger.info(f"FASE 3: sin datos de comparación, saltando")
+                logger.info("FASE 3: sin datos de comparación, saltando")
                 on_phase_items_done.delay([], execution_id, "3")
                 return
 
@@ -137,7 +134,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
             item_counts = _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad)
             total = sum(item_counts.values())
             if total == 0:
-                logger.info(f"FASE 3: sin items que procesar")
+                logger.info("FASE 3: sin items que procesar")
                 on_phase_items_done.delay([], execution_id, "3")
                 return
 
@@ -157,7 +154,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
             item_counts = _create_phase4_items(db, execution_id, ctx_data, modalidad)
             total = sum(item_counts.values())
             if total == 0:
-                logger.info(f"FASE 4: sin items que procesar")
+                logger.info("FASE 4: sin items que procesar")
                 on_phase_items_done.delay([], execution_id, "4")
                 return
 
@@ -253,8 +250,9 @@ def _is_delete_confirmed(db, execution_id: int) -> bool:
 
 
 def _require_review(db, execution_id: int, ctx):
-    from app.db.models import Execution
     from sqlalchemy.orm.attributes import flag_modified
+
+    from app.db.models import Execution
     ex = db.query(Execution).filter(Execution.id == execution_id).first()
     if ex:
         to_delete_count = len(ctx.comparison.get("to_delete", []))
@@ -277,8 +275,9 @@ def _require_review(db, execution_id: int, ctx):
 
 
 def _inc_retry_count(db, execution_id: int) -> int:
-    from app.db.models import Execution
     from sqlalchemy.orm.attributes import flag_modified
+
+    from app.db.models import Execution
     ex = db.query(Execution).filter(Execution.id == execution_id).first()
     if not ex:
         return 0

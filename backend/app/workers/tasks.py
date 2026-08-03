@@ -1,47 +1,38 @@
-import asyncio
 import logging
 import time
-from typing import Dict, List
-
-from celery import chord
+from typing import Dict
 
 from app.celery_app import celery_app
 from app.core.config import settings
 from app.db.session import SessionLocal
 from app.integrations.moodle import MoodleIntegration
 from app.repositories.execution_repo import (
-    clear_checkpoint,
     get_checkpoint,
     get_execution,
-    mark_completed,
     mark_failed,
     mark_running,
-    save_checkpoint,
-    set_report_dir,
-    update_progress,
     should_cancel,
     should_pause,
+    update_progress,
 )
 from app.repositories.log_repo import save_error
-from app.repositories.operation_repo import add_item, create_batch
 from app.services.error_messages import translate_error
 from app.services.etl import ETLService
 from app.services.moodle_factory import get_moodle_service
-from app.services.reports import ReportService
-from app.workers.phases.base import PhaseContext, MoodleOverloadedError
-from app.workers.phases.common import _run_async
-from app.workers.phases.phase1_consult import ConsultPhase
-from app.workers.phases.phase2_analyze import AnalyzePhase
+from app.workers.phases.base import MoodleOverloadedError, PhaseContext
 from app.workers.phases.orchestrator import (
+    _inc_retry_count,
     _is_delete_confirmed,
     _require_review,
     _restore_checkpoint,
     _restore_progress_checkpoint,
     _save_phase_2_data_to_checkpoint,
     _save_phase_checkpoint,
-    _inc_retry_count,
     process_etl_phase,
 )
+from app.workers.phases.phase1_consult import ConsultPhase
+from app.workers.phases.phase2_analyze import AnalyzePhase
+from app.workers.utils import run_moodle_async
 
 logger = logging.getLogger(__name__)
 
@@ -76,12 +67,6 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
 
         moodle_service = get_moodle_service(execution.modalidad or "")
         integration = MoodleIntegration(moodle_service)
-
-        async def _run_phases() -> Dict[str, int]:
-            try:
-                return await _run_pipeline()
-            finally:
-                await moodle_service.close()
 
         async def _run_pipeline() -> Dict[str, int]:
             # Refrescar execution para PhaseContext
@@ -138,7 +123,7 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
 
             return ctx.metrics
 
-        metrics = _run_async(_run_phases())
+        metrics = run_moodle_async(moodle_service, _run_pipeline())
 
         # Fresco: consultar estado actual de BD
         current_exec = get_execution(db, execution_id)

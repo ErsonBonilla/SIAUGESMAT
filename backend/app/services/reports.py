@@ -10,14 +10,14 @@ import logging
 import os
 import shutil
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime
+from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import Execution, ExecutionLog
-from app.services.report_utils import write_csv, create_zip, list_csv_files, get_csv_path
+from app.services.report_utils import write_csv, create_zip
 
 logger = logging.getLogger(__name__)
 

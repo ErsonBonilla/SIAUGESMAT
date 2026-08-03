@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 
 from app.integrations.moodle import MoodleIntegration
-from app.services.moodle_errors import MoodleOverloadedError
+from app.services.moodle_errors import MoodleOverloadedError as MoodleOverloadedError
 from app.services.moodle_operations import MoodleService
 
 

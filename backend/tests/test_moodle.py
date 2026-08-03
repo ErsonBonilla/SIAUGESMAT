@@ -14,7 +14,6 @@ from tenacity import RetryError
 from app.services.moodle_errors import MoodleAPIError
 from app.services.moodle_operations import MoodleService
 from app.services.moodle_adapter import MoodleAdapter
-from app.core.config import settings
 
 
 # ---------------------------------------------------------------------------

@@ -7,9 +7,8 @@ import io
 import logging
 import uuid
 from datetime import datetime
-from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 

@@ -1,6 +1,7 @@
 import logging
 from typing import Dict
 
+from app.core.config import settings
 from app.pipeline.categories import classify_categories
 from app.pipeline.enrolments import resolve_enrolments, users_to_create
 from app.pipeline.plan import plan_log_entries
@@ -77,6 +78,8 @@ class AnalyzePhase(BasePhase):
                 resolved_enrolments,
                 re_upload=ctx.re_upload,
                 courses_with_teacher=ctx.courses_with_teacher,
+                max_age_seconds=settings.COURSE_MAX_AGE_SECONDS,
+                disappeared_age_seconds=settings.COURSE_DISAPPEARED_AGE_SECONDS,
             )
 
             persist_plan_logs(db, eid, ctx.comparison, {

@@ -7,12 +7,10 @@ tokens JWT locales, usando mocks para aislar la comunicación externa.
 
 from unittest.mock import patch
 
-import pytest
 from fastapi import status
 from jose import jwt
 
 from app.core.config import settings
-from app.schemas.user import LoginRequest
 
 
 # ---------------------------------------------------------------------------

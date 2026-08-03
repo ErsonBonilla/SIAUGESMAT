@@ -5,8 +5,9 @@ cédula) se reciben ya consultados y se devuelven eventos en lugar de persistir
 logs directamente.
 """
 import unicodedata
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
+from app.pipeline.course_index import build_base_key
 from app.services.parsers.patterns import parse_shortname
 
 User = Dict[str, object]
@@ -139,10 +140,7 @@ def index_teachers(
 
         parsed = parse_shortname(sn)
         if parsed:
-            bk = (
-                parsed["cat_prefix"], parsed["cod_prog"], parsed["semestre"],
-                parsed["cod_curso"], parsed["grupo"],
-            )
+            bk = build_base_key(parsed)
             by_base_key["emails"].setdefault(bk, []).extend(emails)
             by_base_key["usernames"].setdefault(bk, []).append(enr["username"])
             if cedula:
@@ -169,10 +167,7 @@ def lookup_teacher_candidates(
     if not emails:
         parsed = parse_shortname(shortname)
         if parsed:
-            bk = (
-                parsed["cat_prefix"], parsed["cod_prog"], parsed["semestre"],
-                parsed["cod_curso"], parsed["grupo"],
-            )
+            bk = build_base_key(parsed)
             emails = by_base_key["emails"].get(bk, [])
             usernames = by_base_key["usernames"].get(bk, [])
             idnumbers = by_base_key["idnumbers"].get(bk, [])

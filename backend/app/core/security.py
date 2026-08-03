@@ -8,7 +8,7 @@ usados para proteger los endpoints de la aplicación.
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
-from jose import JWTError, jwt
+from jose import jwt
 
 from app.core.config import settings
 

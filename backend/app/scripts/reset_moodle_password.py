@@ -15,7 +15,6 @@ import argparse
 import asyncio
 import re
 import sys
-from pathlib import Path
 
 import httpx
 
@@ -211,7 +210,7 @@ async def _main():
         print("\n  [WARN] auth no reportado por la API. Se intentará reset sin fix.")
 
     # 2. Reset password
-    print(f"\n--- Reset de contraseña ---")
+    print("\n--- Reset de contraseña ---")
     if await _reset_password(ms, user_id, password):
         print("  Contraseña restablecida exitosamente.")
     else:

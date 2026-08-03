@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.config import settings
 from app.services.moodle_error_handler import extract_error, handle_moodle_errors
-from app.services.moodle_errors import MoodleAPIError, MoodleOverloadedError, is_moodle_overloaded
+from app.services.moodle_errors import MoodleOverloadedError, is_moodle_overloaded
 from app.services.moodle_operations import MoodleService
 
 logger = logging.getLogger(__name__)

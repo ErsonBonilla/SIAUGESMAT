@@ -98,7 +98,7 @@ def recover_stuck_phase():
       (marcador `chord_active` expirado/ausente) y no hay items procesándose
       recientemente, relanza el chord de la fase.
     """
-    from app.workers.phases.common import _get_pending_items, _items_exist_for_execution, on_phase_items_done
+    from app.workers.phases.common import _get_pending_items, _items_exist_for_execution
     from app.workers.phases.phase3_structure import on_delete_items_done
     from app.workers.utils import reset_stuck_items, STUCK_ITEM_TIMEOUT_MINUTES
     from app.db.models import OperationItem

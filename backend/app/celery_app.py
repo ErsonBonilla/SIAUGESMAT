@@ -115,7 +115,7 @@ def setup_dlq_handler(logger, **kwargs):
 
 
 @task_failure.connect
-def on_task_failure(sender, task_id, exception, args, kwargs, traceback, einfo, **kw):
+def on_task_failure(sender, task_id, exception, args, kwargs, **kw):
     """Callback global cuando una tarea agota todos sus reintentos.
     Registra la tarea, sus argumentos y el error final en el logger DLQ."""
     dlq_logger = logging.getLogger("celery.dlq")

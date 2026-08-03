@@ -272,7 +272,7 @@ async def pause_execution_endpoint(
     db: Session = Depends(get_db),
     current_user: UserInToken = Depends(get_current_user),
 ):
-    execution = _resolve_execution(
+    _resolve_execution(
         db, execution_id, expected_statuses={"running"},
         conflict_message="Solo se puede pausar ejecuciones en 'running'.",
     )
@@ -309,7 +309,7 @@ async def cancel_execution_endpoint(
     db: Session = Depends(get_db),
     current_user: UserInToken = Depends(get_current_user),
 ):
-    execution = _resolve_execution(
+    _resolve_execution(
         db, execution_id, expected_statuses={"running", "paused", "queued"},
         conflict_message=(
             "Solo se puede cancelar ejecuciones en 'running', 'paused' o 'queued'."
