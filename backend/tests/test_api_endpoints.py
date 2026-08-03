@@ -12,7 +12,6 @@ import tempfile
 import zlib
 from unittest.mock import patch
 
-import pytest
 from fastapi import status
 
 from app.core.config import settings

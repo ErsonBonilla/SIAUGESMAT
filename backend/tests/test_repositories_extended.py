@@ -7,7 +7,7 @@ Verifica que las funciones CRUD de query_repo y operation_repo funcionan correct
 import pytest
 from datetime import datetime, timezone
 
-from app.db.models import QueryResult, OperationBatch, OperationItem
+from app.db.models import QueryResult
 from app.repositories.query_repo import (
     get_query,
     create_query,

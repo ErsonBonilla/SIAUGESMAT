@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 
 import pandas as pd
 
@@ -240,7 +240,6 @@ class BaseExcelParser(ABC):
 
         return firstname.title(), lastname.title()
 
-    @staticmethod
     @staticmethod
     def _to_roman_numeral(value: str) -> str:
         import re

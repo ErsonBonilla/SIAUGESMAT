@@ -2,15 +2,6 @@
 
 import pytest
 
-from app.repositories.operation_repo import (
-    delete_batch,
-    delete_old_batches,
-    get_batch,
-    get_batch_items,
-    get_batch_status,
-    pause_batch,
-    resume_batch,
-)
 
 
 @pytest.fixture

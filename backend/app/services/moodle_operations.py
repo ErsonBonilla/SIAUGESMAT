@@ -1,10 +1,9 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.core.config import settings
 from app.services.moodle_client import MoodleClient, generate_moodle_password
 from app.services.moodle_adapter import MoodleAdapter, MoodleAdapterFactory
-from app.services.moodle_errors import MoodleAPIError, MoodleOverloadedError, is_moodle_overloaded
+from app.services.moodle_errors import MoodleAPIError
 from app.services.roles import role_shortname_to_id
 
 logger = logging.getLogger(__name__)

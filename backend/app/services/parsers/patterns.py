@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Match, Optional
+from typing import Dict, Optional
 
 SIAUGESMAT_PATTERN = re.compile(
     r"^[A-Z]{3}_\d{4}_(?:\d+_s[IVXLCDM]+|s[IVXLCDM]+_\d+)_G-[^_]+(?:_[^_]+)?$",

@@ -1,5 +1,4 @@
 """Pruebas del núcleo puro de resolución de usuarios (pipeline/users.py)."""
-import pytest
 
 from app.pipeline.users import (
     index_teachers,

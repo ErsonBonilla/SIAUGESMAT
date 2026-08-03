@@ -2,7 +2,6 @@
 Tareas Celery para operaciones masivas de creación y eliminación de entidades en Moodle.
 """
 
-import asyncio
 import logging
 
 from app.celery_app import celery_app
@@ -21,6 +20,7 @@ from app.services.moodle_errors import MoodleAPIError
 from app.services.moodle_factory import get_moodle_service
 from app.services.moodle_operations import MoodleService
 from app.services.roles import resolve_role
+from app.workers.utils import run_moodle_async
 
 logger = logging.getLogger(__name__)
 
@@ -38,44 +38,41 @@ def process_operation_batch(self, batch_id: str):
         items = get_pending_items(db, batch_id)
 
         async def _process_all():
-            try:
-                if batch.entity_type == "categories" and batch.action == "create":
-                    await _ensure_root_category(moodle)
+            if batch.entity_type == "categories" and batch.action == "create":
+                await _ensure_root_category(moodle)
 
-                for item in items:
-                    # Re-consultar batch por si fue pausado o cancelado
-                    try:
-                        paused = db.query(OperationItem).filter_by(
-                            batch_id=batch_id, status="paused"
-                        ).count()
-                        cancelled = db.query(OperationItem).filter_by(
-                            batch_id=batch_id, status="cancelled"
-                        ).count()
-                        if paused > 0:
-                            logger.info(f"Lote {batch_id} pausado, deteniendo procesamiento ({paused} items)")
-                            break
-                        if cancelled > 0:
-                            logger.info(f"Lote {batch_id} cancelado, deteniendo procesamiento ({cancelled} items)")
-                            break
-                    except TypeError:
-                        pass
-                    try:
-                        await _process_single_item(item, batch, moodle, db)
-                    except MoodleAPIError as e:
-                        msg = _format_moodle_error(e, batch.entity_type, item)
-                        logger.exception(f"Error en {batch.entity_type} '{item.identifier}': {msg}")
-                        update_item(db, item.id, "failed", msg)
-                        update_batch_counts(db, batch_id, failed=1)
-                    except Exception as exc:
-                        logger.exception(
-                            f"Error en {batch.entity_type} '{item.identifier}' (lote {batch_id})"
-                        )
-                        update_item(db, item.id, "failed", translate_error(exc))
-                        update_batch_counts(db, batch_id, failed=1)
-            finally:
-                await moodle.close()
+            for item in items:
+                # Re-consultar batch por si fue pausado o cancelado
+                try:
+                    paused = db.query(OperationItem).filter_by(
+                        batch_id=batch_id, status="paused"
+                    ).count()
+                    cancelled = db.query(OperationItem).filter_by(
+                        batch_id=batch_id, status="cancelled"
+                    ).count()
+                    if paused > 0:
+                        logger.info(f"Lote {batch_id} pausado, deteniendo procesamiento ({paused} items)")
+                        break
+                    if cancelled > 0:
+                        logger.info(f"Lote {batch_id} cancelado, deteniendo procesamiento ({cancelled} items)")
+                        break
+                except TypeError:
+                    pass
+                try:
+                    await _process_single_item(item, batch, moodle, db)
+                except MoodleAPIError as e:
+                    msg = _format_moodle_error(e, batch.entity_type, item)
+                    logger.exception(f"Error en {batch.entity_type} '{item.identifier}': {msg}")
+                    update_item(db, item.id, "failed", msg)
+                    update_batch_counts(db, batch_id, failed=1)
+                except Exception as exc:
+                    logger.exception(
+                        f"Error en {batch.entity_type} '{item.identifier}' (lote {batch_id})"
+                    )
+                    update_item(db, item.id, "failed", translate_error(exc))
+                    update_batch_counts(db, batch_id, failed=1)
 
-        asyncio.run(_process_all())
+        run_moodle_async(moodle, _process_all())
 
         complete_batch(db, batch_id)
 

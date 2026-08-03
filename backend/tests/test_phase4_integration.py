@@ -11,8 +11,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.db.session import SessionLocal
-from app.repositories.operation_repo import create_batch
 from app.workers.phases.phase4_people import _create_phase4_items_async as _create_phase4_items
 
 

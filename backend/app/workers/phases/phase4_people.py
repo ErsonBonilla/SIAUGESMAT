@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import uuid
 from functools import wraps
@@ -11,6 +10,7 @@ from app.workers.phases.common import (
     _get_pending_counts,
     _items_exist_for_execution,
 )
+from app.workers.utils import _run_async
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +18,7 @@ logger = logging.getLogger(__name__)
 def _sync_wrap(async_fn):
     @wraps(async_fn)
     def wrapper(*args, **kwargs):
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return asyncio.run(async_fn(*args, **kwargs))
-        return loop.run_until_complete(async_fn(*args, **kwargs))
+        return _run_async(async_fn(*args, **kwargs))
     return wrapper
 
 
@@ -91,7 +87,7 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> D
         if pending:
             logger.info(f"Items FASE 4 ya existen con {sum(pending.values())} pendientes, retomando")
             return pending
-        logger.info(f"Items FASE 4 ya existen y todos procesados, saltando creación")
+        logger.info("Items FASE 4 ya existen y todos procesados, saltando creación")
         return {}
     if not _acquire_advisory_lock(db, execution_id, "4"):
         logger.info(f"Lock FASE 4 ya tomado para ejecución {execution_id}, otro worker crea los items")

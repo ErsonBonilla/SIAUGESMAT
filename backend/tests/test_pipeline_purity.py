@@ -89,17 +89,23 @@ def _forbidden_names(tree: ast.Module) -> list:
 
 def _pipeline_modules():
     assert PIPELINE_DIR.is_dir(), f"No existe el paquete pipeline en {PIPELINE_DIR}"
-    return sorted(p for p in PIPELINE_DIR.glob("*.py") if p.name != "__init__.py")
+    return sorted(
+        p for p in PIPELINE_DIR.glob("**/*.py")
+        if p.name != "__init__.py"
+    )
 
 
 def _tree(path: Path) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
 
+_MODULES = _pipeline_modules()
+
+
 @pytest.mark.parametrize(
     "path",
-    [str(p) for p in _pipeline_modules()],
-    ids=[p.name for p in _pipeline_modules()],
+    [str(p) for p in _MODULES],
+    ids=[p.relative_to(PIPELINE_DIR).as_posix() for p in _MODULES],
 )
 def test_pipeline_module_is_pure(path):
     tree = _tree(Path(path))

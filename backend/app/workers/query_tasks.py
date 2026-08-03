@@ -9,7 +9,6 @@ import time
 from datetime import datetime
 
 from app.celery_app import celery_app
-from app.core.config import settings
 from app.db.session import SessionLocal
 from app.repositories.query_repo import (
     get_query,
@@ -20,6 +19,7 @@ from app.repositories.query_repo import (
 from app.services.moodle_factory import get_moodle_service
 from app.services.moodle_operations import MoodleService
 from app.services.parsers.patterns import SIAUGESMAT_PATTERN, parse_shortname
+from app.workers.utils import run_moodle_async
 
 logger = logging.getLogger(__name__)
 
@@ -142,13 +142,7 @@ def execute_query(self, task_id: str):
 
         moodle = get_moodle_service(qr.modalidad)
 
-        async def _run_and_close():
-            try:
-                return await _do_query(moodle, qr)
-            finally:
-                await moodle.close()
-
-        raw = asyncio.run(_run_and_close())
+        raw = run_moodle_async(moodle, _do_query(moodle, qr))
 
         set_query_completed(db, task_id, raw, len(raw))
 

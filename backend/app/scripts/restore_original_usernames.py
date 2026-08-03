@@ -282,7 +282,7 @@ async def run_audit(ms, pairs: list):
 # Fix: rename back SAFE + AUTH_FIX pairs
 # ---------------------------------------------------------------------------
 async def run_fix(ms, pairs: list):
-    print(f"\n  Renombrando usuarios de vuelta a su username original...\n")
+    print("\n  Renombrando usuarios de vuelta a su username original...\n")
     classified = await classify_all(ms, pairs)
 
     to_fix = [c for c in classified if c["status"] in ("SAFE_RENAME", "AUTH_FIX_RENAME")]
@@ -354,7 +354,6 @@ async def run_recreate_gone(ms, pairs: list):
         firstname = p["firstname"]
         lastname = p["lastname"]
         courses = p["courses"]
-        cedula = p["cedula"]
 
         print(f"  [{i+1}/{len(gone)}] Creando {username} (email={email})...")
         created = await _create_user(ms, username, email, firstname, lastname)
@@ -376,7 +375,7 @@ async def run_recreate_gone(ms, pairs: list):
             print(f"    Matriculas: {enrolled}/{len(courses)}")
         print()
 
-    print(f"  Recreacion completada.\n")
+    print("  Recreacion completada.\n")
 
 
 # ---------------------------------------------------------------------------
@@ -407,9 +406,9 @@ async def run_conflicts_fix(ms, pairs: list):
         if old_user.get("auth") != "manual":
             print(f"    Fijando auth=manual en {p['old']} (id={old_user['id']})...")
             if await _update_user_auth(ms, old_user["id"]):
-                print(f"    [OK] auth=manual")
+                print("    [OK] auth=manual")
             else:
-                print(f"    [FAIL] No se pudo fijar auth")
+                print("    [FAIL] No se pudo fijar auth")
                 continue
 
         # Re-enrol original account from courses data
@@ -426,7 +425,7 @@ async def run_conflicts_fix(ms, pairs: list):
             print(f"    Matriculas: {enrolled}/{len(courses)}")
         print()
 
-    print(f"  Conflictos resueltos.\n")
+    print("  Conflictos resueltos.\n")
 
 
 # ---------------------------------------------------------------------------

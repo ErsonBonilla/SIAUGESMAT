@@ -15,11 +15,8 @@ from app.services.metrics_service import (
     get_latest_execution_data,
 )
 from app.schemas.analytics import (
-    SemesterMetrics,
-    SemaphoreStatus,
     LatestExecution,
 )
-from app.core.config import settings
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +155,6 @@ def test_semaphore_yellow(sample_executions):
     assert status.status == "red"  # duración 7200 >= 7200 → rojo, no amarillo
 
     # Insertemos manualmente una ejecución con tasa de error 2% y duración 3600s (amarillo)
-    from datetime import timedelta
     exec_yellow = Execution(
         filename="yellow.xlsx",
         semester="2025B",

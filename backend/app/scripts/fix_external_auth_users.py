@@ -20,7 +20,7 @@ Ejemplos:
 import argparse
 import asyncio
 import logging
-import sys
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 
@@ -111,6 +111,22 @@ def _get_all_known_usernames() -> list:
             "WHERE action IN ('enrolment_ok', 'user_created_createpassword') "
             "ORDER BY identifier"
         )).fetchall()
+        return [r[0] for r in rows]
+    finally:
+        db.close()
+
+
+def _get_recent_enrolled_usernames(days: int) -> list:
+    """Usernames enrolados o creados por el app en los ultimos `days` dias."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    db = SessionLocal()
+    try:
+        rows = db.execute(text(
+            "SELECT DISTINCT identifier FROM execution_logs "
+            "WHERE action IN ('enrolment_ok', 'user_created_createpassword') "
+            "AND created_at >= :since "
+            "ORDER BY identifier"
+        ), {"since": since}).fetchall()
         return [r[0] for r in rows]
     finally:
         db.close()
@@ -420,7 +436,7 @@ async def main():
             print(f"   Encontrado con auth={auth}.")
             if not args.fix:
                 _print_user(user)
-                print(f"\n   Usa --fix para reparar.\n")
+                print("\n   Usa --fix para reparar.\n")
                 return
             _print_user(user)
             print(f"\n   Cambiando auth={auth} -> manual...")

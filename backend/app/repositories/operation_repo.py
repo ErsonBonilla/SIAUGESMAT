@@ -218,7 +218,6 @@ def get_operations_analytics(db: Session, modalidad: str = None, months: int = 1
         "courses_deleted": 0, "total_errors": 0,
     }
 
-    from collections import defaultdict
     months_data: dict[str, dict] = {}
 
     for b in raw_monthly:

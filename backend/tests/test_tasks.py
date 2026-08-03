@@ -28,7 +28,7 @@ class TestProcessEtlFile:
             mock_db.close.assert_called_once()
 
     @patch("app.workers.tasks.process_etl_phase.delay")
-    @patch("app.workers.tasks._run_async")
+    @patch("app.workers.tasks.run_moodle_async")
     @patch("app.workers.tasks.MoodleIntegration")
     @patch("app.workers.tasks.get_moodle_service")
     @patch("app.workers.tasks.ETLService")

@@ -7,7 +7,7 @@ y un MoodleService/AuthIntegration mockeado.
 
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 from app.db.models import Execution, ExecutionLog
 from app.integrations.moodle import MoodleIntegration

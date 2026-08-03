@@ -57,7 +57,7 @@ async def get_history(
     """
     try:
         return get_history_metrics(db, limit=limit, modalidad=modalidad)
-    except Exception as e:
+    except Exception:
         logger.exception("Error al obtener histórico de métricas")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -92,7 +92,7 @@ async def get_semaphore(
     """
     try:
         return get_semaphore_status(db, semester=semester, modalidad=modalidad)
-    except Exception as e:
+    except Exception:
         logger.exception("Error al calcular el semáforo")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -125,7 +125,7 @@ async def get_latest_execution(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=str(e),
         )
-    except Exception as e:
+    except Exception:
         logger.exception("Error al obtener la última ejecución")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

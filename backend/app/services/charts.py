@@ -1,6 +1,6 @@
 import logging
 import os
-from collections import Counter, defaultdict
+from collections import defaultdict
 from typing import Any, Dict, List, Optional
 
 import plotly.graph_objects as go

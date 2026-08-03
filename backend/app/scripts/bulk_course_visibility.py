@@ -1,10 +1,8 @@
 import argparse
 import asyncio
 import csv
-import sys
 import time
 
-from app.core.config import settings
 from app.services.moodle_factory import get_moodle_service
 
 

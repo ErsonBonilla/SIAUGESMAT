@@ -12,7 +12,6 @@ from unittest.mock import patch
 import pytest
 
 from app.db.session import SessionLocal
-from app.workers.phases.common import _acquire_advisory_lock, _items_exist_for_execution
 
 from app.workers.phases.phase4_people import _create_phase4_items, _create_phase4_items_async
 
@@ -32,13 +31,11 @@ class TestAdvisoryLock:
 
     def test_deterministic_lock_id(self):
         """Mismo execution_id + phase produce siempre el mismo lock_id."""
-        from app.workers.phases.common import _acquire_advisory_lock
         import hashlib
         key = "etl_lock_1_4".encode()
         expected = int(hashlib.sha256(key).hexdigest(), 16) % (2**63)
 
         # Forzar el cálculo igual que en _acquire_advisory_lock
-        from sqlalchemy import text as sql_text
         # No podemos llamar a la función sin DB, pero podemos verificar el hash
         assert expected == int(hashlib.sha256(b"etl_lock_1_4").hexdigest(), 16) % (2**63)
 

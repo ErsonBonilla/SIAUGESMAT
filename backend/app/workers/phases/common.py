@@ -1,16 +1,14 @@
-import asyncio
 import hashlib
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Dict
 
 from celery import chord
 from sqlalchemy import text as sql_text
 
 from app.celery_app import celery_app
-from app.core.config import settings
-from app.db.session import SessionLocal
 from app.db.models import OperationItem
+from app.db.session import SessionLocal
 from app.repositories.execution_repo import (
     clear_checkpoint,
     clear_chord_active,
@@ -23,23 +21,13 @@ from app.repositories.execution_repo import (
     update_progress,
 )
 from app.repositories.log_repo import save_error
-from app.repositories.operation_repo import add_item, create_batch
 from app.services.error_messages import translate_error
-from app.services.moodle_operations import MoodleService
 from app.services.reports import ReportService
+from app.workers.phases.base import MoodleOverloadedError
 from app.workers.phases.item_task import process_etl_item
-from app.workers.phases.base import PhaseContext, MoodleOverloadedError
 from app.workers.utils import reset_stuck_items
 
 logger = logging.getLogger(__name__)
-
-
-def _run_async(coro):
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    return loop.run_until_complete(coro)
 
 
 def _acquire_advisory_lock(db, execution_id: int, phase: str) -> bool:
@@ -216,7 +204,7 @@ def on_users_done(self, results, execution_id):
             chord(task_ids)(on_phase_items_done.s(execution_id=execution_id, phase="4"))
             _mark_chord_active(execution_id)
         else:
-            logger.info(f"on_users_done: sin enrolamientos pendientes")
+            logger.info("on_users_done: sin enrolamientos pendientes")
             on_phase_items_done.delay([], execution_id, "4")
     except Exception as e:
         logger.exception(f"Error en on_users_done: {e}")

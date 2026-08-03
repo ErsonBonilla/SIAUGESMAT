@@ -1,22 +1,19 @@
-import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from sqlalchemy import func
 
 from app.celery_app import celery_app
-from app.core.config import settings
 from app.core.logging_config import ExecutionContextFilter
 from app.db.session import SessionLocal
 from app.integrations.moodle import MoodleIntegration
-from app.db.models import OperationItem
 from app.repositories.execution_repo import increment_metric, should_cancel
 from app.repositories.log_repo import save_error, save_log
 from app.repositories.operation_repo import claim_item, get_item, update_item
 from app.services.error_messages import translate_error
 from app.services.moodle_errors import MoodleOverloadedError, is_moodle_overloaded
 from app.services.moodle_factory import get_moodle_service
-from app.workers.utils import reset_stuck_items
+from app.workers.utils import reset_stuck_items, run_moodle_async
 
 logger = logging.getLogger(__name__)
 
@@ -85,57 +82,54 @@ def process_etl_item(self, item_id: int):
 
         async def _execute():
             success = False
-            try:
-                if action == "delete":
-                    success = await integration.delete_course(identifier)
-                elif action == "activate":
-                    success = await integration.activate_course(identifier)
-                elif action == "hide":
-                    success = await integration.hide_course(identifier)
-                elif action == "rename":
-                    success = await integration.rename_course(
-                        old_shortname=detail.get("old_shortname", identifier),
-                        new_shortname=identifier,
-                        new_fullname=detail.get("fullname", ""),
-                    )
-                elif action == "create":
-                    success = await integration.create_course(
-                        shortname=identifier,
-                        fullname=detail.get("fullname", ""),
-                        category_idnumber=detail.get("category_idnumber", ""),
-                        template_id=detail.get("template_id"),
-                        recreate=detail.get("recreate", False),
-                    )
-                elif action == "create_user":
-                    username, created = await integration.create_user_if_not_exists({
-                        "username": identifier,
-                        "firstname": detail.get("firstname", ""),
-                        "lastname": detail.get("lastname", ""),
-                        "email": detail.get("email", ""),
-                        "password": detail.get("password", ""),
-                        "cedula": detail.get("cedula", ""),
-                        "city": detail.get("city", ""),
-                        "description": detail.get("description", ""),
-                    })
-                    success = username is not None
-                    if success and created and execution_id:
-                        save_log(db, execution_id, "4", "user_created_createpassword",
-                                 username, detail)
-                elif action == "enrol":
-                    course_id = detail.get("_course_id")
-                    course_map = {detail.get("course_shortname", ""): course_id} if course_id else None
-                    result = await integration.enrol_teacher(
-                        username=identifier,
-                        course_shortname=detail.get("course_shortname", ""),
-                        course_map=course_map,
-                    )
-                    success = result["success"]
-                else:
-                    update_item(db, item.id, "failed", f"Acción desconocida: {action}")
-                    db.commit()
-                    return
-            finally:
-                await moodle.close()
+            if action == "delete":
+                success = await integration.delete_course(identifier)
+            elif action == "activate":
+                success = await integration.activate_course(identifier)
+            elif action == "hide":
+                success = await integration.hide_course(identifier)
+            elif action == "rename":
+                success = await integration.rename_course(
+                    old_shortname=detail.get("old_shortname", identifier),
+                    new_shortname=identifier,
+                    new_fullname=detail.get("fullname", ""),
+                )
+            elif action == "create":
+                success = await integration.create_course(
+                    shortname=identifier,
+                    fullname=detail.get("fullname", ""),
+                    category_idnumber=detail.get("category_idnumber", ""),
+                    template_id=detail.get("template_id"),
+                    recreate=detail.get("recreate", False),
+                )
+            elif action == "create_user":
+                username, created = await integration.create_user_if_not_exists({
+                    "username": identifier,
+                    "firstname": detail.get("firstname", ""),
+                    "lastname": detail.get("lastname", ""),
+                    "email": detail.get("email", ""),
+                    "password": detail.get("password", ""),
+                    "cedula": detail.get("cedula", ""),
+                    "city": detail.get("city", ""),
+                    "description": detail.get("description", ""),
+                })
+                success = username is not None
+                if success and created and execution_id:
+                    save_log(db, execution_id, "4", "user_created_createpassword",
+                             username, detail)
+            elif action == "enrol":
+                course_id = detail.get("_course_id")
+                course_map = {detail.get("course_shortname", ""): course_id} if course_id else None
+                result = await integration.enrol_teacher(
+                    username=identifier,
+                    course_shortname=detail.get("course_shortname", ""),
+                    course_map=course_map,
+                )
+                success = result["success"]
+            else:
+                update_item(db, item.id, "failed", f"Acción desconocida: {action}")
+                db.commit()
+                return
 
             if success:
                 update_item(db, item.id, "completed")
@@ -149,7 +143,7 @@ def process_etl_item(self, item_id: int):
             db.commit()
 
         try:
-            asyncio.run(_execute())
+            run_moodle_async(moodle, _execute())
         except MoodleOverloadedError:
             db.commit()
             raise

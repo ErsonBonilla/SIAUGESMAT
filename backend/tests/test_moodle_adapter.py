@@ -4,7 +4,6 @@ y MoodleAdapterFactory).
 """
 
 import pytest
-from unittest.mock import AsyncMock
 
 from app.services.moodle_adapter import (
     Moodle3Adapter,
