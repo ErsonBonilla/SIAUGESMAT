@@ -167,7 +167,7 @@ class TestProcessEtlItem:
              patch("app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()), \
              patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
              patch("app.workers.phases.item_task.update_item"), \
-             patch("app.workers.phases.item_task.save_log"), \
+             patch("app.workers.phases.item_task.save_log") as mock_save_log, \
              patch("app.workers.phases.item_task._refresh_phase_progress"), \
              patch("app.workers.phases.item_task.claim_item", return_value=True):
             mock_integ = AsyncMock()
@@ -179,6 +179,12 @@ class TestProcessEtlItem:
             mock_get.return_value = item
             mock_sl.return_value = MagicMock()
             process_etl_item(1)
+            mock_save_log.assert_called_once()
+            _, _, _, action, identifier, detail = mock_save_log.call_args[0]
+            assert action == "user_created_createpassword"
+            assert identifier == "newuser"
+            assert detail["auth"] == "manual"
+            assert detail["base_db"] == "Manual"
 
     def test_create_user_failure(self):
         with patch("app.workers.phases.item_task.SessionLocal") as mock_sl, \

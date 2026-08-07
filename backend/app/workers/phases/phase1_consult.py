@@ -62,12 +62,25 @@ class ConsultPhase(BasePhase):
                 u["email_personal"] for u in etl_users if u.get("email_personal")
             }
 
+            def _persist_email_conflicts(integration=None):
+                conflicts = getattr(integration, "last_email_conflicts", [])
+                for conflict in conflicts:
+                    log_repo.save_log(db, eid, "1", "identity_by_email_duplicate",
+                                      conflict.get("email", ""), {
+                                          "usernames": conflict.get("usernames", []),
+                                          "selected": conflict.get("selected", ""),
+                                          "selected_id": conflict.get("selected_id"),
+                                          "criterion": "oldest",
+                                      })
+
             institutional_map = await integration.find_users_by_emails(
                 list(all_institutional)
             ) if all_institutional else {}
+            _persist_email_conflicts(integration)
             personal_map = await integration.find_users_by_emails(
                 list(all_personal - all_institutional)
             ) if all_personal else {}
+            _persist_email_conflicts(integration)
             username_index = await integration.find_users_by_usernames(
                 [u.get("username", "") for u in etl_users if u.get("username")]
             )
