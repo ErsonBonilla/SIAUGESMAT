@@ -5,6 +5,7 @@ from app.pipeline.users import (
     lookup_teacher_candidates,
     names_differ,
     normalize_name,
+    pick_oldest_user,
     resolve_users,
 )
 
@@ -127,6 +128,45 @@ class TestResolveUsers:
             {},
         )
         assert username_map == {"doc1": "por_email"}
+
+
+class TestPickOldestUser:
+    def test_picks_lowest_timecreated(self):
+        users = [
+            {"id": "2", "username": "nuevo", "timecreated": "200"},
+            {"id": "1", "username": "viejo", "timecreated": "100"},
+        ]
+        assert pick_oldest_user(users)["username"] == "viejo"
+
+    def test_ties_break_by_lowest_id(self):
+        users = [
+            {"id": "3", "username": "c", "timecreated": "100"},
+            {"id": "1", "username": "a", "timecreated": "100"},
+            {"id": "2", "username": "b", "timecreated": "100"},
+        ]
+        assert pick_oldest_user(users)["username"] == "a"
+
+    def test_falls_back_to_lowest_id_without_timecreated(self):
+        # core_user_get_users_by_field puede no exponer timecreated.
+        users = [
+            {"id": "5", "username": "nuevo"},
+            {"id": "2", "username": "viejo"},
+        ]
+        assert pick_oldest_user(users)["username"] == "viejo"
+
+    def test_prefers_users_with_timecreated(self):
+        users = [
+            {"id": "1", "username": "sin_tc"},
+            {"id": "2", "username": "con_tc", "timecreated": "50"},
+        ]
+        assert pick_oldest_user(users)["username"] == "con_tc"
+
+    def test_single_user(self):
+        users = [{"id": "1", "username": "unico", "timecreated": "0"}]
+        assert pick_oldest_user(users)["username"] == "unico"
+
+    def test_empty_list_returns_none(self):
+        assert pick_oldest_user([]) is None
 
 
 class TestIndexTeachers:

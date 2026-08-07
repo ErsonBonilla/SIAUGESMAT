@@ -13,6 +13,31 @@ User = dict[str, object]
 Event = tuple[str, str, dict[str, object]]
 
 
+def pick_oldest_user(users: list[dict]) -> dict | None:
+    """Selecciona el usuario más antiguo de una lista con el mismo identificador.
+
+    Moodle puede devolver varios usuarios para un mismo email/username/cédula.
+    Se elige el de menor ``timecreated``; por desempate, el de menor ``id``.
+    Si ningún usuario trae ``timecreated`` (p. ej. ``core_user_get_users_by_field``
+    no lo expone), se usa el menor ``id`` (los ids de Moodle son secuenciales y
+    equivalen a antigüedad).
+
+    Pura, sin I/O.
+    """
+    if not users:
+        return None
+    with_time = [u for u in users if (u.get("timecreated") or 0)]
+    if with_time:
+        return min(
+            with_time,
+            key=lambda u: (int(u.get("timecreated") or 0), int(u.get("id") or 0)),
+        )
+    return min(
+        users,
+        key=lambda u: (int(u.get("id") or 0), int(u.get("timecreated") or 0)),
+    )
+
+
 def normalize_name(name: str) -> str:
     """Normaliza un nombre para comparación: minúsculas y sin tildes."""
     text = "".join(

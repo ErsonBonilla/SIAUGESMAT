@@ -41,6 +41,7 @@ class ReportService:
         "audit_conflictos_identidad": "14_audit_conflictos_identidad.csv",
         "audit_plan_acciones": "15_audit_plan_acciones.csv",
         "audit_errores": "16_audit_errores.csv",
+        "usuarios_creados_manual": "17_usuarios_creados_manual.csv",
     }
 
     @classmethod
@@ -296,6 +297,17 @@ class ReportService:
                 str(round(log.detail.get("age_seconds", 0) / 86400, 1)),
             ],
         },
+        {
+            "key": "usuarios_creados_manual",
+            "headers": ["Username", "Correo institucional", "Nombre y Apellidos", "Base de datos"],
+            "match": lambda log: log.action == "user_created_createpassword" and log.detail is not None,
+            "extract": lambda log: [
+                log.identifier or "",
+                log.detail.get("email", ""),
+                f"{log.detail.get('firstname', '')} {log.detail.get('lastname', '')}".strip(),
+                "Manual",
+            ],
+        },
         # Errores — desde ErrorLog (se procesa aparte en generate_all)
     ]
 
@@ -343,7 +355,7 @@ class ReportService:
             ("Cursos ocultados", "course_hidden"),
             ("Cursos renombrados", "course_renamed"),
             ("Cursos activados", "course_activated"),
-            ("Usuarios nuevos", "user_created_createpassword"),
+            ("Usuarios nuevos (Base manual)", "user_created_createpassword"),
             ("Usuarios existentes (resueltos)", "user_resolved"),
             ("Matriculaciones exitosas", "enrolment_ok"),
             ("Matriculaciones fallidas", "enrolment_failed"),

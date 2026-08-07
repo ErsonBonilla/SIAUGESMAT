@@ -12,6 +12,7 @@ import logging
 from typing import Any
 
 from app.core.config import settings
+from app.pipeline.users import pick_oldest_user
 from app.services.moodle_error_handler import extract_error, handle_moodle_errors
 from app.services.moodle_errors import MoodleOverloadedError, is_moodle_overloaded
 from app.services.moodle_operations import MoodleService
@@ -24,6 +25,7 @@ class MoodleIntegration:
     def __init__(self, service: MoodleService):
         self.service = service
         self.last_error = ""
+        self.last_email_conflicts: list[dict] = []
 
     # ------------------------------------------------------------------
     # Cursos
@@ -204,10 +206,31 @@ class MoodleIntegration:
         if not clean:
             return result
         users = await self.service.get_users("email", clean)
+        grouped: dict[str, list[dict]] = {}
         for u in users:
             email = (u.get("email") or "").strip().lower()
             if email:
-                result[email] = u
+                grouped.setdefault(email, []).append(u)
+
+        self.last_email_conflicts = []
+        for email, matches in grouped.items():
+            oldest = pick_oldest_user(matches)
+            if oldest is None:
+                continue
+            result[email] = oldest
+            if len(matches) > 1:
+                conflict = {
+                    "email": email,
+                    "usernames": [m.get("username", "") for m in matches],
+                    "selected": oldest.get("username", ""),
+                    "selected_id": oldest.get("id"),
+                }
+                self.last_email_conflicts.append(conflict)
+                logger.warning(
+                    f"Email duplicado en Moodle {email}: usernames="
+                    f"{conflict['usernames']}; eligiendo el más antiguo "
+                    f"'{conflict['selected']}' (id={conflict['selected_id']})"
+                )
         return result
 
     @handle_moodle_errors(log_message="Error al buscar usuarios por username en lote", default_return={})
@@ -219,10 +242,15 @@ class MoodleIntegration:
         if not clean:
             return result
         users = await self.service.get_users("username", clean)
+        grouped: dict[str, list[dict]] = {}
         for u in users:
             uname = (u.get("username") or "").strip()
             if uname:
-                result[uname] = u
+                grouped.setdefault(uname, []).append(u)
+        for uname, matches in grouped.items():
+            oldest = pick_oldest_user(matches)
+            if oldest is not None:
+                result[uname] = oldest
         return result
 
     @handle_moodle_errors(log_message="Error al buscar usuarios por cédula en lote", default_return={})
@@ -234,10 +262,15 @@ class MoodleIntegration:
         if not clean:
             return result
         users = await self.service.get_users("idnumber", clean)
+        grouped: dict[str, list[dict]] = {}
         for u in users:
             idn = (u.get("idnumber") or "").strip()
             if idn:
-                result[idn] = u
+                grouped.setdefault(idn, []).append(u)
+        for idn, matches in grouped.items():
+            oldest = pick_oldest_user(matches)
+            if oldest is not None:
+                result[idn] = oldest
         return result
 
     @staticmethod
@@ -322,6 +355,12 @@ class MoodleIntegration:
                 self.last_error = f"El usuario {username_esperado} no fue creado a pesar de respuesta exitosa de la API"
                 logger.error(self.last_error)
                 return None, False
+            created_auth = (created_user.get("auth") or "").strip().lower()
+            if created_auth and created_auth != "manual":
+                logger.warning(
+                    f"El usuario {username_esperado} quedó con auth='{created_auth}' "
+                    f"(esperado 'manual'). No se intenta crear en otra base de datos."
+                )
             logger.info(f"Usuario creado: {username_esperado}")
             return username_esperado, True
         except Exception as e:

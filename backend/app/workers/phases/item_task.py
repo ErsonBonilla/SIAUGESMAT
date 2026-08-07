@@ -116,7 +116,7 @@ def process_etl_item(self, item_id: int):
                 success = username is not None
                 if success and created and execution_id:
                     save_log(db, execution_id, "4", "user_created_createpassword",
-                             username, detail)
+                             username, {**detail, "auth": "manual", "base_db": "Manual"})
             elif action == "enrol":
                 course_id = detail.get("_course_id")
                 course_map = {detail.get("course_shortname", ""): course_id} if course_id else None

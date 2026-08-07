@@ -15,6 +15,7 @@ export const REPORT_LABELS: Record<string, string> = {
   audit_conflictos_identidad: "Auditoría: Conflictos de identidad",
   audit_plan_acciones: "Auditoría: Plan de acciones",
   audit_errores: "Auditoría: Errores del proceso",
+  usuarios_creados_manual: "Auditoría: Usuarios creados (Base manual)",
 };
 
 export function formatSize(bytes: number): string {

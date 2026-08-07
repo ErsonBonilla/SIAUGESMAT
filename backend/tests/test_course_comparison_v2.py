@@ -86,6 +86,22 @@ class TestComplete:
         assert len(r["to_hide"]) >= 1 and len(r["to_create"]) >= 1
 
     @pytest.mark.asyncio
+    async def test_6b_suffix_migration_resolved_username(self):
+        # El username Moodle resuelto puede diferir del prefijo del correo
+        # institucional (docente3@ut.edu.co → docente3_alt). Como la matrícula
+        # ya usa el username real resuelto, el rename por agregar cédula sigue
+        # disparándose al coincidir con el editingteacher del curso.
+        old = "IBA_0854_sIV_2022481_G-1"
+        new = "IBA_0854_sIV_2022481_G-1_10000001"
+        r = await CourseComparisonService.compare(
+            [_mc(old, customfields=[{"shortname": "professor", "value": "docente3_alt"}])],
+            [_nc(new)],
+            [{"course_shortname": new, "username": "docente3_alt"}],
+            courses_with_teacher={old: "docente3_alt"})
+        u = [x for x in r["to_update"] if x["shortname"] == new]
+        assert len(u) == 1 and u[0]["old_shortname"] == old
+
+    @pytest.mark.asyncio
     async def test_7_disappeared_old(self):
         sn = "IDE_0105_sI_202_G-01"
         r = await CourseComparisonService.compare(

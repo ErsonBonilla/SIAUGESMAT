@@ -129,6 +129,27 @@ class TestReportGeneration:
         assert data[2][1] == "course_deleted"
         assert data[2][4] == "10.0"
 
+    def test_usuarios_creados_manual(self):
+        logs = [
+            _make_log("user_created_createpassword", phase="4",
+                      identifier="maria.perez",
+                      detail={"firstname": "María", "lastname": "Pérez",
+                              "email": "mperez@ut.edu.co"}),
+            _make_log("user_resolved", phase="1", identifier="doc.existente",
+                      detail={"firstname": "Juan", "lastname": "Díaz",
+                              "email": "jdiaz@ut.edu.co"}),
+        ]
+        _process_report_config(self.tmpdir, "usuarios_creados_manual", logs)
+        data = self._read_csv("17_usuarios_creados_manual.csv")
+        assert data is not None
+        assert len(data) == 2  # header + 1 row (solo creados, no resueltos)
+        assert data[0] == ["Username", "Correo institucional",
+                           "Nombre y Apellidos", "Base de datos"]
+        assert data[1][0] == "maria.perez"
+        assert data[1][1] == "mperez@ut.edu.co"
+        assert data[1][2] == "María Pérez"
+        assert data[1][3] == "Manual"
+
 
 class TestReportServiceIntegration:
 
