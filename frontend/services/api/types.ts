@@ -176,6 +176,7 @@ export interface InactiveTeacherRow {
   cat: string;
   cat_prefix: string;
   last_access: number;
+  days_since_last_access?: number;
 }
 
 export interface InactiveTeachersResponse {
