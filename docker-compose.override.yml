@@ -6,7 +6,7 @@ services:
   backend:
     volumes:
       - ./backend/app:/app/app:ro
-    ports: ["8000:8000"]
+    ports: ["8100:8000"]
   worker:
     volumes:
       - ./backend/app:/app/app:ro
