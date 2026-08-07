@@ -33,8 +33,8 @@ const RENDERERS: Record<
 export interface Filter {
   key: string;
   label: string;
-  type: "select";
-  options: { value: string; label: string }[];
+  type: "select" | "checkbox";
+  options?: { value: string; label: string }[];
 }
 
 interface QueryTableProps {
@@ -69,7 +69,12 @@ export default function QueryTable(
     data.value = [];
     taskStatus.value = null;
     try {
-      const params: Record<string, string> = { ...filterValues.value };
+      const params: Record<string, string> = {};
+      for (const [k, v] of Object.entries(filterValues.value)) {
+        if (v && v !== "false") {
+          params[k] = v;
+        }
+      }
       if (search.value.trim()) {
         params[searchKey] = search.value.trim();
       }
@@ -137,19 +142,40 @@ export default function QueryTable(
   return (
     <div>
       <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
-        {filters?.map((f) => (
-          <select
-            key={f.key}
-            value={filterValues.value[f.key] || f.options[0].value}
-            onChange={(e) =>
-              handleFilterChange(f.key, (e.target as HTMLSelectElement).value)}
-            class="border border-[var(--border-secondary)] rounded px-3 py-1.5 text-sm bg-[var(--bg-primary)] text-[var(--text-primary)]"
-          >
-            {f.options.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-        ))}
+        {filters?.map((f) =>
+          f.type === "checkbox"
+            ? (
+              <label
+                key={f.key}
+                class="flex items-center gap-2 text-sm text-[var(--text-secondary)] cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={filterValues.value[f.key] === "true"}
+                  onChange={(e) =>
+                    handleFilterChange(
+                      f.key,
+                      (e.target as HTMLInputElement).checked ? "true" : "false",
+                    )}
+                  class="h-4 w-4 accent-[var(--brand-green)]"
+                />
+                {f.label}
+              </label>
+            )
+            : (
+              <select
+                key={f.key}
+                value={filterValues.value[f.key] || f.options![0].value}
+                onChange={(e) =>
+                  handleFilterChange(f.key, (e.target as HTMLSelectElement).value)}
+                class="border border-[var(--border-secondary)] rounded px-3 py-1.5 text-sm bg-[var(--bg-primary)] text-[var(--text-primary)]"
+              >
+                {f.options!.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            )
+        )}
 
         {searchPlaceholder && (
           <form onSubmit={handleSearch} class="flex gap-2">

@@ -23,6 +23,7 @@ const COLUMNS = [
   { key: "program", label: "Programa" },
   { key: "cat", label: "CAT" },
   { key: "last_access", label: "Último acceso" },
+  { key: "days_since_last_access", label: "Días sin acceso" },
 ];
 
 function formatLastAccess(ts: number): string {
@@ -30,8 +31,19 @@ function formatLastAccess(ts: number): string {
   return new Date(ts * 1000).toLocaleString();
 }
 
+function formatDaysSince(daysSince?: number): string {
+  if (!daysSince || daysSince <= 0) return "Nunca";
+  return `${daysSince} d`;
+}
+
+type CutoffMode = "days" | "months" | "years" | "semester";
+
 export default function InactiveTeachersQuery() {
+  const cutoffMode = useSignal<CutoffMode>("days");
   const semester = useSignal("");
+  const days = useSignal(15);
+  const months = useSignal(1);
+  const years = useSignal(1);
   const data = useSignal<InactiveTeacherRow[]>([]);
   const loading = useSignal(false);
   const error = useSignal("");
@@ -52,9 +64,34 @@ export default function InactiveTeachersQuery() {
   }, []);
 
   const startQuery = async () => {
-    if (!semester.value) {
-      error.value = "Seleccione un semestre.";
-      return;
+    const params: Record<string, string> = {};
+    if (cutoffMode.value === "days") {
+      const d = Number(days.value);
+      if (!Number.isInteger(d) || d < 1 || d > 30) {
+        error.value = "Ingrese un número de días válido (1–30).";
+        return;
+      }
+      params.days = String(d);
+    } else if (cutoffMode.value === "months") {
+      const m = Number(months.value);
+      if (!Number.isInteger(m) || m < 1 || m > 12) {
+        error.value = "Ingrese un número de meses válido (1–12).";
+        return;
+      }
+      params.months = String(m);
+    } else if (cutoffMode.value === "years") {
+      const y = Number(years.value);
+      if (!Number.isInteger(y) || y < 1) {
+        error.value = "Ingrese un número de años válido (≥ 1).";
+        return;
+      }
+      params.years = String(y);
+    } else {
+      if (!semester.value) {
+        error.value = "Seleccione un semestre.";
+        return;
+      }
+      params.semester = semester.value;
     }
     loading.value = true;
     error.value = "";
@@ -62,9 +99,7 @@ export default function InactiveTeachersQuery() {
     taskStatus.value = null;
     started.value = false;
     try {
-      const result = await queryEntities("inactive_teachers", {
-        semester: semester.value,
-      });
+      const result = await queryEntities("inactive_teachers", params);
       taskId.value = result.task_id;
       startPolling(result.task_id);
     } catch (err) {
@@ -111,24 +146,111 @@ export default function InactiveTeachersQuery() {
   return (
     <div class="space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-end gap-4">
-        <div>
-          <label class="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-            Semestre de corte
-          </label>
-          <SemesterPicker
-            value={semester.value}
-            onChange={(s) => {
-              semester.value = s;
-              error.value = "";
-            }}
-            minYear={2020}
-          />
+        <div class="flex flex-col gap-2">
+          <div class="flex gap-1 bg-[var(--bg-tertiary)] rounded-lg p-1 w-fit flex-wrap">
+            {(["days", "months", "years", "semester"] as const).map((mode) => {
+              const labels: Record<CutoffMode, string> = {
+                days: "Por días",
+                months: "Por meses",
+                years: "Por años",
+                semester: "Por semestre",
+              };
+              return (
+                <button
+                  type="button"
+                  key={mode}
+                  onClick={() => cutoffMode.value = mode}
+                  class={`px-3 py-1 rounded-md text-sm font-medium transition ${
+                    cutoffMode.value === mode
+                      ? "bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm"
+                      : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {labels[mode]}
+                </button>
+              );
+            })}
+          </div>
+          {cutoffMode.value === "days" && (
+            <div>
+              <label class="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Días sin acceso (mínimo)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={30}
+                value={days.value}
+                onChange={(e) => {
+                  days.value = Number(e.currentTarget.value);
+                  error.value = "";
+                }}
+                class="px-3 py-2 border rounded-md w-32 bg-[var(--bg-primary)] text-[var(--text-primary)]"
+              />
+            </div>
+          )}
+          {cutoffMode.value === "months" && (
+            <div>
+              <label class="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Meses sin acceso (mínimo)
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={12}
+                value={months.value}
+                onChange={(e) => {
+                  months.value = Number(e.currentTarget.value);
+                  error.value = "";
+                }}
+                class="px-3 py-2 border rounded-md w-32 bg-[var(--bg-primary)] text-[var(--text-primary)]"
+              />
+            </div>
+          )}
+          {cutoffMode.value === "years" && (
+            <div>
+              <label class="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Años sin acceso (mínimo)
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={years.value}
+                onChange={(e) => {
+                  years.value = Number(e.currentTarget.value);
+                  error.value = "";
+                }}
+                class="px-3 py-2 border rounded-md w-32 bg-[var(--bg-primary)] text-[var(--text-primary)]"
+              />
+            </div>
+          )}
+          {cutoffMode.value === "semester" && (
+            <div>
+              <label class="block text-sm font-medium text-[var(--text-secondary)] mb-2">
+                Semestre de corte
+              </label>
+              <SemesterPicker
+                value={semester.value}
+                onChange={(s) => {
+                  semester.value = s;
+                  error.value = "";
+                }}
+                minYear={2020}
+              />
+            </div>
+          )}
         </div>
 
         <button
           type="button"
           onClick={startQuery}
-          disabled={loading.value || !semester.value}
+          disabled={loading.value ||
+            (cutoffMode.value === "days" &&
+              (!Number.isInteger(days.value) || days.value < 1 || days.value > 30)) ||
+            (cutoffMode.value === "months" &&
+              (!Number.isInteger(months.value) || months.value < 1 || months.value > 12)) ||
+            (cutoffMode.value === "years" && (!Number.isInteger(years.value) || years.value < 1)) ||
+            (cutoffMode.value === "semester" && !semester.value)}
           class="px-3 py-1.5 bg-[var(--brand-green)] text-white rounded text-sm hover:brightness-90 disabled:opacity-60 self-start mt-6"
         >
           {loading.value
@@ -203,7 +325,7 @@ export default function InactiveTeachersQuery() {
                       colSpan={COLUMNS.length}
                       class="py-12 text-center text-[var(--text-muted)]"
                     >
-                      Seleccione un semestre y presione "Consultar".
+                      Seleccione el corte (días o semestre) y presione "Consultar".
                     </td>
                   </tr>
                 )
@@ -235,6 +357,9 @@ export default function InactiveTeachersQuery() {
                     </td>
                     <td class="py-2 px-3 text-[var(--text-primary)]">
                       {formatLastAccess(row.last_access)}
+                    </td>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">
+                      {formatDaysSince(row.days_since_last_access)}
                     </td>
                   </tr>
                 ))}

@@ -37,7 +37,7 @@ ENTITY_CSV_HEADERS = {
     "users": ["Username", "Email", "Nombres", "Apellidos", "Último login"],
     "inactive_teachers": [
         "Docente", "Username", "Correo", "Curso", "Shortname",
-        "Programa", "CAT", "Último acceso",
+        "Programa", "CAT", "Último acceso", "Días sin acceso",
     ],
 }
 
@@ -63,6 +63,8 @@ ENTITY_CSV_EXTRACT = {
         r.get("program", ""), r.get("cat", ""),
         "Nunca" if r.get("last_access", 0) == 0
         else datetime.fromtimestamp(r["last_access"], tz=UTC).strftime("%Y-%m-%d %H:%M"),
+        "Nunca" if r.get("last_access", 0) == 0
+        else str(r.get("days_since_last_access", "")),
     ],
 }
 

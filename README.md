@@ -120,10 +120,10 @@ Consulta cursos, categorías, usuarios y docentes inactivos en Moodle sin timeou
 | Descargar CSV | `GET /queries/tasks/{id}/download` |
 
 **Entidades disponibles**:
-- `courses` — filtros por shortname, estado (>6 meses sin uso), formato de código (5 o 6 segmentos)
+- `courses` — filtros por shortname, estado (>6 meses sin uso; o sin docente/no matriculados), formato de código (5 o 6 segmentos)
 - `categories` — búsqueda por idnumber
 - `users` — búsqueda por username/email/nombre (coincidencia exacta; el webservice Moodle no expone búsqueda por substring ni listado completo de usuarios)
-- `inactive_teachers` — docentes (**editingteacher**) que no han accedido a sus cursos desde el inicio de un semestre seleccionado. Consulta todos los cursos SIAUGESMAT en Moodle, obtiene los profesores matriculados con su `lastcourseaccess` y los filtra por la fecha de corte del semestre. Devuelve: nombre del docente, username, correo, curso, programa académico (código de 4 dígitos) y CAT (prefijo de 3 letras). Procesado en lotes paralelos (5 cursos simultáneos).
+- `inactive_teachers` — docentes (**editingteacher**) que no han accedido a sus cursos desde un corte: **por días** (1–30, default 15), **por meses** (1–12, default 1), **por años** (≥ 1, default 1, sin tope superior) o **por semestre** (ej. `2026A`). Se requiere exactamente un corte por consulta. Consulta todos los cursos SIAUGESMAT en Moodle, obtiene los profesores matriculados con su `lastcourseaccess` y los filtra por la fecha de corte (el semestre usa la fecha de inicio). Devuelve: nombre del docente, username, correo, curso, programa académico (código de 4 dígitos), CAT (prefijo de 3 letras) y días sin acceso. Procesado en lotes paralelos (5 cursos simultáneos).
 
 > **Nota sobre el webservice Moodle:** el servicio web de la universidad no habilita
 > `core_role_assign_get_role_assignments` ni `core_user_search_identity`, por lo que la
@@ -163,7 +163,7 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | `/cursos/eliminar` | CsvUploader — eliminación masiva de cursos vía CSV |
 | `/cursos/visibilidad` | BulkVisibilityIsland — mostrar/ocultar cursos masivamente vía CSV |
 | `/usuarios/crear` | CsvUploader — creación masiva de usuarios |
-| `/usuarios/consultar` | QueryTable + InactiveTeachersQuery — búsqueda de usuarios por username/email (modo normal) y consulta de **docentes que no han accedido a sus cursos** desde el inicio de un semestre seleccionado, con datos de programa y CAT |
+| `/usuarios/consultar` | QueryTable + InactiveTeachersQuery — búsqueda de usuarios por username/email (modo normal) y consulta de **docentes que no han accedido a sus cursos** (por días, default 15, o por semestre), con datos de programa y CAT |
 | `/usuarios/eliminar` | CsvUploader — eliminación masiva de usuarios |
 | `/categorias/crear` | CsvUploader — creación masiva de categorías |
 | `/categorias/consultar` | QueryTable — búsqueda de categorías por idnumber |
@@ -184,7 +184,7 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | `BulkVisibilityIsland` | Selector mostrar/ocultar + carga CSV + polling de progreso de visibilidad de cursos |
 | `QueryTable` | Búsqueda asíncrona con polling y descarga CSV |
 | `NovedadesIsland` | Subir Excel de nueva carga académica, comparar con la ejecución anterior del mismo semestre, detectar cambios de profesores y aplicar acciones (ocultar/crear/rehabilitar cursos) |
-| `InactiveTeachersQuery` | Seleccionar semestre de corte y consultar docentes editingteacher que no han accedido a sus cursos desde esa fecha, con resultados de programa y CAT |
+| `InactiveTeachersQuery` | Seleccionar corte (días de inactividad, default 15, o semestre) y consultar docentes editingteacher que no han accedido a sus cursos desde esa fecha, con resultados de programa y CAT |
 | `Historico` | Evolución semestral y comparación con Chart.js |
 | `HistoricoOperaciones` | Gráfico Plotly theme-aware con métricas adaptativas por operación |
 | `Sidebar` | Navegación con 4 tarjetas (Usuarios, Cursos, Categorías, Operaciones), avatar, ThemeToggle |

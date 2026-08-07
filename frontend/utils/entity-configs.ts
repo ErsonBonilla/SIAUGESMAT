@@ -24,6 +24,11 @@ export const ENTITY_CONSULT_CONFIGS: Record<string, EntityConfig> = {
     searchPlaceholder: "Buscar por shortname...",
     filters: [
       {
+        key: "orphan",
+        label: "Huérfanos (sin docente)",
+        type: "checkbox",
+      },
+      {
         key: "status",
         label: "Estado",
         type: "select",
