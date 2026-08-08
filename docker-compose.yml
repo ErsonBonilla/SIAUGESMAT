@@ -31,7 +31,7 @@ services:
   # 2. Redis (cola de tareas Celery)
   # --------------------------------------------------------------------------
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     container_name: siaugesmat-redis
     restart: unless-stopped
     command: redis-server --appendonly yes
@@ -275,7 +275,7 @@ services:
   # 8. Nginx (reverse proxy HTTPS)
   # --------------------------------------------------------------------------
   nginx:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     container_name: siaugesmat-nginx
     restart: unless-stopped
     ports:
