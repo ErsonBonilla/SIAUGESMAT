@@ -1,7 +1,11 @@
 import argparse
 import asyncio
 import csv
+import sys
 import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.services.moodle_factory import get_moodle_service
 

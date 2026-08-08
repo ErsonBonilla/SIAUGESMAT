@@ -2,7 +2,7 @@
 
 **Sistema de Integración y Automatización para la Gestión de Matrículas en Moodle**
 
-Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle 3.9)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 5 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 16 reportes CSV con información detallada, 5 gráficos Plotly profesionales, dashboard de analítica y semáforos de estado en tiempo real.
+Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle 3.9)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 5 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 16 reportes CSV con información detallada, 5 gráficos profesionales, dashboard de analítica y semáforos de estado en tiempo real.
 
 ---
 
@@ -10,12 +10,12 @@ Aplicación full-stack para la Universidad del Tolima que automatiza la carga ma
 
 | Capa | Tecnología |
 |---|---|
-| **Frontend** | Deno 2 + Fresh + Preact + Signals + Plotly.js |
+| **Frontend** | Deno 2 + Fresh + Preact + Signals + Chart.js |
 | **Backend** | Python 3.12 + FastAPI + SQLAlchemy + Celery + Redis |
 | **Base de datos** | PostgreSQL 17 |
 | **Cola de tareas** | Redis 7 + Celery (+ Celery Beat para tareas periódicas) |
 | **Integración Moodle** | API REST (versiones 3.8 a 5.x) vía adapter pattern + rate limiting |
-| **Reportes** | CSV + gráficos Plotly (PNG, HTML interactivo, JSON) |
+| **Reportes** | CSV + gráficos (PNG, HTML, JSON) + ZIP |
 | **Calidad de código** | Backend: ruff + vulture; Frontend: `deno task check` (fmt + lint + typecheck) + CI en GitHub Actions |
 
 ---
@@ -60,7 +60,7 @@ Los colores de la marca se definen en `utils/theme.ts` como `DARK_THEME_VARS` y 
 
 **Backend:** Endpoints → Repositories (datos) + Workers (Celery) → Phases (ETL) → MoodleService + MoodleIntegration. Las fases implementan el patrón Pipeline con Shared Context (`PhaseContext`). Los repositorios son funciones puras (no clases) que reciben `db` como primer parámetro.
 
-**Núcleo puro (`app/pipeline/`):** todas las transformaciones de negocio que no requieren I/O viven en `app/pipeline/` — un paquete 100 % puro (sin DB, HTTP, settings ni Celery), verificado por AST en `tests/test_pipeline_purity.py`. Incluye `shortnames.py` (parsing de códigos), `course_index.py`, `course_comparison/` (comparador de cursos con umbrales inyectables), `novedades.py`, `metrics.py`, `plan.py`, `progress.py`, `categories.py`, `users.py` y `enrolments.py`. Los módulos de `app/services/` que antes vivían en el núcleo ahora son *shims* de compatibilidad que re-exportan desde `pipeline/` (p. ej. `services/parsers/patterns.py` → `pipeline/shortnames.py`).
+**Núcleo puro (`app/pipeline/`):** todas las transformaciones de negocio que no requieren I/O viven en `app/pipeline/` — un paquete 100 % puro (sin DB, HTTP, settings ni Celery), verificado por AST en `tests/test_pipeline_purity.py`. Incluye `shortnames.py` (parsing de códigos), `course_index.py`, `course_comparison/` (comparador de cursos con umbrales inyectables), `novedades.py`, `metrics.py`, `plan.py`, `progress.py`, `categories.py`, `users.py` y `enrolments.py`. Los workers y tests consumen el núcleo directamente (los antiguos *shims* de `app/services/` fueron eliminados).
 
 **Frontend:** Islands Architecture sobre Preact + Signals. Las islas (`islands/`) manejan fetch y estado. Los componentes (`components/`) son presentacionales puros. Los utils (`utils/`) contienen señales globales (`darkSignal`, `profileSignal`), constantes compartidas (`STATUS_COLORS`, `DARK_VARS`) y helpers.
 
@@ -78,7 +78,7 @@ Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y m
 | **FASE 2** | `AnalyzePhase` | Comparar cursos contra Moodle con matching en 3 niveles (exacto → base key → core key). Determina crear, eliminar, activar, ocultar o renombrar. | 20% → 34% |
 | **FASE 3** | `process_etl_phase` | Ejecutar cambios estructurales vía Celery chords en 2 oleadas: (1) delete, (2) activate, hide, rename, create cursos. | 34% → 62% |
 | **FASE 4** | `process_etl_phase` | Crear usuarios nuevos en Moodle + matricular docentes como editingteacher en sus cursos vía Celery chord. | 65% → 85% |
-| **FASE 5** | `ReportService` | Generar 16 CSVs + 5 gráficos Plotly + ZIP con todo. | 85% → 100% |
+| **FASE 5** | `ReportService` | Generar 16 CSVs + 5 gráficos + ZIP con todo. | 85% → 100% |
 
 ### Destacados
 
@@ -88,7 +88,7 @@ Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y m
 - **Resolución paralela de docentes:** hasta 10 consultas simultáneas a `core_enrol_get_enrolled_users` con semáforo asyncio, en vez de N llamadas secuenciales.
 - **Compatibilidad Moodle 3.9:** adapter pattern para diferencias entre versiones (sin `enrolment_1`, `templatecourse` como `int`, `createpassword` en vez de `preferences[]`, `categoryid` con fallback multi-nivel).
 
-**Archivos clave:** `workers/tasks.py` (orquestador), `workers/utils.py` (runner async compartido `run_moodle_async`), `workers/phases/phase1_consult.py`, `phase2_analyze.py`, `phase3_structure.py`, `phase4_people.py`, `pipeline/` (núcleo puro), `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle.py` (MoodleService), `services/moodle_adapter.py`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`, `services/metrics_service.py`.
+**Archivos clave:** `workers/tasks.py` (orquestador), `workers/utils.py` (runner async compartido `run_moodle_async`), `workers/phases/phase1_consult.py`, `phase2_analyze.py`, `phase3_structure.py`, `phase4_people.py`, `pipeline/` (núcleo puro), `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle_operations.py` (MoodleService), `services/moodle_adapter.py`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`, `services/metrics_service.py`, `services/orchestration.py` (puente API→Celery).
 
 ---
 
@@ -170,9 +170,9 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | `/categorias/consultar` | QueryTable — búsqueda de categorías por idnumber |
 | `/categorias/eliminar` | CsvUploader — eliminación masiva de categorías |
 | `/operaciones/ejecuciones` | Tabs (Crear/Eliminar Cursos/Usuarios/Categorías) con ExecutionList + OperationList |
-| `/operaciones/historico` | Tabs con gráficos Plotly theme-aware + tabla de datos |
+| `/operaciones/historico` | Tabs con gráficos Chart.js theme-aware + tabla de datos |
 | `/jobs/{id}` | Detalle de ejecución con progreso en vivo, métricas, errores paginados |
-| `/reportes?execution_id={id}` | Descarga de 16 CSVs + 5 gráficos Plotly |
+| `/reportes?execution_id={id}` | Descarga de 16 CSVs + 5 gráficos |
 
 ### Islas principales
 
@@ -189,7 +189,7 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | `InactiveCoursesQuery` | Seleccionar corte (días/meses/años/semestre) y consultar cursos SIAUGESMAT sin uso (por `timemodified`), con datos del curso: programa, CAT, fechas y días sin uso |
 | `CursosConsultas` | Tabs **Consulta normal**/**Cursos sin uso** para la página `/cursos/consultar` |
 | `Historico` | Evolución semestral y comparación con Chart.js |
-| `HistoricoOperaciones` | Gráfico Plotly theme-aware con métricas adaptativas por operación |
+| `HistoricoOperaciones` | Gráfico Chart.js theme-aware con métricas adaptativas por operación |
 | `Sidebar` | Navegación con 4 tarjetas (Usuarios, Cursos, Categorías, Operaciones), avatar, ThemeToggle |
 | `JobDetailIsland` | Progreso en vivo con polling, métricas, errores paginados |
 
@@ -222,20 +222,23 @@ SIAUGESMAT/
 │   │   │                       #   novedades, metrics, plan, progress, categories, users, enrolments
 │   │   ├── repositories/       # execution_repo, log_repo, query_repo, operation_repo (CRUD puro)
 │   │   ├── schemas/            # Pydantic schemas (job, analytics, operations, upload, user, novedades)
-│   │   ├── services/           # moodle.py (MoodleService), metrics_service.py, etl.py, reports.py,
-│   │   │                       # novedades_service.py,
-│   │   │                       # charts.py, csv_validator.py, roles.py, rate_limiter.py, moodle_client.py,
-│   │   │                       # moodle_errors.py, moodle_error_handler.py, moodle_factory.py,
-│   │   │                       # moodle_adapter.py, moodle_operations.py, batch_report_service.py,
-│   │   │                       # category_utils.py, error_messages.py
-│   │   │                       # parsers/ (DistanciaParser, patterns→pipeline/shortnames), course_comparison/ (shim→pipeline)
+│   │   ├── services/            # moodle_operations.py (MoodleService), moodle_client.py, moodle_errors.py,
+│   │   │                       # moodle_error_handler.py, moodle_factory.py, moodle_adapter.py,
+│   │   │                       # metrics_service.py, etl.py, reports.py, report_utils.py, novedades_service.py,
+│   │   │                       # charts.py, csv_validator.py, roles.py, rate_limiter.py,
+│   │   │                       # batch_report_service.py, category_utils.py, error_messages.py,
+│   │   │                       # orchestration.py (puente API→Celery)
+│   │   │                       # parsers/ (DistanciaParser, factory, base)
 │   │   ├── workers/            # tasks.py (ETL), phases/ (phase1_consult, phase2_analyze, phase3_structure,
 │   │   │                       #   phase4_people, item_task, orchestrator, common, base)
 │   │   │                       # operations_tasks.py, query_tasks.py, cleanup_tasks.py, utils.py
-│   │   ├── scripts/            # bulk_course_visibility.py, diagnostic_sibate.py
 │   │   ├── celery_app.py       # Config Celery + beat schedule
 │   │   └── main.py
-│   ├── tests/                  # ~553 tests (ETL, repos, phases, pipeline, analytics, API, workers)
+│   ├── tools/                  # CLI de mantenimiento manual (fuera del paquete app/):
+│   │                           #   bulk_course_visibility.py, diagnostic_sibate.py,
+│   │                           #   fix_external_auth_users.py, reset_moodle_password.py,
+│   │                           #   restore_original_usernames.py (+ data/renamed_usernames.tsv)
+│   ├── tests/                  # ~556 tests (ETL, repos, phases, pipeline, analytics, API, workers)
 │   ├── alembic/                # Migraciones de base de datos
 │   ├── reports/                # Reportes generados (CSV, ZIP)
 │   ├── uploads/                # Archivos Excel subidos
@@ -246,13 +249,14 @@ SIAUGESMAT/
 ├── frontend/
 │   ├── components/             # Button, Input, Card, Layout, ProgressBar, Toast, ErrorBox, Pagination,
 │   │                           # LoadingSkeleton, KpiCard, MiniBarChart, YearNav, SemesterPicker,
-│   │                           # SemesterMultiPicker, ReportsSection, HubCard, HubPage, TabbedPage,
-│   │                           # ConsultPage, CsvActionPage, PeriodButton, OperationHistorySection
+│   │                           # SemesterMultiPicker, ReportsSection, ReportCard, HubCard, HubPage,
+│   │                           # TabbedPage, ConsultPage, CsvActionPage, PeriodButton,
+│   │                           # OperationHistorySection, ProcessInProgressBanner
 │   ├── islands/                # Sidebar, ThemeToggle, DashboardIsland, ExecutionList, OperationList,
 │   │                           # Historico, HistoricoOperaciones, FileUploader, CsvUploader, QueryTable,
 │   │                           # CrearUsuarios, JobDetailIsland, Reportes, Chart, MetricsChart,
 │   │   # SemesterComparison, LoginForm, LoginPageIsland, UploadIsland,
-│   │   # NovedadesIsland, InactiveTeachersQuery
+│   │   # NovedadesIsland, InactiveTeachersQuery, BulkVisibilityIsland
 │   ├── routes/                 # _app.tsx, _middleware.ts, index.tsx, login.tsx, dashboard.tsx
 │   │   ├── usuarios/           # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
 │   │   ├── cursos/             # index.tsx (hub), consultar.tsx, crear.tsx, novedades.tsx, eliminar.tsx, visibilidad.tsx
@@ -260,14 +264,15 @@ SIAUGESMAT/
 │   │   ├── operaciones/        # index.tsx (hub), ejecuciones.tsx, historico.tsx
 │   │   ├── jobs/               # [id].tsx
 │   │   └── reportes.tsx
-│   ├── services/api.ts         # Barrel re-export → api/ (types, core, auth, trabajos, analytics, reportes, operaciones, consultas, mantenimiento)
-│   ├── utils/                  # theme.ts, plotly.ts, profile.ts, operations-tabs.ts, constants.ts,
-│   │                           # auth.ts, auth-guard.ts, date.ts, icons.tsx, toast.ts, reports.ts,
-│   │                           # entity-configs.ts
+│   ├── services/api.ts         # Barrel re-export → api/ (types, core, auth, trabajos, analytics, reportes, operaciones, consultas, mantenimiento, novedades)
+│   ├── hooks/                  # useBatchUpload.ts, useUploadGate.ts, useReports.ts
+│   ├── utils/                  # theme.ts, chart.ts, plotlyToChart.ts, profile.ts, operations-tabs.ts,
+│   │                           # constants.ts, auth.ts, auth-guard.ts, date.ts, icons.tsx, toast.ts,
+│   │                           # reports.ts, entity-configs.ts, batch-labels.ts
 │   ├── static/                 # styles.css, main.css, SIAUGESMAT.ico
 │   ├── deno.json               # Configuración Fresh + tareas (check, test, build) + lint rules + lib DOM
 │   └── deno.lock               # Lock de dependencias Deno
-├── docker-compose.yml          # 7 servicios: db, redis, backend, worker, beat, frontend, nginx
+├── docker-compose.yml          # 8 servicios: db, redis, migrate, backend, worker, beat, frontend, nginx
 ├── docker-compose.override.yml  # Puertos expuestos + volume mount para desarrollo
 ├── backend/e2e/                 # Pruebas de integración contra Moodle real
 │   ├── fixtures/                #   .xlsx con datos reales
@@ -419,7 +424,7 @@ El archivo `.env.example` en la raíz contiene todas las variables con valores d
 
 ## Tests y calidad de código
 
-### Backend (~553 tests)
+### Backend (~556 tests)
 
 ```bash
 cd backend

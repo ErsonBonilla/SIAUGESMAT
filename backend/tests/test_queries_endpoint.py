@@ -10,7 +10,7 @@ class TestEnqueueQuery:
         assert resp.status_code == 400
 
     def test_successful_enqueue(self, client, auth_headers, test_db):
-        with patch("app.api.v1.endpoints.queries.execute_query.delay") as mock_delay:
+        with patch("app.api.v1.endpoints.queries.enqueue_async_query") as mock_delay:
             resp = client.post("/api/v1/queries/courses", json={}, headers=auth_headers)
             assert resp.status_code == 200
             data = resp.json()

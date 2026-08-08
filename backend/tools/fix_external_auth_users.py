@@ -8,19 +8,23 @@ Modos:
 
 Ejemplos:
   # Auditoria masiva (solo lectura)
-  python -m app.scripts.fix_external_auth_users --modalidad DISTANCIA --audit
+  python tools/fix_external_auth_users.py --modalidad DISTANCIA --audit
 
   # Reparar todos los encontrados
-  python -m app.scripts.fix_external_auth_users --modalidad DISTANCIA --audit --fix-all
+  python tools/fix_external_auth_users.py --modalidad DISTANCIA --audit --fix-all
 
   # Usuario individual
-  python -m app.scripts.fix_external_auth_users --modalidad DISTANCIA --user lhgarzonr --fix
+  python tools/fix_external_auth_users.py --modalidad DISTANCIA --user lhgarzonr --fix
 """
 
 import argparse
 import asyncio
 import logging
+import sys
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import text
 

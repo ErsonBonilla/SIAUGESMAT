@@ -17,8 +17,9 @@ from app.repositories.query_repo import (
     create_query,
     get_query,
 )
+from app.schemas.api import QueryEnqueuedResponse
 from app.schemas.user import UserInToken
-from app.workers.query_tasks import execute_query
+from app.services.orchestration import enqueue_async_query
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +133,9 @@ def _csv_download(qr):
     )
 
 
-@router.post("/{entity}", summary="Encolar consulta asíncrona")
+@router.post(
+    "/{entity}", response_model=QueryEnqueuedResponse, summary="Encolar consulta asíncrona"
+)
 async def enqueue_query(
     entity: str,
     body: dict = Body(default={}),
@@ -144,7 +147,7 @@ async def enqueue_query(
 
     task_id = str(uuid.uuid4())
     create_query(db, task_id, entity, body, current_user.modalidad)
-    execute_query.delay(task_id)
+    enqueue_async_query(task_id)
 
     label = ENTITY_LABELS[entity].lower()
     logger.info(f"Consulta de {label} encolada (task={task_id[:8]}) por {current_user.username}")

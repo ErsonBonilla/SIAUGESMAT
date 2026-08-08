@@ -3,11 +3,11 @@ login real interactivo (form POST a /login/index.php).
 
 Uso:
   # Solo reset de contraseña sin verificación de login
-  python -m app.scripts.reset_moodle_password --modalidad DISTANCIA \
+  python tools/reset_moodle_password.py --modalidad DISTANCIA \
     --username etiqueg --password '@Tique#997'
 
   # Con verificación de login real (requiere manejo de logintoken CSRF)
-  python -m app.scripts.reset_moodle_password --modalidad DISTANCIA \
+  python tools/reset_moodle_password.py --modalidad DISTANCIA \
     --username etiqueg --password '@Tique#997' --verify-login
 """
 
@@ -15,6 +15,9 @@ import argparse
 import asyncio
 import re
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import httpx
 

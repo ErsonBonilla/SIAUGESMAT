@@ -6,7 +6,7 @@ from typing import Any, ClassVar
 import plotly.graph_objects as go
 
 from app.db.models import Execution, ExecutionLog
-from app.services.parsers.patterns import SHORTNAME_PATTERN
+from app.pipeline.shortnames import SHORTNAME_PATTERN
 
 logger = logging.getLogger(__name__)
 

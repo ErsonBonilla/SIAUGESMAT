@@ -1,5 +1,6 @@
 import logging
 
+from app.pipeline.shortnames import SIAUGESMAT_PATTERN
 from app.pipeline.users import (
     index_teachers,
     lookup_teacher_candidates,
@@ -9,7 +10,6 @@ from app.pipeline.users import (
 )
 from app.repositories import log_repo
 from app.repositories.execution_repo import touch_heartbeat, update_progress
-from app.services.course_comparison import SIAUGESMAT_PATTERN
 from app.services.error_messages import translate_error
 from app.workers.phases.base import BasePhase, PhaseContext
 

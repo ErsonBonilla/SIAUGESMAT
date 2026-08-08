@@ -1,11 +1,12 @@
 import asyncio
 import re
 import sys
+from pathlib import Path
 
-sys.path.insert(0, "/app")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
-from app.services.moodle import MoodleService
+from app.services.moodle_operations import MoodleService
 
 CAT = "SIB"
 

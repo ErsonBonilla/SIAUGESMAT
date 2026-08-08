@@ -1,8 +1,9 @@
 // islands/Chart.tsx
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import { getChartData } from "../services/api.ts";
-import { loadPlotly } from "../utils/plotly.ts";
 import { darkSignal } from "../utils/theme.ts";
+import { useChart } from "../utils/chart.ts";
+import { plotlyToChartConfig } from "../utils/plotlyToChart.ts";
 
 interface ChartProps {
   executionId: number;
@@ -15,55 +16,27 @@ interface ChartProps {
 export default function Chart(
   { executionId, chartName, title, width, height }: ChartProps,
 ) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { canvasRef, createChart } = useChart();
   const chartId = `chart-${chartName}-${executionId}`;
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
     let cancelled = false;
 
     (async () => {
       try {
-        await loadPlotly();
-        if (cancelled) return;
-
         const theme = darkSignal.value ? "dark" : "light";
         const data = await getChartData(executionId, chartName, theme);
         if (cancelled) return;
-
-        const layout = {
-          ...data.layout,
-          width: undefined,
-          height: undefined,
-          autosize: true,
-        };
-
-        window.Plotly.newPlot(container, data.traces, layout, {
-          responsive: true,
-          displayModeBar: true,
-          modeBarButtonsToRemove: ["sendDataToCloud"],
-        });
+        createChart(plotlyToChartConfig(data));
       } catch (err) {
         if (!cancelled) {
-          container.innerHTML =
-            `<div class="text-red-500 text-center p-4">Error al cargar gráfico: ${
-              err instanceof Error ? err.message : "Error desconocido"
-            }</div>`;
+          console.error("Error al cargar gráfico:", err);
         }
       }
     })();
 
     return () => {
       cancelled = true;
-      if (container) {
-        try {
-          window.Plotly?.purge(container);
-        } catch {
-          // ignore
-        }
-      }
     };
   }, [executionId, chartName, darkSignal.value]);
 
@@ -76,12 +49,14 @@ export default function Chart(
       )}
       <div
         id={chartId}
-        ref={containerRef}
         style={{
           width: width || "100%",
           height: height || "400px",
+          position: "relative",
         }}
-      />
+      >
+        <canvas ref={canvasRef} style={{ width: "100%", height: "100%" }} />
+      </div>
     </div>
   );
 }

@@ -1,9 +1,8 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import { getCurrentSemester } from "../services/api.ts";
-import { compareNovedades } from "../services/api/novedades.ts";
+import { compareNovedades, getCurrentSemester } from "../services/api.ts";
 import { useUploadGate } from "../hooks/useUploadGate.ts";
-import type { NovedadItem } from "../services/api/types.ts";
+import type { NovedadItem } from "../services/api.ts";
 import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";

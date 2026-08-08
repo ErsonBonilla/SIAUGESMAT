@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.integrations.moodle import MoodleIntegration
-from app.services.course_comparison.apply_action import apply_action
+from app.pipeline.course_comparison.apply_action import apply_action
 from app.services.moodle_errors import MoodleAPIError, MoodleOverloadedError
 from app.services.moodle_operations import MoodleService
 from app.workers.phases.item_task import process_etl_item

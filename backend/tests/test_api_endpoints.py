@@ -236,7 +236,7 @@ class TestJobsEndpoint:
         test_db.commit()
 
         with (
-            patch("app.api.v1.endpoints.jobs.process_etl_file.delay") as mock_delay,
+            patch("app.api.v1.endpoints.jobs.enqueue_etl") as mock_delay,
             patch("app.api.v1.endpoints.jobs.os.path.isfile", return_value=True),
         ):
             mock_delay.return_value = None

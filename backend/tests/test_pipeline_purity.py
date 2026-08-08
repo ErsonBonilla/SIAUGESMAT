@@ -26,7 +26,6 @@ FORBIDDEN_IMPORT_PREFIXES = (
     "app.schemas",
     "app.main",
     "app.services.etl",
-    "app.services.moodle",
     "app.services.moodle_factory",
     "app.services.moodle_errors",
     "app.services.error_messages",

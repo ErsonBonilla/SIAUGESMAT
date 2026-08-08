@@ -1,11 +1,10 @@
 import { useComputed, useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect } from "preact/hooks";
 import {
   getOperationsAnalytics,
   type OperationsHistoryItem,
 } from "../services/api.ts";
-import { darkSignal } from "../utils/theme.ts";
-import { loadPlotly } from "../utils/plotly.ts";
+import { useChart } from "../utils/chart.ts";
 import ErrorBox from "../components/ErrorBox.tsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
 
@@ -41,7 +40,7 @@ export default function HistoricoOperaciones({ entityType, action }: Props) {
   const loading = useSignal(true);
   const error = useSignal("");
   const view = useSignal<"history" | "table">("history");
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { canvasRef, createChart } = useChart();
   const keys = useComputed(() => getRelevantKeys(entityType, action));
 
   useEffect(() => {
@@ -65,68 +64,40 @@ export default function HistoricoOperaciones({ entityType, action }: Props) {
 
   useEffect(() => {
     if (
-      view.value !== "history" || !data.value.length || !containerRef.current
+      view.value !== "history" || !data.value.length || !canvasRef.current
     ) return;
-    let cancelled = false;
 
-    (async () => {
-      try {
-        await loadPlotly();
-        if (cancelled) return;
+    const months = data.value.map((d) => d.month);
+    const relevant = METRICS.filter((m) => keys.value.includes(m.key));
 
-        const months = data.value.map((d) => d.month);
-        const keys = getRelevantKeys(entityType, action);
-
-        const traces = METRICS
-          .filter((m) => keys.includes(m.key))
-          .map((m) => ({
-            name: m.name,
-            x: months,
-            y: data.value.map((d) =>
-              (d as unknown as Record<string, number>)[m.key]
-            ),
-            type: "bar",
-            marker: { color: m.color },
-          }));
-
-        const isDark = darkSignal.value;
-
-        const layout = {
-          barmode: "stack",
-          autosize: true,
-          margin: { t: 20, r: 20, b: 60, l: 50 },
-          font: { color: isDark ? "#CDD6F4" : "#374151" },
-          legend: { orientation: "h", y: 1.1, font: { size: 10 } },
-          xaxis: { tickangle: -45, gridcolor: isDark ? "#313244" : "#E5E7EB" },
-          yaxis: { gridcolor: isDark ? "#313244" : "#E5E7EB" },
-          paper_bgcolor: isDark ? "#1E1E2E" : "#FFFFFF",
-          plot_bgcolor: isDark ? "#1E1E2E" : "#FFFFFF",
-        };
-
-        if (containerRef.current) {
-          window.Plotly.newPlot(containerRef.current, traces, layout, {
-            responsive: true,
-            displayModeBar: true,
-            modeBarButtonsToRemove: ["sendDataToCloud"],
-          });
-        }
-      } catch {
-        if (!cancelled && containerRef.current) {
-          containerRef.current.innerHTML =
-            `<div class="text-red-500 text-center p-4">Error al cargar gráfico</div>`;
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      if (containerRef.current) {
-        try {
-          window.Plotly?.purge(containerRef.current);
-        } catch { /* ignore */ }
-      }
-    };
-  }, [darkSignal.value, data.value, view.value]);
+    createChart({
+      type: "bar",
+      data: {
+        labels: months,
+        datasets: relevant.map((m) => ({
+          label: m.name,
+          data: data.value.map((d) =>
+            (d as unknown as Record<string, number>)[m.key]
+          ),
+          backgroundColor: m.color,
+        })),
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: "bottom",
+            labels: { boxWidth: 12, boxHeight: 12 },
+          },
+        },
+        scales: {
+          x: { stacked: true, ticks: { autoSkip: false } },
+          y: { stacked: true },
+        },
+      },
+    });
+  }, [keys.value, data.value, view.value]);
 
   const activeBtn = "bg-[var(--accent)] text-white";
   const inactiveBtn =
@@ -169,9 +140,13 @@ export default function HistoricoOperaciones({ entityType, action }: Props) {
           : view.value === "history"
           ? (
             <div
-              ref={containerRef}
-              style={{ width: "100%", height: "450px" }}
-            />
+              style={{ width: "100%", height: "450px", position: "relative" }}
+            >
+              <canvas
+                ref={canvasRef}
+                style={{ width: "100%", height: "100%" }}
+              />
+            </div>
           )
           : (
             <div class="overflow-x-auto">
