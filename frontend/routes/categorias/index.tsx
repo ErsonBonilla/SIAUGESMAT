@@ -21,7 +21,6 @@ export default function CategoriasHub() {
         description:
           "Crea nuevas categorías en Moodle masivamente desde un archivo CSV.",
         href: "/categorias/crear",
-        executionTab: "crear_categorias",
       },
       {
         icon: TrashIcon,
@@ -29,7 +28,6 @@ export default function CategoriasHub() {
         description:
           "Elimina categorías de Moodle masivamente desde un archivo CSV.",
         href: "/categorias/eliminar",
-        executionTab: "eliminar_categorias",
       },
     ],
   });

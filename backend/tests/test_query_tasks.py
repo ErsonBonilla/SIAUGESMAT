@@ -315,7 +315,7 @@ class TestFilterOrphanCourses:
         moodle.get_courses.return_value = [siau, sinon, cin]
         call = moodle.get_enrolled_teachers_with_access
         call.side_effect = lambda cid: [_teacher("doc")] if int(cid) == 1 else []
-        qr = SimpleNamespace(entity="courses", params={"orphan": "true"})
+        qr = SimpleNamespace(entity="courses", params={"status": "orphan"})
         rows = await _do_query(moodle, qr)
         assert [c["id"] for c in rows] == ["2", "3"]
 

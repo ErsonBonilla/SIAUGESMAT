@@ -1,4 +1,4 @@
-// islands/JobDetailIsland.tsx
+// islands/DetalleEjecucionIsland.tsx
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import Pagination from "../components/Pagination.tsx";
@@ -480,7 +480,7 @@ export default function JobDetailIsland({ executionId }: Props) {
       )}
 
       <div class="mt-6 flex gap-4">
-        <a href="/dashboard" class="gradient-text hover:underline text-sm">
+        <a href="/panel" class="gradient-text hover:underline text-sm">
           ← Volver al dashboard
         </a>
         <a

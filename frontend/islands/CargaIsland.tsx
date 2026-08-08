@@ -1,5 +1,6 @@
-// islands/UploadIsland.tsx
-import FileUploader from "./FileUploader.tsx";
+// islands/CargaIsland.tsx
+import FileUploader from "./SubirArchivoIsland.tsx";
+import ExecutionButton from "../components/ExecutionButton.tsx";
 
 export default function UploadIsland() {
   return (
@@ -37,6 +38,7 @@ export default function UploadIsland() {
       </div>
 
       <FileUploader />
+      <ExecutionButton tab="crear_cursos" />
     </div>
   );
 }

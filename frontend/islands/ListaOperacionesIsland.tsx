@@ -1,4 +1,4 @@
-// islands/OperationList.tsx
+// islands/ListaOperacionesIsland.tsx
 import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import {

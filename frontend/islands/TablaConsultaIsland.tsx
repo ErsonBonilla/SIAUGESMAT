@@ -10,6 +10,7 @@ import {
 import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
+import QueryHelp, { type QueryHelpSection } from "../components/QueryHelp.tsx";
 
 const PAGE_SIZE = 20;
 
@@ -43,11 +44,18 @@ interface QueryTableProps {
   filters?: Filter[];
   searchPlaceholder?: string;
   searchKey?: string;
+  help?: QueryHelpSection[];
 }
 
 export default function QueryTable(
-  { entity, columns, filters, searchPlaceholder, searchKey = "search" }:
-    QueryTableProps,
+  {
+    entity,
+    columns,
+    filters,
+    searchPlaceholder,
+    searchKey = "search",
+    help,
+  }: QueryTableProps,
 ) {
   const data = useSignal<Record<string, unknown>[]>([]);
   const loading = useSignal(false);
@@ -141,6 +149,7 @@ export default function QueryTable(
 
   return (
     <div>
+      {help && help.length > 0 && <QueryHelp sections={help} />}
       <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
         {filters?.map((f) =>
           f.type === "checkbox"

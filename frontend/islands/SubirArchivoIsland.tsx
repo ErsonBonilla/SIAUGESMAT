@@ -1,4 +1,4 @@
-// islands/FileUploader.tsx
+// islands/SubirArchivoIsland.tsx
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import {
@@ -89,7 +89,7 @@ export default function FileUploader() {
 
   useEffect(() => {
     if (successExecutionId.value && typeof window !== "undefined") {
-      window.location.href = `/jobs/${successExecutionId.value}`;
+      window.location.href = `/ejecuciones/${successExecutionId.value}`;
     }
   }, [successExecutionId.value]);
 

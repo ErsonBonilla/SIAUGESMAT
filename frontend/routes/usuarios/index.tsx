@@ -21,7 +21,6 @@ export default function UsuariosHub() {
         description:
           "Crea nuevos usuarios en Moodle masivamente desde un archivo CSV.",
         href: "/usuarios/crear",
-        executionTab: "crear_usuarios",
       },
       {
         icon: TrashIcon,
@@ -29,7 +28,6 @@ export default function UsuariosHub() {
         description:
           "Elimina usuarios de Moodle masivamente desde un archivo CSV.",
         href: "/usuarios/eliminar",
-        executionTab: "eliminar_usuarios",
       },
     ],
   });

@@ -44,7 +44,7 @@ export default function LoginForm(
       );
       setToken(data.access_token);
       if (typeof window !== "undefined") {
-        window.location.href = "/dashboard";
+        window.location.href = "/panel";
       }
     } catch (err) {
       let msg = err instanceof Error ? err.message : "";

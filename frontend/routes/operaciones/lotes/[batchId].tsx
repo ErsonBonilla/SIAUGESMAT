@@ -2,7 +2,7 @@
 import type { PageProps } from "@fresh/core";
 import { requireAuth } from "../../../utils/auth-guard.ts";
 import Layout from "../../../components/Layout.tsx";
-import BatchDetailIsland from "../../../islands/BatchDetailIsland.tsx";
+import DetalleLoteIsland from "../../../islands/DetalleLoteIsland.tsx";
 
 export const handler = requireAuth();
 
@@ -11,7 +11,7 @@ export default function BatchDetailPage({ params }: PageProps) {
 
   return (
     <Layout title={`Lote ${batchId.slice(0, 8)}...`}>
-      <BatchDetailIsland batchId={batchId} />
+      <DetalleLoteIsland batchId={batchId} />
     </Layout>
   );
 }

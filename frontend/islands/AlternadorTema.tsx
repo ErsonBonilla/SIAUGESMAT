@@ -1,4 +1,4 @@
-// islands/ThemeToggle.tsx
+// islands/AlternadorTema.tsx
 import {
   applyThemeVars,
   DARK_THEME_VARS,

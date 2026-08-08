@@ -12,6 +12,7 @@ import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
 import SemesterPicker from "../components/SemesterPicker.tsx";
+import QueryHelp from "../components/QueryHelp.tsx";
 
 const PAGE_SIZE = 20;
 
@@ -145,6 +146,29 @@ export default function InactiveTeachersQuery() {
 
   return (
     <div class="space-y-4">
+      <QueryHelp
+        sections={[
+          {
+            title: "Qué consulta",
+            body:
+              "Lista los docentes (rol editingteacher) que no han accedido a sus cursos SIAUGESMAT desde una fecha de corte, usando el campo lastcourseaccess de Moodle.",
+          },
+          {
+            title: "Cómo elegir el corte",
+            body: [
+              "Por días (1-30, default 15), meses (1-12), años (≥ 1) o semestre (ej. 2026A).",
+              "El corte define la fecha límite: se muestran docentes cuyo último acceso al curso es anterior a esa fecha.",
+            ],
+          },
+          {
+            title: "Resultado",
+            body: [
+              "Cada fila muestra nombre del docente, username, correo, curso, programa, CAT, último acceso y días sin acceso.",
+              "Esta consulta recorre todos los cursos SIAUGESMAT y puede tardar varios minutos.",
+            ],
+          },
+        ]}
+      />
       <div class="flex flex-col sm:flex-row sm:items-end gap-4">
         <div class="flex flex-col gap-2">
           <div class="flex gap-1 bg-[var(--bg-tertiary)] rounded-lg p-1 w-fit flex-wrap">

@@ -1,7 +1,7 @@
 // components/Layout.tsx
 import { ComponentChildren } from "preact";
-import Sidebar from "../islands/Sidebar.tsx";
-import MobileMenuButton from "../islands/MobileMenuButton.tsx";
+import BarraLateral from "../islands/BarraLateral.tsx";
+import BotonMenuMovil from "../islands/BotonMenuMovil.tsx";
 import { profileSignal } from "../utils/profile.ts";
 
 interface LayoutProps {
@@ -12,11 +12,11 @@ interface LayoutProps {
 export default function Layout({ children, title }: LayoutProps) {
   return (
     <div class="flex min-h-screen w-full text-[var(--text-primary)]">
-      <Sidebar />
+      <BarraLateral />
 
       {/* Top bar �?" solo visible en mobile */}
       <div class="md:hidden h-14 flex items-center px-4 sticky top-0 z-20 border-b border-[var(--border-secondary)] bg-[var(--navbar-bg)] text-[var(--navbar-text)]">
-        <MobileMenuButton />
+        <BotonMenuMovil />
         <span class="text-base font-bold ml-2">SIAUGESMAT</span>
         <div class="ml-auto flex items-center gap-2">
           {profileSignal.value?.profileimageurl

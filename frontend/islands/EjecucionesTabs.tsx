@@ -1,7 +1,7 @@
 // islands/EjecucionesTabs.tsx
 import { useSignal } from "@preact/signals";
-import ExecutionList from "./ExecutionList.tsx";
-import OperationList from "./OperationList.tsx";
+import ListaEjecucionesIsland from "./ListaEjecucionesIsland.tsx";
+import ListaOperacionesIsland from "./ListaOperacionesIsland.tsx";
 import { OPERATIONS_TABS, type TabKey } from "../utils/operations-tabs.ts";
 
 const ACTIVE = "bg-[var(--accent)] text-white";
@@ -40,9 +40,9 @@ export default function EjecucionesTabs() {
       </div>
       <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6">
         {current.component === "etl"
-          ? <ExecutionList key={current.key} />
+          ? <ListaEjecucionesIsland key={current.key} />
           : (
-            <OperationList
+            <ListaOperacionesIsland
               key={current.key}
               defaultEntity={current.entity!}
               defaultAction={current.action!}

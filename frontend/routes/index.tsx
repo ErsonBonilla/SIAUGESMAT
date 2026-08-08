@@ -4,7 +4,7 @@ import type { FreshContext } from "@fresh/core";
 /**
  * Página raíz que redirige según la presencia de un token de autenticación.
  *
- * - Si existe la cookie "auth_token", redirige al dashboard.
+ * - Si existe la cookie "auth_token", redirige al panel.
  * - Si no existe, redirige a la página de inicio de sesión.
  */
 export const handler = {
@@ -17,13 +17,13 @@ export const handler = {
     if (token) {
       return new Response("", {
         status: 302,
-        headers: { Location: "/dashboard" },
+        headers: { Location: "/panel" },
       });
     }
 
     return new Response("", {
       status: 302,
-      headers: { Location: "/login" },
+      headers: { Location: "/ingreso" },
     });
   },
 };

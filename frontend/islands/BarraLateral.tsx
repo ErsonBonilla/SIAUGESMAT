@@ -12,7 +12,7 @@ import {
   FolderIcon,
   UserGroupIcon,
 } from "../utils/icons.tsx";
-import ThemeToggle from "./ThemeToggle.tsx";
+import ThemeToggle from "./AlternadorTema.tsx";
 
 const NAV_ITEMS = [
   {
@@ -62,7 +62,7 @@ export default function Sidebar() {
     removeToken();
     logout();
     if (typeof window !== "undefined") {
-      window.location.href = "/login";
+      window.location.href = "/ingreso";
     }
   };
 
@@ -87,7 +87,7 @@ export default function Sidebar() {
         } md:translate-x-0`}
       >
         <a
-          href="/dashboard"
+          href="/panel"
           class="flex items-center gap-3 px-5 py-5 font-bold no-underline text-inherit border-b border-[var(--border-secondary)]"
         >
           <span class="gradient-text text-xl px-3 py-1 rounded-md bg-[var(--bg-tertiary)]">

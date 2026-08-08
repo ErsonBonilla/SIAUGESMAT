@@ -1,7 +1,7 @@
 // islands/Reportes.tsx
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import Chart from "./Chart.tsx";
+import Chart from "./GraficoIsland.tsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import ReportCard from "../components/ReportCard.tsx";

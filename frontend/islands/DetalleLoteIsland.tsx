@@ -1,4 +1,4 @@
-// islands/BatchDetailIsland.tsx
+// islands/DetalleLoteIsland.tsx
 import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import {

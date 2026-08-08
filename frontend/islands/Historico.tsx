@@ -1,7 +1,7 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import MetricsChart from "./MetricsChart.tsx";
-import SemesterComparison from "./SemesterComparison.tsx";
+import MetricsChart from "./GraficoMetricasIsland.tsx";
+import SemesterComparison from "./ComparacionSemestre.tsx";
 import SemesterMultiPicker from "../components/SemesterMultiPicker.tsx";
 import { getHistory, type SemesterMetrics } from "../services/api.ts";
 import { darkSignal } from "../utils/theme.ts";
