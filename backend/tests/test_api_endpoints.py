@@ -102,13 +102,48 @@ class TestUploadEndpoint:
 
     def test_upload_accepts_xls_extension(self, client, auth_headers):
         """Archivo .xls debe ser aceptado (formato legacy Excel 97-2003)."""
+        oled2_magic = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+        response = client.post(
+            self.UPLOAD_URL,
+            files={
+                "file": (
+                    "test.xls",
+                    oled2_magic + b"\x00" * 64,
+                    "application/vnd.ms-excel",
+                )
+            },
+            data={"semester": "2025B", "mode": "both", "modalidad": "DISTANCIA"},
+            headers=auth_headers,
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+
+    def test_upload_rejects_invalid_excel_content(self, client, auth_headers):
+        """Un archivo con extensión Excel pero contenido no válido debe rechazarse."""
+        response = client.post(
+            self.UPLOAD_URL,
+            files={
+                "file": (
+                    "test.xlsx",
+                    b"dummy",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
+            data={"semester": "2025B", "mode": "both", "modalidad": "DISTANCIA"},
+            headers=auth_headers,
+        )
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "excel" in response.json()["detail"].lower()
+
+    def test_upload_rejects_invalid_xls_content(self, client, auth_headers):
+        """Un .xls que no es un archivo binario Excel real debe rechazarse."""
         response = client.post(
             self.UPLOAD_URL,
             files={"file": ("test.xls", b"dummy", "application/vnd.ms-excel")},
             data={"semester": "2025B", "mode": "both", "modalidad": "DISTANCIA"},
             headers=auth_headers,
         )
-        assert response.status_code == status.HTTP_201_CREATED
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "excel" in response.json()["detail"].lower()
 
     def test_upload_invalid_semester_format(self, client, auth_headers):
         """Semestre con formato inválido debe ser rechazado."""
