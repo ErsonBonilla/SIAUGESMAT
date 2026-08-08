@@ -10,6 +10,20 @@ def get_batch(db: Session, batch_id: str) -> OperationBatch | None:
     return db.query(OperationBatch).filter_by(batch_id=batch_id).first()
 
 
+def get_active_batch(db: Session, modalidad: str) -> OperationBatch | None:
+    """Devuelve un lote de operaciones en curso (con items pendientes o en
+    proceso) para una modalidad."""
+    return (
+        db.query(OperationBatch)
+        .join(OperationItem, OperationItem.batch_id == OperationBatch.batch_id)
+        .filter(
+            OperationBatch.modalidad == modalidad,
+            OperationItem.status.in_(["pending", "processing"]),
+        )
+        .first()
+    )
+
+
 def get_pending_items(db: Session, batch_id: str) -> list[OperationItem]:
     return db.query(OperationItem).filter_by(
         batch_id=batch_id, status="pending"

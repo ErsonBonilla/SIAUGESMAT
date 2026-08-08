@@ -8,11 +8,13 @@ export {
   getCurrentSemester,
   getExecution,
   getExecutionErrors,
+  getUploadStatus,
   listExecutions,
   pauseExecution,
   resumeExecution,
   startProcess,
   uploadFile,
+  type UploadStatus,
 } from "./api/trabajos.ts";
 
 export {

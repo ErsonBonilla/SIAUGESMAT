@@ -10,6 +10,23 @@ export async function getCurrentSemester(): Promise<string> {
   return data.semester;
 }
 
+export interface UploadStatus {
+  allowed: boolean;
+  execution: { id: number; status: string; filename: string } | null;
+  batch: { batch_id: string; entity_type: string; action: string } | null;
+}
+
+export async function getUploadStatus(
+  modalidad?: string,
+): Promise<UploadStatus> {
+  const sp = new URLSearchParams();
+  if (modalidad) sp.set("modalidad", modalidad);
+  const response = await fetch(`${BASE_URL}/upload/status?${sp}`, {
+    headers: { ...authHeaders() },
+  });
+  return handleResponse<UploadStatus>(response);
+}
+
 export async function uploadFile(
   file: File,
   semester: string,

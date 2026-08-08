@@ -4,7 +4,8 @@ import uuid
 from fastapi import HTTPException, UploadFile
 
 from app.core.entity_config import ENTITY_CONFIG
-from app.repositories.operation_repo import add_item, create_batch
+from app.repositories.execution_repo import get_active_execution
+from app.repositories.operation_repo import add_item, create_batch, get_active_batch
 from app.schemas.operations import CsvUploadResponse
 from app.services.csv_validator import (
     validate_and_parse_csv,
@@ -16,8 +17,19 @@ from app.workers.operations_tasks import process_operation_batch
 logger = logging.getLogger(__name__)
 
 
+def _ensure_modalidad_free(db, modalidad: str) -> None:
+    """Rechaza la subida si hay un proceso en curso para la modalidad."""
+    if get_active_execution(db, modalidad) or get_active_batch(db, modalidad):
+        raise HTTPException(
+            409,
+            "Hay un proceso en ejecución en esta modalidad. "
+            "No se pueden subir archivos hasta que el proceso en curso finalice.",
+        )
+
+
 async def handle_visibility_upload(file: UploadFile, db, current_user, visibility: str):
     config = ENTITY_CONFIG["courses"]
+    _ensure_modalidad_free(db, current_user.modalidad)
 
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(400, "Solo se aceptan archivos CSV")
@@ -55,6 +67,7 @@ async def handle_visibility_upload(file: UploadFile, db, current_user, visibilit
 
 async def handle_upload(file: UploadFile, db, current_user, entity_type, action, default_role=None):
     config = ENTITY_CONFIG[entity_type]
+    _ensure_modalidad_free(db, current_user.modalidad)
 
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(400, "Solo se aceptan archivos CSV")
