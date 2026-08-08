@@ -29,6 +29,7 @@ ENTITY_LABELS = {
     "categories": "Categorías",
     "users": "Usuarios",
     "inactive_teachers": "Docentes sin acceso",
+    "inactive_courses": "Cursos sin uso",
 }
 
 ENTITY_CSV_HEADERS = {
@@ -38,6 +39,10 @@ ENTITY_CSV_HEADERS = {
     "inactive_teachers": [
         "Docente", "Username", "Correo", "Curso", "Shortname",
         "Programa", "CAT", "Último acceso", "Días sin acceso",
+    ],
+    "inactive_courses": [
+        "ID", "Shortname", "Nombre", "Categoría", "Programa", "CAT",
+        "Última modificación", "Días sin uso",
     ],
 }
 
@@ -65,6 +70,14 @@ ENTITY_CSV_EXTRACT = {
         else datetime.fromtimestamp(r["last_access"], tz=UTC).strftime("%Y-%m-%d %H:%M"),
         "Nunca" if r.get("last_access", 0) == 0
         else str(r.get("days_since_last_access", "")),
+    ],
+    "inactive_courses": lambda c: [
+        c.get("id", ""), c.get("shortname", ""), c.get("fullname", ""),
+        c.get("categoryname", ""), c.get("program", ""), c.get("cat", ""),
+        "Nunca" if not c.get("timemodified") else
+        datetime.fromtimestamp(c["timemodified"], tz=UTC).strftime("%Y-%m-%d %H:%M"),
+        "Nunca" if not c.get("timemodified") else
+        str(c.get("days_since_modified", "")),
     ],
 }
 

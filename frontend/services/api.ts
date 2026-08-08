@@ -62,6 +62,7 @@ export type {
   CsvUploadResponse,
   ErrorLog,
   Execution,
+  InactiveCourseRow,
   InactiveTeacherRow,
   LatestExecution,
   NovedadesResponse,

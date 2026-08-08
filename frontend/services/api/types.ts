@@ -179,6 +179,19 @@ export interface InactiveTeacherRow {
   days_since_last_access?: number;
 }
 
+export interface InactiveCourseRow {
+  id: string;
+  shortname: string;
+  fullname: string;
+  categoryname: string;
+  program: string;
+  cat: string;
+  cat_prefix: string;
+  timecreated: number;
+  timemodified: number;
+  days_since_modified?: number;
+}
+
 export interface InactiveTeachersResponse {
   task_id: string;
   entity: string;

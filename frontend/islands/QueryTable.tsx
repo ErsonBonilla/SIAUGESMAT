@@ -167,7 +167,10 @@ export default function QueryTable(
                 key={f.key}
                 value={filterValues.value[f.key] || f.options![0].value}
                 onChange={(e) =>
-                  handleFilterChange(f.key, (e.target as HTMLSelectElement).value)}
+                  handleFilterChange(
+                    f.key,
+                    (e.target as HTMLSelectElement).value,
+                  )}
                 class="border border-[var(--border-secondary)] rounded px-3 py-1.5 text-sm bg-[var(--bg-primary)] text-[var(--text-primary)]"
               >
                 {f.options!.map((o) => (

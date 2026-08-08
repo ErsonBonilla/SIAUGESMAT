@@ -4,7 +4,7 @@ import {
   downloadReport,
   getQueryExportUrl,
   getQueryTaskStatus,
-  type InactiveTeacherRow,
+  type InactiveCourseRow,
   queryEntities,
   type QueryTaskStatus,
 } from "../services/api.ts";
@@ -16,35 +16,35 @@ import SemesterPicker from "../components/SemesterPicker.tsx";
 const PAGE_SIZE = 20;
 
 const COLUMNS = [
-  { key: "teacher_name", label: "Docente" },
-  { key: "username", label: "Username" },
-  { key: "email", label: "Correo" },
-  { key: "course_name", label: "Curso" },
+  { key: "shortname", label: "Shortname" },
+  { key: "fullname", label: "Nombre" },
+  { key: "categoryname", label: "Categoría" },
   { key: "program", label: "Programa" },
   { key: "cat", label: "CAT" },
-  { key: "last_access", label: "Último acceso" },
-  { key: "days_since_last_access", label: "Días sin acceso" },
+  { key: "timecreated", label: "Creado" },
+  { key: "timemodified", label: "Última modificación" },
+  { key: "days_since_modified", label: "Días sin uso" },
 ];
 
-function formatLastAccess(ts: number): string {
+function formatDate(ts: number): string {
   if (!ts || ts <= 0) return "Nunca";
-  return new Date(ts * 1000).toLocaleString();
+  return new Date(ts * 1000).toLocaleDateString();
 }
 
 function formatDaysSince(daysSince?: number): string {
-  if (!daysSince || daysSince <= 0) return "Nunca";
+  if (!daysSince || daysSince <= 0) return "—";
   return `${daysSince} d`;
 }
 
 type CutoffMode = "days" | "months" | "years" | "semester";
 
-export default function InactiveTeachersQuery() {
+export default function InactiveCoursesQuery() {
   const cutoffMode = useSignal<CutoffMode>("days");
   const semester = useSignal("");
   const days = useSignal(15);
   const months = useSignal(1);
   const years = useSignal(1);
-  const data = useSignal<InactiveTeacherRow[]>([]);
+  const data = useSignal<InactiveCourseRow[]>([]);
   const loading = useSignal(false);
   const error = useSignal("");
   const taskId = useSignal("");
@@ -99,7 +99,7 @@ export default function InactiveTeachersQuery() {
     taskStatus.value = null;
     started.value = false;
     try {
-      const result = await queryEntities("inactive_teachers", params);
+      const result = await queryEntities("inactive_courses", params);
       taskId.value = result.task_id;
       startPolling(result.task_id);
     } catch (err) {
@@ -117,7 +117,7 @@ export default function InactiveTeachersQuery() {
         if (status.status === "running") {
           started.value = true;
         } else if (status.status === "completed") {
-          data.value = (status.result || []) as unknown as InactiveTeacherRow[];
+          data.value = (status.result || []) as unknown as InactiveCourseRow[];
           totalItems.value = data.value.length;
           pageOffset.value = 0;
           loading.value = false;
@@ -174,7 +174,7 @@ export default function InactiveTeachersQuery() {
           {cutoffMode.value === "days" && (
             <div>
               <label class="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                Días sin acceso (mínimo)
+                Días sin uso (mínimo)
               </label>
               <input
                 type="number"
@@ -192,7 +192,7 @@ export default function InactiveTeachersQuery() {
           {cutoffMode.value === "months" && (
             <div>
               <label class="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                Meses sin acceso (mínimo)
+                Meses sin uso (mínimo)
               </label>
               <input
                 type="number"
@@ -210,7 +210,7 @@ export default function InactiveTeachersQuery() {
           {cutoffMode.value === "years" && (
             <div>
               <label class="block text-sm font-medium text-[var(--text-secondary)] mb-2">
-                Años sin acceso (mínimo)
+                Años sin uso (mínimo)
               </label>
               <input
                 type="number"
@@ -293,7 +293,7 @@ export default function InactiveTeachersQuery() {
             <button
               type="button"
               onClick={() =>
-                downloadReport(exportUrl, "docentes_inactivos.csv").catch(
+                downloadReport(exportUrl, "cursos_sin_uso.csv").catch(
                   () => {},
                 )}
               class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded text-sm font-medium no-underline hover:bg-[var(--border-secondary)] transition cursor-pointer"
@@ -328,8 +328,8 @@ export default function InactiveTeachersQuery() {
                       colSpan={COLUMNS.length}
                       class="py-12 text-center text-[var(--text-muted)]"
                     >
-                      Seleccione el corte (días o semestre) y presione
-                      "Consultar".
+                      Seleccione el corte (días, meses, años o semestre) y
+                      presione "Consultar".
                     </td>
                   </tr>
                 )
@@ -339,19 +339,16 @@ export default function InactiveTeachersQuery() {
                     class="border-b border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)]"
                   >
                     <td class="py-2 px-3 text-[var(--text-primary)] font-medium">
-                      {row.teacher_name || "—"}
-                    </td>
-                    <td class="py-2 px-3 text-[var(--text-primary)]">
-                      {row.username}
-                    </td>
-                    <td class="py-2 px-3 text-[var(--text-primary)]">
-                      {row.email}
+                      {row.shortname || "—"}
                     </td>
                     <td
                       class="py-2 px-3 text-[var(--text-primary)] max-w-xs truncate"
-                      title={row.course_name}
+                      title={row.fullname}
                     >
-                      {row.course_name}
+                      {row.fullname}
+                    </td>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">
+                      {row.categoryname || "—"}
                     </td>
                     <td class="py-2 px-3 text-[var(--text-primary)]">
                       {row.program || "—"}
@@ -360,10 +357,13 @@ export default function InactiveTeachersQuery() {
                       {row.cat || "—"}
                     </td>
                     <td class="py-2 px-3 text-[var(--text-primary)]">
-                      {formatLastAccess(row.last_access)}
+                      {formatDate(Number(row.timecreated))}
                     </td>
                     <td class="py-2 px-3 text-[var(--text-primary)]">
-                      {formatDaysSince(row.days_since_last_access)}
+                      {formatDate(Number(row.timemodified))}
+                    </td>
+                    <td class="py-2 px-3 text-[var(--text-primary)]">
+                      {formatDaysSince(row.days_since_modified)}
                     </td>
                   </tr>
                 ))}

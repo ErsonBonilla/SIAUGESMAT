@@ -16,6 +16,7 @@ from app.workers.query_tasks import (
     _do_query,
     _filter_orphan_courses,
     _months_to_cutoff,
+    _parse_cutoff,
     _semester_to_cutoff,
     _years_to_cutoff,
 )
@@ -38,6 +39,54 @@ def _teacher(username, lastcourseaccess=0, firstname="Doc", lastname="Uno"):
 
 def _course(shortname, cid=1):
     return {"id": str(cid), "shortname": shortname, "fullname": f"Curso {shortname}"}
+
+
+def _course_ts(shortname, cid, timemodified, categoryname="CAT Sede Ibagué"):
+    return {
+        "id": str(cid),
+        "shortname": shortname,
+        "fullname": f"Curso {shortname}",
+        "categoryname": categoryname,
+        "timecreated": timemodified - 100 * DAY,
+        "timemodified": timemodified,
+    }
+
+
+class TestParseCutoff:
+    def test_days(self):
+        assert abs(_parse_cutoff({"days": 15}) - _days_to_cutoff(15)) <= 2
+
+    def test_months(self):
+        assert abs(_parse_cutoff({"months": 4}) - _months_to_cutoff(4)) <= 2
+
+    def test_years(self):
+        assert abs(_parse_cutoff({"years": 2}) - _years_to_cutoff(2)) <= 2
+
+    def test_semester(self):
+        assert _parse_cutoff({"semester": "2025A"}) == _semester_to_cutoff("2025A")
+
+    def test_requires_exactly_one(self):
+        for params in (
+            {},
+            {"days": 15, "months": 3},
+            {"years": 2, "semester": "2025A"},
+            {"semester": "2025A", "days": 15, "months": 1, "years": 1},
+        ):
+            with pytest.raises(ValueError):
+                _parse_cutoff(params)
+
+    def test_invalid_values(self):
+        for params in (
+            {"days": 0}, {"days": 400}, {"months": 0}, {"months": 13},
+            {"years": 0}, {"days": "abc"},
+        ):
+            with pytest.raises(ValueError):
+                _parse_cutoff(params)
+
+    def test_semester_invalid_shape(self):
+        for semester in ("2025", "2025C", "2025X", "abcde"):
+            with pytest.raises(ValueError):
+                _parse_cutoff({"semester": semester})
 
 
 class TestCutoffHelpers:
@@ -274,3 +323,69 @@ class TestFilterOrphanCourses:
         rows = await _do_query(moodle, qr)
         assert rows == [ahora]
         moodle.get_enrolled_teachers_with_access.assert_not_called()
+
+
+class TestDoQueryInactiveCourses:
+    def _moodle(self, courses: list) -> AsyncMock:
+        moodle = AsyncMock()
+        moodle.get_courses.return_value = courses
+        return moodle
+
+    @pytest.mark.asyncio
+    async def test_by_days_filters_modified_cutoff(self):
+        now = int(time.time())
+        # SIN_USO tiene last_modified hace 30 días (corte 15 → incluido)
+        sin_uso = _course_ts(SIA_COURSE, 1, now - 30 * DAY)
+        # EN_USO tiene modificación reciente (corte 15 → excluido)
+        en_uso = _course_ts("KEN_0852_sV_5031222_G-2", 2, now - 5 * DAY)
+        no_sia = _course("NO-SIAUGE-001", 3)
+        moodle = self._moodle([sin_uso, en_uso, no_sia])
+        qr = SimpleNamespace(entity="inactive_courses", params={"days": 15})
+        rows = await _do_query(moodle, qr)
+        # solo SIAUGESMAT sin modificación > corte → queda "sin_uso"
+        assert [r["shortname"] for r in rows] == [SIA_COURSE]
+
+    @pytest.mark.asyncio
+    async def test_excludes_courses_without_timemodified(self):
+        now = int(time.time())
+        sin_uso = _course_ts(SIA_COURSE, 1, now - 60 * DAY)
+        sin_fecha = _course(SIA_COURSE, 2)  # sin timemodified
+        moodle = self._moodle([sin_uso, sin_fecha])
+        qr = SimpleNamespace(entity="inactive_courses", params={"months": 1})
+        rows = await _do_query(moodle, qr)
+        assert [r["shortname"] for r in rows] == [SIA_COURSE]
+
+    @pytest.mark.asyncio
+    async def test_builds_course_info_fields(self):
+        now = int(time.time())
+        course = _course_ts(SIA_COURSE, 7, now - 90 * DAY, categoryname="Urabá")
+        moodle = self._moodle([course])
+        qr = SimpleNamespace(entity="inactive_courses", params={"months": 2})
+        rows = await _do_query(moodle, qr)
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["id"] == "7"
+        assert row["shortname"] == SIA_COURSE
+        assert row["categoryname"] == "Urabá"
+        parsed = parse_shortname(SIA_COURSE)
+        assert row["program"] == parsed["cod_prog"]
+        assert row["cat_prefix"] == parsed["cat_prefix"]
+        assert row["cat"] == parsed["cat_prefix"]  # no mapeado → prefijo
+        assert abs(int(row["days_since_modified"]) - 90) <= 1
+
+    @pytest.mark.asyncio
+    async def test_exactly_one_cutoff(self):
+        moodle = AsyncMock()
+        for params in ({}, {"days": 15, "months": 2}, {"years": 1, "semester": "2025A"}):
+            qr = SimpleNamespace(entity="inactive_courses", params=params)
+            with pytest.raises(ValueError):
+                await _do_query(moodle, qr)
+
+    @pytest.mark.asyncio
+    async def test_by_semester(self):
+        antes = _course_ts(SIA_COURSE, 1, _semester_to_cutoff("2024B") - 1)
+        despues = _course_ts("UTRS_1122_s3_2025101_G-1", 2, _semester_to_cutoff("2024B") + 1)
+        moodle = self._moodle([antes, despues])
+        qr = SimpleNamespace(entity="inactive_courses", params={"semester": "2024B"})
+        rows = await _do_query(moodle, qr)
+        assert [r["shortname"] for r in rows] == [SIA_COURSE]
