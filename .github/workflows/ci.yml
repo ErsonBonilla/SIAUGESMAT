@@ -32,10 +32,13 @@ jobs:
           cache-dependency-path: backend/requirements*.txt
 
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
+        run: pip install -r requirements-dev.lock
 
       - name: Lint (ruff)
         run: ruff check app tests
+
+      - name: Format (ruff)
+        run: ruff format --check app tests
 
       - name: Dead code (vulture)
         run: vulture app --min-confidence 70
@@ -43,6 +46,9 @@ jobs:
       - name: Tests (pytest)
         env:
           REDIS_URL: redis://localhost:6379/0
+          # SQLite explícito: los tests corren siempre contra SQLite
+          # (igual que en local sin backend/.env), nunca contra PostgreSQL.
+          DATABASE_URL: sqlite:////tmp/siaugesmat-ci.db
         run: pytest
 
   frontend:

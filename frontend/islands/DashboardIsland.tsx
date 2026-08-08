@@ -14,6 +14,7 @@ import {
   type SemesterMetrics,
 } from "../services/api.ts";
 import { profileSignal } from "../utils/profile.ts";
+import { getTokenPayload } from "../utils/auth.ts";
 import { SEMAPHORE_COLORS, STATUS_LABELS } from "../utils/constants.ts";
 import {
   CheckIcon,
@@ -33,17 +34,21 @@ export default function DashboardIsland() {
   useEffect(() => {
     loading.value = true;
     error.value = "";
+    const rawModalidad = getTokenPayload()?.modalidad;
+    const modalidad = typeof rawModalidad === "string"
+      ? rawModalidad
+      : undefined;
     const errors: string[] = [];
     Promise.all([
-      getHistory().catch((e) => {
+      getHistory(10, modalidad).catch((e) => {
         errors.push("Historial: " + (e instanceof Error ? e.message : "error"));
         return [] as SemesterMetrics[];
       }),
-      getLatest().catch((e) => {
+      getLatest(modalidad).catch((e) => {
         errors.push("Semáforo: " + (e instanceof Error ? e.message : "error"));
         return null;
       }),
-      listExecutions({ limit: 5 }).catch((e) => {
+      listExecutions({ limit: 5, modalidad }).catch((e) => {
         errors.push(
           "Ejecuciones: " + (e instanceof Error ? e.message : "error"),
         );

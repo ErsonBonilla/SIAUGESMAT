@@ -63,11 +63,7 @@ def get_history_metrics(
     if modalidad:
         query = query.filter(Execution.modalidad == modalidad.upper())
     aggregate = (
-        query
-        .group_by(Execution.semester)
-        .order_by(Execution.semester.desc())
-        .limit(limit)
-        .all()
+        query.group_by(Execution.semester).order_by(Execution.semester.desc()).limit(limit).all()
     )
 
     if not aggregate:
@@ -141,8 +137,7 @@ def get_semaphore_status(
 
     if semester:
         execution = (
-            base_query
-            .filter(Execution.semester == semester)
+            base_query.filter(Execution.semester == semester)
             .order_by(Execution.completed_at.desc())
             .first()
         )
@@ -156,11 +151,7 @@ def get_semaphore_status(
                 message=f"No hay ejecuciones completadas para {semester}.",
             )
     else:
-        execution = (
-            base_query
-            .order_by(Execution.completed_at.desc())
-            .first()
-        )
+        execution = base_query.order_by(Execution.completed_at.desc()).first()
         if not execution:
             return SemaphoreStatus(
                 semester="N/A",

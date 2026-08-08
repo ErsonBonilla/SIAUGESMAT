@@ -3,6 +3,7 @@
 Cubre M5: el contexto/reason generado por CourseComparisonService debe
 persistir en los items (detail) y propagarse al log de auditoría.
 """
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.db.models import OperationItem
@@ -65,9 +66,10 @@ def _ctx_data():
 class TestCreatePhase3ItemsPersistReason:
     def test_items_persist_reason_and_context(self, test_db):
         comparison = _comparison()
-        with patch("app.workers.phases.phase3_structure._acquire_advisory_lock",
-                   return_value=True), \
-             patch("app.workers.phases.phase3_structure.get_moodle_service") as mock_factory:
+        with (
+            patch("app.workers.phases.phase3_structure._acquire_advisory_lock", return_value=True),
+            patch("app.workers.phases.phase3_structure.get_moodle_service") as mock_factory,
+        ):
             mock_ms = MagicMock()
             mock_ms.get_courses = AsyncMock(return_value=[])
             mock_ms.close = AsyncMock(return_value=None)
@@ -75,9 +77,9 @@ class TestCreatePhase3ItemsPersistReason:
 
             _create_phase3_items(test_db, 999, _ctx_data(), comparison, "DISTANCIA")
 
-        items = test_db.query(OperationItem).filter(
-            OperationItem.batch_id.like(f"etl_3_%_{999}")
-        ).all()
+        items = (
+            test_db.query(OperationItem).filter(OperationItem.batch_id.like(f"etl_3_%_{999}")).all()
+        )
         by_action = {}
         for it in items:
             by_action.setdefault((it.detail["action"], it.identifier), it)
@@ -113,13 +115,12 @@ class TestCreatePhase3ItemsPersistReason:
             "to_update": [],
             "to_create": [],
         }
-        with patch("app.workers.phases.phase3_structure._acquire_advisory_lock",
-                   return_value=True):
+        with patch("app.workers.phases.phase3_structure._acquire_advisory_lock", return_value=True):
             _create_phase3_items(test_db, 998, {"courses": []}, comparison, "DISTANCIA")
 
-        items = test_db.query(OperationItem).filter(
-            OperationItem.batch_id.like(f"etl_3_%_{998}")
-        ).all()
+        items = (
+            test_db.query(OperationItem).filter(OperationItem.batch_id.like(f"etl_3_%_{998}")).all()
+        )
         assert len(items) == 1
         assert "reason" not in items[0].detail
         assert items[0].detail.get("age_seconds") is None
@@ -130,11 +131,20 @@ class TestLogSuccessPropagatesReason:
         for action in ("delete", "activate", "hide", "create"):
             with patch("app.workers.phases.item_task.save_log") as mock_save:
                 _log_success(
-                    MagicMock(), 1, action, "SN_001",
-                    {"reason": "some_reason", "old_shortname": "OLD",
-                     "professor": "p1", "template_shortname": "TPL",
-                     "age_seconds": 42, "recreate": True,
-                     "fullname": "Curso Uno", "category_idnumber": "CAT"},
+                    MagicMock(),
+                    1,
+                    action,
+                    "SN_001",
+                    {
+                        "reason": "some_reason",
+                        "old_shortname": "OLD",
+                        "professor": "p1",
+                        "template_shortname": "TPL",
+                        "age_seconds": 42,
+                        "recreate": True,
+                        "fullname": "Curso Uno",
+                        "category_idnumber": "CAT",
+                    },
                 )
             assert mock_save.called
             args = mock_save.call_args[0]
@@ -149,9 +159,17 @@ class TestLogSuccessPropagatesReason:
 
     def test_rename_copies_old_shortname_and_new_fullname(self):
         with patch("app.workers.phases.item_task.save_log") as mock_save:
-            _log_success(MagicMock(), 1, "rename", "SN_NEW",
-                         {"old_shortname": "SN_OLD", "reason": "core_rename",
-                          "fullname": "Curso Renombrado"})
+            _log_success(
+                MagicMock(),
+                1,
+                "rename",
+                "SN_NEW",
+                {
+                    "old_shortname": "SN_OLD",
+                    "reason": "core_rename",
+                    "fullname": "Curso Renombrado",
+                },
+            )
         args = mock_save.call_args[0]
         assert args[5]["old_shortname"] == "SN_OLD"
         assert args[5]["new_fullname"] == "Curso Renombrado"
@@ -159,21 +177,23 @@ class TestLogSuccessPropagatesReason:
 
     def test_enrol_copies_fullname(self):
         with patch("app.workers.phases.item_task.save_log") as mock_save:
-            _log_success(MagicMock(), 1, "enrol", "user1",
-                         {"course_shortname": "CUR_101",
-                          "fullname": "Curso de Prueba"})
+            _log_success(
+                MagicMock(),
+                1,
+                "enrol",
+                "user1",
+                {"course_shortname": "CUR_101", "fullname": "Curso de Prueba"},
+            )
         args = mock_save.call_args[0]
         assert args[5]["course"] == "CUR_101"
         assert args[5]["fullname"] == "Curso de Prueba"
 
     def test_skips_reason_for_user_created(self):
         with patch("app.workers.phases.item_task.save_log") as mock_save:
-            _log_success(MagicMock(), 1, "create_user", "user1",
-                         {"reason": "user_reason"})
+            _log_success(MagicMock(), 1, "create_user", "user1", {"reason": "user_reason"})
         assert not mock_save.called
 
     def test_no_execution_id_no_log(self):
         with patch("app.workers.phases.item_task.save_log") as mock_save:
-            _log_success(MagicMock(), None, "delete", "SN_001",
-                         {"reason": "some_reason"})
+            _log_success(MagicMock(), None, "delete", "SN_001", {"reason": "some_reason"})
         assert not mock_save.called

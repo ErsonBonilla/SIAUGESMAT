@@ -95,13 +95,16 @@ class TestCreateUserIfNotExistsRecovery:
         integ = moodle_integration
         integ.service.get_users.return_value = []  # no encontrado por email
         integ.service.get_user_by_username.return_value = {
-            "username": "teacher1", "id": 9,
+            "username": "teacher1",
+            "id": 9,
         }
-        username, created = await integ.create_user_if_not_exists({
-            "email": "teacher1@ut.edu.co",
-            "firstname": "Ana",
-            "lastname": "Pérez",
-        })
+        username, created = await integ.create_user_if_not_exists(
+            {
+                "email": "teacher1@ut.edu.co",
+                "firstname": "Ana",
+                "lastname": "Pérez",
+            }
+        )
         assert username == "teacher1"
         assert created is False
         integ.service.create_users.assert_not_awaited()
@@ -111,9 +114,11 @@ class TestCreateUserIfNotExistsRecovery:
         integ = moodle_integration
         integ.service.get_users.return_value = []
         integ.service.get_user_by_username.side_effect = MoodleAPIError("boom")
-        username, created = await integ.create_user_if_not_exists({
-            "email": "teacher1@ut.edu.co",
-        })
+        username, created = await integ.create_user_if_not_exists(
+            {
+                "email": "teacher1@ut.edu.co",
+            }
+        )
         assert username is None
         assert created is False
 
@@ -133,7 +138,10 @@ class TestCreateCourseRecreate:
         integ.service.delete_courses.return_value = {"status": "ok"}
         integ.service.create_courses.return_value = [{"shortname": "EXISTING", "id": "2"}]
         result = await integ.create_course(
-            "EXISTING", "Existing", "CAT-01", recreate=True,
+            "EXISTING",
+            "Existing",
+            "CAT-01",
+            recreate=True,
         )
         assert result is True
         integ.service.delete_courses.assert_awaited_once_with(["EXISTING"])
@@ -144,7 +152,10 @@ class TestCreateCourseRecreate:
         integ.service.get_courses.return_value = [{"shortname": "EXISTING", "id": "1"}]
         integ.service.delete_courses.return_value = None  # no borra
         result = await integ.create_course(
-            "EXISTING", "Existing", "CAT-01", recreate=True,
+            "EXISTING",
+            "Existing",
+            "CAT-01",
+            recreate=True,
         )
         assert result is False
         assert "persiste" in integ.last_error
@@ -167,23 +178,49 @@ class TestApplyActionRecreate:
         apply_action(
             "recreate",
             {"old_shortname": "OLD-1", "reason": "contenido renovado"},
-            "NEW-1", "prof",
-            None, to_create, to_delete, [], [], [], [], [],
+            "NEW-1",
+            "prof",
+            None,
+            to_create,
+            to_delete,
+            [],
+            [],
+            [],
+            [],
+            [],
         )
-        assert to_delete == [{
-            "shortname": "OLD-1", "old_shortname": "OLD-1", "reason": "contenido renovado",
-        }]
-        assert to_create == [{
-            "shortname": "NEW-1", "professor": "prof",
-            "recreate": True, "reason": "contenido renovado",
-            "old_shortname": "OLD-1",
-        }]
+        assert to_delete == [
+            {
+                "shortname": "OLD-1",
+                "old_shortname": "OLD-1",
+                "reason": "contenido renovado",
+            }
+        ]
+        assert to_create == [
+            {
+                "shortname": "NEW-1",
+                "professor": "prof",
+                "recreate": True,
+                "reason": "contenido renovado",
+                "old_shortname": "OLD-1",
+            }
+        ]
 
     def test_plain_create_has_no_recreate_flag(self):
         to_create, to_delete = [], []
         apply_action(
-            "create", {}, "NEW-1", "prof",
-            None, to_create, to_delete, [], [], [], [], [],
+            "create",
+            {},
+            "NEW-1",
+            "prof",
+            None,
+            to_create,
+            to_delete,
+            [],
+            [],
+            [],
+            [],
+            [],
         )
         assert to_create == [{"shortname": "NEW-1", "professor": "prof"}]
 
@@ -198,27 +235,36 @@ class TestItemTaskRecreate:
         item.status = "pending"
         item.identifier = "IDENTIFIER_001"
         item.detail = {
-            "action": "create", "execution_id": 1, "modalidad": "DISTANCIA",
-            "fullname": "New Course", "category_idnumber": "CAT_01",
-            "template_id": None, "recreate": True,
+            "action": "create",
+            "execution_id": 1,
+            "modalidad": "DISTANCIA",
+            "fullname": "New Course",
+            "category_idnumber": "CAT_01",
+            "template_id": None,
+            "recreate": True,
         }
         moodle = MagicMock()
         moodle.close = AsyncMock(return_value=None)
         mock_integ = AsyncMock()
         mock_integ.create_course.return_value = True
-        with patch("app.workers.phases.item_task.SessionLocal") as mock_sl, \
-             patch("app.workers.phases.item_task.get_item", return_value=item), \
-             patch("app.workers.phases.item_task.get_moodle_service", return_value=moodle), \
-             patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
-             patch("app.workers.phases.item_task.update_item"), \
-             patch("app.workers.phases.item_task._refresh_phase_progress"), \
-             patch("app.workers.phases.item_task.claim_item", return_value=True):
+        with (
+            patch("app.workers.phases.item_task.SessionLocal") as mock_sl,
+            patch("app.workers.phases.item_task.get_item", return_value=item),
+            patch("app.workers.phases.item_task.get_moodle_service", return_value=moodle),
+            patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls,
+            patch("app.workers.phases.item_task.update_item"),
+            patch("app.workers.phases.item_task._refresh_phase_progress"),
+            patch("app.workers.phases.item_task.claim_item", return_value=True),
+        ):
             mock_integ_cls.return_value = mock_integ
             mock_sl.return_value = MagicMock()
             process_etl_item(1)
         mock_integ.create_course.assert_called_once_with(
-            shortname="IDENTIFIER_001", fullname="New Course",
-            category_idnumber="CAT_01", template_id=None, recreate=True,
+            shortname="IDENTIFIER_001",
+            fullname="New Course",
+            category_idnumber="CAT_01",
+            template_id=None,
+            recreate=True,
         )
 
 
@@ -230,22 +276,27 @@ class TestItemTaskOverloadExhaustion:
         moodle = _make_moodle()
         mock_integ = AsyncMock()
         mock_integ.delete_course.side_effect = MoodleOverloadedError("504 gateway time-out")
-        with patch("app.workers.phases.item_task.SessionLocal") as mock_sl, \
-             patch("app.workers.phases.item_task.get_item",
-                   return_value=_make_item(action="delete")), \
-             patch("app.workers.phases.item_task.get_moodle_service", return_value=moodle), \
-             patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
-             patch("app.workers.phases.item_task.should_cancel", return_value=False), \
-             patch("app.workers.phases.item_task.update_item") as mock_update, \
-             patch("app.workers.phases.item_task._handle_error"), \
-             patch("app.workers.phases.item_task._refresh_phase_progress"), \
-             patch("app.workers.phases.item_task.claim_item", return_value=True), \
-             patch.object(process_etl_item, "max_retries", 0):
+        with (
+            patch("app.workers.phases.item_task.SessionLocal") as mock_sl,
+            patch(
+                "app.workers.phases.item_task.get_item", return_value=_make_item(action="delete")
+            ),
+            patch("app.workers.phases.item_task.get_moodle_service", return_value=moodle),
+            patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls,
+            patch("app.workers.phases.item_task.should_cancel", return_value=False),
+            patch("app.workers.phases.item_task.update_item") as mock_update,
+            patch("app.workers.phases.item_task._handle_error"),
+            patch("app.workers.phases.item_task._refresh_phase_progress"),
+            patch("app.workers.phases.item_task.claim_item", return_value=True),
+            patch.object(process_etl_item, "max_retries", 0),
+        ):
             mock_integ_cls.return_value = mock_integ
             mock_sl.return_value = MagicMock()
             process_etl_item(1)  # no debe lanzar: el chord no debe romperse
         mock_update.assert_any_call(
-            mock_sl.return_value, 1, "failed",
+            mock_sl.return_value,
+            1,
+            "failed",
             "Agotados reintentos por sobrecarga de Moodle",
         )
 
@@ -253,15 +304,18 @@ class TestItemTaskOverloadExhaustion:
         moodle = _make_moodle()
         mock_integ = AsyncMock()
         mock_integ.delete_course.side_effect = MoodleOverloadedError("504 gateway time-out")
-        with patch("app.workers.phases.item_task.SessionLocal") as mock_sl, \
-             patch("app.workers.phases.item_task.get_item",
-                   return_value=_make_item(action="delete")), \
-             patch("app.workers.phases.item_task.get_moodle_service", return_value=moodle), \
-             patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls, \
-              patch("app.workers.phases.item_task.should_cancel", return_value=False), \
-             patch("app.workers.phases.item_task.update_item") as mock_update, \
-             patch("app.workers.phases.item_task.claim_item", return_value=True), \
-             patch.object(process_etl_item, "max_retries", 3):
+        with (
+            patch("app.workers.phases.item_task.SessionLocal") as mock_sl,
+            patch(
+                "app.workers.phases.item_task.get_item", return_value=_make_item(action="delete")
+            ),
+            patch("app.workers.phases.item_task.get_moodle_service", return_value=moodle),
+            patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls,
+            patch("app.workers.phases.item_task.should_cancel", return_value=False),
+            patch("app.workers.phases.item_task.update_item") as mock_update,
+            patch("app.workers.phases.item_task.claim_item", return_value=True),
+            patch.object(process_etl_item, "max_retries", 3),
+        ):
             mock_integ_cls.return_value = mock_integ
             mock_sl.return_value = MagicMock()
             with pytest.raises(MoodleOverloadedError):
@@ -279,8 +333,11 @@ class TestChordActiveMarker:
         from app.repositories.execution_repo import clear_chord_active, set_chord_active
 
         ex = Execution(
-            filename="test.xlsx", semester="2025A", status="running",
-            modalidad="DISTANCIA", created_at=datetime.now(UTC),
+            filename="test.xlsx",
+            semester="2025A",
+            status="running",
+            modalidad="DISTANCIA",
+            created_at=datetime.now(UTC),
         )
         test_db.add(ex)
         test_db.commit()
@@ -303,8 +360,11 @@ class TestChordActiveMarker:
         from app.repositories.execution_repo import set_chord_active
 
         ex = Execution(
-            filename="test.xlsx", semester="2025A", status="running",
-            modalidad="DISTANCIA", created_at=datetime.now(UTC),
+            filename="test.xlsx",
+            semester="2025A",
+            status="running",
+            modalidad="DISTANCIA",
+            created_at=datetime.now(UTC),
         )
         test_db.add(ex)
         test_db.commit()
@@ -323,9 +383,13 @@ class TestChordActiveMarker:
 class TestRecoverStuckPhase:
     def _make_execution(self, test_db, status="running", checkpoint=None):
         from app.db.models import Execution
+
         ex = Execution(
-            filename="test.xlsx", semester="2025A", status=status,
-            modalidad="DISTANCIA", created_at=datetime.now(UTC),
+            filename="test.xlsx",
+            semester="2025A",
+            status=status,
+            modalidad="DISTANCIA",
+            created_at=datetime.now(UTC),
             phase_checkpoint=checkpoint or {},
         )
         test_db.add(ex)
@@ -335,21 +399,25 @@ class TestRecoverStuckPhase:
 
     def test_relaunches_phase3_when_chord_expired(self, test_db):
         ex = self._make_execution(test_db)
-        with patch("app.workers.phases.common._get_pending_items",
-                   return_value=[MagicMock()]), \
-             patch("app.workers.utils.reset_stuck_items", return_value=[]), \
-             patch("app.workers.phases.phase3_structure.on_delete_items_done") as mock_cb:
+        with (
+            patch("app.workers.phases.common._get_pending_items", return_value=[MagicMock()]),
+            patch("app.workers.utils.reset_stuck_items", return_value=[]),
+            patch("app.workers.phases.phase3_structure.on_delete_items_done") as mock_cb,
+        ):
             from app.workers.cleanup_tasks import recover_stuck_phase
+
             recover_stuck_phase()
         mock_cb.delay.assert_called_once_with([], ex.id)
 
     def test_relaunches_phase4(self, test_db):
         ex = self._make_execution(test_db)
-        with patch("app.workers.phases.common._get_pending_items",
-                   side_effect=[[], [MagicMock()]]), \
-             patch("app.workers.utils.reset_stuck_items", return_value=[]), \
-             patch("app.workers.cleanup_tasks._relaunch_phase4") as mock_relaunch:
+        with (
+            patch("app.workers.phases.common._get_pending_items", side_effect=[[], [MagicMock()]]),
+            patch("app.workers.utils.reset_stuck_items", return_value=[]),
+            patch("app.workers.cleanup_tasks._relaunch_phase4") as mock_relaunch,
+        ):
             from app.workers.cleanup_tasks import recover_stuck_phase
+
             recover_stuck_phase()
         mock_relaunch.assert_called_once()
         assert mock_relaunch.call_args.args[1] == ex.id
@@ -357,9 +425,12 @@ class TestRecoverStuckPhase:
     def test_skips_relaunch_when_chord_active(self, test_db):
         future = (datetime.now(UTC) + timedelta(minutes=30)).isoformat()
         self._make_execution(test_db, checkpoint={"chord_active": future})
-        with patch("app.workers.phases.common._get_pending_items") as mock_get, \
-             patch("app.workers.phases.phase3_structure.on_delete_items_done") as mock_cb:
+        with (
+            patch("app.workers.phases.common._get_pending_items") as mock_get,
+            patch("app.workers.phases.phase3_structure.on_delete_items_done") as mock_cb,
+        ):
             from app.workers.cleanup_tasks import recover_stuck_phase
+
             recover_stuck_phase()
         mock_get.assert_not_called()
         mock_cb.delay.assert_not_called()
@@ -368,12 +439,13 @@ class TestRecoverStuckPhase:
         from app.workers.phases.common import on_phase_items_done
 
         ex = self._make_execution(test_db)
-        with patch("app.workers.phases.common._get_pending_items",
-                   return_value=[MagicMock()]), \
-             patch("app.workers.phases.common.reset_stuck_items", return_value=[]), \
-             patch("app.workers.phases.common.process_etl_item") as mock_task, \
-             patch("app.workers.phases.common.chord") as mock_chord, \
-             patch("app.workers.phases.common._mark_chord_active") as mock_mark:
+        with (
+            patch("app.workers.phases.common._get_pending_items", return_value=[MagicMock()]),
+            patch("app.workers.phases.common.reset_stuck_items", return_value=[]),
+            patch("app.workers.phases.common.process_etl_item") as mock_task,
+            patch("app.workers.phases.common.chord") as mock_chord,
+            patch("app.workers.phases.common._mark_chord_active") as mock_mark,
+        ):
             mock_task.si.return_value = "sig1"
             mock_chord.return_value = MagicMock()
             on_phase_items_done([], ex.id, "4")
@@ -386,13 +458,14 @@ class TestRecoverStuckPhase:
         ex.progress_updated_at = old
         ex.created_at = old
         test_db.commit()
-        with patch("app.workers.phases.common._get_pending_items",
-                   side_effect=[[], []]), \
-             patch("app.workers.phases.common._items_exist_for_execution",
-                   return_value=False), \
-             patch("app.workers.tasks.process_etl_file") as mock_file, \
-             patch("os.path.isfile", return_value=True):
+        with (
+            patch("app.workers.phases.common._get_pending_items", side_effect=[[], []]),
+            patch("app.workers.phases.common._items_exist_for_execution", return_value=False),
+            patch("app.workers.tasks.process_etl_file") as mock_file,
+            patch("os.path.isfile", return_value=True),
+        ):
             from app.workers.cleanup_tasks import recover_stuck_phase
+
             recover_stuck_phase()
         mock_file.delay.assert_called_once()
         args = mock_file.delay.call_args[0]
@@ -404,12 +477,13 @@ class TestRecoverStuckPhase:
         ex.progress_updated_at = fresh
         ex.created_at = fresh
         test_db.commit()
-        with patch("app.workers.phases.common._get_pending_items",
-                   side_effect=[[], []]), \
-             patch("app.workers.phases.common._items_exist_for_execution",
-                   return_value=False), \
-             patch("app.workers.tasks.process_etl_file") as mock_file:
+        with (
+            patch("app.workers.phases.common._get_pending_items", side_effect=[[], []]),
+            patch("app.workers.phases.common._items_exist_for_execution", return_value=False),
+            patch("app.workers.tasks.process_etl_file") as mock_file,
+        ):
             from app.workers.cleanup_tasks import recover_stuck_phase
+
             recover_stuck_phase()
         mock_file.delay.assert_not_called()
 
@@ -419,13 +493,14 @@ class TestRecoverStuckPhase:
         ex.progress_updated_at = old
         ex.created_at = old
         test_db.commit()
-        with patch("app.workers.phases.common._get_pending_items",
-                   side_effect=[[], []]), \
-             patch("app.workers.phases.common._items_exist_for_execution",
-                   return_value=False), \
-             patch("app.workers.tasks.process_etl_file") as mock_file, \
-             patch("os.path.isfile", return_value=True):
+        with (
+            patch("app.workers.phases.common._get_pending_items", side_effect=[[], []]),
+            patch("app.workers.phases.common._items_exist_for_execution", return_value=False),
+            patch("app.workers.tasks.process_etl_file") as mock_file,
+            patch("os.path.isfile", return_value=True),
+        ):
             from app.workers.cleanup_tasks import recover_stuck_phase
+
             recover_stuck_phase()
         mock_file.delay.assert_not_called()
 
@@ -436,18 +511,22 @@ class TestRecoverStuckPhase:
 class TestNormalizeEnrolReason:
     def test_user_not_found_spanish(self):
         from app.workers.phases.item_task import _normalize_enrol_reason
+
         assert _normalize_enrol_reason("Usuario no encontrado en Moodle: u1") == "user_not_found"
 
     def test_user_inactive_by_code(self):
         from app.workers.phases.item_task import _normalize_enrol_reason
+
         assert _normalize_enrol_reason("usernotactive: user suspended") == "user_inactive"
 
     def test_course_not_found(self):
         from app.workers.phases.item_task import _normalize_enrol_reason
+
         assert _normalize_enrol_reason("Curso no encontrado en Moodle: C1") == "course_not_found"
 
     def test_fallback_raw(self):
         from app.workers.phases.item_task import _normalize_enrol_reason
+
         assert _normalize_enrol_reason("unknown weird error") == "unknown weird error"
 
 
@@ -458,13 +537,21 @@ class TestClaimItem:
     def test_claims_from_pending(self, test_db):
         from app.db.models import OperationBatch, OperationItem
         from app.repositories.operation_repo import claim_item
-        batch = OperationBatch(batch_id="etl_test_claim", entity_type="test",
-                               action="test", total=1, modalidad="DISTANCIA")
+
+        batch = OperationBatch(
+            batch_id="etl_test_claim",
+            entity_type="test",
+            action="test",
+            total=1,
+            modalidad="DISTANCIA",
+        )
         test_db.add(batch)
         test_db.flush()
         item = OperationItem(
-            batch_id="etl_test_claim", identifier="ID1",
-            detail={"action": "test"}, status="pending",
+            batch_id="etl_test_claim",
+            identifier="ID1",
+            detail={"action": "test"},
+            status="pending",
         )
         test_db.add(item)
         test_db.flush()
@@ -476,13 +563,21 @@ class TestClaimItem:
     def test_second_claim_fails(self, test_db):
         from app.db.models import OperationBatch, OperationItem
         from app.repositories.operation_repo import claim_item
-        batch = OperationBatch(batch_id="etl_test_claim2", entity_type="test",
-                               action="test", total=1, modalidad="DISTANCIA")
+
+        batch = OperationBatch(
+            batch_id="etl_test_claim2",
+            entity_type="test",
+            action="test",
+            total=1,
+            modalidad="DISTANCIA",
+        )
         test_db.add(batch)
         test_db.flush()
         item = OperationItem(
-            batch_id="etl_test_claim2", identifier="ID1",
-            detail={"action": "test"}, status="pending",
+            batch_id="etl_test_claim2",
+            identifier="ID1",
+            detail={"action": "test"},
+            status="pending",
         )
         test_db.add(item)
         test_db.flush()
@@ -497,11 +592,14 @@ class TestClaimItem:
 class TestChordActiveOrdering:
     def test_launch_items_chord_marks_before_chord(self):
         from app.workers.phases.common import _launch_items_chord
+
         item = MagicMock()
         item.id = 1
         calls = []
-        with patch("app.workers.phases.common.chord") as mock_chord_fn, \
-             patch("app.workers.phases.common._mark_chord_active") as mock_mark:
+        with (
+            patch("app.workers.phases.common.chord") as mock_chord_fn,
+            patch("app.workers.phases.common._mark_chord_active") as mock_mark,
+        ):
             mock_mark.side_effect = lambda *a, **kw: calls.append("mark")
             mock_chord_fn.side_effect = lambda *a, **kw: calls.append("chord") or MagicMock()
             _launch_items_chord(1, [item])
@@ -509,11 +607,14 @@ class TestChordActiveOrdering:
 
     def test_launch_delete_chord_marks_before_chord(self):
         from app.workers.phases.phase3_structure import _launch_delete_chord
+
         item = MagicMock()
         item.id = 1
         calls = []
-        with patch("app.workers.phases.phase3_structure.chord") as mock_chord_fn, \
-             patch("app.workers.phases.phase3_structure._mark_delete_chord_active") as mock_mark:
+        with (
+            patch("app.workers.phases.phase3_structure.chord") as mock_chord_fn,
+            patch("app.workers.phases.phase3_structure._mark_delete_chord_active") as mock_mark,
+        ):
             mock_mark.side_effect = lambda *a, **kw: calls.append("mark")
             mock_chord_fn.side_effect = lambda *a, **kw: calls.append("chord") or MagicMock()
             _launch_delete_chord(1, [item])

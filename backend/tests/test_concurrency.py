@@ -17,21 +17,30 @@ from app.workers.phases.phase4_people import _create_phase4_items, _create_phase
 
 def _make_ctx_data(users=None, enrolments=None):
     return {
-        "users_to_create": users or [{"username": "testuser", "firstname": "T",
-                                       "lastname": "U", "email": "tu@ut.edu.co",
-                                       "cedula": "12345", "password": "",
-                                       "city": "", "description": "",
-                                       "email_personal": ""}],
-        "resolved_enrolments": enrolments or [{"username": "testuser",
-                                                "course_shortname": "TST_0001_sI_001_G-1_12345"}],
+        "users_to_create": users
+        or [
+            {
+                "username": "testuser",
+                "firstname": "T",
+                "lastname": "U",
+                "email": "tu@ut.edu.co",
+                "cedula": "12345",
+                "password": "",
+                "city": "",
+                "description": "",
+                "email_personal": "",
+            }
+        ],
+        "resolved_enrolments": enrolments
+        or [{"username": "testuser", "course_shortname": "TST_0001_sI_001_G-1_12345"}],
     }
 
 
 class TestAdvisoryLock:
-
     def test_deterministic_lock_id(self):
         """Mismo execution_id + phase produce siempre el mismo lock_id."""
         import hashlib
+
         key = b"etl_lock_1_4"
         expected = int(hashlib.sha256(key).hexdigest(), 16) % (2**63)
 
@@ -42,6 +51,7 @@ class TestAdvisoryLock:
     def test_different_phases_different_locks(self):
         """Distintas fases producen distintos lock_ids."""
         import hashlib
+
         lock_3 = int(hashlib.sha256(b"etl_lock_1_3").hexdigest(), 16) % (2**63)
         lock_4 = int(hashlib.sha256(b"etl_lock_1_4").hexdigest(), 16) % (2**63)
         assert lock_3 != lock_4
@@ -49,13 +59,13 @@ class TestAdvisoryLock:
     def test_different_executions_different_locks(self):
         """Distintas ejecuciones producen distintos lock_ids."""
         import hashlib
+
         lock_1 = int(hashlib.sha256(b"etl_lock_1_4").hexdigest(), 16) % (2**63)
         lock_2 = int(hashlib.sha256(b"etl_lock_2_4").hexdigest(), 16) % (2**63)
         assert lock_1 != lock_2
 
 
 class TestConcurrentPhase4:
-
     @pytest.mark.asyncio
     async def test_concurrent_create_items(self, test_db):
         """Dos llamadas concurrentes a _create_phase4_items con el mismo
@@ -75,7 +85,9 @@ class TestConcurrentPhase4:
                     ]
                     mock_factory.return_value = instance
 
-                    with patch("app.workers.phases.phase4_people._acquire_advisory_lock") as mock_lock:
+                    with patch(
+                        "app.workers.phases.phase4_people._acquire_advisory_lock"
+                    ) as mock_lock:
                         # Primer worker obtiene lock, segundo no
                         mock_lock.side_effect = [True, False]
 
@@ -98,8 +110,10 @@ class TestConcurrentPhase4:
     @pytest.mark.asyncio
     async def test_no_duplicate_items_on_retry(self, test_db):
         """Si los items ya existen, _create_phase4_items retorna vacío."""
-        with patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True), \
-             patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory:
+        with (
+            patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True),
+            patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory,
+        ):
             instance = __import__("unittest").mock.AsyncMock()
             instance.get_courses.return_value = []
             mock_factory.return_value = instance

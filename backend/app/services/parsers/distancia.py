@@ -42,18 +42,13 @@ class DistanciaParser(BaseExcelParser):
         expected_keys = set(cls.CANONICAL_MAP.keys())
 
         for i, row in raw.iterrows():
-            normalized = {
-                cls._normalize_column_name(str(v))
-                for v in row if pd.notna(v)
-            }
+            normalized = {cls._normalize_column_name(str(v)) for v in row if pd.notna(v)}
             matches = len(expected_keys & normalized)
             if matches >= 5:
-                return pd.read_excel(file_path, header=i, dtype=str,
-                                     engine=engine)
+                return pd.read_excel(file_path, header=i, dtype=str, engine=engine)
 
         logger.warning(
-            "No se detectó fila de encabezados en '%s', "
-            "se asume primera fila como encabezado.",
+            "No se detectó fila de encabezados en '%s', se asume primera fila como encabezado.",
             file_path,
         )
         return pd.read_excel(file_path, dtype=str, engine=engine)
@@ -79,9 +74,7 @@ class DistanciaParser(BaseExcelParser):
         }
 
     @classmethod
-    def _process_rows(
-        cls, df: pd.DataFrame, modalidad: str
-    ) -> tuple[dict, list, dict, list, list]:
+    def _process_rows(cls, df: pd.DataFrame, modalidad: str) -> tuple[dict, list, dict, list, list]:
         categories_map: dict = {}
         courses: list = []
         users: dict = {}
@@ -103,18 +96,33 @@ class DistanciaParser(BaseExcelParser):
             cedula = str(row.get("doc_docente", "")).strip()
 
             course_data = cls._build_course_data(
-                row, cat_prefix, cod_prog, semestre_romano, grupo, cedula,
+                row,
+                cat_prefix,
+                cod_prog,
+                semestre_romano,
+                grupo,
+                cedula,
             )
             courses.append(course_data)
 
             cls._ensure_categories(
-                categories_map, modalidad, cat_prefix, cod_prog,
-                semestre_romano, nombre_cat, row,
+                categories_map,
+                modalidad,
+                cat_prefix,
+                cod_prog,
+                semestre_romano,
+                nombre_cat,
+                row,
             )
 
             cls._process_teacher(
-                row, course_data["shortname"], cedula, nombre_cat,
-                users, enrolments, duplicates,
+                row,
+                course_data["shortname"],
+                cedula,
+                nombre_cat,
+                users,
+                enrolments,
+                duplicates,
             )
 
         return categories_map, courses, users, enrolments, duplicates
@@ -123,6 +131,7 @@ class DistanciaParser(BaseExcelParser):
     def _sanitize_group(grupo: str) -> str:
         """Reemplaza caracteres que rompen el patrón SIAUGESMAT (ej. '_' → '-')."""
         import re
+
         if not grupo:
             return grupo
         return re.sub(r"_+", "-", grupo)
@@ -131,8 +140,10 @@ class DistanciaParser(BaseExcelParser):
     def _build_cat_prefix(nombre_cat: str) -> str:
         if not nombre_cat:
             return "SIN"
-        return "URA" if nombre_cat == "APARTADO" else (
-            nombre_cat[:3].upper() if len(nombre_cat) >= 3 else nombre_cat.upper()
+        return (
+            "URA"
+            if nombre_cat == "APARTADO"
+            else (nombre_cat[:3].upper() if len(nombre_cat) >= 3 else nombre_cat.upper())
         )
 
     @classmethod
@@ -154,19 +165,28 @@ class DistanciaParser(BaseExcelParser):
 
     @staticmethod
     def _build_course_data(
-        row, cat_prefix: str, cod_prog: str, semestre_romano: str,
-        grupo: str, cedula: str,
+        row,
+        cat_prefix: str,
+        cod_prog: str,
+        semestre_romano: str,
+        grupo: str,
+        cedula: str,
     ) -> dict:
         cod_curso = str(row.get("cod_curso", "")).strip()
         nombre_curso = str(row.get("nombre_curso", "")).strip()
         cedula_suffix = f"_{cedula}" if cedula else ""
         shortname = (
-            f"{cat_prefix}_{cod_prog}_s{semestre_romano}_{cod_curso}"
-            f"_G-{grupo}{cedula_suffix}"
+            f"{cat_prefix}_{cod_prog}_s{semestre_romano}_{cod_curso}_G-{grupo}{cedula_suffix}"
         )
         if len(shortname) > 255:
-            logger.warning(f"Shortname excede 255 caracteres: {shortname[:80]}... (longitud={len(shortname)})")
-        fullname = f"{nombre_curso} - GRUPO {grupo}".upper() if nombre_curso else f"CURSO {cod_curso} - GRUPO {grupo}".upper()
+            logger.warning(
+                f"Shortname excede 255 caracteres: {shortname[:80]}... (longitud={len(shortname)})"
+            )
+        fullname = (
+            f"{nombre_curso} - GRUPO {grupo}".upper()
+            if nombre_curso
+            else f"CURSO {cod_curso} - GRUPO {grupo}".upper()
+        )
         cat_idnumber = f"{cat_prefix}_{cod_prog}_s{semestre_romano}"
         template = f"PORTAFOLIO_{cod_prog}_s{semestre_romano}_{cod_curso}" if cod_curso else None
         return {
@@ -181,9 +201,14 @@ class DistanciaParser(BaseExcelParser):
 
     @classmethod
     def _ensure_categories(
-        cls, categories_map: dict, modalidad: str,
-        cat_prefix: str, cod_prog: str, semestre_romano: str,
-        nombre_cat: str, row,
+        cls,
+        categories_map: dict,
+        modalidad: str,
+        cat_prefix: str,
+        cod_prog: str,
+        semestre_romano: str,
+        nombre_cat: str,
+        row,
     ):
         cat1_idnumber = cat_prefix
         if cat1_idnumber not in categories_map:
@@ -214,8 +239,14 @@ class DistanciaParser(BaseExcelParser):
 
     @classmethod
     def _process_teacher(
-        cls, row, shortname: str, cedula: str, nombre_cat: str,
-        users: dict, enrolments: list, duplicates: list,
+        cls,
+        row,
+        shortname: str,
+        cedula: str,
+        nombre_cat: str,
+        users: dict,
+        enrolments: list,
+        duplicates: list,
     ):
         email = str(row.get("email_docente", "")).strip().lower()
         nombre_docente = str(row.get("nombre_docente", "")).strip()
@@ -244,13 +275,17 @@ class DistanciaParser(BaseExcelParser):
                 logger.warning(
                     "Email duplicado detectado: %s. Se conservan datos del primer registro.", email
                 )
-                duplicates.append({
-                    "email": email,
+                duplicates.append(
+                    {
+                        "email": email,
+                        "username": username,
+                        "course_shortname": shortname,
+                    }
+                )
+            enrolments.append(
+                {
                     "username": username,
                     "course_shortname": shortname,
-                })
-            enrolments.append({
-                "username": username,
-                "course_shortname": shortname,
-                "role": "editingteacher",
-            })
+                    "role": "editingteacher",
+                }
+            )

@@ -20,6 +20,7 @@ class Execution(Base):
     Almacena el estado, el semestre, el modo (courses/users/both), las
     métricas finales y los tiempos de inicio y fin.
     """
+
     __tablename__ = "executions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -41,7 +42,9 @@ class Execution(Base):
     modalidad = Column(String(20), nullable=True, index=True)
     phase_checkpoint = Column(JSON, nullable=True)
     celery_task_id = Column(String(255), nullable=True, index=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), index=True)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), index=True
+    )
 
     errors = relationship("ErrorLog", back_populates="execution", cascade="all, delete-orphan")
     logs = relationship("ExecutionLog", back_populates="execution", cascade="all, delete-orphan")
@@ -73,6 +76,7 @@ class ExecutionLog(Base):
     Almacena cada operación (creación, eliminación, activación, error, alerta)
     con datos estructurados para la generación de reportes.
     """
+
     __tablename__ = "execution_logs"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -86,7 +90,9 @@ class ExecutionLog(Base):
     execution = relationship("Execution", back_populates="logs")
 
     def __repr__(self) -> str:
-        return f"<ExecutionLog id={self.id} execution_id={self.execution_id} action={self.action!r}>"
+        return (
+            f"<ExecutionLog id={self.id} execution_id={self.execution_id} action={self.action!r}>"
+        )
 
 
 class OperationBatch(Base):
@@ -96,6 +102,7 @@ class OperationBatch(Base):
     Agrupa un conjunto de ítems procesados mediante tareas Celery,
     con seguimiento de progreso por lote.
     """
+
     __tablename__ = "operation_batches"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -106,13 +113,17 @@ class OperationBatch(Base):
     completed = Column(Integer, default=0)
     failed = Column(Integer, default=0)
     modalidad = Column(String(20), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), index=True)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), index=True
+    )
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
     items = relationship("OperationItem", back_populates="batch", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
-        return f"<OperationBatch id={self.id} batch_id={self.batch_id!r} entity={self.entity_type!r}>"
+        return (
+            f"<OperationBatch id={self.id} batch_id={self.batch_id!r} entity={self.entity_type!r}>"
+        )
 
 
 class OperationItem(Base):
@@ -121,17 +132,24 @@ class OperationItem(Base):
 
     Registra el estado, intentos y errores de cada entidad procesada.
     """
+
     __tablename__ = "operation_items"
 
     id = Column(Integer, primary_key=True, index=True)
-    batch_id = Column(String(64), ForeignKey("operation_batches.batch_id"), nullable=False, index=True)
+    batch_id = Column(
+        String(64), ForeignKey("operation_batches.batch_id"), nullable=False, index=True
+    )
     identifier = Column(String(255), nullable=False)
     status = Column(String(20), nullable=False, default="pending", index=True)
     attempt = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
     detail = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
+    )
 
     batch = relationship("OperationBatch", back_populates="items")
 
@@ -146,6 +164,7 @@ class QueryResult(Base):
     La consulta se ejecuta como tarea Celery y el resultado JSON
     completo queda almacenado para consulta y exportación CSV.
     """
+
     __tablename__ = "query_results"
 
     id = Column(Integer, primary_key=True, index=True)

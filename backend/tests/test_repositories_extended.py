@@ -72,7 +72,10 @@ class TestQueryRepo:
 
     def test_delete_old_queries(self, test_db):
         qr = QueryResult(
-            task_id="old-1", entity="courses", params={}, status="completed",
+            task_id="old-1",
+            entity="courses",
+            params={},
+            status="completed",
             modalidad="DISTANCIA",
             created_at=datetime.now(UTC).replace(year=2000),
         )

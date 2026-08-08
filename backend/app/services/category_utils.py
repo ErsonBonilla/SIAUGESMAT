@@ -1,5 +1,3 @@
-
-
 def sort_categories(categories: list[dict]) -> list[dict]:
     sorted_cats = []
     roots = [c for c in categories if not c.get("parent")]

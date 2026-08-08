@@ -13,20 +13,28 @@ def translate_error(e: Exception) -> str:
 
     # Errores de red / timeout
     if "ConnectError" in msg or "ConnectionError" in msg or "connection refused" in msg.lower():
-        return ("Error de conexión a Moodle. Verifique que el servidor Moodle "
-                "esté accesible y que tenga conexión a internet.")
+        return (
+            "Error de conexión a Moodle. Verifique que el servidor Moodle "
+            "esté accesible y que tenga conexión a internet."
+        )
 
     if "ReadTimeout" in msg or "Read timed out" in msg:
-        return ("Tiempo de espera agotado al contactar Moodle. "
-                "El servidor de Moodle está lento o no responde.")
+        return (
+            "Tiempo de espera agotado al contactar Moodle. "
+            "El servidor de Moodle está lento o no responde."
+        )
 
     if "RetryError" in msg:
-        return ("Agotados los reintentos de conexión a Moodle. "
-                "Revise su conexión a internet y el estado del servidor Moodle.")
+        return (
+            "Agotados los reintentos de conexión a Moodle. "
+            "Revise su conexión a internet y el estado del servidor Moodle."
+        )
 
     if "HTTPStatusError" in msg or "Server error" in msg:
-        return ("El servidor de Moodle devolvió un error HTTP. "
-                "Posiblemente esté en mantenimiento o sobrecargado.")
+        return (
+            "El servidor de Moodle devolvió un error HTTP. "
+            "Posiblemente esté en mantenimiento o sobrecargado."
+        )
 
     # Errores de Moodle API (ya tienen mensaje en español)
     if isinstance(e, MoodleAPIError):

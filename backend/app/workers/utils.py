@@ -21,11 +21,13 @@ def _run_async(coro):
 
 def run_moodle_async(moodle, coro):
     """Ejecuta un coroutine y garantiza el cierre del servicio Moodle."""
+
     async def _run_and_close():
         try:
             return await coro
         finally:
             await moodle.close()
+
     return _run_async(_run_and_close())
 
 

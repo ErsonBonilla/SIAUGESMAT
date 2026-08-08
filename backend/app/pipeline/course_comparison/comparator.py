@@ -31,7 +31,6 @@ logger = logging.getLogger(__name__)
 
 
 class CourseComparisonService:
-
     @classmethod
     async def compare(
         cls,
@@ -47,8 +46,7 @@ class CourseComparisonService:
         if courses_with_teacher is None:
             courses_with_teacher = {}
         siaugesmat_courses = [
-            c for c in existing_courses
-            if SIAUGESMAT_PATTERN.match(c.get("shortname", ""))
+            c for c in existing_courses if SIAUGESMAT_PATTERN.match(c.get("shortname", ""))
         ]
 
         existing_by_shortname = build_shortname_index(siaugesmat_courses)
@@ -89,20 +87,30 @@ class CourseComparisonService:
                 existing_prof = get_course_professor(existing)
 
                 if sn not in courses_with_teacher:
-                    action, detail = "recreate", {
-                        "reason": "orphan_course",
-                        "old_shortname": existing.get("shortname", sn),
-                        "professor": professor,
-                        "old_professor": existing_prof or "",
-                    }
-                elif (existing_prof and existing_prof == professor) or courses_with_teacher.get(sn) == professor:
+                    action, detail = (
+                        "recreate",
+                        {
+                            "reason": "orphan_course",
+                            "old_shortname": existing.get("shortname", sn),
+                            "professor": professor,
+                            "old_professor": existing_prof or "",
+                        },
+                    )
+                elif (existing_prof and existing_prof == professor) or courses_with_teacher.get(
+                    sn
+                ) == professor:
                     action, detail = handle_same_professor(
-                        existing, sn, professor,
+                        existing,
+                        sn,
+                        professor,
                         max_age_seconds=max_age_seconds,
                     )
                 else:
                     action, detail = handle_different_professor(
-                        existing, sn, professor, existing_prof,
+                        existing,
+                        sn,
+                        professor,
+                        existing_prof,
                         should_hide_existing=True,
                         re_upload=re_upload,
                         max_age_seconds=max_age_seconds,
@@ -115,46 +123,61 @@ class CourseComparisonService:
 
                 if candidates:
                     match = next(
-                        (c for c in candidates
-                         if get_suffix(c.get("shortname", "")) == new_suffix),
+                        (c for c in candidates if get_suffix(c.get("shortname", "")) == new_suffix),
                         None,
                     )
                     if match:
                         existing_prof = get_course_professor(match)
                         if existing_prof and existing_prof == professor:
                             action, detail = handle_same_professor(
-                                match, sn, professor,
+                                match,
+                                sn,
+                                professor,
                                 max_age_seconds=max_age_seconds,
                             )
                         else:
                             action, detail = handle_different_professor(
-                                match, sn, professor, existing_prof,
+                                match,
+                                sn,
+                                professor,
+                                existing_prof,
                                 re_upload=re_upload,
                                 max_age_seconds=max_age_seconds,
                             )
                     elif new_suffix:
                         match = next(
-                            (c for c in candidates
-                             if get_course_professor(c) == professor
-                             or (c.get("shortname", "") in courses_with_teacher
-                                 and courses_with_teacher[c.get("shortname", "")] == professor)),
+                            (
+                                c
+                                for c in candidates
+                                if get_course_professor(c) == professor
+                                or (
+                                    c.get("shortname", "") in courses_with_teacher
+                                    and courses_with_teacher[c.get("shortname", "")] == professor
+                                )
+                            ),
                             None,
                         )
                         if match:
                             old_hidden = is_course_hidden(match)
-                            action, detail = "rename_group", {
-                                "reason": "suffix_update",
-                                "professor": professor,
-                                "old_shortname": match["shortname"],
-                                "old_suffix": get_suffix(match["shortname"]),
-                                "new_suffix": new_suffix,
-                                "reactivate": old_hidden,
-                            }
+                            action, detail = (
+                                "rename_group",
+                                {
+                                    "reason": "suffix_update",
+                                    "professor": professor,
+                                    "old_shortname": match["shortname"],
+                                    "old_suffix": get_suffix(match["shortname"]),
+                                    "new_suffix": new_suffix,
+                                    "reactivate": old_hidden,
+                                },
+                            )
                         else:
                             target = first_visible(candidates)
                             existing_prof = get_course_professor(target)
                             action, detail = handle_different_professor(
-                                target, sn, professor, existing_prof,
+                                target,
+                                sn,
+                                professor,
+                                existing_prof,
                                 should_hide_existing=True,
                                 re_upload=re_upload,
                                 max_age_seconds=max_age_seconds,
@@ -163,7 +186,10 @@ class CourseComparisonService:
                         target = first_visible(candidates)
                         existing_prof = get_course_professor(target)
                         action, detail = handle_different_professor(
-                            target, sn, professor, existing_prof,
+                            target,
+                            sn,
+                            professor,
+                            existing_prof,
                             should_hide_existing=True,
                             re_upload=re_upload,
                             max_age_seconds=max_age_seconds,
@@ -186,13 +212,30 @@ class CourseComparisonService:
                 action, detail = "create", {"reason": "new", "professor": professor}
 
             apply_action(
-                action, detail, sn, professor, parsed_new,
-                to_create, to_delete, to_activate, to_hide, to_update, alerts, logs,
+                action,
+                detail,
+                sn,
+                professor,
+                parsed_new,
+                to_create,
+                to_delete,
+                to_activate,
+                to_hide,
+                to_update,
+                alerts,
+                logs,
             )
 
         find_disappeared_courses(
-            existing_by_shortname, existing_by_base_key, new_shortnames, new_base_keys,
-            new_program_codes, to_delete, to_hide, alerts, logs,
+            existing_by_shortname,
+            existing_by_base_key,
+            new_shortnames,
+            new_base_keys,
+            new_program_codes,
+            to_delete,
+            to_hide,
+            alerts,
+            logs,
             disappeared_age_seconds=disappeared_age_seconds,
         )
 

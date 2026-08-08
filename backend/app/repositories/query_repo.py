@@ -9,8 +9,9 @@ def get_query(db: Session, task_id: str) -> QueryResult | None:
     return db.query(QueryResult).filter_by(task_id=task_id).first()
 
 
-def create_query(db: Session, task_id: str, entity: str, params: dict,
-                 modalidad: str) -> QueryResult:
+def create_query(
+    db: Session, task_id: str, entity: str, params: dict, modalidad: str
+) -> QueryResult:
     qr = QueryResult(
         task_id=task_id,
         entity=entity,
@@ -34,7 +35,9 @@ def set_query_running(db: Session, task_id: str) -> QueryResult | None:
     return qr
 
 
-def set_query_completed(db: Session, task_id: str, result_json, total_count: int) -> QueryResult | None:
+def set_query_completed(
+    db: Session, task_id: str, result_json, total_count: int
+) -> QueryResult | None:
     qr = db.query(QueryResult).filter_by(task_id=task_id).first()
     if qr:
         qr.result_json = result_json
@@ -57,8 +60,10 @@ def set_query_failed(db: Session, task_id: str, error_message: str) -> QueryResu
 
 def delete_old_queries(db: Session, days: int) -> int:
     cutoff = datetime.now(UTC) - timedelta(days=days)
-    deleted = db.query(QueryResult).filter(
-        QueryResult.created_at < cutoff
-    ).delete(synchronize_session=False)
+    deleted = (
+        db.query(QueryResult)
+        .filter(QueryResult.created_at < cutoff)
+        .delete(synchronize_session=False)
+    )
     db.commit()
     return deleted

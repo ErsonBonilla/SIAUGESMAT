@@ -36,15 +36,11 @@ class MoodleAdapter(ABC):
         """Activa la auto-matriculación en un curso."""
 
     @abstractmethod
-    async def get_courses(
-        self, shortname: str | None, call_ws: WSFunc
-    ) -> list[dict]:
+    async def get_courses(self, shortname: str | None, call_ws: WSFunc) -> list[dict]:
         """Obtiene cursos, con opciones específicas de versión."""
 
     @abstractmethod
-    def build_create_course_enrolment_params(
-        self, params: dict, course: dict, index: int
-    ) -> None:
+    def build_create_course_enrolment_params(self, params: dict, course: dict, index: int) -> None:
         """Agrega parámetros de matriculación a la creación de un curso."""
 
 
@@ -71,23 +67,22 @@ class Moodle3Adapter(MoodleAdapter):
             )
         return existing[0]
 
-    async def get_courses(
-        self, shortname: str | None, call_ws: WSFunc
-    ) -> list[dict]:
+    async def get_courses(self, shortname: str | None, call_ws: WSFunc) -> list[dict]:
         if shortname:
-            result = await call_ws("core_course_get_courses_by_field", {
-                "field": "shortname",
-                "value": shortname,
-            })
+            result = await call_ws(
+                "core_course_get_courses_by_field",
+                {
+                    "field": "shortname",
+                    "value": shortname,
+                },
+            )
         else:
             result = await call_ws("core_course_get_courses", {})
         if isinstance(result, dict):
             return result.get("courses", [])
         return result
 
-    def build_create_course_enrolment_params(
-        self, params: dict, course: dict, index: int
-    ) -> None:
+    def build_create_course_enrolment_params(self, params: dict, course: dict, index: int) -> None:
         pass  # Moodle 3.9 no acepta enrolment_1 como parametro de core_course_create_courses
 
 
@@ -121,6 +116,7 @@ class MoodleAdapterFactory:
         else:
             # Normalizar: "3.9.3" → "3.9", "3.9+" → "3.9"
             import re
+
             match = re.match(r"^(\d+\.\d+)", version.replace("+", ""))
             normalized = match.group(1) if match else version
             adapter_cls = cls._adapters.get(normalized)

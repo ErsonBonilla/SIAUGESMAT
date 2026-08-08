@@ -25,13 +25,12 @@ def get_active_batch(db: Session, modalidad: str) -> OperationBatch | None:
 
 
 def get_pending_items(db: Session, batch_id: str) -> list[OperationItem]:
-    return db.query(OperationItem).filter_by(
-        batch_id=batch_id, status="pending"
-    ).all()
+    return db.query(OperationItem).filter_by(batch_id=batch_id, status="pending").all()
 
 
-def create_batch(db: Session, batch_id: str, entity_type: str, action: str,
-                 total: int, modalidad: str) -> OperationBatch:
+def create_batch(
+    db: Session, batch_id: str, entity_type: str, action: str, total: int, modalidad: str
+) -> OperationBatch:
     batch = OperationBatch(
         batch_id=batch_id,
         entity_type=entity_type,
@@ -45,8 +44,9 @@ def create_batch(db: Session, batch_id: str, entity_type: str, action: str,
     return batch
 
 
-def add_item(db: Session, batch_id: str, identifier: str, detail: dict = None,
-             status: str = "pending") -> OperationItem:
+def add_item(
+    db: Session, batch_id: str, identifier: str, detail: dict = None, status: str = "pending"
+) -> OperationItem:
     item = OperationItem(
         batch_id=batch_id,
         identifier=identifier,
@@ -69,16 +69,18 @@ def claim_item(db: Session, item_id: int) -> bool:
     """
     result = db.execute(
         text(
-            "UPDATE operation_items SET status = 'processing', updated_at = now() "
+            "UPDATE operation_items SET status = 'processing', updated_at = :updated_at "
             "WHERE id = :id AND status = 'pending'"
         ),
-        {"id": item_id},
+        {"id": item_id, "updated_at": datetime.now(UTC)},
     )
     db.commit()
     return result.rowcount > 0
 
 
-def update_item(db: Session, item_id: int, status: str, error_message: str = None) -> OperationItem | None:
+def update_item(
+    db: Session, item_id: int, status: str, error_message: str = None
+) -> OperationItem | None:
     item = db.query(OperationItem).filter(OperationItem.id == item_id).first()
     if item:
         item.status = status
@@ -121,36 +123,49 @@ def get_batch_status(db: Session, batch_id: str) -> dict:
 
 
 def get_batch_items(db: Session, batch_id: str, offset: int, limit: int) -> list[OperationItem]:
-    return db.query(OperationItem).filter_by(batch_id=batch_id).order_by(
-        OperationItem.id).offset(offset).limit(limit).all()
+    return (
+        db.query(OperationItem)
+        .filter_by(batch_id=batch_id)
+        .order_by(OperationItem.id)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
 
 def get_all_batch_items(db: Session, batch_id: str) -> list[OperationItem]:
-    return db.query(OperationItem).filter_by(batch_id=batch_id).order_by(
-        OperationItem.id).all()
+    return db.query(OperationItem).filter_by(batch_id=batch_id).order_by(OperationItem.id).all()
 
 
 def pause_batch(db: Session, batch_id: str) -> int:
-    paused = db.query(OperationItem).filter_by(
-        batch_id=batch_id, status="pending"
-    ).update({"status": "paused", "updated_at": datetime.now(UTC)}, synchronize_session=False)
+    paused = (
+        db.query(OperationItem)
+        .filter_by(batch_id=batch_id, status="pending")
+        .update({"status": "paused", "updated_at": datetime.now(UTC)}, synchronize_session=False)
+    )
     db.commit()
     return paused
 
 
 def resume_batch(db: Session, batch_id: str) -> int:
-    resumed = db.query(OperationItem).filter_by(
-        batch_id=batch_id, status="paused"
-    ).update({"status": "pending", "updated_at": datetime.now(UTC)}, synchronize_session=False)
+    resumed = (
+        db.query(OperationItem)
+        .filter_by(batch_id=batch_id, status="paused")
+        .update({"status": "pending", "updated_at": datetime.now(UTC)}, synchronize_session=False)
+    )
     db.commit()
     return resumed
 
 
 def cancel_batch(db: Session, batch_id: str) -> int:
-    cancelled = db.query(OperationItem).filter(
-        OperationItem.batch_id == batch_id,
-        OperationItem.status.in_(["pending", "processing", "paused"]),
-    ).update({"status": "cancelled", "updated_at": datetime.now(UTC)}, synchronize_session=False)
+    cancelled = (
+        db.query(OperationItem)
+        .filter(
+            OperationItem.batch_id == batch_id,
+            OperationItem.status.in_(["pending", "processing", "paused"]),
+        )
+        .update({"status": "cancelled", "updated_at": datetime.now(UTC)}, synchronize_session=False)
+    )
     db.commit()
     return cancelled
 
@@ -168,25 +183,23 @@ def delete_batch(db: Session, batch_id: str) -> bool:
 def get_batch_paused_counts(db: Session, batch_ids: list[str]) -> dict[str, int]:
     if not batch_ids:
         return {}
-    rows = db.query(
-        OperationItem.batch_id, func.count(OperationItem.id)
-    ).filter(
-        OperationItem.batch_id.in_(batch_ids),
-        OperationItem.status == "paused"
-    ).group_by(OperationItem.batch_id).all()
+    rows = (
+        db.query(OperationItem.batch_id, func.count(OperationItem.id))
+        .filter(OperationItem.batch_id.in_(batch_ids), OperationItem.status == "paused")
+        .group_by(OperationItem.batch_id)
+        .all()
+    )
     return {row[0]: row[1] for row in rows}
 
 
 def delete_old_batches(db: Session, days: int) -> int:
     cutoff = datetime.now(UTC) - timedelta(days=days)
-    old_batches = db.query(OperationBatch).filter(
-        OperationBatch.created_at < cutoff
-    ).all()
+    old_batches = db.query(OperationBatch).filter(OperationBatch.created_at < cutoff).all()
     batch_ids = [b.batch_id for b in old_batches]
     if batch_ids:
-        db.query(OperationItem).filter(
-            OperationItem.batch_id.in_(batch_ids)
-        ).delete(synchronize_session=False)
+        db.query(OperationItem).filter(OperationItem.batch_id.in_(batch_ids)).delete(
+            synchronize_session=False
+        )
     deleted = 0
     for b in old_batches:
         db.delete(b)
@@ -195,9 +208,14 @@ def delete_old_batches(db: Session, days: int) -> int:
     return deleted
 
 
-def list_batches(db: Session, entity_type: str = None, action: str = None,
-                 modalidad: str = None, limit: int = 20,
-                 offset: int = 0) -> tuple[int, list[OperationBatch]]:
+def list_batches(
+    db: Session,
+    entity_type: str = None,
+    action: str = None,
+    modalidad: str = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[int, list[OperationBatch]]:
     query = db.query(OperationBatch)
     if entity_type:
         query = query.filter(OperationBatch.entity_type == entity_type)
@@ -210,8 +228,13 @@ def list_batches(db: Session, entity_type: str = None, action: str = None,
     return total, batches
 
 
-def get_operations_analytics(db: Session, modalidad: str = None, months: int = 12,
-                             entity_type: str = None, action: str = None) -> list[dict]:
+def get_operations_analytics(
+    db: Session,
+    modalidad: str = None,
+    months: int = 12,
+    entity_type: str = None,
+    action: str = None,
+) -> list[dict]:
     cutoff = datetime.now(UTC) - timedelta(days=months * 30)
     base_filters = [OperationBatch.created_at >= cutoff]
     if modalidad:
@@ -226,9 +249,12 @@ def get_operations_analytics(db: Session, modalidad: str = None, months: int = 1
     raw_monthly = monthly_batches.all()
 
     base_metrics = {
-        "users_created": 0, "users_deleted": 0,
-        "categories_created": 0, "categories_deleted": 0,
-        "courses_deleted": 0, "total_errors": 0,
+        "users_created": 0,
+        "users_deleted": 0,
+        "categories_created": 0,
+        "categories_deleted": 0,
+        "courses_deleted": 0,
+        "total_errors": 0,
     }
 
     months_data: dict[str, dict] = {}
@@ -239,17 +265,17 @@ def get_operations_analytics(db: Session, modalidad: str = None, months: int = 1
             months_data[month] = dict(base_metrics, month=month)
 
         m = months_data[month]
-        m["total_errors"] += (b.failed or 0)
+        m["total_errors"] += b.failed or 0
         key = f"{b.entity_type}_{b.action}"
         if key == "users_create":
-            m["users_created"] += (b.completed or 0)
+            m["users_created"] += b.completed or 0
         elif key == "users_delete":
-            m["users_deleted"] += (b.completed or 0)
+            m["users_deleted"] += b.completed or 0
         elif key == "categories_create":
-            m["categories_created"] += (b.completed or 0)
+            m["categories_created"] += b.completed or 0
         elif key == "categories_delete":
-            m["categories_deleted"] += (b.completed or 0)
+            m["categories_deleted"] += b.completed or 0
         elif key == "courses_delete":
-            m["courses_deleted"] += (b.completed or 0)
+            m["courses_deleted"] += b.completed or 0
 
     return sorted(months_data.values(), key=lambda m: m["month"])

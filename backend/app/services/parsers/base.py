@@ -9,27 +9,38 @@ from app.services.category_utils import sort_categories
 class BaseExcelParser(ABC):
     CANONICAL_MAP: ClassVar[dict[str, str]] = {}
     IGNORE_PREFIXES = ("total_", "horas_")
-    IGNORE_EXACT: ClassVar[set[str]] = {"categoria", "tipo_programa", "tipo_vinculacion", "nivel", "perfil_del_curso"}
+    IGNORE_EXACT: ClassVar[set[str]] = {
+        "categoria",
+        "tipo_programa",
+        "tipo_vinculacion",
+        "nivel",
+        "perfil_del_curso",
+    }
 
     @classmethod
     @abstractmethod
-    def read_excel(cls, file_path: str) -> pd.DataFrame:
-        ...
+    def read_excel(cls, file_path: str) -> pd.DataFrame: ...
 
     @classmethod
     @abstractmethod
-    def parse(cls, df: pd.DataFrame, modalidad: str) -> dict[str, Any]:
-        ...
+    def parse(cls, df: pd.DataFrame, modalidad: str) -> dict[str, Any]: ...
 
     @staticmethod
     def _normalize_column_name(name: str) -> str:
         import re
 
         name = name.lower().strip()
-        accent_map = str.maketrans({
-            "á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u",
-            "ü": "u", "ñ": "n",
-        })
+        accent_map = str.maketrans(
+            {
+                "á": "a",
+                "é": "e",
+                "í": "i",
+                "ó": "o",
+                "ú": "u",
+                "ü": "u",
+                "ñ": "n",
+            }
+        )
         name = name.translate(accent_map)
         name = re.sub(r"[.\-/\\'´`()]+", "_", name)
         name = re.sub(r"\s+", "_", name)
@@ -75,12 +86,16 @@ class BaseExcelParser(ABC):
         descartadas = before - len(df)
         if descartadas:
             import logging
+
             logging.getLogger(__name__).info(
                 "Confirma: %d → %d filas (%d descartadas por no tener ACEPTA)",
-                before, len(df), descartadas,
+                before,
+                len(df),
+                descartadas,
             )
         else:
             import logging
+
             logging.getLogger(__name__).info("Confirma: todas las %d filas están ACEPTA", len(df))
 
         return df
@@ -100,24 +115,24 @@ class BaseExcelParser(ABC):
             )
 
         before = len(df)
-        mask = df[observaciones_col].astype(str).str.contains(
-            "virtual", case=False, na=False
-        )
+        mask = df[observaciones_col].astype(str).str.contains("virtual", case=False, na=False)
         df = df[~mask].copy()
         df = df.drop(columns=[observaciones_col])
 
         descartadas = before - len(df)
         if descartadas:
             import logging
+
             logging.getLogger(__name__).info(
                 "Observaciones: %d → %d filas (%d descartadas por virtualidad)",
-                before, len(df), descartadas,
+                before,
+                len(df),
+                descartadas,
             )
         else:
             import logging
-            logging.getLogger(__name__).info(
-                "Observaciones: todas las %d filas continúan", len(df)
-            )
+
+            logging.getLogger(__name__).info("Observaciones: todas las %d filas continúan", len(df))
 
         return df
 
@@ -137,9 +152,20 @@ class BaseExcelParser(ABC):
 
     @staticmethod
     def _clean_data(df: pd.DataFrame) -> pd.DataFrame:
-        for col in ["nombre_cat", "cod_programa", "cod_curso", "semestre", "grupo",
-                    "nombre_curso", "nombre_programa", "nombre_docente", "email_docente",
-                    "email_personal", "doc_docente", "docente_perfil"]:
+        for col in [
+            "nombre_cat",
+            "cod_programa",
+            "cod_curso",
+            "semestre",
+            "grupo",
+            "nombre_curso",
+            "nombre_programa",
+            "nombre_docente",
+            "email_docente",
+            "email_personal",
+            "doc_docente",
+            "docente_perfil",
+        ]:
             if col in df.columns:
                 df[col] = df[col].fillna("").astype(str)
         return df
@@ -147,6 +173,7 @@ class BaseExcelParser(ABC):
     @staticmethod
     def _clean_program_name(raw: str) -> str:
         import re
+
         cleaned = re.sub(r"[\d-]", "", raw)
         return re.sub(r"\s+", " ", cleaned).strip()
 
@@ -155,48 +182,255 @@ class BaseExcelParser(ABC):
     # Convención: [APELLIDO(S)] [NOMBRE(S)]
     # ----------------------------------------------------------------
     _GIVEN_NAMES: ClassVar[set[str]] = {
-        "ADIELA", "ADOLFO", "ADRIANA", "AGUSTIN", "AGUSTÍN", "AINHOA",
-        "ALBA", "ALBEIRO", "ALBERTO", "ALEJANDRA", "ALEJANDRO", "ALEXANDER",
-        "ALFREDO", "ALICIA", "ALVARO", "ÁLVARO", "AMALIA", "AMANDA",
-        "AMPARO", "ANA", "ANDRES", "ANDRÉS", "ANDREA", "ANGEL", "ÁNGEL",
-        "ANGELA", "ÁNGELA", "ANGIE", "ANTONIA", "ANTONIO", "ARACELY",
-        "ARLES", "ARTURO", "BEATRIZ", "BENITO", "BERTHA", "BIBIANA",
-        "BLANCA", "CAMILA", "CAMILO", "CARLA", "CARLOS", "CARMEN",
-        "CATALINA", "CELIA", "CESAR", "CÉSAR", "CLARA", "CLAUDIA",
-        "CLAUDIO", "CONSTANZA", "CRISTINA", "DANIEL", "DANIELA", "DAVID",
-        "DAYANA", "DENISSE", "DIANA", "DIEGO", "DOLORES", "DOMINGO",
-        "DORA", "DORIAN", "DUBAN", "EDGAR", "EDILMA", "EDINSON", "EDUARDO",
-        "EDWIN", "ELENA", "ELIZABETH", "ELKIN", "ENCARNACION",
-        "ENCARNACIÓN", "ENRIQUE", "ESNEIDER", "ESPERANZA", "ESTEBAN",
-        "ESTHER", "EVA", "FABIO", "FANNY", "FELIPE", "FERNANDO", "FLOR",
-        "FRANCISCA", "FRANCISCO", "GABRIEL", "GEMA", "GERMAN", "GERMÁN",
-        "GISSELLE", "GLADIS", "GLORIA", "GONZALO", "GRACIELA", "GUILLERMO",
-        "GUSTAVO", "HAROLD", "HECTOR", "HÉCTOR", "HENRY", "HERMES",
-        "HUGO", "IGNACIO", "IRENE", "ISABEL", "IVAN", "IVÁN", "JAIME",
-        "JAVIER", "JEFFERSON", "JENNIFER", "JENNY", "JESUS", "JESÚS",
-        "JIMMY", "JOAQUIN", "JOAQUÍN", "JOHANNA", "JORGE", "JOSE", "JOSÉ",
-        "JOSEFA", "JUAN", "JULIA", "JULIAN", "JULIÁN", "JULIETH", "JULIO",
-        "KAREN", "KATERINE", "KATHERINE", "LARA", "LAURA", "LEYDI",
-        "LILIANA", "LINA", "LISETH", "LUCIA", "LUCÍA", "LUIS", "LUISA",
-        "LUZ", "MAGDA", "MANUEL", "MARCOS", "MARGARITA", "MARIA", "MARÍA",
-        "MARINA", "MARITZA", "MARTA", "MARTIN", "MARTÍN", "MAURICIO",
-        "MAYRA", "MERCEDES", "MERY", "MIGUEL", "MILENA", "MILTON",
-        "MONICA", "MÓNICA", "MYRIAM", "NAIARA", "NANCY", "NATALIA",
-        "NEIDER", "NELLY", "NELSON", "NEREA", "NICOLAS", "NICOLÁS",
-        "NORA", "NUBIA", "NURIA", "OLGA", "OSCAR", "ÓSCAR", "PABLO",
-        "PAOLA", "PASCUAL", "PASTORA", "PATRICIA", "PAULA", "PEDRO",
-        "PIEDAD", "RAFAEL", "RAMON", "RAMÓN", "RAQUEL", "RAUL", "RAÚL",
-        "RICARDO", "ROBERTO", "ROBINSON", "ROCIO", "ROCÍO", "ROSA",
-        "RUBEN", "RUBÉN", "RUTH", "SANDRA", "SANTIAGO", "SARA", "SEBASTIAN",
-        "SEBASTIÁN", "SERGIO", "SHIRLEY", "SILVIA", "SOCORRO", "SOFIA",
-        "SOFÍA", "SUSANA", "TATIANA", "TERESA", "TOMAS", "TOMÁS",
-        "VALENTINA", "VALERIA", "VERONICA", "VERÓNICA", "VICENTE", "VICTOR",
-        "VÍCTOR", "VIVIANA", "WALTER", "WILLIAM", "WILSON", "YAMID",
-        "YANETH", "YENIFER", "YENNY", "YOLANDA", "YOLIMA", "ZULMA",
+        "ADIELA",
+        "ADOLFO",
+        "ADRIANA",
+        "AGUSTIN",
+        "AGUSTÍN",
+        "AINHOA",
+        "ALBA",
+        "ALBEIRO",
+        "ALBERTO",
+        "ALEJANDRA",
+        "ALEJANDRO",
+        "ALEXANDER",
+        "ALFREDO",
+        "ALICIA",
+        "ALVARO",
+        "ÁLVARO",
+        "AMALIA",
+        "AMANDA",
+        "AMPARO",
+        "ANA",
+        "ANDRES",
+        "ANDRÉS",
+        "ANDREA",
+        "ANGEL",
+        "ÁNGEL",
+        "ANGELA",
+        "ÁNGELA",
+        "ANGIE",
+        "ANTONIA",
+        "ANTONIO",
+        "ARACELY",
+        "ARLES",
+        "ARTURO",
+        "BEATRIZ",
+        "BENITO",
+        "BERTHA",
+        "BIBIANA",
+        "BLANCA",
+        "CAMILA",
+        "CAMILO",
+        "CARLA",
+        "CARLOS",
+        "CARMEN",
+        "CATALINA",
+        "CELIA",
+        "CESAR",
+        "CÉSAR",
+        "CLARA",
+        "CLAUDIA",
+        "CLAUDIO",
+        "CONSTANZA",
+        "CRISTINA",
+        "DANIEL",
+        "DANIELA",
+        "DAVID",
+        "DAYANA",
+        "DENISSE",
+        "DIANA",
+        "DIEGO",
+        "DOLORES",
+        "DOMINGO",
+        "DORA",
+        "DORIAN",
+        "DUBAN",
+        "EDGAR",
+        "EDILMA",
+        "EDINSON",
+        "EDUARDO",
+        "EDWIN",
+        "ELENA",
+        "ELIZABETH",
+        "ELKIN",
+        "ENCARNACION",
+        "ENCARNACIÓN",
+        "ENRIQUE",
+        "ESNEIDER",
+        "ESPERANZA",
+        "ESTEBAN",
+        "ESTHER",
+        "EVA",
+        "FABIO",
+        "FANNY",
+        "FELIPE",
+        "FERNANDO",
+        "FLOR",
+        "FRANCISCA",
+        "FRANCISCO",
+        "GABRIEL",
+        "GEMA",
+        "GERMAN",
+        "GERMÁN",
+        "GISSELLE",
+        "GLADIS",
+        "GLORIA",
+        "GONZALO",
+        "GRACIELA",
+        "GUILLERMO",
+        "GUSTAVO",
+        "HAROLD",
+        "HECTOR",
+        "HÉCTOR",
+        "HENRY",
+        "HERMES",
+        "HUGO",
+        "IGNACIO",
+        "IRENE",
+        "ISABEL",
+        "IVAN",
+        "IVÁN",
+        "JAIME",
+        "JAVIER",
+        "JEFFERSON",
+        "JENNIFER",
+        "JENNY",
+        "JESUS",
+        "JESÚS",
+        "JIMMY",
+        "JOAQUIN",
+        "JOAQUÍN",
+        "JOHANNA",
+        "JORGE",
+        "JOSE",
+        "JOSÉ",
+        "JOSEFA",
+        "JUAN",
+        "JULIA",
+        "JULIAN",
+        "JULIÁN",
+        "JULIETH",
+        "JULIO",
+        "KAREN",
+        "KATERINE",
+        "KATHERINE",
+        "LARA",
+        "LAURA",
+        "LEYDI",
+        "LILIANA",
+        "LINA",
+        "LISETH",
+        "LUCIA",
+        "LUCÍA",
+        "LUIS",
+        "LUISA",
+        "LUZ",
+        "MAGDA",
+        "MANUEL",
+        "MARCOS",
+        "MARGARITA",
+        "MARIA",
+        "MARÍA",
+        "MARINA",
+        "MARITZA",
+        "MARTA",
+        "MARTIN",
+        "MARTÍN",
+        "MAURICIO",
+        "MAYRA",
+        "MERCEDES",
+        "MERY",
+        "MIGUEL",
+        "MILENA",
+        "MILTON",
+        "MONICA",
+        "MÓNICA",
+        "MYRIAM",
+        "NAIARA",
+        "NANCY",
+        "NATALIA",
+        "NEIDER",
+        "NELLY",
+        "NELSON",
+        "NEREA",
+        "NICOLAS",
+        "NICOLÁS",
+        "NORA",
+        "NUBIA",
+        "NURIA",
+        "OLGA",
+        "OSCAR",
+        "ÓSCAR",
+        "PABLO",
+        "PAOLA",
+        "PASCUAL",
+        "PASTORA",
+        "PATRICIA",
+        "PAULA",
+        "PEDRO",
+        "PIEDAD",
+        "RAFAEL",
+        "RAMON",
+        "RAMÓN",
+        "RAQUEL",
+        "RAUL",
+        "RAÚL",
+        "RICARDO",
+        "ROBERTO",
+        "ROBINSON",
+        "ROCIO",
+        "ROCÍO",
+        "ROSA",
+        "RUBEN",
+        "RUBÉN",
+        "RUTH",
+        "SANDRA",
+        "SANTIAGO",
+        "SARA",
+        "SEBASTIAN",
+        "SEBASTIÁN",
+        "SERGIO",
+        "SHIRLEY",
+        "SILVIA",
+        "SOCORRO",
+        "SOFIA",
+        "SOFÍA",
+        "SUSANA",
+        "TATIANA",
+        "TERESA",
+        "TOMAS",
+        "TOMÁS",
+        "VALENTINA",
+        "VALERIA",
+        "VERONICA",
+        "VERÓNICA",
+        "VICENTE",
+        "VICTOR",
+        "VÍCTOR",
+        "VIVIANA",
+        "WALTER",
+        "WILLIAM",
+        "WILSON",
+        "YAMID",
+        "YANETH",
+        "YENIFER",
+        "YENNY",
+        "YOLANDA",
+        "YOLIMA",
+        "ZULMA",
     }
 
     _SURNAME_PARTICLES: ClassVar[set[str]] = {
-        "DE", "DEL", "E", "LA", "LAS", "LOS", "VAN", "VON", "Y",
+        "DE",
+        "DEL",
+        "E",
+        "LA",
+        "LAS",
+        "LOS",
+        "VAN",
+        "VON",
+        "Y",
     }
 
     @staticmethod
@@ -252,9 +486,19 @@ class BaseExcelParser(ABC):
             if num < 1:
                 return value
             numerals = [
-                (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
-                (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
-                (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"),
+                (1000, "M"),
+                (900, "CM"),
+                (500, "D"),
+                (400, "CD"),
+                (100, "C"),
+                (90, "XC"),
+                (50, "L"),
+                (40, "XL"),
+                (10, "X"),
+                (9, "IX"),
+                (5, "V"),
+                (4, "IV"),
+                (1, "I"),
             ]
             result = ""
             for n, roman in numerals:

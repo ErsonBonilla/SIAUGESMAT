@@ -1,4 +1,3 @@
-
 from app.pipeline.course_comparison.thresholds import (
     DEFAULT_COURSE_DISAPPEARED_AGE_SECONDS,
 )
@@ -37,38 +36,50 @@ def find_disappeared_courses(
 
         age = get_course_age_seconds(existing)
         if age >= disappeared_age_seconds:
-            to_delete.append({
-                "shortname": sn,
-                "reason": "disappeared",
-                "age_seconds": age,
-                "fullname": existing.get("fullname", ""),
-            })
-            alerts.append({
-                "shortname": sn,
-                "reason": "disappeared",
-                "age_seconds": age,
-            })
-            logs.append({
-                "phase": "2",
-                "action": "course_deleted",
-                "identifier": sn,
-                "detail": {"reason": "disappeared", "age_seconds": age},
-            })
+            to_delete.append(
+                {
+                    "shortname": sn,
+                    "reason": "disappeared",
+                    "age_seconds": age,
+                    "fullname": existing.get("fullname", ""),
+                }
+            )
+            alerts.append(
+                {
+                    "shortname": sn,
+                    "reason": "disappeared",
+                    "age_seconds": age,
+                }
+            )
+            logs.append(
+                {
+                    "phase": "2",
+                    "action": "course_deleted",
+                    "identifier": sn,
+                    "detail": {"reason": "disappeared", "age_seconds": age},
+                }
+            )
         elif not is_course_hidden(existing):
-            to_hide.append({
-                "shortname": sn,
-                "reason": "disappeared_recent",
-                "age_seconds": age,
-                "fullname": existing.get("fullname", ""),
-            })
-            alerts.append({
-                "shortname": sn,
-                "reason": "disappeared_recent",
-                "age_seconds": age,
-            })
-            logs.append({
-                "phase": "2",
-                "action": "course_disappeared_recent_hidden",
-                "identifier": sn,
-                "detail": {"reason": "disappeared_recent", "age_seconds": age},
-            })
+            to_hide.append(
+                {
+                    "shortname": sn,
+                    "reason": "disappeared_recent",
+                    "age_seconds": age,
+                    "fullname": existing.get("fullname", ""),
+                }
+            )
+            alerts.append(
+                {
+                    "shortname": sn,
+                    "reason": "disappeared_recent",
+                    "age_seconds": age,
+                }
+            )
+            logs.append(
+                {
+                    "phase": "2",
+                    "action": "course_disappeared_recent_hidden",
+                    "identifier": sn,
+                    "detail": {"reason": "disappeared_recent", "age_seconds": age},
+                }
+            )

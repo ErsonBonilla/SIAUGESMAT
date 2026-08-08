@@ -1,4 +1,5 @@
 """Pruebas del núcleo puro de métricas y semáforo."""
+
 import pytest
 
 from app.pipeline.metrics import (

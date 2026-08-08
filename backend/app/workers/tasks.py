@@ -41,9 +41,17 @@ PROGRESS_START = [0, 20]
 PROGRESS_RESTORE = [12, 30]
 
 
-@celery_app.task(bind=True, autoretry_for=(MoodleOverloadedError,), max_retries=10,
-                  default_retry_delay=60, retry_backoff=True, retry_backoff_max=600, retry_jitter=True,
-                  soft_time_limit=25200, time_limit=28800)
+@celery_app.task(
+    bind=True,
+    autoretry_for=(MoodleOverloadedError,),
+    max_retries=10,
+    default_retry_delay=60,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    soft_time_limit=25200,
+    time_limit=28800,
+)
 def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> None:
     db = SessionLocal()
     start_time = time.monotonic()
@@ -87,14 +95,22 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
                 phase_name = PHASE_NAMES[i]
 
                 if should_cancel(db, execution_id):
-                    update_progress(db, execution_id, PROGRESS_RESTORE[i - 1] if i > 0 else 12,
-                                    f"FASE {phase_name} cancelada")
+                    update_progress(
+                        db,
+                        execution_id,
+                        PROGRESS_RESTORE[i - 1] if i > 0 else 12,
+                        f"FASE {phase_name} cancelada",
+                    )
                     logger.info(f"FASE {phase_name}: cancelada por el usuario")
                     return ctx.metrics
 
                 if should_pause(db, execution_id):
-                    update_progress(db, execution_id, PROGRESS_RESTORE[i - 1] if i > 0 else 12,
-                                    f"FASE {phase_name} pausada")
+                    update_progress(
+                        db,
+                        execution_id,
+                        PROGRESS_RESTORE[i - 1] if i > 0 else 12,
+                        f"FASE {phase_name} pausada",
+                    )
                     logger.info(f"FASE {phase_name}: pausada por el usuario")
                     return ctx.metrics
 
@@ -102,9 +118,15 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
                     _restore_checkpoint(ctx, checkpoint[phase_name], phase_name)
                     retry_count = _inc_retry_count(db, execution_id)
                     retry_label = f" (reintento {retry_count})" if retry_count > 0 else ""
-                    update_progress(db, execution_id, PROGRESS_RESTORE[i],
-                                    f"FASE {phase_name} restaurada desde checkpoint{retry_label}")
-                    logger.info(f"FASE {phase_name}: restaurada desde checkpoint (reintento {retry_count})")
+                    update_progress(
+                        db,
+                        execution_id,
+                        PROGRESS_RESTORE[i],
+                        f"FASE {phase_name} restaurada desde checkpoint{retry_label}",
+                    )
+                    logger.info(
+                        f"FASE {phase_name}: restaurada desde checkpoint (reintento {retry_count})"
+                    )
                 else:
                     progress_key = f"{phase_name}_progress"
                     if progress_key in checkpoint:
@@ -114,7 +136,11 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
                     _save_phase_checkpoint(db, execution_id, ctx, phase_name)
                     logger.info(f"FASE {phase_name}: completada, checkpoint guardado")
 
-                    if phase_name == "2" and ctx.mode in ("courses", "both") and not _is_delete_confirmed(db, execution_id):
+                    if (
+                        phase_name == "2"
+                        and ctx.mode in ("courses", "both")
+                        and not _is_delete_confirmed(db, execution_id)
+                    ):
                         to_delete_count = len(ctx.comparison.get("to_delete", []))
                         if to_delete_count > settings.MAX_AUTO_DELETE_COURSES:
                             _require_review(db, execution_id, ctx)
@@ -131,20 +157,34 @@ def process_etl_file(self, execution_id: int, file_path: str, semester: str) -> 
             return
 
         if current_exec.status in ("cancelled", "paused"):
-            logger.info(f"Ejecución {execution_id}: {current_exec.status} después de fases 1-2, no se lanza Fase 3")
+            logger.info(
+                f"Ejecución {execution_id}: {current_exec.status} después de fases 1-2, no se lanza Fase 3"
+            )
             return
 
         if current_exec.status == "review_required":
-            logger.info(f"Ejecución {execution_id}: en espera de confirmación de eliminación masiva")
+            logger.info(
+                f"Ejecución {execution_id}: en espera de confirmación de eliminación masiva"
+            )
             return
 
         if current_exec.status == "completed":
-            logger.info(f"Ejecución {execution_id}: ya completada por chord callbacks, no se relanza")
+            logger.info(
+                f"Ejecución {execution_id}: ya completada por chord callbacks, no se relanza"
+            )
             return
 
         # Save context for Phase 3 subtask orchestration
         phase2_data = get_checkpoint(db, execution_id) or {}
-        _save_phase_2_data_to_checkpoint(db, execution_id, etl_data, metrics, phase2_data, current_exec.modalidad, current_exec.mode)
+        _save_phase_2_data_to_checkpoint(
+            db,
+            execution_id,
+            etl_data,
+            metrics,
+            phase2_data,
+            current_exec.modalidad,
+            current_exec.mode,
+        )
 
         update_progress(db, execution_id, 32, "Preparando subtareas…", step=3)
         logger.info(f"Ejecución {execution_id}: lanzando FASE 3 como subtareas")

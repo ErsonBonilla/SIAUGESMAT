@@ -25,7 +25,7 @@ def users_to_create(
 ) -> list[User]:
     """Usuarios ETL sin resolver en Moodle y con email institucional."""
     return [
-        u for u in etl_users
-        if u["username"] not in username_map
-        and u.get("email", "").endswith("@ut.edu.co")
+        u
+        for u in etl_users
+        if u["username"] not in username_map and u.get("email", "").endswith("@ut.edu.co")
     ]

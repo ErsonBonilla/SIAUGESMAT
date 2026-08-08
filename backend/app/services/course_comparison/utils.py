@@ -1,4 +1,5 @@
 """Shim de compatibilidad: re-exporta utils de course_comparison desde el núcleo puro."""
+
 from app.pipeline.course_comparison.utils import (
     build_base_key,
     build_base_key_str,

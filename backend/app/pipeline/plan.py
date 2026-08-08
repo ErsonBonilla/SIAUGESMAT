@@ -30,11 +30,13 @@ def plan_log_entries(
     entries: list[Entry] = []
 
     for entry in comparison.get("logs", []):
-        entries.append((
-            f"planned_{entry.get('action', 'unknown')}",
-            entry.get("identifier", ""),
-            entry.get("detail"),
-        ))
+        entries.append(
+            (
+                f"planned_{entry.get('action', 'unknown')}",
+                entry.get("identifier", ""),
+                entry.get("detail"),
+            )
+        )
 
     for alert in comparison.get("alerts", []):
         action = ALERT_ACTION_BY_REASON.get(alert.get("reason"))

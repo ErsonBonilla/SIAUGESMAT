@@ -6,6 +6,7 @@ infraestructura (base de datos, settings, HTTP, repositorios, Celery, pandas,
 ETL de archivos) ni los use por nombre. El objetivo es impedir regresiones
 que vuelvan a mezclar I/O con las transformaciones puras.
 """
+
 import ast
 from pathlib import Path
 
@@ -67,7 +68,8 @@ def _module_import_paths(tree: ast.Module) -> list:
 
 def _forbidden_imports(paths: list) -> list:
     return [
-        p for p in paths
+        p
+        for p in paths
         if any(p == prefix or p.startswith(f"{prefix}.") for prefix in FORBIDDEN_IMPORT_PREFIXES)
     ]
 
@@ -88,10 +90,7 @@ def _forbidden_names(tree: ast.Module) -> list:
 
 def _pipeline_modules():
     assert PIPELINE_DIR.is_dir(), f"No existe el paquete pipeline en {PIPELINE_DIR}"
-    return sorted(
-        p for p in PIPELINE_DIR.glob("**/*.py")
-        if p.name != "__init__.py"
-    )
+    return sorted(p for p in PIPELINE_DIR.glob("**/*.py") if p.name != "__init__.py")
 
 
 def _tree(path: Path) -> ast.Module:

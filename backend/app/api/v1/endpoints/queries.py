@@ -37,47 +37,76 @@ ENTITY_CSV_HEADERS = {
     "categories": ["ID", "Nombre", "ID Number", "Padre", "Cursos", "Descripción"],
     "users": ["Username", "Email", "Nombres", "Apellidos", "Último login"],
     "inactive_teachers": [
-        "Docente", "Username", "Correo", "Curso", "Shortname",
-        "Programa", "CAT", "Último acceso", "Días sin acceso",
+        "Docente",
+        "Username",
+        "Correo",
+        "Curso",
+        "Shortname",
+        "Programa",
+        "CAT",
+        "Último acceso",
+        "Días sin acceso",
     ],
     "inactive_courses": [
-        "ID", "Shortname", "Nombre", "Categoría", "Programa", "CAT",
-        "Última modificación", "Días sin uso",
+        "ID",
+        "Shortname",
+        "Nombre",
+        "Categoría",
+        "Programa",
+        "CAT",
+        "Última modificación",
+        "Días sin uso",
     ],
 }
 
 ENTITY_CSV_EXTRACT = {
     "courses": lambda c: [
-        c.get("id", ""), c.get("shortname", ""), c.get("fullname", ""),
+        c.get("id", ""),
+        c.get("shortname", ""),
+        c.get("fullname", ""),
         c.get("categoryname", ""),
         "Sí" if c.get("visible", 1) == 1 else "No",
         c.get("timecreated", ""),
     ],
     "categories": lambda c: [
-        c.get("id", ""), c.get("name", ""), c.get("idnumber", ""),
-        c.get("parent", ""), c.get("coursecount", ""), c.get("description", ""),
+        c.get("id", ""),
+        c.get("name", ""),
+        c.get("idnumber", ""),
+        c.get("parent", ""),
+        c.get("coursecount", ""),
+        c.get("description", ""),
     ],
     "users": lambda u: [
-        u.get("username", ""), u.get("email", ""),
-        u.get("firstname", ""), u.get("lastname", ""),
+        u.get("username", ""),
+        u.get("email", ""),
+        u.get("firstname", ""),
+        u.get("lastname", ""),
         "Nunca" if u.get("lastlogin", 0) == 0 else str(u.get("lastlogin", "")),
     ],
     "inactive_teachers": lambda r: [
-        r.get("teacher_name", ""), r.get("username", ""), r.get("email", ""),
-        r.get("course_name", ""), r.get("course_shortname", ""),
-        r.get("program", ""), r.get("cat", ""),
-        "Nunca" if r.get("last_access", 0) == 0
+        r.get("teacher_name", ""),
+        r.get("username", ""),
+        r.get("email", ""),
+        r.get("course_name", ""),
+        r.get("course_shortname", ""),
+        r.get("program", ""),
+        r.get("cat", ""),
+        "Nunca"
+        if r.get("last_access", 0) == 0
         else datetime.fromtimestamp(r["last_access"], tz=UTC).strftime("%Y-%m-%d %H:%M"),
-        "Nunca" if r.get("last_access", 0) == 0
-        else str(r.get("days_since_last_access", "")),
+        "Nunca" if r.get("last_access", 0) == 0 else str(r.get("days_since_last_access", "")),
     ],
     "inactive_courses": lambda c: [
-        c.get("id", ""), c.get("shortname", ""), c.get("fullname", ""),
-        c.get("categoryname", ""), c.get("program", ""), c.get("cat", ""),
-        "Nunca" if not c.get("timemodified") else
-        datetime.fromtimestamp(c["timemodified"], tz=UTC).strftime("%Y-%m-%d %H:%M"),
-        "Nunca" if not c.get("timemodified") else
-        str(c.get("days_since_modified", "")),
+        c.get("id", ""),
+        c.get("shortname", ""),
+        c.get("fullname", ""),
+        c.get("categoryname", ""),
+        c.get("program", ""),
+        c.get("cat", ""),
+        "Nunca"
+        if not c.get("timemodified")
+        else datetime.fromtimestamp(c["timemodified"], tz=UTC).strftime("%Y-%m-%d %H:%M"),
+        "Nunca" if not c.get("timemodified") else str(c.get("days_since_modified", "")),
     ],
 }
 
@@ -98,8 +127,7 @@ def _csv_download(qr):
         iter([output.getvalue().encode("utf-8-sig")]),
         media_type="text/csv",
         headers={
-            "Content-Disposition":
-            f"attachment; filename={entity}_consulta_{qr.task_id[:8]}.csv"
+            "Content-Disposition": f"attachment; filename={entity}_consulta_{qr.task_id[:8]}.csv"
         },
     )
 
@@ -122,7 +150,9 @@ async def enqueue_query(
     logger.info(f"Consulta de {label} encolada (task={task_id[:8]}) por {current_user.username}")
 
     return {
-        "task_id": task_id, "entity": entity, "status": "pending",
+        "task_id": task_id,
+        "entity": entity,
+        "status": "pending",
         "message": f"Consulta de {label} encolada. Esperando resultado...",
     }
 
@@ -138,8 +168,10 @@ def get_task_status(
         raise HTTPException(404, "Tarea de consulta no encontrada")
 
     response = {
-        "task_id": qr.task_id, "entity": qr.entity,
-        "status": qr.status, "total_count": qr.total_count,
+        "task_id": qr.task_id,
+        "entity": qr.entity,
+        "status": qr.status,
+        "total_count": qr.total_count,
     }
     if qr.status == "completed":
         response["result"] = qr.result_json

@@ -7,10 +7,12 @@ import {
   deleteExecution,
   downloadReport,
   type Execution,
+  getHistory,
   getReportDownloadUrl,
   listExecutions,
   pauseExecution,
   resumeExecution,
+  type SemesterMetrics,
   startProcess,
 } from "../services/api.ts";
 import { toast } from "../utils/toast.ts";
@@ -49,17 +51,25 @@ export default function ExecutionList() {
     loading.value = true;
     error.value = "";
     try {
-      const result = await listExecutions({
-        semester: filterSemester.value || undefined,
-        status: filterStatus.value || undefined,
-        mode: filterMode.value || undefined,
-        limit: PAGE_SIZE,
-        offset: offset.value,
-      });
+      // El listado es paginado (PAGE_SIZE); los semestres se obtienen del
+      // histórico agregado para que el dropdown muestre todos, no solo los de la página actual.
+      const [result, history] = await Promise.all([
+        listExecutions({
+          semester: filterSemester.value || undefined,
+          status: filterStatus.value || undefined,
+          mode: filterMode.value || undefined,
+          limit: PAGE_SIZE,
+          offset: offset.value,
+        }),
+        getHistory(50).catch(() => [] as SemesterMetrics[]),
+      ]);
       items.value = result.items;
       total.value = result.total;
 
       const semSet = new Set<string>();
+      for (const s of history) {
+        if (s.semester) semSet.add(s.semester);
+      }
       for (const exec of result.items) {
         if (exec.semester) semSet.add(exec.semester);
       }

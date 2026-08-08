@@ -77,8 +77,12 @@ class TestParseCutoff:
 
     def test_invalid_values(self):
         for params in (
-            {"days": 0}, {"days": 400}, {"months": 0}, {"months": 13},
-            {"years": 0}, {"days": "abc"},
+            {"days": 0},
+            {"days": 400},
+            {"months": 0},
+            {"months": 13},
+            {"years": 0},
+            {"days": "abc"},
         ):
             with pytest.raises(ValueError):
                 _parse_cutoff(params)
@@ -294,7 +298,8 @@ class TestFilterOrphanCourses:
         no_sia = _course("NO-SIAUGE-001", cid=4)
         moodle = self._moodle({1: [_teacher("doc")], 2: [], 3: []})
         result = await _filter_orphan_courses(
-            moodle, [con_docente, sinon, otro_sin, no_sia],
+            moodle,
+            [con_docente, sinon, otro_sin, no_sia],
         )
         # solo SIAUGESMAT sin docentes; "con_docente" tiene 1 => no; "no_sia" se excluye
         assert [c["id"] for c in result] == ["2", "3"]

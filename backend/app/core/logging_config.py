@@ -22,16 +22,20 @@ class ExecutionContextFilter(logging.Filter):
     de cada tarea Celery. Thread-safe (contextvars)."""
 
     @staticmethod
-    def set_context(execution_id: int | None = None,
-                    item_id: int | None = None,
-                    action: str | None = None,
-                    phase: str | None = None):
-        _context_vars.set({
-            "execution_id": execution_id,
-            "item_id": item_id,
-            "action": action,
-            "phase": phase,
-        })
+    def set_context(
+        execution_id: int | None = None,
+        item_id: int | None = None,
+        action: str | None = None,
+        phase: str | None = None,
+    ):
+        _context_vars.set(
+            {
+                "execution_id": execution_id,
+                "item_id": item_id,
+                "action": action,
+                "phase": phase,
+            }
+        )
 
     @staticmethod
     def clear_context():
@@ -77,9 +81,7 @@ def setup_logging(debug: bool = False):
     handler.setLevel(level)
 
     if debug or os.getenv("DEV_LOGGING"):
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     else:
         formatter = JSONFormatter()
 

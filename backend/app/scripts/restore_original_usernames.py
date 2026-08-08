@@ -41,8 +41,10 @@ async def _get_users_batch(ms, usernames: list, timeout: float = 60.0) -> list:
         params[f"values[{i}]"] = u
     try:
         result = await ms._request(
-            "core_user_get_users_by_field", params,
-            use_post=True, timeout=timeout,
+            "core_user_get_users_by_field",
+            params,
+            use_post=True,
+            timeout=timeout,
         )
         if isinstance(result, list):
             return result
@@ -56,7 +58,8 @@ async def _find_user_by_username(ms, username: str) -> dict | None:
         result = await ms._request(
             "core_user_get_users",
             params={"criteria[0][key]": "username", "criteria[0][value]": username},
-            use_post=True, timeout=60.0,
+            use_post=True,
+            timeout=60.0,
         )
         if isinstance(result, dict):
             users = result.get("users", [])
@@ -68,10 +71,15 @@ async def _find_user_by_username(ms, username: str) -> dict | None:
 
 async def _update_user_username(ms, user_id: int, username: str) -> bool:
     try:
-        await ms._request("core_user_update_users", params={
-            "users[0][id]": user_id,
-            "users[0][username]": username,
-        }, use_post=True, timeout=30.0)
+        await ms._request(
+            "core_user_update_users",
+            params={
+                "users[0][id]": user_id,
+                "users[0][username]": username,
+            },
+            use_post=True,
+            timeout=30.0,
+        )
         return True
     except Exception as e:
         logger.exception(f"  Fallo al renombrar id={user_id} -> {username}: {e}")
@@ -80,10 +88,15 @@ async def _update_user_username(ms, user_id: int, username: str) -> bool:
 
 async def _update_user_auth(ms, user_id: int, auth: str = "manual") -> bool:
     try:
-        await ms._request("core_user_update_users", params={
-            "users[0][id]": user_id,
-            "users[0][auth]": auth,
-        }, use_post=True, timeout=30.0)
+        await ms._request(
+            "core_user_update_users",
+            params={
+                "users[0][id]": user_id,
+                "users[0][auth]": auth,
+            },
+            use_post=True,
+            timeout=30.0,
+        )
         return True
     except Exception as e:
         logger.exception(f"  Fallo al fijar auth={auth} para id={user_id}: {e}")
@@ -109,8 +122,7 @@ async def _update_batch_auth(ms, users: list) -> tuple:
         return ok, fail
 
 
-async def _create_user(ms, username: str, email: str, firstname: str,
-                       lastname: str) -> dict | None:
+async def _create_user(ms, username: str, email: str, firstname: str, lastname: str) -> dict | None:
     params = {
         "users[0][username]": username,
         "users[0][email]": email,
@@ -120,8 +132,7 @@ async def _create_user(ms, username: str, email: str, firstname: str,
         "users[0][createpassword]": 1,
     }
     try:
-        result = await ms._request("core_user_create_users", params,
-                                   use_post=True, timeout=30.0)
+        result = await ms._request("core_user_create_users", params, use_post=True, timeout=30.0)
         if isinstance(result, list) and result:
             return result[0]
     except Exception as e:
@@ -131,10 +142,14 @@ async def _create_user(ms, username: str, email: str, firstname: str,
 
 async def _get_course_id(ms, shortname: str) -> int | None:
     try:
-        result = await ms._request("core_course_get_courses_by_field", params={
-            "field": "shortname",
-            "value": shortname,
-        }, timeout=30.0)
+        result = await ms._request(
+            "core_course_get_courses_by_field",
+            params={
+                "field": "shortname",
+                "value": shortname,
+            },
+            timeout=30.0,
+        )
         if isinstance(result, dict):
             courses = result.get("courses", [])
             if courses:
@@ -146,11 +161,16 @@ async def _get_course_id(ms, shortname: str) -> int | None:
 
 async def _enrol_user(ms, user_id: int, course_id: int, role_id: int = 3) -> bool:
     try:
-        await ms._request("enrol_manual_enrol_users", params={
-            "enrolments[0][userid]": user_id,
-            "enrolments[0][courseid]": course_id,
-            "enrolments[0][roleid]": role_id,
-        }, use_post=True, timeout=30.0)
+        await ms._request(
+            "enrol_manual_enrol_users",
+            params={
+                "enrolments[0][userid]": user_id,
+                "enrolments[0][courseid]": course_id,
+                "enrolments[0][roleid]": role_id,
+            },
+            use_post=True,
+            timeout=30.0,
+        )
         return True
     except Exception as e:
         logger.exception(f"  Fallo al matricular userid={user_id} en courseid={course_id}: {e}")
@@ -159,9 +179,14 @@ async def _enrol_user(ms, user_id: int, course_id: int, role_id: int = 3) -> boo
 
 async def _delete_user_by_id(ms, user_id: int) -> bool:
     try:
-        await ms._request("core_user_delete_users", params={
-            "userids[0]": user_id,
-        }, use_post=True, timeout=30.0)
+        await ms._request(
+            "core_user_delete_users",
+            params={
+                "userids[0]": user_id,
+            },
+            use_post=True,
+            timeout=30.0,
+        )
         return True
     except Exception as e:
         logger.exception(f"  Fallo al eliminar userid={user_id}: {e}")
@@ -184,16 +209,18 @@ def load_pairs() -> list:
             parts = line.split("\t")
             if len(parts) < 8:
                 continue
-            pairs.append({
-                "old": parts[0],
-                "new": parts[1],
-                "email": parts[2],
-                "firstname": parts[3],
-                "lastname": parts[4],
-                "cedula": parts[5],
-                "email_personal": parts[6],
-                "courses": [c for c in parts[7].split(",") if c],
-            })
+            pairs.append(
+                {
+                    "old": parts[0],
+                    "new": parts[1],
+                    "email": parts[2],
+                    "firstname": parts[3],
+                    "lastname": parts[4],
+                    "cedula": parts[5],
+                    "email_personal": parts[6],
+                    "courses": [c for c in parts[7].split(",") if c],
+                }
+            )
     return pairs
 
 
@@ -207,14 +234,14 @@ async def classify_all(ms, pairs: list) -> list:
 
     new_state = {}
     for i in range(0, len(all_news), BATCH_SIZE):
-        batch = all_news[i:i + BATCH_SIZE]
+        batch = all_news[i : i + BATCH_SIZE]
         users = await _get_users_batch(ms, batch)
         for u in users:
             new_state[u.get("username")] = u
 
     old_state = {}
     for i in range(0, len(all_olds), BATCH_SIZE):
-        batch = all_olds[i:i + BATCH_SIZE]
+        batch = all_olds[i : i + BATCH_SIZE]
         users = await _get_users_batch(ms, batch)
         for u in users:
             old_state[u.get("username")] = u
@@ -229,7 +256,9 @@ async def classify_all(ms, pairs: list) -> list:
             else:
                 results.append({"pair": p, "status": "AUTH_FIX_RENAME", "new_user": new_user})
         elif new_user and old_user:
-            results.append({"pair": p, "status": "CONFLICT", "new_user": new_user, "old_user": old_user})
+            results.append(
+                {"pair": p, "status": "CONFLICT", "new_user": new_user, "old_user": old_user}
+            )
         elif not new_user and old_user:
             results.append({"pair": p, "status": "ALREADY_OK", "old_user": old_user})
         else:
@@ -313,7 +342,7 @@ async def run_fix(ms, pairs: list):
             ok += 1
             restored.append(p)
             if (i + 1) % 20 == 0:
-                print(f"  [{i+1}/{len(to_fix)}] OK={ok} FAIL={fail}")
+                print(f"  [{i + 1}/{len(to_fix)}] OK={ok} FAIL={fail}")
         else:
             fail += 1
             print(f"  [FAIL] id={user_id}: {new_user.get('username')} -> {old_username}")
@@ -355,7 +384,7 @@ async def run_recreate_gone(ms, pairs: list):
         lastname = p["lastname"]
         courses = p["courses"]
 
-        print(f"  [{i+1}/{len(gone)}] Creando {username} (email={email})...")
+        print(f"  [{i + 1}/{len(gone)}] Creando {username} (email={email})...")
         created = await _create_user(ms, username, email, firstname, lastname)
         if not created:
             print(f"    [FAIL] No se pudo crear {username}")
@@ -398,7 +427,7 @@ async def run_conflicts_fix(ms, pairs: list):
         if not old_user or not new_user:
             continue
 
-        print(f"  [{i+1}/{len(conflicts)}] {p['old']} (original) vs {p['new']} (email-prefix)")
+        print(f"  [{i + 1}/{len(conflicts)}] {p['old']} (original) vs {p['new']} (email-prefix)")
         print(f"    old: id={old_user.get('id')} auth={old_user.get('auth')}")
         print(f"    new: id={new_user.get('id')} auth={new_user.get('auth')}")
 
@@ -434,17 +463,26 @@ async def run_conflicts_fix(ms, pairs: list):
 def generate_csv(pairs: list, output_path: str):
     rows = []
     for p in pairs:
-        rows.append({
-            "email": p.get("email", ""),
-            "username_original": p["old"],
-            "username_erroneo": p["new"],
-            "firstname": p.get("firstname", ""),
-            "lastname": p.get("lastname", ""),
-        })
+        rows.append(
+            {
+                "email": p.get("email", ""),
+                "username_original": p["old"],
+                "username_erroneo": p["new"],
+                "firstname": p.get("firstname", ""),
+                "lastname": p.get("lastname", ""),
+            }
+        )
     with open(output_path, "w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(f, fieldnames=[
-            "email", "username_original", "username_erroneo", "firstname", "lastname",
-        ])
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "email",
+                "username_original",
+                "username_erroneo",
+                "firstname",
+                "lastname",
+            ],
+        )
         writer.writeheader()
         writer.writerows(rows)
     print(f"  CSV generado: {output_path} ({len(rows)} docentes)\n")
@@ -457,20 +495,29 @@ async def main():
     parser = argparse.ArgumentParser(
         description="Restaura usernames originales de Moodle renombrados por el bug del ETL"
     )
-    parser.add_argument("--modalidad", default="DISTANCIA",
-                        help="Modalidad (DISTANCIA/PRESENCIAL)")
-    parser.add_argument("--audit", action="store_true",
-                        help="Clasificar los 128 pares (solo lectura)")
-    parser.add_argument("--fix", action="store_true",
-                        help="Aplicar renombramiento de vuelta (safe + auth-fix)")
-    parser.add_argument("--recreate-gone", action="store_true",
-                        help="Recrear las 3 cuentas eliminadas + re-matricular")
-    parser.add_argument("--conflicts-fix", action="store_true",
-                        help="Resolver conflictos conservando username original")
-    parser.add_argument("--csv", type=str, default=None,
-                        help="Generar CSV de notificacion en la ruta especificada")
-    parser.add_argument("--all", action="store_true",
-                        help="Ejecutar --fix + --conflicts-fix + --recreate-gone")
+    parser.add_argument("--modalidad", default="DISTANCIA", help="Modalidad (DISTANCIA/PRESENCIAL)")
+    parser.add_argument(
+        "--audit", action="store_true", help="Clasificar los 128 pares (solo lectura)"
+    )
+    parser.add_argument(
+        "--fix", action="store_true", help="Aplicar renombramiento de vuelta (safe + auth-fix)"
+    )
+    parser.add_argument(
+        "--recreate-gone",
+        action="store_true",
+        help="Recrear las 3 cuentas eliminadas + re-matricular",
+    )
+    parser.add_argument(
+        "--conflicts-fix",
+        action="store_true",
+        help="Resolver conflictos conservando username original",
+    )
+    parser.add_argument(
+        "--csv", type=str, default=None, help="Generar CSV de notificacion en la ruta especificada"
+    )
+    parser.add_argument(
+        "--all", action="store_true", help="Ejecutar --fix + --conflicts-fix + --recreate-gone"
+    )
     args = parser.parse_args()
 
     print(f"\n=== restore_original_usernames | modalidad={args.modalidad} ===\n")

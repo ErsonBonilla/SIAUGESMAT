@@ -27,8 +27,10 @@ def _build_rows(batch: OperationBatch, items: list[OperationItem]) -> dict[str, 
     for item in items:
         det = item.detail or {}
         row = {
-            "identificador": item.identifier, "estado": item.status,
-            "error": item.error_message or "", "intentos": str(item.attempt or 0),
+            "identificador": item.identifier,
+            "estado": item.status,
+            "error": item.error_message or "",
+            "intentos": str(item.attempt or 0),
         }
         if batch.entity_type == "categories" and batch.action == "create":
             row["idnumber"] = det.get("idnumber") or ""
@@ -80,7 +82,10 @@ def _build_rows(batch: OperationBatch, items: list[OperationItem]) -> dict[str, 
         {"campo": "Fallidos", "valor": str(failed)},
         {"campo": "Batch ID", "valor": batch.batch_id},
         {"campo": "Creado", "valor": batch.created_at.isoformat() if batch.created_at else ""},
-        {"campo": "Completado", "valor": batch.completed_at.isoformat() if batch.completed_at else ""},
+        {
+            "campo": "Completado",
+            "valor": batch.completed_at.isoformat() if batch.completed_at else "",
+        },
     ]
     csvs["resumen"] = (["campo", "valor"], resumen_rows)
 

@@ -38,12 +38,18 @@ def cleanup_stuck_executions():
     db = SessionLocal()
     try:
         cutoff = datetime.now(UTC)
-        stuck = db.query(Execution).filter(
-            Execution.status.in_(["running", "queued"]),
-        ).all()
+        stuck = (
+            db.query(Execution)
+            .filter(
+                Execution.status.in_(["running", "queued"]),
+            )
+            .all()
+        )
         count = 0
         for ex in stuck:
-            age = (cutoff - (ex.progress_updated_at or ex.started_at or ex.created_at)).total_seconds()
+            age = (
+                cutoff - (ex.progress_updated_at or ex.started_at or ex.created_at)
+            ).total_seconds()
             if age > settings.STUCK_EXECUTION_TIMEOUT:
                 ex.status = "failed"
                 ex.current_phase = f"{ex.current_phase or ''} (timeout 6h)"
@@ -127,16 +133,23 @@ def recover_stuck_phase():
                 pending = _get_pending_items(db, eid, phase)
                 if not pending:
                     continue
-                recent_processing = db.query(OperationItem).filter(
-                    OperationItem.batch_id.like(f"etl_{phase}_%_{eid}"),
-                    OperationItem.status == "processing",
-                    OperationItem.updated_at >= now - timedelta(minutes=STUCK_ITEM_TIMEOUT_MINUTES),
-                ).count()
+                recent_processing = (
+                    db.query(OperationItem)
+                    .filter(
+                        OperationItem.batch_id.like(f"etl_{phase}_%_{eid}"),
+                        OperationItem.status == "processing",
+                        OperationItem.updated_at
+                        >= now - timedelta(minutes=STUCK_ITEM_TIMEOUT_MINUTES),
+                    )
+                    .count()
+                )
                 if recent_processing:
                     continue
 
                 reset_stuck_items(
-                    db, batch_id_prefix=f"etl_{phase}_%", execution_id=eid,
+                    db,
+                    batch_id_prefix=f"etl_{phase}_%",
+                    execution_id=eid,
                     increment_attempt=True,
                 )
                 logger.warning(
@@ -151,21 +164,25 @@ def recover_stuck_phase():
                 break
 
             if not phase_relaunched and not checkpoint.get("phase3_ctx"):
-                has_items = _items_exist_for_execution(db, eid, "3") or _items_exist_for_execution(db, eid, "4")
+                has_items = _items_exist_for_execution(db, eid, "3") or _items_exist_for_execution(
+                    db, eid, "4"
+                )
                 if not has_items:
                     heartbeat = ex.progress_updated_at or ex.created_at
-                    stale = (
-                        heartbeat is not None
-                        and (now - heartbeat.replace(tzinfo=UTC) if heartbeat.tzinfo is None else (now - heartbeat))
-                        >= timedelta(minutes=STUCK_ITEM_TIMEOUT_MINUTES)
-                    )
+                    stale = heartbeat is not None and (
+                        now - heartbeat.replace(tzinfo=UTC)
+                        if heartbeat.tzinfo is None
+                        else (now - heartbeat)
+                    ) >= timedelta(minutes=STUCK_ITEM_TIMEOUT_MINUTES)
                     if stale:
                         retry = checkpoint.get("_retry_count", 0)
                         if retry < 3:
                             import os
+
                             file_path = os.path.join(settings.UPLOAD_DIR, ex.filename)
                             if os.path.isfile(file_path):
                                 from app.workers.tasks import process_etl_file
+
                                 checkpoint["_retry_count"] = retry + 1
                                 ex.phase_checkpoint = checkpoint
                                 db.commit()

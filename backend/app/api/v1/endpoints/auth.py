@@ -28,8 +28,10 @@ router = APIRouter()
 # Modelos de solicitud y respuesta
 # ---------------------------------------------------------------------------
 
+
 class LoginRequest(BaseModel):
     """Credenciales de inicio de sesión."""
+
     username: str = Field(..., description="Nombre de usuario en Moodle")
     password: str = Field(..., min_length=1, description="Contraseña del usuario")
     modalidad: str = Field(..., description="Modalidad: PRESENCIAL o DISTANCIA")
@@ -37,6 +39,7 @@ class LoginRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     """Respuesta exitosa con token de acceso."""
+
     access_token: str
     token_type: str = "bearer"
     user_id: int
@@ -46,6 +49,7 @@ class LoginResponse(BaseModel):
 
 class UserProfileResponse(BaseModel):
     """Perfil público del usuario autenticado."""
+
     username: str
     firstname: str
     lastname: str
@@ -55,6 +59,7 @@ class UserProfileResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Lógica de validación contra Moodle
 # ---------------------------------------------------------------------------
+
 
 async def _get_moodle_token(moodle_url: str, username: str, password: str) -> str:
     """
@@ -78,7 +83,7 @@ async def _get_moodle_token(moodle_url: str, username: str, password: str) -> st
         "username": username,
         "password": password,
         "service": "FastAPI",
-        "moodlewsrestformat": "json"
+        "moodlewsrestformat": "json",
     }
 
     async with httpx.AsyncClient(timeout=15.0) as client:
@@ -89,7 +94,7 @@ async def _get_moodle_token(moodle_url: str, username: str, password: str) -> st
             logger.exception(f"Error de red al contactar Moodle ({moodle_url}): {exc}")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="No se puede conectar con el servicio de Moodle."
+                detail="No se puede conectar con el servicio de Moodle.",
             ) from exc
 
         try:
@@ -98,7 +103,7 @@ async def _get_moodle_token(moodle_url: str, username: str, password: str) -> st
             logger.exception("Moodle no devolvió JSON válido en la autenticación")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Respuesta inesperada del servidor de Moodle."
+                detail="Respuesta inesperada del servidor de Moodle.",
             ) from None
 
         token = data.get("token")
@@ -107,7 +112,7 @@ async def _get_moodle_token(moodle_url: str, username: str, password: str) -> st
             logger.warning(f"Autenticación fallida para {username}: {error_msg}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Fallo de autenticación: {error_msg}"
+                detail=f"Fallo de autenticación: {error_msg}",
             )
         return token
 
@@ -150,13 +155,13 @@ async def _check_moodle_permissions(moodle_url: str, token: str) -> int:
             logger.exception(f"Error de red durante verificación de permisos: {exc}")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="No se pudo contactar a Moodle para verificar permisos."
+                detail="No se pudo contactar a Moodle para verificar permisos.",
             ) from exc
         except ValueError:
             logger.exception("Respuesta no JSON en verificación de permisos")
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Respuesta inesperada de Moodle (verificación)."
+                detail="Respuesta inesperada de Moodle (verificación).",
             ) from None
 
         if "error" in site_info:
@@ -164,14 +169,14 @@ async def _check_moodle_permissions(moodle_url: str, token: str) -> int:
             logger.exception(f"Error en site_info: {error_detail}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"No se pudo obtener información del usuario: {error_detail}"
+                detail=f"No se pudo obtener información del usuario: {error_detail}",
             )
 
         userid = site_info.get("userid")
         if not userid:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="No se pudo determinar el identificador del usuario."
+                detail="No se pudo determinar el identificador del usuario.",
             )
 
         # 2. Llamada de prueba a una función administrativa
@@ -186,17 +191,19 @@ async def _check_moodle_permissions(moodle_url: str, token: str) -> int:
             logger.exception(f"Error durante llamada de prueba de permisos: {exc}")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="No se pudo verificar los permisos del usuario."
+                detail="No se pudo verificar los permisos del usuario.",
             ) from exc
 
         if "errorcode" in categ_data and categ_data["errorcode"] in (
-            "accessexception", "requireloginerror", "nopermissions"
+            "accessexception",
+            "requireloginerror",
+            "nopermissions",
         ):
             error_msg = categ_data.get("message", "Permisos insuficientes.")
             logger.warning(f"Usuario {userid} no tiene permisos: {error_msg}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="El usuario no posee los permisos requeridos en Moodle."
+                detail="El usuario no posee los permisos requeridos en Moodle.",
             )
 
         logger.info(f"Usuario {userid} validado con permisos adecuados.")
@@ -206,6 +213,7 @@ async def _check_moodle_permissions(moodle_url: str, token: str) -> int:
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("/login", response_model=LoginResponse, summary="Iniciar sesión")
 async def login(request: LoginRequest, response: Response):
@@ -221,7 +229,7 @@ async def login(request: LoginRequest, response: Response):
     if request.modalidad.upper() == "PRESENCIAL" and not settings.ALLOW_PRESENCIAL:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Modalidad PRESENCIAL no disponible actualmente."
+            detail="Modalidad PRESENCIAL no disponible actualmente.",
         )
 
     # 2. Resolver Moodle según la modalidad
@@ -275,7 +283,9 @@ async def logout(response: Response):
     return {"status": "ok"}
 
 
-@router.get("/me", response_model=UserProfileResponse, summary="Obtener perfil del usuario autenticado")
+@router.get(
+    "/me", response_model=UserProfileResponse, summary="Obtener perfil del usuario autenticado"
+)
 async def get_my_profile(current_user: UserInToken = Depends(get_current_user)):
     """
     Devuelve el primer nombre, apellido y la URL de la imagen de perfil
@@ -288,7 +298,9 @@ async def get_my_profile(current_user: UserInToken = Depends(get_current_user)):
         # Buscar el usuario en Moodle por su username (el que viene en el JWT)
         users = await moodle.get_users("username", [current_user.username])
         if not users:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado en Moodle")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado en Moodle"
+            )
 
         user = users[0]
         return UserProfileResponse(
@@ -299,9 +311,14 @@ async def get_my_profile(current_user: UserInToken = Depends(get_current_user)):
         )
     except MoodleAPIError as e:
         logger.exception(f"Error al obtener perfil de {current_user.username}: {e}")
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="No se pudo obtener el perfil del usuario") from e
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No se pudo obtener el perfil del usuario",
+        ) from e
     except Exception:
         logger.exception("Error inesperado al obtener perfil")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno") from None
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno"
+        ) from None
     finally:
         await moodle.close()

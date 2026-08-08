@@ -71,16 +71,17 @@ def _parse_cutoff(params: dict) -> int:
     days = params.get("days")
     months = params.get("months")
     years = params.get("years")
-    provided = sum([
-        bool(semester and len(semester) == 5 and semester[-1] in ("A", "B")),
-        days is not None,
-        months is not None,
-        years is not None,
-    ])
+    provided = sum(
+        [
+            bool(semester and len(semester) == 5 and semester[-1] in ("A", "B")),
+            days is not None,
+            months is not None,
+            years is not None,
+        ]
+    )
     if provided != 1:
         raise ValueError(
-            "Se requiere exactamente un corte: semestre (ej. 2026A), "
-            "días, meses o años."
+            "Se requiere exactamente un corte: semestre (ej. 2026A), días, meses o años."
         )
     if semester:
         return _semester_to_cutoff(semester)
@@ -90,9 +91,7 @@ def _parse_cutoff(params: dict) -> int:
         except (TypeError, ValueError):
             raise ValueError("'days' debe ser un número entero.") from None
         if days < 1 or days > MAX_INACTIVE_DAYS:
-            raise ValueError(
-                f"'days' debe estar entre 1 y {MAX_INACTIVE_DAYS}."
-            )
+            raise ValueError(f"'days' debe estar entre 1 y {MAX_INACTIVE_DAYS}.")
         return _days_to_cutoff(days)
     if months is not None:
         try:
@@ -100,9 +99,7 @@ def _parse_cutoff(params: dict) -> int:
         except (TypeError, ValueError):
             raise ValueError("'months' debe ser un número entero.") from None
         if months < 1 or months > MAX_INACTIVE_MONTHS:
-            raise ValueError(
-                f"'months' debe estar entre 1 y {MAX_INACTIVE_MONTHS}."
-            )
+            raise ValueError(f"'months' debe estar entre 1 y {MAX_INACTIVE_MONTHS}.")
         return _months_to_cutoff(months)
     try:
         years = int(years)
@@ -126,18 +123,22 @@ def _build_inactive_rows(teachers: list[dict], course: dict, cutoff: int) -> lis
         last_access = t.get("lastcourseaccess", 0) or 0
         if last_access > 0 and last_access >= cutoff:
             continue
-        rows.append({
-            "teacher_name": f'{t.get("firstname", "")} {t.get("lastname", "")}'.strip(),
-            "username": t.get("username", ""),
-            "email": t.get("email", ""),
-            "course_name": course.get("fullname", ""),
-            "course_shortname": sn,
-            "program": program,
-            "cat": cat_name,
-            "cat_prefix": cat_prefix,
-            "last_access": last_access,
-            "days_since_last_access": int((now - last_access) // 86400) if last_access > 0 else 0,
-        })
+        rows.append(
+            {
+                "teacher_name": f"{t.get('firstname', '')} {t.get('lastname', '')}".strip(),
+                "username": t.get("username", ""),
+                "email": t.get("email", ""),
+                "course_name": course.get("fullname", ""),
+                "course_shortname": sn,
+                "program": program,
+                "cat": cat_name,
+                "cat_prefix": cat_prefix,
+                "last_access": last_access,
+                "days_since_last_access": int((now - last_access) // 86400)
+                if last_access > 0
+                else 0,
+            }
+        )
     return rows
 
 
@@ -152,14 +153,16 @@ async def _filter_orphan_courses(moodle: MoodleService, courses: list[dict]) -> 
             try:
                 teachers = await moodle.get_enrolled_teachers_with_access(int(course["id"]))
             except Exception as e:
-                logger.warning(f"Error obteniendo docentes del curso {course.get('shortname')}: {e}")
+                logger.warning(
+                    f"Error obteniendo docentes del curso {course.get('shortname')}: {e}"
+                )
                 return
             if not teachers:
                 results.append(course)
 
     batch_size = 5
     for i in range(0, len(siau_courses), batch_size):
-        batch = siau_courses[i:i + batch_size]
+        batch = siau_courses[i : i + batch_size]
         await asyncio.gather(*[check_course(c) for c in batch])
 
     return results
@@ -177,7 +180,11 @@ async def _do_query(moodle: MoodleService, qr):
             raw = [c for c in raw if q in (c.get("shortname") or "").lower()]
         if status_filter == "unused_6months":
             cutoff = int(time.time()) - (6 * 30 * 24 * 3600)
-            raw = [c for c in raw if c.get("timemodified", 0) and int(c.get("timemodified", 0)) < cutoff]
+            raw = [
+                c
+                for c in raw
+                if c.get("timemodified", 0) and int(c.get("timemodified", 0)) < cutoff
+            ]
         pattern = params.get("pattern", "all")
         if pattern == "6segments":
             raw = [c for c in raw if (c.get("shortname") or "").count("_") == 5]
@@ -216,13 +223,15 @@ async def _do_query(moodle: MoodleService, qr):
                 try:
                     teachers = await moodle.get_enrolled_teachers_with_access(course_id)
                 except Exception as e:
-                    logger.warning(f"Error obteniendo profesores del curso {course.get('shortname')}: {e}")
+                    logger.warning(
+                        f"Error obteniendo profesores del curso {course.get('shortname')}: {e}"
+                    )
                     return
                 results.extend(_build_inactive_rows(teachers, course, cutoff))
 
         batch_size = 5
         for i in range(0, len(siau_courses), batch_size):
-            batch = siau_courses[i:i + batch_size]
+            batch = siau_courses[i : i + batch_size]
             await asyncio.gather(*[process_course(c) for c in batch])
 
         return results
@@ -232,9 +241,7 @@ async def _do_query(moodle: MoodleService, qr):
         now = int(time.time())
 
         all_courses = await moodle.get_courses()
-        siau_courses = [
-            c for c in all_courses if SIAUGESMAT_RE.match(c.get("shortname", ""))
-        ]
+        siau_courses = [c for c in all_courses if SIAUGESMAT_RE.match(c.get("shortname", ""))]
 
         results = []
         for course in siau_courses:
@@ -246,24 +253,28 @@ async def _do_query(moodle: MoodleService, qr):
             program = parsed["cod_prog"] if parsed else ""
             cat_prefix = parsed["cat_prefix"] if parsed else ""
             days_since_modified = (now - last_modified) // 86400 if last_modified else 0
-            results.append({
-                "id": course.get("id", ""),
-                "shortname": sn,
-                "fullname": course.get("fullname", ""),
-                "categoryname": course.get("categoryname", ""),
-                "program": program,
-                "cat_prefix": cat_prefix,
-                "cat": CAT_NAMES.get(cat_prefix, cat_prefix) if cat_prefix else "",
-                "timecreated": course.get("timecreated", ""),
-                "timemodified": last_modified,
-                "days_since_modified": days_since_modified,
-            })
+            results.append(
+                {
+                    "id": course.get("id", ""),
+                    "shortname": sn,
+                    "fullname": course.get("fullname", ""),
+                    "categoryname": course.get("categoryname", ""),
+                    "program": program,
+                    "cat_prefix": cat_prefix,
+                    "cat": CAT_NAMES.get(cat_prefix, cat_prefix) if cat_prefix else "",
+                    "timecreated": course.get("timecreated", ""),
+                    "timemodified": last_modified,
+                    "days_since_modified": days_since_modified,
+                }
+            )
         return results
 
     raise ValueError(f"Entidad desconocida: {qr.entity}")
 
 
-@celery_app.task(bind=True, max_retries=2, default_retry_delay=30, time_limit=3600, soft_time_limit=3540)
+@celery_app.task(
+    bind=True, max_retries=2, default_retry_delay=30, time_limit=3600, soft_time_limit=3540
+)
 def execute_query(self, task_id: str):
     db = SessionLocal()
     qr = None
@@ -284,7 +295,7 @@ def execute_query(self, task_id: str):
         logger.exception(f"Fallo en query {task_id}")
         set_query_failed(db, task_id, str(exc))
         if self.request.retries < self.max_retries:
-            raise self.retry(exc=exc, countdown=2 ** self.request.retries) from exc
+            raise self.retry(exc=exc, countdown=2**self.request.retries) from exc
 
     finally:
         db.close()

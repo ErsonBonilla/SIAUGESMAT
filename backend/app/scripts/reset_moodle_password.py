@@ -43,11 +43,13 @@ async def _get_user(ms, username: str) -> dict | None:
         return None
     u = users[0]
     prefs = {p["name"]: p["value"] for p in u.get("preferences", [])}
-    print(f"  Usuario encontrado: id={u['id']} username={u['username']} "
-          f"auth={u.get('auth','?')} suspended={u.get('suspended','?')} "
-          f"confirmed={u.get('confirmed','?')}")
+    print(
+        f"  Usuario encontrado: id={u['id']} username={u['username']} "
+        f"auth={u.get('auth', '?')} suspended={u.get('suspended', '?')} "
+        f"confirmed={u.get('confirmed', '?')}"
+    )
     failed = prefs.get("login_failed_count_since_success", "0")
-    locked  = prefs.get("login_lockout")
+    locked = prefs.get("login_lockout")
     print(f"  login_failed_count_since_success = {failed}")
     if locked:
         print(f"  login_lockout = {locked} (LOCKED)")
@@ -57,10 +59,15 @@ async def _get_user(ms, username: str) -> dict | None:
 async def _fix_auth(ms, user_id: int) -> bool:
     """Fija auth=manual si no lo es."""
     try:
-        await ms._request("core_user_update_users", params={
-            "users[0][id]": user_id,
-            "users[0][auth]": "manual",
-        }, use_post=True, timeout=30.0)
+        await ms._request(
+            "core_user_update_users",
+            params={
+                "users[0][id]": user_id,
+                "users[0][auth]": "manual",
+            },
+            use_post=True,
+            timeout=30.0,
+        )
         return True
     except Exception as e:
         print(f"  [ERROR] Fijando auth=manual: {e}")
@@ -70,10 +77,15 @@ async def _fix_auth(ms, user_id: int) -> bool:
 async def _reset_password(ms, user_id: int, password: str) -> bool:
     """Restablece la contraseña via core_user_update_users."""
     try:
-        await ms._request("core_user_update_users", params={
-            "users[0][id]": user_id,
-            "users[0][password]": password,
-        }, use_post=True, timeout=30.0)
+        await ms._request(
+            "core_user_update_users",
+            params={
+                "users[0][id]": user_id,
+                "users[0][password]": password,
+            },
+            use_post=True,
+            timeout=30.0,
+        )
         return True
     except Exception as e:
         msg = _print_safe_error(str(e), password)
@@ -112,11 +124,15 @@ async def _verify_login(base_url: str, username: str, password: str) -> bool:
 
         # 2. POST credentials
         try:
-            r2 = await client.post(login_url, data={
-                "username": username,
-                "password": password,
-                "logintoken": token,
-            }, cookies=jar)
+            r2 = await client.post(
+                login_url,
+                data={
+                    "username": username,
+                    "password": password,
+                    "logintoken": token,
+                },
+                cookies=jar,
+            )
         except Exception as e:
             print(f"  [ERROR] POST login: {e}")
             return False
@@ -161,7 +177,8 @@ async def _verify_login(base_url: str, username: str, password: str) -> bool:
         # 5. Parse error message
         error = re.search(
             r'(?:loginerrormessage|alert-danger|class="error"[^>]*>)\s*([^<]{10,200})',
-            body_lower, re.IGNORECASE
+            body_lower,
+            re.IGNORECASE,
         )
         msg = error.group(1).strip()[:200] if error else ""
         if msg:
@@ -179,18 +196,21 @@ async def _main():
     p.add_argument("--modalidad", required=True, help="PRESENCIAL o DISTANCIA")
     p.add_argument("--username", required=True)
     p.add_argument("--password", required=True)
-    p.add_argument("--verify-login", action="store_true",
-                   help="Hacer POST real de login después del reset")
+    p.add_argument(
+        "--verify-login", action="store_true", help="Hacer POST real de login después del reset"
+    )
     args = p.parse_args()
 
     password = args.password
     username = args.username
     config = settings.get_moodle_config(args.modalidad)
     base_url = config["url"]
-    version  = config.get("version", "3.9")
+    version = config.get("version", "3.9")
 
-    print(f"\n=== reset_moodle_password | modalidad={args.modalidad} "
-          f"| version={version} | base={base_url} ===\n")
+    print(
+        f"\n=== reset_moodle_password | modalidad={args.modalidad} "
+        f"| version={version} | base={base_url} ===\n"
+    )
 
     ms = get_moodle_service(args.modalidad)
 

@@ -46,8 +46,8 @@ class Settings(BaseSettings):
     MOODLE_VERSION__DISTANCIA: str | None = None
 
     # Rate limiting para la API de Moodle
-    MOODLE_MAX_REQUESTS_PER_SECOND: int = 5         # llamadas por segundo
-    MOODLE_BURST_SIZE: int = 10                     # capacidad máxima del bucket
+    MOODLE_MAX_REQUESTS_PER_SECOND: int = 5  # llamadas por segundo
+    MOODLE_BURST_SIZE: int = 10  # capacidad máxima del bucket
 
     # Tiempo máximo de espera por solicitud (segundos)
     # Operaciones pesadas (import_course) usan 120s por separado.
@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # Comparación de cursos (FASE 2)
     # ------------------------------------------------------------------
-    COURSE_MAX_AGE_SECONDS: int = 24 * 30 * 24 * 3600       # 24 meses
+    COURSE_MAX_AGE_SECONDS: int = 24 * 30 * 24 * 3600  # 24 meses
     COURSE_DISAPPEARED_AGE_SECONDS: int = 18 * 30 * 24 * 3600  # 18 meses
 
     # ------------------------------------------------------------------
@@ -98,7 +98,7 @@ class Settings(BaseSettings):
     # Trabajos ETL
     # ------------------------------------------------------------------
     # Tiempo máximo de ejecución de un trabajo (segundos)
-    JOB_TIMEOUT: int = 28800                         # 8 horas
+    JOB_TIMEOUT: int = 28800  # 8 horas
 
     # Máximo de cursos a eliminar automáticamente. Si el plan supera
     # este número, la ejecución se detiene y requiere confirmación manual.
@@ -109,7 +109,7 @@ class Settings(BaseSettings):
     CHORD_ACTIVE_MINUTES: int = 15
 
     # Tiempo de espera para considerar una ejecución como "stuck" (segundos)
-    STUCK_EXECUTION_TIMEOUT: int = 21600                   # 6 horas
+    STUCK_EXECUTION_TIMEOUT: int = 21600  # 6 horas
 
     # ------------------------------------------------------------------
     # Umbrales del semáforo de analítica
@@ -121,10 +121,10 @@ class Settings(BaseSettings):
     ANALYTICS_ERROR_THRESHOLD_RED: float = 5.0
 
     # Duración máxima en segundos para considerar advertencia (amarillo)
-    ANALYTICS_MAX_DURATION_YELLOW: float = 3600.0    # 1 hora
+    ANALYTICS_MAX_DURATION_YELLOW: float = 3600.0  # 1 hora
 
     # Duración máxima en segundos para considerar crítico (rojo)
-    ANALYTICS_MAX_DURATION_RED: float = 7200.0       # 2 horas
+    ANALYTICS_MAX_DURATION_RED: float = 7200.0  # 2 horas
 
     # ------------------------------------------------------------------
     # Autenticación JWT
@@ -184,9 +184,7 @@ class Settings(BaseSettings):
         if not self.CORS_ORIGINS:
             errors.append("CORS_ORIGINS no está configurada")
         if errors:
-            raise ValueError(
-                "Errores de configuración crítica:\n  - " + "\n  - ".join(errors)
-            )
+            raise ValueError("Errores de configuración crítica:\n  - " + "\n  - ".join(errors))
 
 
 # Instancia única de configuración para toda la aplicación

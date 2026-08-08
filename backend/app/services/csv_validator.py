@@ -43,9 +43,7 @@ def validate_users_csv(content: str, default_role: str = None) -> list[dict]:
 
     has_role_column = "role1" in {n.strip().lower() for n in reader.fieldnames}
     if not default_role and not has_role_column:
-        raise ValueError(
-            "Debe incluir la columna 'role1' o especificar un default_role"
-        )
+        raise ValueError("Debe incluir la columna 'role1' o especificar un default_role")
 
     users = []
     for row_num, row in enumerate(reader, start=2):
@@ -63,7 +61,9 @@ def validate_users_csv(content: str, default_role: str = None) -> list[dict]:
 
         user["role1"] = default_role
         if has_role_column:
-            role_actual = next((n for n in reader.fieldnames if n.strip().lower() == "role1"), "role1")
+            role_actual = next(
+                (n for n in reader.fieldnames if n.strip().lower() == "role1"), "role1"
+            )
             csv_role = (row.get(role_actual) or "").strip()
             if csv_role:
                 try:
@@ -72,7 +72,9 @@ def validate_users_csv(content: str, default_role: str = None) -> list[dict]:
                     raise ValueError(f"Fila {row_num}: rol inválido '{csv_role}'") from None
                 user["role1"] = csv_role
 
-        fpc_field = next((n for n in reader.fieldnames if n.strip().lower() == "forcepasswordchange"), None)
+        fpc_field = next(
+            (n for n in reader.fieldnames if n.strip().lower() == "forcepasswordchange"), None
+        )
         if fpc_field:
             fpc = (row.get(fpc_field) or "").strip()
             if fpc in ("1", "0"):
@@ -85,7 +87,9 @@ def validate_users_csv(content: str, default_role: str = None) -> list[dict]:
     return users
 
 
-def _get_field(row: dict, fieldnames: list, column: str, required: bool = False, row_num: int = 0) -> str:
+def _get_field(
+    row: dict, fieldnames: list, column: str, required: bool = False, row_num: int = 0
+) -> str:
     actual = next((n for n in fieldnames if n.strip().lower() == column), column)
     value = (row.get(actual) or "").strip()
     if required and not value:

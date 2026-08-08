@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import bindparam
 from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -15,8 +16,9 @@ def get_execution(db: Session, execution_id: int) -> Execution | None:
 ACTIVE_EXECUTION_STATUSES = ("queued", "running", "paused", "review_required")
 
 
-def get_active_execution(db: Session, modalidad: str,
-                         exclude_id: int | None = None) -> Execution | None:
+def get_active_execution(
+    db: Session, modalidad: str, exclude_id: int | None = None
+) -> Execution | None:
     """Devuelve la ejecución en curso (no terminada) de una modalidad.
 
     Estados considerados activos: queued, running, paused, review_required.
@@ -33,8 +35,9 @@ def get_active_execution(db: Session, modalidad: str,
     return query.order_by(Execution.created_at.desc()).first()
 
 
-def create_execution(db: Session, filename: str, semester: str, mode: str,
-                     modalidad: str, moodle_version: str) -> Execution:
+def create_execution(
+    db: Session, filename: str, semester: str, mode: str, modalidad: str, moodle_version: str
+) -> Execution:
     execution = Execution(
         filename=filename,
         semester=semester,
@@ -50,20 +53,30 @@ def create_execution(db: Session, filename: str, semester: str, mode: str,
     return execution
 
 
-def atomic_mark_queued(db: Session, execution_id: int, task_id: str, allowed_statuses: tuple) -> bool:
+def atomic_mark_queued(
+    db: Session, execution_id: int, task_id: str, allowed_statuses: tuple
+) -> bool:
     result = db.execute(
         sql_text(
             "UPDATE executions SET status = 'queued', started_at = :now, celery_task_id = :task_id "
             "WHERE id = :id AND status IN :allowed_statuses"
+        ).bindparams(
+            bindparam("allowed_statuses", expanding=True),
         ),
-        {"now": datetime.now(UTC), "task_id": task_id, "id": execution_id,
-         "allowed_statuses": allowed_statuses},
+        {
+            "now": datetime.now(UTC),
+            "task_id": task_id,
+            "id": execution_id,
+            "allowed_statuses": allowed_statuses,
+        },
     )
     db.commit()
     return result.rowcount > 0
 
 
-def update_progress(db: Session, execution_id: int, pct: float, phase: str = None, step: int = None) -> None:
+def update_progress(
+    db: Session, execution_id: int, pct: float, phase: str = None, step: int = None
+) -> None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         if phase is not None:
@@ -93,8 +106,9 @@ def mark_running(db: Session, execution_id: int) -> Execution | None:
     return execution
 
 
-def mark_completed(db: Session, execution_id: int, metrics: dict,
-                   errors_count: int, duration_seconds: float) -> Execution | None:
+def mark_completed(
+    db: Session, execution_id: int, metrics: dict, errors_count: int, duration_seconds: float
+) -> Execution | None:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     if execution:
         execution.status = "completed"
@@ -125,9 +139,16 @@ def delete_execution(db: Session, execution_id: int) -> None:
         db.commit()
 
 
-def list_executions(db: Session, semester: str = None, status: str = None, mode: str = None,
-                    moodle_version: str = None, modalidad: str = None,
-                    limit: int = 20, offset: int = 0) -> tuple[int, list[Execution]]:
+def list_executions(
+    db: Session,
+    semester: str = None,
+    status: str = None,
+    mode: str = None,
+    moodle_version: str = None,
+    modalidad: str = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> tuple[int, list[Execution]]:
     query = db.query(Execution)
     if semester:
         query = query.filter(Execution.semester == semester)
@@ -163,20 +184,29 @@ def set_report_dir(db: Session, execution_id: int, report_dir: str) -> None:
 
 
 def is_reupload(db: Session, semester: str, modalidad: str, exclude_id: int) -> bool:
-    return db.query(Execution).filter(
-        Execution.semester == semester,
-        Execution.modalidad == modalidad,
-        Execution.status == "completed",
-        Execution.id != exclude_id,
-    ).first() is not None
+    return (
+        db.query(Execution)
+        .filter(
+            Execution.semester == semester,
+            Execution.modalidad == modalidad,
+            Execution.status == "completed",
+            Execution.id != exclude_id,
+        )
+        .first()
+        is not None
+    )
 
 
 def delete_old_pending_executions(db: Session, hours: int = 24) -> int:
     cutoff = datetime.now(UTC) - timedelta(hours=hours)
-    old = db.query(Execution).filter(
-        Execution.status == "pending",
-        Execution.created_at < cutoff,
-    ).all()
+    old = (
+        db.query(Execution)
+        .filter(
+            Execution.status == "pending",
+            Execution.created_at < cutoff,
+        )
+        .all()
+    )
     if not old:
         return 0
     for ex in old:
@@ -261,9 +291,11 @@ def cancel_execution(db: Session, execution_id: int) -> tuple[bool, str]:
     execution.status = "cancelled"
     execution.current_phase = f"{execution.current_phase or ''} (cancelado)"
     execution.completed_at = datetime.now(UTC)
-    execution.duration_seconds = round(
-        (datetime.now(UTC) - execution.started_at).total_seconds()
-    ) if execution.started_at else 0
+    execution.duration_seconds = (
+        round((datetime.now(UTC) - execution.started_at).total_seconds())
+        if execution.started_at
+        else 0
+    )
     db.commit()
     return True, task_id
 

@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "preact/hooks";
 import { getChartData } from "../services/api.ts";
 import { loadPlotly } from "../utils/plotly.ts";
+import { darkSignal } from "../utils/theme.ts";
 
 interface ChartProps {
   executionId: number;
@@ -28,8 +29,7 @@ export default function Chart(
         await loadPlotly();
         if (cancelled) return;
 
-        const theme = document.documentElement.getAttribute("data-theme") ||
-          "dark";
+        const theme = darkSignal.value ? "dark" : "light";
         const data = await getChartData(executionId, chartName, theme);
         if (cancelled) return;
 
@@ -65,7 +65,7 @@ export default function Chart(
         }
       }
     };
-  }, [executionId, chartName]);
+  }, [executionId, chartName, darkSignal.value]);
 
   return (
     <div class="bg-[var(--bg-primary)] rounded-lg shadow p-4">

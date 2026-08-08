@@ -45,7 +45,8 @@ class AnalyzePhase(BasePhase):
 
         try:
             resolved_enrolments = resolve_enrolments(
-                etl_data["enrolments"], ctx.username_map,
+                etl_data["enrolments"],
+                ctx.username_map,
             )
             ctx.resolved_enrolments = resolved_enrolments
 
@@ -56,19 +57,33 @@ class AnalyzePhase(BasePhase):
             )
 
             if ctx.missing_categories:
-                log_repo.save_log(db, eid, "2", "categories_missing", detail={
-                    "count": len(ctx.missing_categories),
-                    "categories": [c["idnumber"] for c in ctx.missing_categories],
-                })
+                log_repo.save_log(
+                    db,
+                    eid,
+                    "2",
+                    "categories_missing",
+                    detail={
+                        "count": len(ctx.missing_categories),
+                        "categories": [c["idnumber"] for c in ctx.missing_categories],
+                    },
+                )
             if ctx.categories_to_relocate:
-                log_repo.save_log(db, eid, "2", "categories_to_relocate", detail={
-                    "count": len(ctx.categories_to_relocate),
-                    "categories": [c["idnumber"] for c in ctx.categories_to_relocate],
-                })
+                log_repo.save_log(
+                    db,
+                    eid,
+                    "2",
+                    "categories_to_relocate",
+                    detail={
+                        "count": len(ctx.categories_to_relocate),
+                        "categories": [c["idnumber"] for c in ctx.categories_to_relocate],
+                    },
+                )
 
             ctx.re_upload = is_reupload(
-                db, ctx.execution.semester,
-                ctx.execution.modalidad or "", eid,
+                db,
+                ctx.execution.semester,
+                ctx.execution.modalidad or "",
+                eid,
             )
 
             ctx.comparison = await CourseComparisonService.compare(
@@ -81,25 +96,34 @@ class AnalyzePhase(BasePhase):
                 disappeared_age_seconds=settings.COURSE_DISAPPEARED_AGE_SECONDS,
             )
 
-            persist_plan_logs(db, eid, ctx.comparison, {
-                c.get("shortname", ""): c.get("fullname", "") for c in ctx.existing_courses
-            })
+            persist_plan_logs(
+                db,
+                eid,
+                ctx.comparison,
+                {c.get("shortname", ""): c.get("fullname", "") for c in ctx.existing_courses},
+            )
 
             if mode in ("users", "both"):
                 ctx.users_to_create = users_to_create(etl_data["users"], ctx.username_map)
 
             ctx.metrics["alerts"] = len(ctx.comparison.get("alerts", []))
 
-            log_repo.save_log(db, eid, "2", "phase2_complete", detail={
-                "categories_to_create": len(ctx.missing_categories),
-                "courses_to_create": len(ctx.comparison.get("to_create", [])),
-                "courses_to_delete": len(ctx.comparison.get("to_delete", [])),
-                "courses_to_activate": len(ctx.comparison.get("to_activate", [])),
-                "courses_to_hide": len(ctx.comparison.get("to_hide", [])),
-                "courses_to_update": len(ctx.comparison.get("to_update", [])),
-                "users_to_create": len(ctx.users_to_create),
-                "alerts": ctx.metrics["alerts"],
-            })
+            log_repo.save_log(
+                db,
+                eid,
+                "2",
+                "phase2_complete",
+                detail={
+                    "categories_to_create": len(ctx.missing_categories),
+                    "courses_to_create": len(ctx.comparison.get("to_create", [])),
+                    "courses_to_delete": len(ctx.comparison.get("to_delete", [])),
+                    "courses_to_activate": len(ctx.comparison.get("to_activate", [])),
+                    "courses_to_hide": len(ctx.comparison.get("to_hide", [])),
+                    "courses_to_update": len(ctx.comparison.get("to_update", [])),
+                    "users_to_create": len(ctx.users_to_create),
+                    "alerts": ctx.metrics["alerts"],
+                },
+            )
             logger.info(
                 f"FASE 2: crear {len(ctx.missing_categories)} cats, "
                 f"reubicar {len(ctx.categories_to_relocate)} cats, "

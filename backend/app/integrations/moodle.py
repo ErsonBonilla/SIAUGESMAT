@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 class MoodleIntegration:
-
     def __init__(self, service: MoodleService):
         self.service = service
         self.last_error = ""
@@ -31,7 +30,9 @@ class MoodleIntegration:
     # Cursos
     # ------------------------------------------------------------------
     @handle_moodle_errors(log_message="No se pudo reubicar categoría")
-    async def relocate_category(self, idnumber: str, moodle_id: int, target_parent_idn: str) -> bool:
+    async def relocate_category(
+        self, idnumber: str, moodle_id: int, target_parent_idn: str
+    ) -> bool:
         await self.service.update_category(
             category_id=moodle_id,
             parent_idnumber=target_parent_idn,
@@ -70,23 +71,31 @@ class MoodleIntegration:
                         return False
                 else:
                     if template_id:
-                        logger.info(f"Curso {shortname} ya existe, re-importando template {template_id}")
+                        logger.info(
+                            f"Curso {shortname} ya existe, re-importando template {template_id}"
+                        )
                         await self.service.import_course_content(
                             from_id=template_id,
                             to_id=int(existing[0]["id"]),
                         )
                     return True
 
-            await self.service.create_courses([{
-                "shortname": shortname,
-                "fullname": fullname,
-                "categoryidnumber": category_idnumber,
-                "format": settings.DEFAULT_COURSE_FORMAT,
-                "visible": visible,
-            }])
+            await self.service.create_courses(
+                [
+                    {
+                        "shortname": shortname,
+                        "fullname": fullname,
+                        "categoryidnumber": category_idnumber,
+                        "format": settings.DEFAULT_COURSE_FORMAT,
+                        "visible": visible,
+                    }
+                ]
+            )
             created = await self.service.get_courses(shortname=shortname)
             if not created:
-                self.last_error = f"El curso {shortname} no fue creado a pesar de respuesta exitosa de la API"
+                self.last_error = (
+                    f"El curso {shortname} no fue creado a pesar de respuesta exitosa de la API"
+                )
                 logger.error(self.last_error)
                 return False
             logger.info(f"Curso creado (vacío): {shortname}")
@@ -100,7 +109,9 @@ class MoodleIntegration:
                         )
                         logger.info(f"Plantilla {template_id} importada a {shortname}")
                 except Exception as imp_e:
-                    logger.warning(f"Template {template_id} no se pudo importar a {shortname}: {imp_e}")
+                    logger.warning(
+                        f"Template {template_id} no se pudo importar a {shortname}: {imp_e}"
+                    )
             return True
         except Exception as e:
             if is_moodle_overloaded(e):
@@ -124,10 +135,14 @@ class MoodleIntegration:
         if not existing:
             self.last_error = f"Curso no encontrado: {shortname}"
             return False
-        await self.service.update_courses([{
-            "shortname": shortname,
-            "visible": 1,
-        }])
+        await self.service.update_courses(
+            [
+                {
+                    "shortname": shortname,
+                    "visible": 1,
+                }
+            ]
+        )
         verified = await self.service.get_courses(shortname=shortname)
         if not verified or verified[0].get("visible") != 1:
             self.last_error = f"Activación de {shortname} no se confirmó en Moodle"
@@ -142,10 +157,14 @@ class MoodleIntegration:
         if not existing:
             self.last_error = f"Curso no encontrado: {shortname}"
             return False
-        await self.service.update_courses([{
-            "shortname": shortname,
-            "visible": 0,
-        }])
+        await self.service.update_courses(
+            [
+                {
+                    "shortname": shortname,
+                    "visible": 0,
+                }
+            ]
+        )
         verified = await self.service.get_courses(shortname=shortname)
         if not verified or verified[0].get("visible") != 0:
             self.last_error = f"Ocultamiento de {shortname} no se confirmó en Moodle"
@@ -172,11 +191,15 @@ class MoodleIntegration:
             logger.warning(self.last_error)
             return False
         course_id = int(existing[0]["id"])
-        await self.service.update_courses([{
-            "id": course_id,
-            "shortname": new_shortname,
-            "fullname": new_fullname,
-        }])
+        await self.service.update_courses(
+            [
+                {
+                    "id": course_id,
+                    "shortname": new_shortname,
+                    "fullname": new_fullname,
+                }
+            ]
+        )
         verified = await self.service.get_courses(shortname=new_shortname)
         if not verified:
             self.last_error = f"Rename {old_shortname} → {new_shortname} no se confirmó en Moodle"
@@ -197,7 +220,9 @@ class MoodleIntegration:
             )
         return users[0] if users else None
 
-    @handle_moodle_errors(log_message="Error al buscar usuarios por email en lote", default_return={})
+    @handle_moodle_errors(
+        log_message="Error al buscar usuarios por email en lote", default_return={}
+    )
     async def find_users_by_emails(self, emails: list[str]) -> dict[str, dict]:
         result: dict[str, dict] = {}
         if not emails:
@@ -233,7 +258,9 @@ class MoodleIntegration:
                 )
         return result
 
-    @handle_moodle_errors(log_message="Error al buscar usuarios por username en lote", default_return={})
+    @handle_moodle_errors(
+        log_message="Error al buscar usuarios por username en lote", default_return={}
+    )
     async def find_users_by_usernames(self, usernames: list[str]) -> dict[str, dict]:
         result: dict[str, dict] = {}
         if not usernames:
@@ -253,7 +280,9 @@ class MoodleIntegration:
                 result[uname] = oldest
         return result
 
-    @handle_moodle_errors(log_message="Error al buscar usuarios por cédula en lote", default_return={})
+    @handle_moodle_errors(
+        log_message="Error al buscar usuarios por cédula en lote", default_return={}
+    )
     async def find_users_by_idnumbers(self, idnumbers: list[str]) -> dict[str, dict]:
         result: dict[str, dict] = {}
         if not idnumbers:
@@ -320,7 +349,9 @@ class MoodleIntegration:
                 if is_moodle_overloaded(e):
                     raise MoodleOverloadedError(extract_error(e)[:200]) from e
                 self.last_error = extract_error(e)
-                logger.exception(f"Error al buscar usuario por email personal {email_personal}: {self.last_error}")
+                logger.exception(
+                    f"Error al buscar usuario por email personal {email_personal}: {self.last_error}"
+                )
                 return None, False
             if existing_by_personal:
                 return existing_by_personal.get("username", username_esperado), False
@@ -331,25 +362,33 @@ class MoodleIntegration:
             if is_moodle_overloaded(e):
                 raise MoodleOverloadedError(extract_error(e)[:200]) from e
             self.last_error = extract_error(e)
-            logger.exception(f"Error al buscar usuario por username {username_esperado}: {self.last_error}")
+            logger.exception(
+                f"Error al buscar usuario por username {username_esperado}: {self.last_error}"
+            )
             return None, False
         if existing_by_username:
-            logger.info(f"Usuario {username_esperado} ya existe en Moodle (por username), no se crea")
+            logger.info(
+                f"Usuario {username_esperado} ya existe en Moodle (por username), no se crea"
+            )
             return existing_by_username.get("username", username_esperado), False
 
         try:
             password = user.get("password", str(user.get("cedula", "")))
-            await self.service.create_users([{
-                "username": username_esperado,
-                "firstname": user.get("firstname", ""),
-                "lastname": user.get("lastname", ""),
-                "email": email,
-                "password": password,
-                "cedula": user.get("cedula", ""),
-                "forcepasswordchange": 1,
-                "city": user.get("city", ""),
-                "description": user.get("description", ""),
-            }])
+            await self.service.create_users(
+                [
+                    {
+                        "username": username_esperado,
+                        "firstname": user.get("firstname", ""),
+                        "lastname": user.get("lastname", ""),
+                        "email": email,
+                        "password": password,
+                        "cedula": user.get("cedula", ""),
+                        "forcepasswordchange": 1,
+                        "city": user.get("city", ""),
+                        "description": user.get("description", ""),
+                    }
+                ]
+            )
             created_user = await self.service.get_user_by_username(username_esperado)
             if not created_user:
                 self.last_error = f"El usuario {username_esperado} no fue creado a pesar de respuesta exitosa de la API"
@@ -366,33 +405,48 @@ class MoodleIntegration:
         except Exception as e:
             if is_moodle_overloaded(e):
                 raise MoodleOverloadedError(extract_error(e)[:200]) from e
-            if getattr(e, 'error_code', None) == "duplicateuser":
-                logger.info(f"Usuario {username_esperado} ya existe (race condition), recuperando ID")
+            if getattr(e, "error_code", None) == "duplicateuser":
+                logger.info(
+                    f"Usuario {username_esperado} ya existe (race condition), recuperando ID"
+                )
                 try:
                     existing = await self.find_user_by_email(email)
                     if existing:
                         return existing.get("username", username_esperado), False
                 except Exception as recovery_err:
-                    logger.warning(f"Recovery falló para usuario duplicado {username_esperado}: {recovery_err}")
+                    logger.warning(
+                        f"Recovery falló para usuario duplicado {username_esperado}: {recovery_err}"
+                    )
                 return username_esperado, False
             self.last_error = extract_error(e)
             logger.exception(f"Error al crear usuario {username_esperado}: {self.last_error}")
             return None, False
 
-    @handle_moodle_errors(log_message="", default_return={"success": False, "reason": "Error del servidor Moodle"})
-    async def enrol_teacher(self, username: str, course_shortname: str,
-                             course_map=None, courses=None) -> dict[str, Any]:
-        result = await self.service.enrol_users([{
-            "username": username,
-            "course_shortname": course_shortname,
-            "role": "editingteacher",
-        }], course_map=course_map, courses=courses)
+    @handle_moodle_errors(
+        log_message="", default_return={"success": False, "reason": "Error del servidor Moodle"}
+    )
+    async def enrol_teacher(
+        self, username: str, course_shortname: str, course_map=None, courses=None
+    ) -> dict[str, Any]:
+        result = await self.service.enrol_users(
+            [
+                {
+                    "username": username,
+                    "course_shortname": course_shortname,
+                    "role": "editingteacher",
+                }
+            ],
+            course_map=course_map,
+            courses=courses,
+        )
         if not result["success"]:
             error_codes = result.get("error_codes", [])
             if "alreadyenrolled" in error_codes:
                 logger.info(f"Usuario {username} ya matriculado en {course_shortname}, omitiendo")
                 return {"success": True, "username": username, "reason": "already_enrolled"}
             err = result.get("errors", ["Error desconocido"])[0]
-            self.last_error = str(err) if str(err).strip() else "Error desconocido del servidor Moodle"
+            self.last_error = (
+                str(err) if str(err).strip() else "Error desconocido del servidor Moodle"
+            )
             return {"success": False, "username": username, "reason": self.last_error}
         return {"success": True, "username": username, "reason": "enrolled"}

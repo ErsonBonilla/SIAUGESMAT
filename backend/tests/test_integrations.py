@@ -20,7 +20,10 @@ def integration():
     mock_service.get_user_by_username.return_value = None
     mock_service.create_users.return_value = [{"id": 1, "username": "testuser"}]
     mock_service.enrol_users.return_value = {
-        "success": True, "enrolled": 1, "failed": 0, "errors": [],
+        "success": True,
+        "enrolled": 1,
+        "failed": 0,
+        "errors": [],
     }
     return MoodleIntegration(mock_service)
 
@@ -87,7 +90,12 @@ class TestFindUsersByFieldOldest:
         ]
         result = await integration.find_users_by_emails(["a@ut.edu.co"])
         assert result == {
-            "a@ut.edu.co": {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"}
+            "a@ut.edu.co": {
+                "id": "1",
+                "username": "viejo",
+                "email": "a@ut.edu.co",
+                "timecreated": "100",
+            }
         }
         assert len(integration.last_email_conflicts) == 1
         c = integration.last_email_conflicts[0]
@@ -149,9 +157,11 @@ class TestFindUsersByFieldOldest:
 class TestCreateUserIfNotExists:
     @pytest.mark.asyncio
     async def test_non_institutional_email(self, integration):
-        username, created = await integration.create_user_if_not_exists({
-            "email": "personal@gmail.com",
-        })
+        username, created = await integration.create_user_if_not_exists(
+            {
+                "email": "personal@gmail.com",
+            }
+        )
         assert username is None
         assert created is False
 
@@ -160,11 +170,13 @@ class TestCreateUserIfNotExists:
         integration.service.get_users.return_value = [
             {"username": "teacher1", "email": "a@ut.edu.co"}
         ]
-        username, created = await integration.create_user_if_not_exists({
-            "email": "a@ut.edu.co",
-            "firstname": "Ana",
-            "lastname": "Pérez",
-        })
+        username, created = await integration.create_user_if_not_exists(
+            {
+                "email": "a@ut.edu.co",
+                "firstname": "Ana",
+                "lastname": "Pérez",
+            }
+        )
         assert username == "teacher1"
         assert created is False
 
@@ -177,14 +189,17 @@ class TestCreateUserIfNotExists:
             if email == "personal@gmail.com":
                 return [{"username": "teacher1", "email": "personal@gmail.com"}]
             return []
+
         integration.service.get_users.side_effect = side_effect
 
-        username, created = await integration.create_user_if_not_exists({
-            "email": "institucional@ut.edu.co",
-            "email_personal": "personal@gmail.com",
-            "firstname": "Ana",
-            "lastname": "Pérez",
-        })
+        username, created = await integration.create_user_if_not_exists(
+            {
+                "email": "institucional@ut.edu.co",
+                "email_personal": "personal@gmail.com",
+                "firstname": "Ana",
+                "lastname": "Pérez",
+            }
+        )
         assert username == "teacher1"
         assert created is False
 
@@ -195,15 +210,15 @@ class TestCreateUserIfNotExists:
             None,  # no existe por username (lookup previo a crear)
             {"id": 10, "username": "anita"},  # verificación post-creación
         ]
-        integration.service.create_users.return_value = [
-            {"id": 10, "username": "anita"}
-        ]
-        username, created = await integration.create_user_if_not_exists({
-            "email": "anita@ut.edu.co",
-            "firstname": "Ana",
-            "lastname": "Pérez",
-            "cedula": "12345",
-        })
+        integration.service.create_users.return_value = [{"id": 10, "username": "anita"}]
+        username, created = await integration.create_user_if_not_exists(
+            {
+                "email": "anita@ut.edu.co",
+                "firstname": "Ana",
+                "lastname": "Pérez",
+                "cedula": "12345",
+            }
+        )
         assert username == "anita"
         assert created is True
         # Verificar que create_users recibió city y description
@@ -217,17 +232,17 @@ class TestCreateUserIfNotExists:
             None,
             {"id": 10, "username": "anita"},
         ]
-        integration.service.create_users.return_value = [
-            {"id": 10, "username": "anita"}
-        ]
-        await integration.create_user_if_not_exists({
-            "email": "anita@ut.edu.co",
-            "firstname": "Ana",
-            "lastname": "Pérez",
-            "cedula": "12345",
-            "city": "IBAGUE",
-            "description": "Perfil docente",
-        })
+        integration.service.create_users.return_value = [{"id": 10, "username": "anita"}]
+        await integration.create_user_if_not_exists(
+            {
+                "email": "anita@ut.edu.co",
+                "firstname": "Ana",
+                "lastname": "Pérez",
+                "cedula": "12345",
+                "city": "IBAGUE",
+                "description": "Perfil docente",
+            }
+        )
         call_args = integration.service.create_users.call_args[0][0][0]
         assert call_args["city"] == "IBAGUE"
         assert call_args["description"] == "Perfil docente"
@@ -235,9 +250,11 @@ class TestCreateUserIfNotExists:
     @pytest.mark.asyncio
     async def test_lookup_error_returns_none(self, integration):
         integration.service.get_users.side_effect = MoodleAPIError("API down")
-        username, created = await integration.create_user_if_not_exists({
-            "email": "anita@ut.edu.co",
-        })
+        username, created = await integration.create_user_if_not_exists(
+            {
+                "email": "anita@ut.edu.co",
+            }
+        )
         assert username is None
         assert created is False
 
@@ -245,11 +262,13 @@ class TestCreateUserIfNotExists:
     async def test_creation_error_returns_none(self, integration):
         integration.service.get_users.return_value = []
         integration.service.create_users.side_effect = MoodleAPIError("Duplicate")
-        username, created = await integration.create_user_if_not_exists({
-            "email": "anita@ut.edu.co",
-            "firstname": "Ana",
-            "lastname": "Pérez",
-        })
+        username, created = await integration.create_user_if_not_exists(
+            {
+                "email": "anita@ut.edu.co",
+                "firstname": "Ana",
+                "lastname": "Pérez",
+            }
+        )
         assert username is None
         assert created is False
 
@@ -260,17 +279,18 @@ class TestCreateUserIfNotExists:
             None,
             {"id": 10, "username": "anita", "auth": "db"},
         ]
-        integration.service.create_users.return_value = [
-            {"id": 10, "username": "anita"}
-        ]
+        integration.service.create_users.return_value = [{"id": 10, "username": "anita"}]
         import logging
+
         with caplog.at_level(logging.WARNING, logger="app.integrations.moodle"):
-            username, created = await integration.create_user_if_not_exists({
-                "email": "anita@ut.edu.co",
-                "firstname": "Ana",
-                "lastname": "Pérez",
-                "cedula": "12345",
-            })
+            username, created = await integration.create_user_if_not_exists(
+                {
+                    "email": "anita@ut.edu.co",
+                    "firstname": "Ana",
+                    "lastname": "Pérez",
+                    "cedula": "12345",
+                }
+            )
         assert username == "anita"
         assert created is True
         assert any("auth='db'" in r.message for r in caplog.records)
@@ -283,7 +303,9 @@ class TestEnrolTeacher:
     @pytest.mark.asyncio
     async def test_user_resolution_failure(self, integration):
         integration.service.enrol_users.return_value = {
-            "success": False, "enrolled": 0, "failed": 1,
+            "success": False,
+            "enrolled": 0,
+            "failed": 1,
             "errors": ["user=teacher1, course=CURSO1"],
         }
         result = await integration.enrol_teacher("teacher1", "CURSO1")
@@ -299,7 +321,9 @@ class TestEnrolTeacher:
     @pytest.mark.asyncio
     async def test_enrolment_resolution_failure(self, integration):
         integration.service.enrol_users.return_value = {
-            "success": False, "enrolled": 0, "failed": 1,
+            "success": False,
+            "enrolled": 0,
+            "failed": 1,
             "errors": ["user=teacher1, course=NO_EXISTE"],
         }
         result = await integration.enrol_teacher("teacher1", "NO_EXISTE")
@@ -312,6 +336,3 @@ class TestEnrolTeacher:
         result = await integration.enrol_teacher("teacher1", "CURSO1")
         assert result["success"] is False
         assert result["reason"] is not None
-
-
-

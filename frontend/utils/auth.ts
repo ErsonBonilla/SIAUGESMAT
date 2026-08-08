@@ -56,6 +56,21 @@ export function removeToken(): void {
 // ---------------------------------------------------------------------------
 
 /**
+ * Decodifica el payload (segmento 2) de un JWT en base64url.
+ *
+ * El JWT producido por python-jose usa base64url (caracteres `-`/`_`) y omite
+ * el padding `=`, por lo que `atob` directo falla. Se normaliza a base64
+ * estándar y se decodifican los bytes como UTF-8 (los payloads pueden
+ * contener caracteres no ASCII, p. ej. nombres con acentos).
+ */
+function base64UrlDecode(segment: string): string {
+  const b64 = segment.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = b64.padEnd(Math.ceil(b64.length / 4) * 4, "=");
+  const bytes = atob(padded).split("").map((c) => c.charCodeAt(0));
+  return new TextDecoder().decode(new Uint8Array(bytes));
+}
+
+/**
  * Comprueba si el token almacenado en localStorage es válido (no ha expirado).
  *
  * Realiza una decodificación básica del payload sin verificar la firma
@@ -69,7 +84,9 @@ export function isTokenValid(): boolean {
   if (!token) return false;
 
   try {
-    const payload: TokenPayload = JSON.parse(atob(token.split(".")[1]));
+    const payload: TokenPayload = JSON.parse(
+      base64UrlDecode(token.split(".")[1]),
+    );
     if (!payload.exp) return true; // sin expiración se asume válido
     return Date.now() < payload.exp * 1000;
   } catch {
@@ -88,7 +105,7 @@ export function getTokenPayload(): TokenPayload | null {
   if (!token) return null;
 
   try {
-    return JSON.parse(atob(token.split(".")[1]));
+    return JSON.parse(base64UrlDecode(token.split(".")[1]));
   } catch {
     return null;
   }

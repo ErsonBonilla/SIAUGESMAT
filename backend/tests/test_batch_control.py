@@ -1,4 +1,4 @@
-﻿from datetime import UTC
+from datetime import UTC
 from unittest.mock import patch
 
 import pytest
@@ -15,6 +15,7 @@ def mock_batch():
         modalidad = "DISTANCIA"
         created_at = datetime.now(UTC)
         completed_at = None
+
     return MockBatch()
 
 
@@ -27,10 +28,18 @@ class TestGetBatchStatus:
     def test_returns_status(self, client, auth_headers, mock_batch):
         with (
             patch("app.api.v1.endpoints.batch_control.get_batch", return_value=mock_batch),
-            patch("app.api.v1.endpoints.batch_control.get_batch_status", return_value={
-                "total": 10, "pending": 2, "processing": 0, "paused": 0,
-                "completed": 8, "failed": 0, "cancelled": 0,
-            }),
+            patch(
+                "app.api.v1.endpoints.batch_control.get_batch_status",
+                return_value={
+                    "total": 10,
+                    "pending": 2,
+                    "processing": 0,
+                    "paused": 0,
+                    "completed": 8,
+                    "failed": 0,
+                    "cancelled": 0,
+                },
+            ),
             patch("app.api.v1.endpoints.batch_control.get_batch_items", return_value=[]),
         ):
             resp = client.get("/api/v1/operations/batch/test-batch-1/status", headers=auth_headers)

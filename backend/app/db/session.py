@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _is_sqlite = urlparse(settings.DATABASE_URL).scheme.startswith("sqlite")
 engine_kwargs = {
-    "pool_pre_ping": True,       # verifica que la conexión siga viva antes de usarla
-    "echo": settings.DEBUG,      # imprime las consultas SQL solo en modo DEBUG
+    "pool_pre_ping": True,  # verifica que la conexión siga viva antes de usarla
+    "echo": settings.DEBUG,  # imprime las consultas SQL solo en modo DEBUG
 }
 
 if not _is_sqlite:
@@ -38,8 +38,8 @@ engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
 # Fábrica de sesiones
 # ---------------------------------------------------------------------------
 SessionLocal = sessionmaker(
-    autocommit=False,             # las operaciones deben confirmarse explícitamente
-    autoflush=False,              # no hace flush automático antes de cada consulta
+    autocommit=False,  # las operaciones deben confirmarse explícitamente
+    autoflush=False,  # no hace flush automático antes de cada consulta
     bind=engine,
 )
 

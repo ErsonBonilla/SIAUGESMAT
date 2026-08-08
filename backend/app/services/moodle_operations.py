@@ -18,7 +18,13 @@ class MoodleService(MoodleClient):
     el **username** como identificador principal.
     """
 
-    def __init__(self, token: str, base_url: str, adapter: MoodleAdapter | None = None, version: str | None = None):
+    def __init__(
+        self,
+        token: str,
+        base_url: str,
+        adapter: MoodleAdapter | None = None,
+        version: str | None = None,
+    ):
         super().__init__(token, base_url, version)
         resolved_version = version or "3.9"
         self._adapter = adapter or MoodleAdapterFactory.create(resolved_version)
@@ -30,8 +36,7 @@ class MoodleService(MoodleClient):
     # ------------------------------------------------------------------
     async def create_categories(self, categories: list[dict]) -> list[dict]:
         parent_idnumbers = {
-            str(c["parent"]) for c in categories
-            if c.get("parent") and str(c["parent"]) != "0"
+            str(c["parent"]) for c in categories if c.get("parent") and str(c["parent"]) != "0"
         }
         parent_map: dict[str, int] = {}
         for pid in parent_idnumbers:
@@ -67,8 +72,13 @@ class MoodleService(MoodleClient):
         self._categories_cache = None
         return result
 
-    async def update_category(self, category_id: int, parent_idnumber: str | None = None,
-                               name: str | None = None, idnumber: str | None = None) -> dict:
+    async def update_category(
+        self,
+        category_id: int,
+        parent_idnumber: str | None = None,
+        name: str | None = None,
+        idnumber: str | None = None,
+    ) -> dict:
         params: dict[str, Any] = {"categories[0][id]": category_id}
         if parent_idnumber is not None:
             parent_id = await self._get_category_id_by_idnumber(parent_idnumber)
@@ -94,11 +104,7 @@ class MoodleService(MoodleClient):
         return None
 
     async def create_courses(self, courses: list[dict]) -> list[dict]:
-        cat_idnumbers = {
-            c["categoryidnumber"]
-            for c in courses
-            if "categoryidnumber" in c
-        }
+        cat_idnumbers = {c["categoryidnumber"] for c in courses if "categoryidnumber" in c}
         cat_map: dict[str, int] = {}
         for idnumber in cat_idnumbers:
             cat_id = await self._get_category_id_by_idnumber(idnumber)
@@ -132,8 +138,12 @@ class MoodleService(MoodleClient):
         return await self._request("core_course_create_courses", params, use_post=use_post)
 
     async def duplicate_course(
-        self, from_id: int, fullname: str, shortname: str,
-        categoryid: int, visible: int = 1,
+        self,
+        from_id: int,
+        fullname: str,
+        shortname: str,
+        categoryid: int,
+        visible: int = 1,
     ) -> dict:
         params = {
             "courseid": from_id,
@@ -192,9 +202,13 @@ class MoodleService(MoodleClient):
         use_post = use_post or len(course_ids) > 25
         return await self._request("core_course_delete_courses", params, use_post=use_post)
 
-    async def get_enrolled_teachers(self, course_id: int, teacher_emails: list[str],
-                                     teacher_usernames: list[str] = None,
-                                     teacher_idnumbers: list[str] = None) -> list[dict]:
+    async def get_enrolled_teachers(
+        self,
+        course_id: int,
+        teacher_emails: list[str],
+        teacher_usernames: list[str] = None,
+        teacher_idnumbers: list[str] = None,
+    ) -> list[dict]:
         if not teacher_emails and not teacher_usernames and not teacher_idnumbers:
             return []
         users = await self._request(
@@ -209,7 +223,8 @@ class MoodleService(MoodleClient):
         target_usernames = set(teacher_usernames) if teacher_usernames else set()
         target_idnumbers = set(teacher_idnumbers) if teacher_idnumbers else set()
         return [
-            u for u in users
+            u
+            for u in users
             if (target_emails and u.get("email", "").lower() in target_emails)
             or (target_usernames and u.get("username", "") in target_usernames)
             or (target_idnumbers and u.get("idnumber", "") in target_idnumbers)
@@ -318,9 +333,11 @@ class MoodleService(MoodleClient):
         for i, v in enumerate(values):
             params[f"values[{i}]"] = v
         try:
-            return await self._request("core_user_get_users_by_field", params, use_post=len(values) > 50)
+            return await self._request(
+                "core_user_get_users_by_field", params, use_post=len(values) > 50
+            )
         except MoodleAPIError as e:
-            if getattr(e, 'error_code', None) == "invalidparameter":
+            if getattr(e, "error_code", None) == "invalidparameter":
                 return []
             raise
 
@@ -338,7 +355,9 @@ class MoodleService(MoodleClient):
                 if resolved:
                     user_id = int(resolved["id"])
             if not user_id:
-                logger.warning(f"No se pudo resolver ID para usuario '{user.get('username')}', se omite")
+                logger.warning(
+                    f"No se pudo resolver ID para usuario '{user.get('username')}', se omite"
+                )
                 continue
             params[f"users[{idx}][id]"] = user_id
             if "email" in user:
@@ -401,10 +420,14 @@ class MoodleService(MoodleClient):
     # ------------------------------------------------------------------
     # Matriculación
     # ------------------------------------------------------------------
-    async def enrol_users(self, enrolments: list[dict], course_map: dict[str, int] = None, courses: list[dict] = None) -> dict[str, Any]:
+    async def enrol_users(
+        self, enrolments: list[dict], course_map: dict[str, int] = None, courses: list[dict] = None
+    ) -> dict[str, Any]:
         missing_username = [e for e in enrolments if "username" not in e]
         if missing_username:
-            logger.warning(f"{len(missing_username)} enrolment(s) sin 'username': {missing_username}")
+            logger.warning(
+                f"{len(missing_username)} enrolment(s) sin 'username': {missing_username}"
+            )
         usernames = [e["username"] for e in enrolments if "username" in e]
         shortnames = [e["course_shortname"] for e in enrolments]
 
@@ -416,8 +439,12 @@ class MoodleService(MoodleClient):
         if course_map is None:
             course_map = {}
             if shortnames:
-                courses_info = courses if courses else await self.get_courses_by_shortnames(shortnames)
-                course_map = {c.get("shortname", ""): int(c["id"]) for c in courses_info if c.get("shortname")}
+                courses_info = (
+                    courses if courses else await self.get_courses_by_shortnames(shortnames)
+                )
+                course_map = {
+                    c.get("shortname", ""): int(c["id"]) for c in courses_info if c.get("shortname")
+                }
 
         params = {}
         idx = 0
@@ -486,4 +513,6 @@ class MoodleService(MoodleClient):
             params[f"enrolments[{i}][userid]"] = uid
             params[f"enrolments[{i}][courseid]"] = course_id
             params[f"enrolments[{i}][roleid]"] = role_id
-        return await self._request("enrol_manual_unenrol_users", params, use_post=len(user_ids) > 10)
+        return await self._request(
+            "enrol_manual_unenrol_users", params, use_post=len(user_ids) > 10
+        )

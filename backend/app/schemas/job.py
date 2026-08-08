@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 # ---------------------------------------------------------------------------
 class ErrorOut(BaseModel):
     """Representa un error registrado durante una ejecución."""
+
     id: int
     execution_id: int
     type: str
@@ -30,6 +31,7 @@ class ErrorOut(BaseModel):
 # ---------------------------------------------------------------------------
 class ExecutionOut(BaseModel):
     """Detalles completos de una ejecución, incluyendo métricas."""
+
     id: int
     filename: str
     semester: str
@@ -68,6 +70,7 @@ class ExecutionOut(BaseModel):
 
 class ExecutionList(BaseModel):
     """Lista paginada de ejecuciones."""
+
     total: int
     items: list[ExecutionOut]
 
@@ -77,6 +80,7 @@ class ExecutionList(BaseModel):
 # ---------------------------------------------------------------------------
 class ProcessResponse(BaseModel):
     """Respuesta al encolar un proceso ETL."""
+
     execution_id: int
     job_id: str
     status: str

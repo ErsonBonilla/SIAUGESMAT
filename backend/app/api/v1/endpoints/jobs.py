@@ -38,16 +38,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _resolve_execution(db: Session, execution_id: int, expected_statuses=None, conflict_message=None):
+def _resolve_execution(
+    db: Session, execution_id: int, expected_statuses=None, conflict_message=None
+):
     """Obtiene una ejecución y valida que exista y esté en el estado esperado."""
     execution = get_execution(db, execution_id)
     if not execution:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail="Ejecución no encontrada.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Ejecución no encontrada."
+        )
     if expected_statuses and execution.status not in expected_statuses:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=conflict_message or (
+            detail=conflict_message
+            or (
                 f"La ejecución está en estado '{execution.status}'"
                 f" y no puede ser procesada nuevamente."
             ),
@@ -67,7 +71,8 @@ async def start_process(
     current_user: UserInToken = Depends(get_current_user),
 ):
     execution = _resolve_execution(
-        db, execution_id,
+        db,
+        execution_id,
         expected_statuses={"pending", "failed", "queued", "review_required", "paused"},
     )
 
@@ -77,12 +82,13 @@ async def start_process(
             detail="No se puede procesar una ejecución de modalidad PRESENCIAL.",
         )
 
-    if (get_active_execution(db, execution.modalidad, exclude_id=execution_id)
-            or get_active_batch(db, execution.modalidad)):
+    if get_active_execution(db, execution.modalidad, exclude_id=execution_id) or get_active_batch(
+        db, execution.modalidad
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Ya existe un proceso en ejecución en esta modalidad. "
-                   "Espere a que finalice antes de iniciar otro.",
+            "Espere a que finalice antes de iniciar otro.",
         )
 
     file_path = os.path.join(settings.UPLOAD_DIR, execution.filename)
@@ -173,9 +179,14 @@ async def list_executions_endpoint(
     current_user: UserInToken = Depends(get_current_user),
 ):
     total, executions = list_executions(
-        db, semester=semester, status=status, mode=mode,
-        moodle_version=moodle_version, modalidad=modalidad,
-        limit=limit, offset=offset,
+        db,
+        semester=semester,
+        status=status,
+        mode=mode,
+        moodle_version=moodle_version,
+        modalidad=modalidad,
+        limit=limit,
+        offset=offset,
     )
     return ExecutionList(
         total=total,
@@ -194,7 +205,8 @@ async def delete_execution_endpoint(
     current_user: UserInToken = Depends(get_current_user),
 ):
     _resolve_execution(
-        db, execution_id,
+        db,
+        execution_id,
         expected_statuses={"pending", "failed", "review_required", "cancelled", "queued"},
     )
     delete_execution(db, execution_id)
@@ -218,7 +230,7 @@ async def confirm_mass_delete(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"La ejecución está en estado '{execution.status}'. "
-                   f"Solo se puede confirmar ejecuciones en 'review_required'.",
+            f"Solo se puede confirmar ejecuciones en 'review_required'.",
         )
 
     if execution.modalidad == "PRESENCIAL":
@@ -258,8 +270,7 @@ async def confirm_mass_delete(
     db.commit()
 
     logger.info(
-        f"Eliminación masiva confirmada para ejecución {execution_id} "
-        f"por {current_user.username}"
+        f"Eliminación masiva confirmada para ejecución {execution_id} por {current_user.username}"
     )
 
     return ProcessResponse(
@@ -282,14 +293,18 @@ async def pause_execution_endpoint(
     current_user: UserInToken = Depends(get_current_user),
 ):
     _resolve_execution(
-        db, execution_id, expected_statuses={"running"},
+        db,
+        execution_id,
+        expected_statuses={"running"},
         conflict_message="Solo se puede pausar ejecuciones en 'running'.",
     )
 
     success, task_id = pause_execution(db, execution_id)
     if not success:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail="No se pudo pausar la ejecución.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo pausar la ejecución.",
+        )
 
     if task_id:
         try:
@@ -319,16 +334,18 @@ async def cancel_execution_endpoint(
     current_user: UserInToken = Depends(get_current_user),
 ):
     _resolve_execution(
-        db, execution_id, expected_statuses={"running", "paused", "queued"},
-        conflict_message=(
-            "Solo se puede cancelar ejecuciones en 'running', 'paused' o 'queued'."
-        ),
+        db,
+        execution_id,
+        expected_statuses={"running", "paused", "queued"},
+        conflict_message=("Solo se puede cancelar ejecuciones en 'running', 'paused' o 'queued'."),
     )
 
     success, task_id = cancel_execution(db, execution_id)
     if not success:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                            detail="No se pudo cancelar la ejecución.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No se pudo cancelar la ejecución.",
+        )
 
     if task_id:
         try:

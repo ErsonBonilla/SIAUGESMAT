@@ -37,27 +37,29 @@ def test_excel_engine_selection():
 # ---------------------------------------------------------------------------
 def test_transform_basic():
     """Un curso con docente debe generar las estructuras esperadas."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "105 - Lic. en Matemáticas",
-            "Código curso": "202",
-            "Semestre": "1",
-            "Grupo": "01",
-            "Curso": "Matemáticas",
-            "Correo Institucional": "juan.perez@ut.edu.co",
-            "Docente": "Pérez Juan",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "105 - Lic. en Matemáticas",
+                "Código curso": "202",
+                "Semestre": "1",
+                "Grupo": "01",
+                "Curso": "Matemáticas",
+                "Correo Institucional": "juan.perez@ut.edu.co",
+                "Docente": "Pérez Juan",
+            }
+        ]
+    )
 
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
 
     # Categorías: deben existir los tres niveles sin duplicados
     cats = result["categories"]
     cat_ids = [c["idnumber"] for c in cats]
-    assert "IDE" in cat_ids           # nivel 1
-    assert "IDE_0105" in cat_ids      # nivel 2
-    assert "IDE_0105_sI" in cat_ids   # nivel 3
+    assert "IDE" in cat_ids  # nivel 1
+    assert "IDE_0105" in cat_ids  # nivel 2
+    assert "IDE_0105_sI" in cat_ids  # nivel 3
 
     # Curso
     courses = result["courses"]
@@ -93,18 +95,20 @@ def test_transform_basic():
 # ---------------------------------------------------------------------------
 def test_apartado_maps_to_uraba_prefix():
     """La categoría APARTADO debe usar el prefijo URA."""
-    df = _base_dataframe([
-        {
-            "CAT": "APARTADO",
-            "Programa": "305 - Ing. Física",
-            "Código curso": "101",
-            "Semestre": "2",
-            "Grupo": "02",
-            "Curso": "Física",
-            "Correo Institucional": "ana@ut.edu.co",
-            "Docente": "Ana López",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "APARTADO",
+                "Programa": "305 - Ing. Física",
+                "Código curso": "101",
+                "Semestre": "2",
+                "Grupo": "02",
+                "Curso": "Física",
+                "Correo Institucional": "ana@ut.edu.co",
+                "Docente": "Ana López",
+            }
+        ]
+    )
 
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     course = result["courses"][0]
@@ -126,18 +130,20 @@ def test_apartado_maps_to_uraba_prefix():
 # ---------------------------------------------------------------------------
 def test_code_padding():
     """Un código de programa sin cero inicial se debe completar a 3 dígitos."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "5 - Química",
-            "Código curso": "10",
-            "Semestre": "1",
-            "Grupo": "1",
-            "Curso": "Química",
-            "Correo Institucional": "x@ut.edu.co",
-            "Docente": "X Y",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "5 - Química",
+                "Código curso": "10",
+                "Semestre": "1",
+                "Grupo": "1",
+                "Curso": "Química",
+                "Correo Institucional": "x@ut.edu.co",
+                "Docente": "X Y",
+            }
+        ]
+    )
 
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     course = result["courses"][0]
@@ -150,18 +156,20 @@ def test_code_padding():
 # ---------------------------------------------------------------------------
 def test_invalid_email_ignored():
     """Un docente sin email @ut.edu.co no debe aparecer en usuarios ni matrículas."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "100 - Test",
-            "Código curso": "1",
-            "Semestre": "1",
-            "Grupo": "1",
-            "Curso": "Test",
-            "Correo Institucional": "docente@gmail.com",   # no institucional
-            "Docente": "Juan Pérez",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "100 - Test",
+                "Código curso": "1",
+                "Semestre": "1",
+                "Grupo": "1",
+                "Curso": "Test",
+                "Correo Institucional": "docente@gmail.com",  # no institucional
+                "Docente": "Juan Pérez",
+            }
+        ]
+    )
 
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     assert len(result["users"]) == 0
@@ -173,18 +181,20 @@ def test_invalid_email_ignored():
 # ---------------------------------------------------------------------------
 def test_name_splitting():
     """Divide el nombre completo usando el diccionario de nombres propios."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "1 - Test",
-            "Código curso": "1",
-            "Semestre": "1",
-            "Grupo": "1",
-            "Curso": "Test",
-            "Correo Institucional": "pedro@ut.edu.co",
-            "Docente": "García López Pedro Luis",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "1 - Test",
+                "Código curso": "1",
+                "Semestre": "1",
+                "Grupo": "1",
+                "Curso": "Test",
+                "Correo Institucional": "pedro@ut.edu.co",
+                "Docente": "García López Pedro Luis",
+            }
+        ]
+    )
 
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     user = result["users"][0]
@@ -197,18 +207,20 @@ def test_name_splitting():
 # ---------------------------------------------------------------------------
 def test_single_word_name():
     """Si el nombre solo tiene una palabra, se toma como firstname."""
-    df = _base_dataframe([
-        {
-            "CAT": "X",
-            "Programa": "1 - X",
-            "Código curso": "1",
-            "Semestre": "1",
-            "Grupo": "1",
-            "Curso": "X",
-            "Correo Institucional": "x@ut.edu.co",
-            "Docente": "Sol",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "X",
+                "Programa": "1 - X",
+                "Código curso": "1",
+                "Semestre": "1",
+                "Grupo": "1",
+                "Curso": "X",
+                "Correo Institucional": "x@ut.edu.co",
+                "Docente": "Sol",
+            }
+        ]
+    )
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     user = result["users"][0]
     assert user["firstname"] == "Sol"
@@ -220,18 +232,20 @@ def test_single_word_name():
 # ---------------------------------------------------------------------------
 def test_category_hierarchy_order():
     """Las categorías deben aparecer en orden de padre antes que hijos."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "200 - Programa A",
-            "Código curso": "10",
-            "Semestre": "2025",
-            "Grupo": "A",
-            "Curso": "Curso A",
-            "Correo Institucional": "p@ut.edu.co",
-            "Docente": "P P",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "200 - Programa A",
+                "Código curso": "10",
+                "Semestre": "2025",
+                "Grupo": "A",
+                "Curso": "Curso A",
+                "Correo Institucional": "p@ut.edu.co",
+                "Docente": "P P",
+            }
+        ]
+    )
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     cats = result["categories"]
     # El primer elemento debe ser el raíz (parent=0)
@@ -245,28 +259,30 @@ def test_category_hierarchy_order():
 # ---------------------------------------------------------------------------
 def test_multiple_courses_same_program():
     """Varios cursos en el mismo programa comparten las categorías superiores."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "105 - Programa 1",
-            "Código curso": "201",
-            "Semestre": "1",
-            "Grupo": "01",
-            "Curso": "Curso 1",
-            "Correo Institucional": "doc1@ut.edu.co",
-            "Docente": "Doc Uno",
-        },
-        {
-            "CAT": "IDEAD",
-            "Programa": "105 - Programa 1",
-            "Código curso": "202",
-            "Semestre": "1",
-            "Grupo": "02",
-            "Curso": "Curso 2",
-            "Correo Institucional": "doc2@ut.edu.co",
-            "Docente": "Doc Dos",
-        },
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "105 - Programa 1",
+                "Código curso": "201",
+                "Semestre": "1",
+                "Grupo": "01",
+                "Curso": "Curso 1",
+                "Correo Institucional": "doc1@ut.edu.co",
+                "Docente": "Doc Uno",
+            },
+            {
+                "CAT": "IDEAD",
+                "Programa": "105 - Programa 1",
+                "Código curso": "202",
+                "Semestre": "1",
+                "Grupo": "02",
+                "Curso": "Curso 2",
+                "Correo Institucional": "doc2@ut.edu.co",
+                "Docente": "Doc Dos",
+            },
+        ]
+    )
 
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     cats = result["categories"]
@@ -298,18 +314,20 @@ def test_multiple_courses_same_program():
 # ---------------------------------------------------------------------------
 def test_delete_flags():
     """Las marcas de eliminación son siempre False desde el ETL."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "1 - Test",
-            "Código curso": "1",
-            "Semestre": "1",
-            "Grupo": "1",
-            "Curso": "Test",
-            "Correo Institucional": "t@ut.edu.co",
-            "Docente": "T T",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "1 - Test",
+                "Código curso": "1",
+                "Semestre": "1",
+                "Grupo": "1",
+                "Curso": "Test",
+                "Correo Institucional": "t@ut.edu.co",
+                "Docente": "T T",
+            }
+        ]
+    )
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     assert result["courses"][0]["delete"] is False
     assert result["users"][0]["delete"] is False
@@ -320,18 +338,20 @@ def test_delete_flags():
 # ---------------------------------------------------------------------------
 def test_course_visibility():
     """El curso siempre se crea visible (1) desde el ETL."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "1 - Test",
-            "Código curso": "1",
-            "Semestre": "1",
-            "Grupo": "1",
-            "Curso": "Test",
-            "Correo Institucional": "t@ut.edu.co",
-            "Docente": "T T",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "1 - Test",
+                "Código curso": "1",
+                "Semestre": "1",
+                "Grupo": "1",
+                "Curso": "Test",
+                "Correo Institucional": "t@ut.edu.co",
+                "Docente": "T T",
+            }
+        ]
+    )
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     assert result["courses"][0]["visible"] == 1
 
@@ -341,18 +361,20 @@ def test_course_visibility():
 # ---------------------------------------------------------------------------
 def test_new_format_with_program_parse():
     """El nuevo formato con Programa='cod - nombre' extrae cod_programa."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "0838 - TECNOLOGIA EN PROTECCION Y RECUPERACION DE ECOSISTEMAS FORESTALES",
-            "Código curso": "202",
-            "Semestre": "1",
-            "Grupo": "01",
-            "Curso": "Matemáticas",
-            "Correo Institucional": "juan.perez@ut.edu.co",
-            "Docente": "Juan Pérez",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "0838 - TECNOLOGIA EN PROTECCION Y RECUPERACION DE ECOSISTEMAS FORESTALES",
+                "Código curso": "202",
+                "Semestre": "1",
+                "Grupo": "01",
+                "Curso": "Matemáticas",
+                "Correo Institucional": "juan.perez@ut.edu.co",
+                "Docente": "Juan Pérez",
+            }
+        ]
+    )
 
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
 
@@ -381,18 +403,20 @@ def test_new_format_with_program_parse():
 # ---------------------------------------------------------------------------
 def test_new_format_without_program_code():
     """Cuando Programa no tiene formato 'cod - nombre', cod_programa queda vacío."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "LICENCIATURA EN MATEMATICAS",
-            "Código curso": "202",
-            "Semestre": "1",
-            "Grupo": "01",
-            "Curso": "Matemáticas",
-            "Correo Institucional": "juan.perez@ut.edu.co",
-            "Docente": "Juan Pérez",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "LICENCIATURA EN MATEMATICAS",
+                "Código curso": "202",
+                "Semestre": "1",
+                "Grupo": "01",
+                "Curso": "Matemáticas",
+                "Correo Institucional": "juan.perez@ut.edu.co",
+                "Docente": "Juan Pérez",
+            }
+        ]
+    )
 
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
 
@@ -411,23 +435,25 @@ def test_new_format_without_program_code():
 # ---------------------------------------------------------------------------
 def test_noise_columns_ignored():
     """Columnas como Categoría, Perfil, Total, Tipo deben ser ignoradas."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "105 - Test",
-            "Código curso": "202",
-            "Semestre": "1",
-            "Grupo": "01",
-            "Curso": "Matemáticas",
-            "Docente": "Juan Pérez",
-            "Correo Institucional": "juan.perez@ut.edu.co",
-            "Categoría": "AUXILIAR",
-            "Perfil del Curso": "INGENIERO",
-            "Total Cursos Docente": "4",
-            "Tipo Programa": "PREGRADO",
-            "Horas Curso": "30",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "105 - Test",
+                "Código curso": "202",
+                "Semestre": "1",
+                "Grupo": "01",
+                "Curso": "Matemáticas",
+                "Docente": "Juan Pérez",
+                "Correo Institucional": "juan.perez@ut.edu.co",
+                "Categoría": "AUXILIAR",
+                "Perfil del Curso": "INGENIERO",
+                "Total Cursos Docente": "4",
+                "Tipo Programa": "PREGRADO",
+                "Horas Curso": "30",
+            }
+        ]
+    )
 
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     course = result["courses"][0]
@@ -464,19 +490,21 @@ class TestRomanNumeral:
 # ---------------------------------------------------------------------------
 def test_virtual_rows_ignored():
     """Filas cuya columna Observaciones mencione virtualidad se ignoran."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "105 - Test",
-            "Código curso": "202",
-            "Semestre": "1",
-            "Grupo": "01",
-            "Curso": "Matemáticas",
-            "Correo Institucional": "juan.perez@ut.edu.co",
-            "Docente": "Juan Pérez",
-            "Observaciones": "CURSO VIRTUAL",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "105 - Test",
+                "Código curso": "202",
+                "Semestre": "1",
+                "Grupo": "01",
+                "Curso": "Matemáticas",
+                "Correo Institucional": "juan.perez@ut.edu.co",
+                "Docente": "Juan Pérez",
+                "Observaciones": "CURSO VIRTUAL",
+            }
+        ]
+    )
 
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     assert result["courses"] == []
@@ -500,7 +528,29 @@ def test_virtuality_conjugations_ignored():
         "virtual1",
     ]
     for obs in variants:
-        df = _base_dataframe([
+        df = _base_dataframe(
+            [
+                {
+                    "CAT": "IDEAD",
+                    "Programa": "105 - Test",
+                    "Código curso": "202",
+                    "Semestre": "1",
+                    "Grupo": "01",
+                    "Curso": "Matemáticas",
+                    "Correo Institucional": "juan.perez@ut.edu.co",
+                    "Docente": "Juan Pérez",
+                    "Observaciones": obs,
+                }
+            ]
+        )
+        result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+        assert result["courses"] == [], f"Debería ignorarse la fila con: {obs!r}"
+
+
+def test_non_virtual_rows_kept():
+    """Filas sin referencias a virtualidad se procesan normalmente."""
+    df = _base_dataframe(
+        [
             {
                 "CAT": "IDEAD",
                 "Programa": "105 - Test",
@@ -510,28 +560,10 @@ def test_virtuality_conjugations_ignored():
                 "Curso": "Matemáticas",
                 "Correo Institucional": "juan.perez@ut.edu.co",
                 "Docente": "Juan Pérez",
-                "Observaciones": obs,
+                "Observaciones": "Clase presencial",
             }
-        ])
-        result = DistanciaParser.parse(df, modalidad="DISTANCIA")
-        assert result["courses"] == [], f"Debería ignorarse la fila con: {obs!r}"
-
-
-def test_non_virtual_rows_kept():
-    """Filas sin referencias a virtualidad se procesan normalmente."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "105 - Test",
-            "Código curso": "202",
-            "Semestre": "1",
-            "Grupo": "01",
-            "Curso": "Matemáticas",
-            "Correo Institucional": "juan.perez@ut.edu.co",
-            "Docente": "Juan Pérez",
-            "Observaciones": "Clase presencial",
-        }
-    ])
+        ]
+    )
 
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     assert len(result["courses"]) == 1
@@ -541,18 +573,20 @@ def test_non_virtual_rows_kept():
 
 def test_missing_observaciones_column_raises():
     """Falta la columna Observaciones → ValueError."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "105 - Test",
-            "Código curso": "202",
-            "Semestre": "1",
-            "Grupo": "01",
-            "Curso": "Matemáticas",
-            "Correo Institucional": "juan.perez@ut.edu.co",
-            "Docente": "Juan Pérez",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "105 - Test",
+                "Código curso": "202",
+                "Semestre": "1",
+                "Grupo": "01",
+                "Curso": "Matemáticas",
+                "Correo Institucional": "juan.perez@ut.edu.co",
+                "Docente": "Juan Pérez",
+            }
+        ]
+    )
     df = df.drop(columns=["Observaciones"])
 
     with pytest.raises(ValueError, match="Observaciones"):
@@ -564,18 +598,20 @@ def test_missing_observaciones_column_raises():
 # ---------------------------------------------------------------------------
 def test_course_minimal_fields():
     """Todo curso debe incluir los campos obligatorios para Moodle 3.9."""
-    df = _base_dataframe([
-        {
-            "CAT": "IDEAD",
-            "Programa": "105 - TEST",
-            "Código curso": "202",
-            "Semestre": "1",
-            "Grupo": "01",
-            "Curso": "Test",
-            "Correo Institucional": "t@ut.edu.co",
-            "Docente": "T T",
-        }
-    ])
+    df = _base_dataframe(
+        [
+            {
+                "CAT": "IDEAD",
+                "Programa": "105 - TEST",
+                "Código curso": "202",
+                "Semestre": "1",
+                "Grupo": "01",
+                "Curso": "Test",
+                "Correo Institucional": "t@ut.edu.co",
+                "Docente": "T T",
+            }
+        ]
+    )
     result = DistanciaParser.parse(df, modalidad="DISTANCIA")
     for course in result["courses"]:
         assert "shortname" in course

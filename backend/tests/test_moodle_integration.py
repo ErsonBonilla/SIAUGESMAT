@@ -26,12 +26,14 @@ class TestRelocateCategory:
         result = await integ.relocate_category("CAT-01", 123, "PARENT-01")
         assert result is True
         integ.service.update_category.assert_awaited_once_with(
-            category_id=123, parent_idnumber="PARENT-01",
+            category_id=123,
+            parent_idnumber="PARENT-01",
         )
 
     @pytest.mark.asyncio
     async def test_overloaded_raises(self, moodle_integration):
         from app.services.moodle_errors import MoodleOverloadedError
+
         integ = moodle_integration
         integ.service.update_category.side_effect = ConnectionError("gateway time-out")
         with pytest.raises(MoodleOverloadedError):
@@ -151,9 +153,7 @@ class TestFindUserByEmail:
     @pytest.mark.asyncio
     async def test_found(self, moodle_integration):
         integ = moodle_integration
-        integ.service.get_users.return_value = [
-            {"username": "jdoe", "email": "jdoe@test.com"}
-        ]
+        integ.service.get_users.return_value = [{"username": "jdoe", "email": "jdoe@test.com"}]
         result = await integ.find_user_by_email("jdoe@test.com")
         assert result is not None
         assert result["username"] == "jdoe"
@@ -198,8 +198,11 @@ class TestEnrolTeacher:
     async def test_already_enrolled(self, moodle_integration):
         integ = moodle_integration
         integ.service.enrol_users.return_value = {
-            "success": False, "enrolled": 0, "failed": 1,
-            "errors": ["already enrolled"], "error_codes": ["alreadyenrolled"],
+            "success": False,
+            "enrolled": 0,
+            "failed": 1,
+            "errors": ["already enrolled"],
+            "error_codes": ["alreadyenrolled"],
         }
         result = await integ.enrol_teacher("prof1", "CURSO-101")
         assert result["success"] is True
@@ -209,8 +212,11 @@ class TestEnrolTeacher:
     async def test_enrol_failure(self, moodle_integration):
         integ = moodle_integration
         integ.service.enrol_users.return_value = {
-            "success": False, "enrolled": 0, "failed": 1,
-            "errors": ["Server error"], "error_codes": [],
+            "success": False,
+            "enrolled": 0,
+            "failed": 1,
+            "errors": ["Server error"],
+            "error_codes": [],
         }
         result = await integ.enrol_teacher("prof1", "CURSO-101")
         assert result["success"] is False

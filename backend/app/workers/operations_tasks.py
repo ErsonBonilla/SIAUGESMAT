@@ -44,17 +44,25 @@ def process_operation_batch(self, batch_id: str):
             for item in items:
                 # Re-consultar batch por si fue pausado o cancelado
                 try:
-                    paused = db.query(OperationItem).filter_by(
-                        batch_id=batch_id, status="paused"
-                    ).count()
-                    cancelled = db.query(OperationItem).filter_by(
-                        batch_id=batch_id, status="cancelled"
-                    ).count()
+                    paused = (
+                        db.query(OperationItem)
+                        .filter_by(batch_id=batch_id, status="paused")
+                        .count()
+                    )
+                    cancelled = (
+                        db.query(OperationItem)
+                        .filter_by(batch_id=batch_id, status="cancelled")
+                        .count()
+                    )
                     if paused > 0:
-                        logger.info(f"Lote {batch_id} pausado, deteniendo procesamiento ({paused} items)")
+                        logger.info(
+                            f"Lote {batch_id} pausado, deteniendo procesamiento ({paused} items)"
+                        )
                         break
                     if cancelled > 0:
-                        logger.info(f"Lote {batch_id} cancelado, deteniendo procesamiento ({cancelled} items)")
+                        logger.info(
+                            f"Lote {batch_id} cancelado, deteniendo procesamiento ({cancelled} items)"
+                        )
                         break
                 except TypeError:
                     pass
@@ -149,7 +157,9 @@ async def _process_single_item(item, batch, moodle, db):
                 "username": item.identifier,
                 "firstname": detail.get("firstname", item.identifier),
                 "lastname": detail.get("lastname", ""),
-                "email": detail.get("email", f"{item.identifier}{settings.INSTITUTIONAL_EMAIL_DOMAIN}"),
+                "email": detail.get(
+                    "email", f"{item.identifier}{settings.INSTITUTIONAL_EMAIL_DOMAIN}"
+                ),
             }
             if detail.get("password"):
                 user_data["password"] = detail["password"]
@@ -198,12 +208,18 @@ async def _ensure_root_category(moodle: MoodleService):
     try:
         cats = await moodle.get_categories(idnumber="DISTANCIA")
         if not cats:
-            await moodle.create_categories([{
-                "name": settings.ROOT_CATEGORY_NAME,
-                "idnumber": "DISTANCIA",
-                "parent": 0,
-            }])
-            logger.info(f"Categoría raíz {settings.ROOT_CATEGORY_NAME} (DISTANCIA) creada automáticamente")
+            await moodle.create_categories(
+                [
+                    {
+                        "name": settings.ROOT_CATEGORY_NAME,
+                        "idnumber": "DISTANCIA",
+                        "parent": 0,
+                    }
+                ]
+            )
+            logger.info(
+                f"Categoría raíz {settings.ROOT_CATEGORY_NAME} (DISTANCIA) creada automáticamente"
+            )
     except MoodleAPIError as e:
         logger.exception(f"Error al crear categoría raíz {settings.ROOT_CATEGORY_NAME}: {e}")
         raise
@@ -220,7 +236,9 @@ def _format_moodle_error(e: MoodleAPIError, entity_type: str, item) -> str:
         return f"Email inválido '{email}' para el usuario '{item.identifier}'."
     if code == "emailnotallowed":
         email = detail.get("email", "")
-        return f"El dominio del email '{email}' no está permitido en Moodle para '{item.identifier}'."
+        return (
+            f"El dominio del email '{email}' no está permitido en Moodle para '{item.identifier}'."
+        )
     if code == "duplicatecategory":
         return f"La categoría '{item.identifier}' ya existe en Moodle (idnumber duplicado)."
     if code == "cannotfindparentcategory":

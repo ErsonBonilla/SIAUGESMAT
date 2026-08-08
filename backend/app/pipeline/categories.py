@@ -36,12 +36,14 @@ def classify_categories(
             and str(expected_parent_idn) != "0"
             and actual_parent_idn != expected_parent_idn
         ):
-            relocate.append({
-                "idnumber": idn,
-                "moodle_id": existing.get("id"),
-                "expected_parent_idn": expected_parent_idn,
-                "actual_parent_idn": actual_parent_idn or "root",
-                "cat_data": cat,
-            })
+            relocate.append(
+                {
+                    "idnumber": idn,
+                    "moodle_id": existing.get("id"),
+                    "expected_parent_idn": expected_parent_idn,
+                    "actual_parent_idn": actual_parent_idn or "root",
+                    "cat_data": cat,
+                }
+            )
 
     return missing, relocate

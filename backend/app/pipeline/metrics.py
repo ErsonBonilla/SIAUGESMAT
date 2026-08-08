@@ -19,13 +19,10 @@ def calculate_error_rate(metrics: dict | None, errors_count: int | None) -> floa
     Si `metrics` no trae ``total_operations`` se estima sumando cursos,
     usuarios y matrículas creados. Devuelve 0.0 cuando no hay operaciones.
     """
-    total = (
-        (metrics or {}).get("total_operations", 0)
-        or (
-            (metrics or {}).get("courses_created", 0)
-            + (metrics or {}).get("users_created", 0)
-            + (metrics or {}).get("enrolments", 0)
-        )
+    total = (metrics or {}).get("total_operations", 0) or (
+        (metrics or {}).get("courses_created", 0)
+        + (metrics or {}).get("users_created", 0)
+        + (metrics or {}).get("enrolments", 0)
     )
     errors = errors_count or 0
     return (errors / total * 100.0) if total > 0 else 0.0
@@ -39,7 +36,10 @@ def semaphore_color(
     """Color del semáforo según tasa de error y duración."""
     if error_rate >= thresholds["error_rate_red"] or duration >= thresholds["max_duration_red"]:
         return "red"
-    if error_rate >= thresholds["error_rate_yellow"] or duration >= thresholds["max_duration_yellow"]:
+    if (
+        error_rate >= thresholds["error_rate_yellow"]
+        or duration >= thresholds["max_duration_yellow"]
+    ):
         return "yellow"
     return "green"
 

@@ -24,7 +24,9 @@ def moodle_service():
     """Crea una instancia de MoodleService con adapter mockeado."""
     mock_adapter = AsyncMock(spec=MoodleAdapter)
     mock_adapter.build_create_course_enrolment_params.return_value = None
-    service = MoodleService(token="fake_token", base_url="http://fake.moodle.com", adapter=mock_adapter)
+    service = MoodleService(
+        token="fake_token", base_url="http://fake.moodle.com", adapter=mock_adapter
+    )
     mock_client = AsyncMock(spec=httpx.AsyncClient)
     service._client = mock_client
     return service, mock_adapter
@@ -63,6 +65,7 @@ async def test_request_moodle_error(moodle_service):
         await service._request("core_course_get_courses", {})
     # La excepción original está en exc_info.value.__cause__
     assert isinstance(exc_info.value.__cause__, MoodleAPIError)
+
 
 # ---------------------------------------------------------------------------
 # Reintentos ante error HTTP
@@ -152,12 +155,24 @@ async def test_create_categories_invalidates_cache(moodle_service):
     ]
 
     await service.get_categories()
-    await service.create_categories([{
-        "name": "Programa", "idnumber": "IBA_0992", "parent": "0",
-    }])
-    await service.create_categories([{
-        "name": "Semestre I", "idnumber": "IBA_0992_sI", "parent": "IBA_0992",
-    }])
+    await service.create_categories(
+        [
+            {
+                "name": "Programa",
+                "idnumber": "IBA_0992",
+                "parent": "0",
+            }
+        ]
+    )
+    await service.create_categories(
+        [
+            {
+                "name": "Semestre I",
+                "idnumber": "IBA_0992_sI",
+                "parent": "IBA_0992",
+            }
+        ]
+    )
 
     last_call = service._client.get.call_args_list[-1][1]["params"]
     assert last_call["categories[0][parent]"] == 5
@@ -178,13 +193,15 @@ async def test_create_courses(moodle_service):
     fake_create.raise_for_status.return_value = None
     service._client.get.side_effect = [fake_cat, fake_create]
 
-    courses = [{
-        "shortname": "CUR_01",
-        "fullname": "Curso 1",
-        "categoryidnumber": "CAT_1",
-        "format": "onetopic",
-        "visible": 1,
-    }]
+    courses = [
+        {
+            "shortname": "CUR_01",
+            "fullname": "Curso 1",
+            "categoryidnumber": "CAT_1",
+            "format": "onetopic",
+            "visible": 1,
+        }
+    ]
     result = await service.create_courses(courses)
     assert len(result) == 1
     mock_adapter.build_create_course_enrolment_params.assert_called_once()
@@ -240,13 +257,15 @@ async def test_create_users(moodle_service):
     fake_response.raise_for_status.return_value = None
     service._client.get.return_value = fake_response
 
-    users = [{
-        "username": "juan",
-        "firstname": "Juan",
-        "lastname": "Pérez",
-        "email": "juan@ut.edu.co",
-        "password": "changeme",
-    }]
+    users = [
+        {
+            "username": "juan",
+            "firstname": "Juan",
+            "lastname": "Pérez",
+            "email": "juan@ut.edu.co",
+            "password": "changeme",
+        }
+    ]
     result = await service.create_users(users)
     assert result[0]["id"] == 100
     params = service._client.get.call_args[1]["params"]

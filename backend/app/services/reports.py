@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 
 
 class ReportService:
-
     REPORT_NAMES: ClassVar[dict[str, str]] = {
         "resumen_ejecutivo": "01_resumen_ejecutivo.csv",
         "inc_usuarios_inactivos": "02_inc_usuarios_inactivos.csv",
@@ -53,17 +52,11 @@ class ReportService:
             Ruta al directorio donde se almacenaron los reportes.
         """
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-        report_dir = os.path.join(
-            settings.REPORT_DIR, f"exec_{execution_id}_{timestamp}"
-        )
+        report_dir = os.path.join(settings.REPORT_DIR, f"exec_{execution_id}_{timestamp}")
         os.makedirs(report_dir, exist_ok=True)
 
         execution = db.query(Execution).filter(Execution.id == execution_id).first()
-        logs = (
-            db.query(ExecutionLog)
-            .filter(ExecutionLog.execution_id == execution_id)
-            .all()
-        )
+        logs = db.query(ExecutionLog).filter(ExecutionLog.execution_id == execution_id).all()
 
         for cfg in cls.REPORT_CONFIGS:
             rows = []
@@ -72,7 +65,9 @@ class ReportService:
                     if cfg["match"](log):
                         rows.append(cfg["extract"](log))
                 except Exception:
-                    logger.warning(f"Error extrayendo log para reporte {cfg.get('key', '?')}, log_id={log.id}")
+                    logger.warning(
+                        f"Error extrayendo log para reporte {cfg.get('key', '?')}, log_id={log.id}"
+                    )
             if rows:
                 write_csv(
                     os.path.join(report_dir, cls.REPORT_NAMES[cfg["key"]]),
@@ -87,6 +82,7 @@ class ReportService:
 
         if execution:
             from app.services.charts import ChartService
+
             ChartService.generate_all(execution, logs, report_dir)
 
         create_zip(report_dir, report_dir + ".zip", extensions=(".csv", ".png", ".html"))
@@ -114,11 +110,13 @@ class ReportService:
         for name, filename in cls.REPORT_NAMES.items():
             path = os.path.join(report_dir, filename)
             if os.path.exists(path):
-                reports.append({
-                    "name": name,
-                    "filename": filename,
-                    "size": os.path.getsize(path),
-                })
+                reports.append(
+                    {
+                        "name": name,
+                        "filename": filename,
+                        "size": os.path.getsize(path),
+                    }
+                )
         return reports
 
     # ------------------------------------------------------------------
@@ -130,7 +128,8 @@ class ReportService:
             "key": "inc_usuarios_inactivos",
             "headers": ["Correo", "Curso (shortname)", "Curso (nombre)", "Motivo"],
             "match": lambda log: (
-                log.action == "enrolment_failed" and log.detail
+                log.action == "enrolment_failed"
+                and log.detail
                 and log.detail.get("reason") in ("user_not_found", "user_inactive")
             ),
             "extract": lambda log: [
@@ -144,19 +143,26 @@ class ReportService:
             "key": "inc_cursos_recientes",
             "headers": ["Shortname", "Curso", "Motivo", "Antigüedad (días)", "Profesor"],
             "match": lambda log: (
-                log.action in ("alert_disappeared_recent", "alert_teacher_change_recent") and log.detail
+                log.action in ("alert_disappeared_recent", "alert_teacher_change_recent")
+                and log.detail
             ),
             "extract": lambda log: [
                 log.identifier or "",
                 log.detail.get("fullname", ""),
                 log.detail.get("reason", ""),
                 str(round(log.detail.get("age_seconds", 0) / 86400, 1)),
-                log.detail.get("professor", "") or log.detail.get("firstname", "") + " " + log.detail.get("lastname", ""),
+                log.detail.get("professor", "")
+                or log.detail.get("firstname", "") + " " + log.detail.get("lastname", ""),
             ],
         },
         {
             "key": "inc_plantilla_no_encontrada",
-            "headers": ["Curso (shortname)", "Curso (nombre)", "Plantilla esperada", "Plantilla usada (fallback)"],
+            "headers": [
+                "Curso (shortname)",
+                "Curso (nombre)",
+                "Plantilla esperada",
+                "Plantilla usada (fallback)",
+            ],
             "match": lambda log: log.action == "template_not_found" and log.detail,
             "extract": lambda log: [
                 log.identifier or "",
@@ -189,9 +195,23 @@ class ReportService:
         },
         {
             "key": "audit_cursos_creados",
-            "headers": ["Shortname", "Curso", "Categoría", "Profesor (username)", "Profesor (nombre)", "Acción", "Plantilla"],
+            "headers": [
+                "Shortname",
+                "Curso",
+                "Categoría",
+                "Profesor (username)",
+                "Profesor (nombre)",
+                "Acción",
+                "Plantilla",
+            ],
             "match": lambda log: (
-                log.action in ("course_created", "course_created_with_template", "course_recreated", "course_hidden_and_created")
+                log.action
+                in (
+                    "course_created",
+                    "course_created_with_template",
+                    "course_recreated",
+                    "course_hidden_and_created",
+                )
                 and log.detail
             ),
             "extract": lambda log: [
@@ -262,7 +282,14 @@ class ReportService:
         },
         {
             "key": "audit_matriculas",
-            "headers": ["Curso (shortname)", "Curso (nombre)", "Usuario (username)", "Docente", "Resultado", "Motivo"],
+            "headers": [
+                "Curso (shortname)",
+                "Curso (nombre)",
+                "Usuario (username)",
+                "Docente",
+                "Resultado",
+                "Motivo",
+            ],
             "match": lambda log: log.action in ("enrolment_ok", "enrolment_failed"),
             "extract": lambda log: [
                 log.detail.get("course", ""),
@@ -287,11 +314,17 @@ class ReportService:
         },
         {
             "key": "audit_plan_acciones",
-            "headers": ["Shortname", "Acción planificada", "Motivo", "Profesor", "Antigüedad (días)"],
+            "headers": [
+                "Shortname",
+                "Acción planificada",
+                "Motivo",
+                "Profesor",
+                "Antigüedad (días)",
+            ],
             "match": lambda log: log.action.startswith("planned_") and log.detail is not None,
             "extract": lambda log: [
                 log.identifier or "",
-                log.action[len("planned_"):],
+                log.action[len("planned_") :],
                 log.detail.get("reason", ""),
                 log.detail.get("professor", "") or log.detail.get("old_professor", ""),
                 str(round(log.detail.get("age_seconds", 0) / 86400, 1)),
@@ -300,7 +333,9 @@ class ReportService:
         {
             "key": "usuarios_creados_manual",
             "headers": ["Username", "Correo institucional", "Nombre y Apellidos", "Base de datos"],
-            "match": lambda log: log.action == "user_created_createpassword" and log.detail is not None,
+            "match": lambda log: (
+                log.action == "user_created_createpassword" and log.detail is not None
+            ),
             "extract": lambda log: [
                 log.identifier or "",
                 log.detail.get("email", ""),
@@ -322,13 +357,17 @@ class ReportService:
         for entry in os.listdir(parent):
             path = os.path.join(parent, entry)
             # Limpiar directorios de reportes (exec_*) y sus ZIPs
-            if entry.startswith("exec_") and os.path.isdir(path) and os.path.getmtime(path) < cutoff:
-                    shutil.rmtree(path, ignore_errors=True)
-                    logger.info("Reportes antiguos eliminados: %s", path)
-                    # También eliminar el ZIP si existe
-                    zip_path = path + ".zip"
-                    if os.path.exists(zip_path):
-                        os.remove(zip_path)
+            if (
+                entry.startswith("exec_")
+                and os.path.isdir(path)
+                and os.path.getmtime(path) < cutoff
+            ):
+                shutil.rmtree(path, ignore_errors=True)
+                logger.info("Reportes antiguos eliminados: %s", path)
+                # También eliminar el ZIP si existe
+                zip_path = path + ".zip"
+                if os.path.exists(zip_path):
+                    os.remove(zip_path)
 
     @classmethod
     def _write_resumen_ejecutivo(cls, report_dir: str, logs: list[ExecutionLog], execution=None):
@@ -349,8 +388,15 @@ class ReportService:
             ]
         metric_rows = [
             ("Categorías creadas", "category_created"),
-            ("Cursos creados", lambda c: c.get("course_created", 0) + c.get("course_created_with_template", 0)
-             + c.get("course_recreated", 0) + c.get("course_hidden_and_created", 0)),
+            (
+                "Cursos creados",
+                lambda c: (
+                    c.get("course_created", 0)
+                    + c.get("course_created_with_template", 0)
+                    + c.get("course_recreated", 0)
+                    + c.get("course_hidden_and_created", 0)
+                ),
+            ),
             ("Cursos eliminados", "course_deleted"),
             ("Cursos ocultados", "course_hidden"),
             ("Cursos renombrados", "course_renamed"),
@@ -361,7 +407,12 @@ class ReportService:
             ("Matriculaciones fallidas", "enrolment_failed"),
             ("Plantillas no encontradas", "template_not_found"),
             ("Correos duplicados", "duplicate_email"),
-            ("Alertas: cursos recientes", lambda c: c.get("alert_disappeared_recent", 0) + c.get("alert_teacher_change_recent", 0)),
+            (
+                "Alertas: cursos recientes",
+                lambda c: (
+                    c.get("alert_disappeared_recent", 0) + c.get("alert_teacher_change_recent", 0)
+                ),
+            ),
         ]
         for label, src in metric_rows:
             val = src(counts) if callable(src) else counts.get(src, 0)
@@ -382,6 +433,7 @@ class ReportService:
     @classmethod
     def _write_audit_errores(cls, report_dir: str, db, execution_id: int):
         from app.db.models import ErrorLog
+
         errors = db.query(ErrorLog).filter(ErrorLog.execution_id == execution_id).all()
         if not errors:
             return

@@ -1,4 +1,5 @@
 """Pruebas del núcleo puro de detección de novedades."""
+
 from app.pipeline.novedades import detect_novedades
 
 IDE = "IDE_0001_sI_101_G-01"

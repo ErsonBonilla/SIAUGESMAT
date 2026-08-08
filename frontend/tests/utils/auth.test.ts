@@ -9,7 +9,11 @@ import {
 import { assert, assertEquals, assertExists, assertFalse } from "@std/assert";
 
 function base64urlEncode(str: string): string {
-  return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  // Codifica como UTF-8 (igual que python-jose) y luego a base64url.
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 function makeToken(payload: Record<string, unknown>): string {
   const header = base64urlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
@@ -72,4 +76,12 @@ Deno.test("getUsername - retorna el username del token", () => {
 Deno.test("getUsername - retorna null si no hay token", () => {
   localStorage.clear();
   assertEquals(getUsername(), null);
+});
+Deno.test("decodifica base64url con '_'/'-' y caracteres UTF-8", () => {
+  // El username contiene "/" y "año": al codificar en base64url aparece "_"
+  // y los bytes multibyte requieren decodificación UTF-8 (atob directo falla).
+  localStorage.clear();
+  setToken(makeToken({ username: "profe/paño" }));
+  assertEquals(getUsername(), "profe/paño");
+  assert(isTokenValid());
 });
