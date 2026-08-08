@@ -21,8 +21,7 @@ export default function QueryHelp({ sections }: QueryHelpProps) {
         class="w-full flex items-center justify-between gap-2 px-4 py-3 text-left cursor-pointer bg-transparent border-none"
       >
         <span class="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-          <span aria-hidden>❓</span>
-          Cómo usar esta consulta
+          Instrucciones
         </span>
         <span
           class="text-sm text-[var(--text-muted)] transition-transform duration-300"
