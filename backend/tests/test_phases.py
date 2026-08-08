@@ -59,7 +59,11 @@ def _make_ctx(test_db, mock_moodle, mode="both"):
             },
         ],
         "enrolments": [
-            {"username": "doc1", "course_shortname": "IDE_0001_sI_101_G-01", "role": "editingteacher"},
+            {
+                "username": "doc1",
+                "course_shortname": "IDE_0001_sI_101_G-01",
+                "role": "editingteacher",
+            },
         ],
     }
 
@@ -86,7 +90,9 @@ class TestConsultPhase:
         ]
         mock_find = AsyncMock()
         with patch.object(MoodleIntegration, "find_users_by_emails", new=mock_find):
-            mock_find.return_value = {"doc1@ut.edu.co": {"username": "doc1", "email": "doc1@ut.edu.co"}}
+            mock_find.return_value = {
+                "doc1@ut.edu.co": {"username": "doc1", "email": "doc1@ut.edu.co"}
+            }
 
             ctx = _make_ctx(test_db, mock_moodle_service)
             phase = ConsultPhase()
@@ -110,12 +116,21 @@ class TestConsultPhase:
     async def test_resolves_user_by_username_when_email_missing(self, test_db, mock_moodle_service):
         mock_moodle_service.get_categories.return_value = []
         mock_moodle_service.get_courses.return_value = []
-        with patch.object(MoodleIntegration, "find_users_by_emails", new=AsyncMock(return_value={})), \
-             patch.object(MoodleIntegration, "find_users_by_usernames",
-                          new=AsyncMock(return_value={
-                              "doc1": {"username": "doc1", "firstname": "Docente", "lastname": "Uno"},
-                          })), \
-             patch.object(MoodleIntegration, "find_users_by_idnumbers", new=AsyncMock(return_value={})):
+        with (
+            patch.object(MoodleIntegration, "find_users_by_emails", new=AsyncMock(return_value={})),
+            patch.object(
+                MoodleIntegration,
+                "find_users_by_usernames",
+                new=AsyncMock(
+                    return_value={
+                        "doc1": {"username": "doc1", "firstname": "Docente", "lastname": "Uno"},
+                    }
+                ),
+            ),
+            patch.object(
+                MoodleIntegration, "find_users_by_idnumbers", new=AsyncMock(return_value={})
+            ),
+        ):
             ctx = _make_ctx(test_db, mock_moodle_service)
             phase = ConsultPhase()
             await phase.run(ctx)
@@ -123,15 +138,26 @@ class TestConsultPhase:
         assert ctx.username_map == {"doc1": "doc1"}
 
     @pytest.mark.asyncio
-    async def test_username_match_with_different_name_is_flagged(self, test_db, mock_moodle_service):
+    async def test_username_match_with_different_name_is_flagged(
+        self, test_db, mock_moodle_service
+    ):
         mock_moodle_service.get_categories.return_value = []
         mock_moodle_service.get_courses.return_value = []
-        with patch.object(MoodleIntegration, "find_users_by_emails", new=AsyncMock(return_value={})), \
-             patch.object(MoodleIntegration, "find_users_by_usernames",
-                          new=AsyncMock(return_value={
-                              "doc1": {"username": "doc1", "firstname": "Carlos", "lastname": "Andres"},
-                          })), \
-             patch.object(MoodleIntegration, "find_users_by_idnumbers", new=AsyncMock(return_value={})):
+        with (
+            patch.object(MoodleIntegration, "find_users_by_emails", new=AsyncMock(return_value={})),
+            patch.object(
+                MoodleIntegration,
+                "find_users_by_usernames",
+                new=AsyncMock(
+                    return_value={
+                        "doc1": {"username": "doc1", "firstname": "Carlos", "lastname": "Andres"},
+                    }
+                ),
+            ),
+            patch.object(
+                MoodleIntegration, "find_users_by_idnumbers", new=AsyncMock(return_value={})
+            ),
+        ):
             ctx = _make_ctx(test_db, mock_moodle_service)
             phase = ConsultPhase()
             await phase.run(ctx)
@@ -142,7 +168,9 @@ class TestConsultPhase:
 
 class TestAnalyzePhase:
     @pytest.mark.asyncio
-    async def test_detects_missing_categories_and_users_to_create(self, test_db, mock_moodle_service):
+    async def test_detects_missing_categories_and_users_to_create(
+        self, test_db, mock_moodle_service
+    ):
         ctx = _make_ctx(test_db, mock_moodle_service)
         ctx.existing_cat_idnumbers = set()
         ctx.username_map = {}
@@ -201,16 +229,25 @@ class TestPersistPlanLogs:
 
         comparison = {
             "logs": [
-                {"action": "course_created", "identifier": "C1",
-                 "detail": {"reason": "new", "professor": "p1"}},
-                {"action": "course_deleted", "identifier": "C2",
-                 "detail": {"reason": "disappeared", "age_seconds": 864000}},
+                {
+                    "action": "course_created",
+                    "identifier": "C1",
+                    "detail": {"reason": "new", "professor": "p1"},
+                },
+                {
+                    "action": "course_deleted",
+                    "identifier": "C2",
+                    "detail": {"reason": "disappeared", "age_seconds": 864000},
+                },
             ],
             "alerts": [
-                {"shortname": "C3", "reason": "disappeared_recent",
-                 "age_seconds": 7200},
-                {"shortname": "C4", "reason": "teacher_change_recent",
-                 "old_professor": "p1", "new_professor": "p2"},
+                {"shortname": "C3", "reason": "disappeared_recent", "age_seconds": 7200},
+                {
+                    "shortname": "C4",
+                    "reason": "teacher_change_recent",
+                    "old_professor": "p1",
+                    "new_professor": "p2",
+                },
                 {"shortname": "C5", "reason": "reason_desconocido"},
             ],
         }
@@ -244,8 +281,11 @@ class TestPersistPlanLogs:
 
     def test_persists_alert_fullname_and_professor_from_map(self, test_db):
         execution = Execution(
-            filename="test.xlsx", semester="2025A", mode="both",
-            status="pending", modalidad="DISTANCIA",
+            filename="test.xlsx",
+            semester="2025A",
+            mode="both",
+            status="pending",
+            modalidad="DISTANCIA",
             created_at=datetime.now(UTC),
         )
         test_db.add(execution)
@@ -254,10 +294,13 @@ class TestPersistPlanLogs:
 
         comparison = {
             "alerts": [
-                {"shortname": "C1", "reason": "disappeared_recent",
-                 "age_seconds": 3600},
-                {"shortname": "C2", "reason": "teacher_change_recent",
-                 "old_professor": "oldp", "new_professor": "newp"},
+                {"shortname": "C1", "reason": "disappeared_recent", "age_seconds": 3600},
+                {
+                    "shortname": "C2",
+                    "reason": "teacher_change_recent",
+                    "old_professor": "oldp",
+                    "new_professor": "newp",
+                },
             ],
         }
         fullname_map = {"C1": "Curso Uno", "C2": "Curso Dos"}
@@ -274,5 +317,3 @@ class TestPersistPlanLogs:
         assert logs[0].detail.get("professor") == ""
         assert logs[1].detail["fullname"] == "Curso Dos"
         assert logs[1].detail["professor"] == "newp"
-
-

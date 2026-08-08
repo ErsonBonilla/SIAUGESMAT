@@ -19,15 +19,22 @@ def is_moodle_overloaded(e: BaseException) -> bool:
     if isinstance(e, httpx.ReadTimeout):
         return True
     inner = e
-    if hasattr(e, 'last_attempt'):
+    if hasattr(e, "last_attempt"):
         try:
             inner = e.last_attempt.exception() or inner
         except Exception:
             logger.debug("No se pudo obtener last_attempt.exception()")
-    if isinstance(inner, MoodleAPIError) and inner.error_code in ("invalidrecord", "storedfilenotcreated", "invalidcoursemodule"):
+    if isinstance(inner, MoodleAPIError) and inner.error_code in (
+        "invalidrecord",
+        "storedfilenotcreated",
+        "invalidcoursemodule",
+    ):
         return True
     msg = str(e).lower()
-    return any(kw in msg for kw in ("gateway time-out", "connect error", "read timeout", "connection refused"))
+    return any(
+        kw in msg
+        for kw in ("gateway time-out", "connect error", "read timeout", "connection refused")
+    )
 
 
 def _is_retryable_error(exception: BaseException) -> bool:
@@ -47,15 +54,30 @@ def _is_retryable_error(exception: BaseException) -> bool:
 class MoodleAPIError(Exception):
     """Excepción lanzada cuando la API de Moodle devuelve un error."""
 
-    NON_RETRYABLE_CODES = frozenset({
-        "invalidparameter", "missingparam", "invaliduser", "invalidcourse",
-        "cannotcreatesitecourse", "invalidtoken", "nopermissions",
-        "accessexception", "contextlevelnotsupported",
-        "duplicatedshortname", "alreadyenrolled", "enrolmentnotfound",
-        "notenrolled", "cannotdeletecategory", "cannotdeletecourse",
-        "couldnotassignrole", "missingcapability", "duplicateuser", "duplicatecourse",
-        "valueofparamelementnotset",
-    })
+    NON_RETRYABLE_CODES = frozenset(
+        {
+            "invalidparameter",
+            "missingparam",
+            "invaliduser",
+            "invalidcourse",
+            "cannotcreatesitecourse",
+            "invalidtoken",
+            "nopermissions",
+            "accessexception",
+            "contextlevelnotsupported",
+            "duplicatedshortname",
+            "alreadyenrolled",
+            "enrolmentnotfound",
+            "notenrolled",
+            "cannotdeletecategory",
+            "cannotdeletecourse",
+            "couldnotassignrole",
+            "missingcapability",
+            "duplicateuser",
+            "duplicatecourse",
+            "valueofparamelementnotset",
+        }
+    )
 
     ERROR_CODES: ClassVar[dict[str, str]] = {
         "invalidparameter": "Parámetro inválido enviado a Moodle.",

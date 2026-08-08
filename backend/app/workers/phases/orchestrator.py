@@ -37,20 +37,25 @@ logger = logging.getLogger(__name__)
 
 
 def _save_phase_2_data_to_checkpoint(db, eid, etl_data, metrics, phase2_data, modalidad, mode):
-    save_checkpoint(db, eid, "phase3_ctx", {
-        "courses": etl_data.get("courses", []),
-        "users": etl_data.get("users", []),
-        "existing_courses": phase2_data.get("1", {}).get("courses", []),
-        "metrics": metrics,
-        "modalidad": modalidad,
-        "mode": mode,
-        "comparison": phase2_data.get("2", {}).get("comparison", {}),
-        "missing_categories": phase2_data.get("2", {}).get("missing_categories", []),
-        "categories_to_relocate": phase2_data.get("2", {}).get("categories_to_relocate", []),
-        "users_to_create": phase2_data.get("2", {}).get("users_to_create", []),
-        "resolved_enrolments": phase2_data.get("2", {}).get("resolved_enrolments", []),
-        "username_map": phase2_data.get("1", {}).get("username_map", {}),
-    })
+    save_checkpoint(
+        db,
+        eid,
+        "phase3_ctx",
+        {
+            "courses": etl_data.get("courses", []),
+            "users": etl_data.get("users", []),
+            "existing_courses": phase2_data.get("1", {}).get("courses", []),
+            "metrics": metrics,
+            "modalidad": modalidad,
+            "mode": mode,
+            "comparison": phase2_data.get("2", {}).get("comparison", {}),
+            "missing_categories": phase2_data.get("2", {}).get("missing_categories", []),
+            "categories_to_relocate": phase2_data.get("2", {}).get("categories_to_relocate", []),
+            "users_to_create": phase2_data.get("2", {}).get("users_to_create", []),
+            "resolved_enrolments": phase2_data.get("2", {}).get("resolved_enrolments", []),
+            "username_map": phase2_data.get("1", {}).get("username_map", {}),
+        },
+    )
 
 
 @celery_app.task(bind=True, soft_time_limit=3600, time_limit=7200)
@@ -81,6 +86,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
             update_progress(db, execution_id, 34, "Preparando items de estructura…", step=3)
 
             if _do_courses() and ctx_data.get("missing_categories"):
+
                 async def _create_cats():
                     ms = get_moodle_service(modalidad)
                     try:
@@ -90,13 +96,21 @@ def process_etl_phase(self, execution_id: int, phase: str):
                                 logger.info(f"Categoría {cat['idnumber']} ya existe, omitiendo")
                                 continue
                             await ms.create_categories([cat])
-                            save_log(db, execution_id, "3", "category_created", cat["idnumber"], {
-                                "name": cat.get("name", ""),
-                                "parent": cat.get("parent", ""),
-                            })
+                            save_log(
+                                db,
+                                execution_id,
+                                "3",
+                                "category_created",
+                                cat["idnumber"],
+                                {
+                                    "name": cat.get("name", ""),
+                                    "parent": cat.get("parent", ""),
+                                },
+                            )
                             increment_metric(db, execution_id, "categories_created")
                     finally:
                         await ms.close()
+
                 try:
                     _run_async(_create_cats())
                 except Exception as e:
@@ -105,6 +119,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
 
             cats_to_relocate = ctx_data.get("categories_to_relocate", [])
             if _do_courses() and cats_to_relocate:
+
                 async def _relocate_cats():
                     ms = get_moodle_service(modalidad)
                     integ = MoodleIntegration(ms)
@@ -119,6 +134,7 @@ def process_etl_phase(self, execution_id: int, phase: str):
                                 logger.info(f"Categoría {cat['idnumber']} reubicada correctamente")
                     finally:
                         await ms.close()
+
                 try:
                     _run_async(_relocate_cats())
                 except Exception as e:
@@ -142,7 +158,9 @@ def process_etl_phase(self, execution_id: int, phase: str):
             structure_items = _get_pending_items(db, execution_id, "3", "structure")
 
             if delete_items:
-                logger.info(f"FASE 3: lanzando {len(delete_items)} delete(s) + {len(structure_items)} estructura(s)")
+                logger.info(
+                    f"FASE 3: lanzando {len(delete_items)} delete(s) + {len(structure_items)} estructura(s)"
+                )
                 _launch_delete_chord(execution_id, delete_items)
             elif structure_items:
                 _launch_items_chord(execution_id, structure_items)
@@ -165,9 +183,11 @@ def process_etl_phase(self, execution_id: int, phase: str):
                 logger.info(f"FASE 4: creando {len(user_items)} usuario(s)")
                 set_chord_active(db, execution_id)
                 task_ids = [process_etl_item.si(item.id) for item in user_items]
-                chord(task_ids)(on_users_done.s(
-                    execution_id=execution_id,
-                ))
+                chord(task_ids)(
+                    on_users_done.s(
+                        execution_id=execution_id,
+                    )
+                )
             elif enrol_items:
                 logger.info(f"FASE 4: enrolando {len(enrol_items)} profesor(es)")
                 set_chord_active(db, execution_id)
@@ -190,21 +210,31 @@ def process_etl_phase(self, execution_id: int, phase: str):
 
 def _save_phase_checkpoint(db, eid, ctx: PhaseContext, phase_name: str):
     if phase_name == "1":
-        save_checkpoint(db, eid, "1", {
-            "cat_idnumbers": list(ctx.existing_cat_idnumbers),
-            "courses": ctx.existing_courses,
-            "username_map": ctx.username_map,
-            "courses_with_teacher": dict(ctx.courses_with_teacher),
-        })
+        save_checkpoint(
+            db,
+            eid,
+            "1",
+            {
+                "cat_idnumbers": list(ctx.existing_cat_idnumbers),
+                "courses": ctx.existing_courses,
+                "username_map": ctx.username_map,
+                "courses_with_teacher": dict(ctx.courses_with_teacher),
+            },
+        )
     elif phase_name == "2":
-        save_checkpoint(db, eid, "2", {
-            "comparison": _serialize_comparison(ctx.comparison),
-            "missing_categories": ctx.missing_categories,
-            "categories_to_relocate": ctx.categories_to_relocate,
-            "users_to_create": ctx.users_to_create,
-            "resolved_enrolments": ctx.resolved_enrolments,
-            "re_upload": ctx.re_upload,
-        })
+        save_checkpoint(
+            db,
+            eid,
+            "2",
+            {
+                "comparison": _serialize_comparison(ctx.comparison),
+                "missing_categories": ctx.missing_categories,
+                "categories_to_relocate": ctx.categories_to_relocate,
+                "users_to_create": ctx.users_to_create,
+                "resolved_enrolments": ctx.resolved_enrolments,
+                "re_upload": ctx.re_upload,
+            },
+        )
 
 
 def _restore_checkpoint(ctx: PhaseContext, data: dict, phase_name: str):
@@ -243,6 +273,7 @@ def _serialize_comparison(comparison: dict) -> dict:
 
 def _is_delete_confirmed(db, execution_id: int) -> bool:
     from app.db.models import Execution
+
     ex = db.query(Execution).filter(Execution.id == execution_id).first()
     if not ex or not ex.phase_checkpoint:
         return False
@@ -253,6 +284,7 @@ def _require_review(db, execution_id: int, ctx):
     from sqlalchemy.orm.attributes import flag_modified
 
     from app.db.models import Execution
+
     ex = db.query(Execution).filter(Execution.id == execution_id).first()
     if ex:
         to_delete_count = len(ctx.comparison.get("to_delete", []))
@@ -278,6 +310,7 @@ def _inc_retry_count(db, execution_id: int) -> int:
     from sqlalchemy.orm.attributes import flag_modified
 
     from app.db.models import Execution
+
     ex = db.query(Execution).filter(Execution.id == execution_id).first()
     if not ex:
         return 0

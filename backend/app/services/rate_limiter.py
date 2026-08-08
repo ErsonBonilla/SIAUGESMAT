@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # Token Bucket local (en memoria)
 # ---------------------------------------------------------------------------
 
+
 class TokenBucket:
     def __init__(self, rate: float, burst: int):
         if rate <= 0:
@@ -57,6 +58,7 @@ class RateLimiter:
 # Redis Rate Limiter (distribuido, sliding-window via sorted sets)
 # ---------------------------------------------------------------------------
 
+
 class RedisRateLimiter:
     """Rate limiter distribuido vía Redis.
     Usa sorted set con timestamps como scores para ventana deslizante.
@@ -71,6 +73,7 @@ class RedisRateLimiter:
     async def _get_pool(self):
         if self._pool is None:
             import redis.asyncio as aredis
+
             self._pool = aredis.ConnectionPool.from_url(
                 settings.REDIS_URL,
                 max_connections=5,
@@ -81,6 +84,7 @@ class RedisRateLimiter:
 
     async def acquire(self) -> None:
         import redis.asyncio as aredis
+
         pool = await self._get_pool()
         if self._redis is None:
             self._redis = aredis.Redis(connection_pool=pool)

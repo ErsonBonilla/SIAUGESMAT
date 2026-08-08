@@ -5,8 +5,7 @@ from typing import ClassVar
 from app.services.charts import ChartService
 
 
-def _make_log(action: str, phase: str = "2", identifier: str = "",
-              detail: dict = None):
+def _make_log(action: str, phase: str = "2", identifier: str = "", detail: dict = None):
     obj = type("FakeLog", (), {})()
     obj.action = action
     obj.phase = phase
@@ -32,19 +31,22 @@ class FakeExec:
 
 
 class TestChartGeneration:
-
     def setup_method(self):
         self.tmpdir = tempfile.mkdtemp()
 
     def test_generate_all_creates_png_and_html(self):
         logs = [
-            _make_log("course_created", identifier="IDE_0105_123_sI_G-A",
-                      detail={"reason": "new", "professor": "p1"}),
-            _make_log("enrolment_ok", identifier="user1",
-                      detail={"course": "IDE_0105_123_sI_G-A"}),
-            _make_log("enrolment_failed", identifier="user2",
-                      detail={"course": "IDE_0105_124_sII_G-B",
-                              "reason": "user_not_found"}),
+            _make_log(
+                "course_created",
+                identifier="IDE_0105_123_sI_G-A",
+                detail={"reason": "new", "professor": "p1"},
+            ),
+            _make_log("enrolment_ok", identifier="user1", detail={"course": "IDE_0105_123_sI_G-A"}),
+            _make_log(
+                "enrolment_failed",
+                identifier="user2",
+                detail={"course": "IDE_0105_124_sII_G-B", "reason": "user_not_found"},
+            ),
         ]
         ChartService.generate_all(FakeExec(), logs, self.tmpdir)
 
@@ -59,7 +61,7 @@ class TestChartGeneration:
         fig = ChartService.resumen_ejecutivo(FakeExec(), [])
         data = fig.data[0]
         assert len(data.y) == 4  # cursos, usuarios, matrículas, errores
-        assert data.x[0] == 5   # courses_created
+        assert data.x[0] == 5  # courses_created
 
     def test_resumen_ejecutivo_json(self):
         result = ChartService.resumen_ejecutivo_json(FakeExec(), [])
@@ -70,7 +72,7 @@ class TestChartGeneration:
         fig = ChartService.tasa_exito(FakeExec(), [])
         data = fig.data[0]
         assert data.values[0] == 10  # enrolments
-        assert data.values[1] == 2   # enrolment_errors
+        assert data.values[1] == 2  # enrolment_errors
 
     def test_tasa_exito_zero_total(self):
         exec_zero = type("FakeExecZero", (), {})()

@@ -10,8 +10,14 @@ from app.pipeline.users import (
 )
 
 
-def _user(username="doc1", email="doc1@ut.edu.co", personal="doc1@gmail.com",
-          first="Docente", last="Uno", cedula="12345"):
+def _user(
+    username="doc1",
+    email="doc1@ut.edu.co",
+    personal="doc1@gmail.com",
+    first="Docente",
+    last="Uno",
+    cedula="12345",
+):
     return {
         "username": username,
         "email": email,
@@ -45,7 +51,9 @@ class TestResolveUsers:
         username_map, events = resolve_users(
             [user],
             {"doc1@ut.edu.co": {"username": "m_doc1"}},
-            {}, {}, {},
+            {},
+            {},
+            {},
         )
         assert username_map == {"doc1": "m_doc1"}
         assert any(t == "user_resolved" for t, _, _ in events)
@@ -56,7 +64,8 @@ class TestResolveUsers:
             [user],
             {},
             {"doc1@gmail.com": {"username": "m_doc1"}},
-            {}, {},
+            {},
+            {},
         )
         assert username_map == {"doc1": "m_doc1"}
 
@@ -64,7 +73,8 @@ class TestResolveUsers:
         user = _user()
         username_map, _ = resolve_users(
             [user],
-            {}, {},
+            {},
+            {},
             {"doc1": {"username": "m_doc1"}},
             {},
         )
@@ -74,7 +84,9 @@ class TestResolveUsers:
         user = _user()
         username_map, _ = resolve_users(
             [user],
-            {}, {}, {},
+            {},
+            {},
+            {},
             {"12345": {"username": "m_doc1"}},
         )
         assert username_map == {"doc1": "m_doc1"}
@@ -89,7 +101,8 @@ class TestResolveUsers:
         user = _user()
         username_map, events = resolve_users(
             [user],
-            {}, {},
+            {},
+            {},
             {"doc1": {"username": "m_doc1", "firstname": "Carlos", "lastname": "Andres"}},
             {},
         )
@@ -102,7 +115,9 @@ class TestResolveUsers:
         user = _user()
         username_map, _ = resolve_users(
             [user],
-            {}, {}, {},
+            {},
+            {},
+            {},
             {"12345": {"username": "m_doc1", "firstname": "Docente", "lastname": "Uno"}},
         )
         assert username_map == {"doc1": "m_doc1"}
@@ -113,7 +128,9 @@ class TestResolveUsers:
         username_map, events = resolve_users(
             [user],
             {"doc1@ut.edu.co": {"username": "m_doc1", "firstname": "Carlos", "lastname": "Andres"}},
-            {}, {}, {},
+            {},
+            {},
+            {},
         )
         assert username_map == {"doc1": "m_doc1"}
         assert all(t != "user_identity_conflict" for t, _, _ in events)
@@ -184,7 +201,11 @@ class TestIndexTeachers:
         idx = index_teachers(users, self._enrolments())
         sn = "IDE_0001_sI_101_G-01"
         assert sorted(idx["by_course"]["usernames"][sn]) == ["doc1", "doc2"]
-        assert sorted(idx["by_course"]["emails"][sn]) == ["a@ut.edu.co", "b@ut.edu.co", "p1@gmail.com"]
+        assert sorted(idx["by_course"]["emails"][sn]) == [
+            "a@ut.edu.co",
+            "b@ut.edu.co",
+            "p1@gmail.com",
+        ]
         assert sorted(idx["by_course"]["idnumbers"][sn]) == ["1", "2"]
 
         bk = ("IDE", "0001", "I", "101", "01")
@@ -212,7 +233,8 @@ class TestLookupTeacherCandidates:
         idx = index_teachers(self._single_user(), enrolments)
 
         emails, usernames, idnumbers = lookup_teacher_candidates(
-            "IDE_0001_sI_101_G-01", idx,
+            "IDE_0001_sI_101_G-01",
+            idx,
         )
         assert emails == ["a@ut.edu.co"]
         assert usernames == ["doc1"]
@@ -226,7 +248,8 @@ class TestLookupTeacherCandidates:
 
         # Mismo base_key (grupo 01) pero con sufijo de profesor distinto.
         emails, usernames, _ = lookup_teacher_candidates(
-            "IDE_0001_sI_101_G-01_99999", idx,
+            "IDE_0001_sI_101_G-01_99999",
+            idx,
         )
         assert emails == ["a@ut.edu.co"]
         assert usernames == ["doc1"]
@@ -234,6 +257,7 @@ class TestLookupTeacherCandidates:
     def test_empty_when_no_candidates(self):
         idx = index_teachers([], [])
         emails, usernames, idnumbers = lookup_teacher_candidates(
-            "IDE_0001_sI_101_G-99", idx,
+            "IDE_0001_sI_101_G-99",
+            idx,
         )
         assert (emails, usernames, idnumbers) == ([], [], [])

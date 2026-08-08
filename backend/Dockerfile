@@ -26,21 +26,25 @@ RUN addgroup --system --gid 1001 app && \
 
 WORKDIR /app
 
-# Copiar e instalar dependencias Python
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copiar e instalar dependencias Python (versiones fijadas en requirements.lock)
+COPY requirements.txt requirements.lock ./
+RUN pip install --no-cache-dir -r requirements.lock
 
-# Copiar código fuente y migraciones
+# Copiar código fuente, migraciones y entrypoint
 COPY ./app ./app
 COPY ./alembic.ini ./alembic.ini
 COPY ./alembic ./alembic
+COPY ./docker-entrypoint.sh ./docker-entrypoint.sh
 
 # Crear directorios para uploads/reports con permisos correctos
 RUN mkdir -p /app/uploads /app/reports && \
-    chown -R app:app /app
+    chown -R app:app /app && \
+    chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 8000
 
 USER app
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

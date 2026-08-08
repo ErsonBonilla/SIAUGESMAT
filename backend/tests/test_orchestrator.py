@@ -135,8 +135,9 @@ class TestSavePhase2Data:
             },
             "1": {"username_map": {}},
         }
-        _save_phase_2_data_to_checkpoint(test_db, execution.id, etl_data, metrics,
-                                          phase2_data, "DISTANCIA", "both")
+        _save_phase_2_data_to_checkpoint(
+            test_db, execution.id, etl_data, metrics, phase2_data, "DISTANCIA", "both"
+        )
         test_db.refresh(execution)
         cp = execution.phase_checkpoint
         assert "phase3_ctx" in cp
@@ -192,8 +193,10 @@ class TestIncRetryCount:
 
 class TestProcessEtlPhase:
     def test_execution_not_found(self):
-        with patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl, \
-             patch("app.workers.phases.orchestrator.get_execution", return_value=None):
+        with (
+            patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl,
+            patch("app.workers.phases.orchestrator.get_execution", return_value=None),
+        ):
             mock_db = MagicMock()
             mock_sl.return_value = mock_db
             process_etl_phase(1, "3")
@@ -201,8 +204,10 @@ class TestProcessEtlPhase:
 
     @pytest.mark.parametrize("status", ["paused", "cancelled"])
     def test_execution_paused_or_cancelled(self, status):
-        with patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl, \
-             patch("app.workers.phases.orchestrator.get_execution") as mock_get_ex:
+        with (
+            patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl,
+            patch("app.workers.phases.orchestrator.get_execution") as mock_get_ex,
+        ):
             mock_ex = MagicMock()
             mock_ex.status = status
             mock_get_ex.return_value = mock_ex
@@ -211,14 +216,19 @@ class TestProcessEtlPhase:
             process_etl_phase(1, "3")
             mock_db.close.assert_called_once()
 
-    @patch("app.workers.phases.orchestrator._create_phase3_items", return_value={"delete": 1, "structure": 0})
+    @patch(
+        "app.workers.phases.orchestrator._create_phase3_items",
+        return_value={"delete": 1, "structure": 0},
+    )
     @patch("app.workers.phases.orchestrator._get_pending_items")
     @patch("app.workers.phases.orchestrator._launch_delete_chord")
     def test_phase3_delete_items(self, mock_launch, mock_pending, mock_create3):
         mock_pending.side_effect = [[MagicMock()], []]
-        with patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl, \
-             patch("app.workers.phases.orchestrator.get_execution") as mock_get_ex, \
-             patch("app.workers.phases.orchestrator.get_checkpoint") as mock_get_cp:
+        with (
+            patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl,
+            patch("app.workers.phases.orchestrator.get_execution") as mock_get_ex,
+            patch("app.workers.phases.orchestrator.get_checkpoint") as mock_get_cp,
+        ):
             mock_ex = MagicMock()
             mock_ex.status = "running"
             mock_get_ex.return_value = mock_ex
@@ -235,14 +245,19 @@ class TestProcessEtlPhase:
             process_etl_phase(1, "3")
             mock_launch.assert_called_once()
 
-    @patch("app.workers.phases.orchestrator._create_phase3_items", return_value={"delete": 0, "structure": 2})
+    @patch(
+        "app.workers.phases.orchestrator._create_phase3_items",
+        return_value={"delete": 0, "structure": 2},
+    )
     @patch("app.workers.phases.orchestrator._get_pending_items")
     @patch("app.workers.phases.orchestrator._launch_items_chord")
     def test_phase3_structure_items(self, mock_launch, mock_pending, mock_create3):
         mock_pending.side_effect = [[], [MagicMock(), MagicMock()]]
-        with patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl, \
-             patch("app.workers.phases.orchestrator.get_execution") as mock_get_ex, \
-             patch("app.workers.phases.orchestrator.get_checkpoint") as mock_get_cp:
+        with (
+            patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl,
+            patch("app.workers.phases.orchestrator.get_execution") as mock_get_ex,
+            patch("app.workers.phases.orchestrator.get_checkpoint") as mock_get_cp,
+        ):
             mock_ex = MagicMock()
             mock_ex.status = "running"
             mock_get_ex.return_value = mock_ex
@@ -259,12 +274,17 @@ class TestProcessEtlPhase:
             process_etl_phase(1, "3")
             mock_launch.assert_called_once()
 
-    @patch("app.workers.phases.orchestrator._create_phase3_items", return_value={"delete": 0, "structure": 0})
+    @patch(
+        "app.workers.phases.orchestrator._create_phase3_items",
+        return_value={"delete": 0, "structure": 0},
+    )
     @patch("app.workers.phases.orchestrator.on_phase_items_done")
     def test_phase3_no_items(self, mock_done, mock_create3):
-        with patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl, \
-             patch("app.workers.phases.orchestrator.get_execution") as mock_get_ex, \
-             patch("app.workers.phases.orchestrator.get_checkpoint") as mock_get_cp:
+        with (
+            patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl,
+            patch("app.workers.phases.orchestrator.get_execution") as mock_get_ex,
+            patch("app.workers.phases.orchestrator.get_checkpoint") as mock_get_cp,
+        ):
             mock_ex = MagicMock()
             mock_ex.status = "running"
             mock_get_ex.return_value = mock_ex
@@ -281,15 +301,20 @@ class TestProcessEtlPhase:
             process_etl_phase(1, "3")
             mock_done.delay.assert_called_once_with([], 1, "3")
 
-    @patch("app.workers.phases.orchestrator._create_phase4_items", return_value={"create_user": 1, "enrol": 0})
+    @patch(
+        "app.workers.phases.orchestrator._create_phase4_items",
+        return_value={"create_user": 1, "enrol": 0},
+    )
     @patch("app.workers.phases.orchestrator._get_pending_items")
     @patch("app.workers.phases.orchestrator.on_users_done")
     def test_phase4_users(self, mock_users, mock_pending, mock_create4):
         mock_pending.return_value = [MagicMock()]
-        with patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl, \
-             patch("app.workers.phases.orchestrator.get_execution") as mock_get_ex, \
-             patch("app.workers.phases.orchestrator.get_checkpoint") as mock_get_cp, \
-             patch("app.workers.phases.orchestrator.chord") as mock_chord:
+        with (
+            patch("app.workers.phases.orchestrator.SessionLocal") as mock_sl,
+            patch("app.workers.phases.orchestrator.get_execution") as mock_get_ex,
+            patch("app.workers.phases.orchestrator.get_checkpoint") as mock_get_cp,
+            patch("app.workers.phases.orchestrator.chord") as mock_chord,
+        ):
             mock_ex = MagicMock()
             mock_ex.status = "running"
             mock_get_ex.return_value = mock_ex

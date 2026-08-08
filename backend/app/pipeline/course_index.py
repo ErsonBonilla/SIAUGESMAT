@@ -36,4 +36,8 @@ def index_courses(courses: list[dict]) -> dict[str, list[dict]]:
 
 
 def build_enrolment_map(enrolments: list[dict]) -> dict[str, str]:
-    return {e["course_shortname"]: e.get("username", "") for e in enrolments if e.get("course_shortname")}
+    return {
+        e["course_shortname"]: e.get("username", "")
+        for e in enrolments
+        if e.get("course_shortname")
+    }

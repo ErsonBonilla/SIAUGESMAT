@@ -34,11 +34,13 @@ def list_csv_files(directory: str) -> list[dict[str, str]]:
         if fname.endswith(".csv"):
             path = os.path.join(directory, fname)
             name = fname.replace(".csv", "")
-            reports.append({
-                "name": name,
-                "filename": fname,
-                "size": os.path.getsize(path),
-            })
+            reports.append(
+                {
+                    "name": name,
+                    "filename": fname,
+                    "size": os.path.getsize(path),
+                }
+            )
     return reports
 
 

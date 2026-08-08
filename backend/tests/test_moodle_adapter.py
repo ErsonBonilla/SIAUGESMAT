@@ -31,10 +31,12 @@ class TestRoleShortnameToId:
 # ---------------------------------------------------------------------------
 def _make_call_ws(responses: dict):
     """Crea un call_ws async que devuelve respuestas según el wsfunction."""
+
     async def call_ws(wsfunction: str, params: dict):
         if wsfunction in responses:
             return responses[wsfunction]
         raise ValueError(f"Unexpected wsfunction: {wsfunction}")
+
     return call_ws
 
 
@@ -49,12 +51,14 @@ class TestMoodle3Adapter:
     @pytest.mark.asyncio
     async def test_enable_self_enrolment_existing(self, adapter):
         """3.x: si existe self-enrolment, retorna la instancia."""
-        call_ws = _make_call_ws({
-            "core_enrol_get_course_enrolment_methods": [
-                {"type": "manual", "id": 1},
-                {"type": "self", "id": 42},
-            ],
-        })
+        call_ws = _make_call_ws(
+            {
+                "core_enrol_get_course_enrolment_methods": [
+                    {"type": "manual", "id": 1},
+                    {"type": "self", "id": 42},
+                ],
+            }
+        )
         result = await adapter.enable_self_enrolment(500, call_ws)
         assert result["id"] == 42
         assert result["type"] == "self"
@@ -62,11 +66,13 @@ class TestMoodle3Adapter:
     @pytest.mark.asyncio
     async def test_enable_self_enrolment_missing_raises(self, adapter):
         """3.x: si no existe self-enrolment, lanza excepción."""
-        call_ws = _make_call_ws({
-            "core_enrol_get_course_enrolment_methods": [
-                {"type": "manual", "id": 1},
-            ],
-        })
+        call_ws = _make_call_ws(
+            {
+                "core_enrol_get_course_enrolment_methods": [
+                    {"type": "manual", "id": 1},
+                ],
+            }
+        )
         with pytest.raises(ValueError, match="Enrolment 'self' no encontrado"):
             await adapter.enable_self_enrolment(500, call_ws)
 

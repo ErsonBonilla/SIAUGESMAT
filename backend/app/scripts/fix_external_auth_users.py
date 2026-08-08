@@ -46,8 +46,10 @@ async def _get_users_batch(ms, usernames: list) -> list:
     for i, u in enumerate(usernames):
         params[f"values[{i}]"] = u
     result = await ms._request(
-        "core_user_get_users_by_field", params,
-        use_post=True, timeout=60.0,
+        "core_user_get_users_by_field",
+        params,
+        use_post=True,
+        timeout=60.0,
     )
     if isinstance(result, list):
         return result
@@ -58,7 +60,8 @@ async def _find_user_by_username(ms, username: str) -> dict | None:
     result = await ms._request(
         "core_user_get_users",
         params={"criteria[0][key]": "username", "criteria[0][value]": username},
-        use_post=True, timeout=60.0,
+        use_post=True,
+        timeout=60.0,
     )
     if isinstance(result, dict):
         users = result.get("users", [])
@@ -69,10 +72,13 @@ async def _find_user_by_username(ms, username: str) -> dict | None:
 async def _fix_user_auth(ms, user: dict) -> bool:
     """Repara un usuario individual."""
     try:
-        await ms._request("core_user_update_users", params={
-            "users[0][id]": user["id"],
-            "users[0][auth]": "manual",
-        })
+        await ms._request(
+            "core_user_update_users",
+            params={
+                "users[0][id]": user["id"],
+                "users[0][auth]": "manual",
+            },
+        )
         return True
     except Exception as e:
         logger.exception(f"  Fallo al reparar {user.get('username')} (id={user['id']}): {e}")
@@ -106,11 +112,13 @@ def _get_all_known_usernames() -> list:
     """Todos los usernames procesados por el app (enrol+create, sin limite de tiempo)."""
     db = SessionLocal()
     try:
-        rows = db.execute(text(
-            "SELECT DISTINCT identifier FROM execution_logs "
-            "WHERE action IN ('enrolment_ok', 'user_created_createpassword') "
-            "ORDER BY identifier"
-        )).fetchall()
+        rows = db.execute(
+            text(
+                "SELECT DISTINCT identifier FROM execution_logs "
+                "WHERE action IN ('enrolment_ok', 'user_created_createpassword') "
+                "ORDER BY identifier"
+            )
+        ).fetchall()
         return [r[0] for r in rows]
     finally:
         db.close()
@@ -121,12 +129,15 @@ def _get_recent_enrolled_usernames(days: int) -> list:
     since = datetime.now(UTC) - timedelta(days=days)
     db = SessionLocal()
     try:
-        rows = db.execute(text(
-            "SELECT DISTINCT identifier FROM execution_logs "
-            "WHERE action IN ('enrolment_ok', 'user_created_createpassword') "
-            "AND created_at >= :since "
-            "ORDER BY identifier"
-        ), {"since": since}).fetchall()
+        rows = db.execute(
+            text(
+                "SELECT DISTINCT identifier FROM execution_logs "
+                "WHERE action IN ('enrolment_ok', 'user_created_createpassword') "
+                "AND created_at >= :since "
+                "ORDER BY identifier"
+            ),
+            {"since": since},
+        ).fetchall()
         return [r[0] for r in rows]
     finally:
         db.close()
@@ -139,7 +150,7 @@ def _print_user(user: dict, idx: int = 0):
     username = user.get("username", "?")
     email = (user.get("email") or "sin email").strip().lower()
     auth = user.get("auth", "?")
-    fullname = f"{user.get('firstname','')} {user.get('lastname','')}".strip()
+    fullname = f"{user.get('firstname', '')} {user.get('lastname', '')}".strip()
     prefix = f"   #{idx:<3}" if idx else "   "
     print(f"{prefix}{username:<20} {email:<35} auth={auth:<8} {fullname}")
 
@@ -158,11 +169,11 @@ async def _audit_and_fix(ms, usernames: list, fix_all: bool, days: int):
     affected = []
 
     for i in range(0, len(usernames), BATCH_SIZE):
-        batch = usernames[i:i + BATCH_SIZE]
+        batch = usernames[i : i + BATCH_SIZE]
         try:
             users = await _get_users_batch(ms, batch)
         except Exception as e:
-            print(f"   ERROR lote {i//BATCH_SIZE + 1}: {e}")
+            print(f"   ERROR lote {i // BATCH_SIZE + 1}: {e}")
             continue
         for user in users:
             auth = user.get("auth", "")
@@ -203,7 +214,7 @@ async def _audit_and_fix(ms, usernames: list, fix_all: bool, days: int):
     print(f"\n   Aplicando reparacion en lotes de {FIX_BATCH_SIZE} ({len(affected)} usuarios)...\n")
     ok = fail = 0
     for i in range(0, len(affected), FIX_BATCH_SIZE):
-        batch = affected[i:i + FIX_BATCH_SIZE]
+        batch = affected[i : i + FIX_BATCH_SIZE]
         b_ok, b_fail = await _fix_users_batch(ms, batch)
         ok += b_ok
         fail += b_fail
@@ -219,9 +230,13 @@ async def _audit_and_fix(ms, usernames: list, fix_all: bool, days: int):
 async def _get_user_courses(ms, user_id: int) -> list:
     """Cursos en los que el usuario esta enrolado."""
     try:
-        result = await ms._request("core_enrol_get_users_courses", {
-            "userid": user_id,
-        }, timeout=30.0)
+        result = await ms._request(
+            "core_enrol_get_users_courses",
+            {
+                "userid": user_id,
+            },
+            timeout=30.0,
+        )
         if isinstance(result, list):
             return result
     except Exception:
@@ -245,10 +260,15 @@ async def _delete_users(ms, user_ids: list) -> bool:
 async def _find_users_by_email(ms, email: str) -> list:
     """Busca TODOS los usuarios con un email (incluye los que NO estan en los logs del app)."""
     try:
-        result = await ms._request("core_user_get_users_by_field", {
-            "field": "email",
-            "values[0]": email,
-        }, use_post=True, timeout=30.0)
+        result = await ms._request(
+            "core_user_get_users_by_field",
+            {
+                "field": "email",
+                "values[0]": email,
+            },
+            use_post=True,
+            timeout=30.0,
+        )
         if isinstance(result, list):
             return result
     except Exception:
@@ -267,11 +287,11 @@ async def _dedup_flow(ms, fix: bool, days: int):
 
     all_users: list = []
     for i in range(0, len(usernames), BATCH_SIZE):
-        batch = usernames[i:i + BATCH_SIZE]
+        batch = usernames[i : i + BATCH_SIZE]
         try:
             users = await _get_users_batch(ms, batch)
         except Exception as e:
-            print(f"   ERROR lote {i//BATCH_SIZE + 1}: {e}")
+            print(f"   ERROR lote {i // BATCH_SIZE + 1}: {e}")
             continue
         for user in users:
             email = (user.get("email") or "").strip().lower()
@@ -324,7 +344,7 @@ async def _dedup_flow(ms, fix: bool, days: int):
         for u in users:
             courses = await _get_user_courses(ms, u["id"])
             u["_courses"] = len(courses)
-            label = f"{u['username']} (id={u['id']}, cursos={u['_courses']}, firstaccess={u.get('firstaccess','?')})"
+            label = f"{u['username']} (id={u['id']}, cursos={u['_courses']}, firstaccess={u.get('firstaccess', '?')})"
             print(f"      {label}")
             if courses:
                 with_courses.append(u)
@@ -354,11 +374,15 @@ async def _dedup_flow(ms, fix: bool, days: int):
         else:
             # Varios con cursos: requiere decision manual
             to_warn.append((email, with_courses))
-            print(f"      *** ATENCION: {len(with_courses)} usuarios con cursos. Requiere decision manual. ***")
+            print(
+                f"      *** ATENCION: {len(with_courses)} usuarios con cursos. Requiere decision manual. ***"
+            )
         print()
 
     if to_warn:
-        print(f"   *** {len(to_warn)} emails requieren decision manual (varios usuarios con cursos):\n")
+        print(
+            f"   *** {len(to_warn)} emails requieren decision manual (varios usuarios con cursos):\n"
+        )
         for email, users in to_warn:
             print(f"   {email}:")
             for u in users:
@@ -369,8 +393,9 @@ async def _dedup_flow(ms, fix: bool, days: int):
         print("   No hay usuarios seguros para eliminar (todos tienen cursos).\n")
         return
 
-    print(f"   >>> {'DRY RUN' if not fix else 'ELIMINANDO'} - "
-          f"{len(to_delete)} usuarios sin cursos:\n")
+    print(
+        f"   >>> {'DRY RUN' if not fix else 'ELIMINANDO'} - {len(to_delete)} usuarios sin cursos:\n"
+    )
     for u in to_delete:
         email = (u.get("email") or "").strip().lower()
         print(f"      {u['username']:<20} id={u['id']:<6} {email}  (0 cursos)")
@@ -395,24 +420,29 @@ async def _dedup_flow(ms, fix: bool, days: int):
                 print(f"   [ERROR] {u['username']}")
         print(f"\n  Eliminados: {ok}")
         print(f"  Fallidos:  {fail}\n")
+
+
 async def main():
     parser = argparse.ArgumentParser(
         description="Audita y repara usuarios de Moodle con auth externo"
     )
-    parser.add_argument("--modalidad", default="DISTANCIA",
-                        help="Modalidad (DISTANCIA/PRESENCIAL)")
-    parser.add_argument("--user", type=str, default=None,
-                        help="Reparar un usuario especifico por username")
-    parser.add_argument("--fix", action="store_true",
-                        help="Aplicar reparacion (con --user)")
-    parser.add_argument("--audit", action="store_true",
-                        help="Auditar enrolados recientes con auth != manual")
-    parser.add_argument("--fix-all", action="store_true",
-                        help="Reparar TODOS los encontrados en la auditoria")
-    parser.add_argument("--days", type=int, default=15,
-                        help="Dias hacia atras para la auditoria (default 15)")
-    parser.add_argument("--dedup", action="store_true",
-                        help="[PENDIENTE] Consolidar emails duplicados (Fase 3)")
+    parser.add_argument("--modalidad", default="DISTANCIA", help="Modalidad (DISTANCIA/PRESENCIAL)")
+    parser.add_argument(
+        "--user", type=str, default=None, help="Reparar un usuario especifico por username"
+    )
+    parser.add_argument("--fix", action="store_true", help="Aplicar reparacion (con --user)")
+    parser.add_argument(
+        "--audit", action="store_true", help="Auditar enrolados recientes con auth != manual"
+    )
+    parser.add_argument(
+        "--fix-all", action="store_true", help="Reparar TODOS los encontrados en la auditoria"
+    )
+    parser.add_argument(
+        "--days", type=int, default=15, help="Dias hacia atras para la auditoria (default 15)"
+    )
+    parser.add_argument(
+        "--dedup", action="store_true", help="[PENDIENTE] Consolidar emails duplicados (Fase 3)"
+    )
     args = parser.parse_args()
 
     print(f"\n=== fix_external_auth_users | modalidad={args.modalidad} ===\n")

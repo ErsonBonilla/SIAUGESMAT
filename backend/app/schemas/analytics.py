@@ -14,12 +14,14 @@ class SemesterMetrics(BaseModel):
     avg_duration_seconds: float
     last_completed: datetime | None = None
 
+
 class SemaphoreStatus(BaseModel):
     semester: str
     status: str  # green, yellow, red, gray
     error_rate: float
     avg_duration: float
     message: str
+
 
 class LatestExecution(BaseModel):
     id: int

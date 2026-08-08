@@ -52,11 +52,15 @@ class TestRealMoodleCategoria:
 
         try:
             # Crear
-            await ms.create_categories([{
-                "name": f"CAT INTEGRACION {uid}",
-                "idnumber": cat_idn,
-                "parent": 0,
-            }])
+            await ms.create_categories(
+                [
+                    {
+                        "name": f"CAT INTEGRACION {uid}",
+                        "idnumber": cat_idn,
+                        "parent": 0,
+                    }
+                ]
+            )
             cats = await ms.get_categories(idnumber=cat_idn)
             assert cats, "La categoría no se encontró después de crearla"
 
@@ -79,20 +83,28 @@ class TestRealMoodleCurso:
 
         try:
             # Crear categoría padre primero
-            await ms.create_categories([{
-                "name": f"CAT INT {uid}",
-                "idnumber": cat_idn,
-                "parent": 0,
-            }])
+            await ms.create_categories(
+                [
+                    {
+                        "name": f"CAT INT {uid}",
+                        "idnumber": cat_idn,
+                        "parent": 0,
+                    }
+                ]
+            )
 
             # Crear curso
-            r = await ms.create_courses([{
-                "shortname": sn,
-                "fullname": f"CURSO INTEGRACION {uid}",
-                "categoryidnumber": cat_idn,
-                "format": "onetopic",
-                "visible": 1,
-            }])
+            r = await ms.create_courses(
+                [
+                    {
+                        "shortname": sn,
+                        "fullname": f"CURSO INTEGRACION {uid}",
+                        "categoryidnumber": cat_idn,
+                        "format": "onetopic",
+                        "visible": 1,
+                    }
+                ]
+            )
             assert r, "create_courses no devolvió resultado"
             assert r[0].get("id"), "El curso creado no tiene ID"
 
@@ -124,13 +136,17 @@ class TestRealMoodleUsuario:
 
         try:
             # Crear
-            await ms.create_users([{
-                "username": username,
-                "firstname": "Test",
-                "lastname": f"Integracion{uid}",
-                "email": f"{username}@test.com",
-                "createpassword": True,
-            }])
+            await ms.create_users(
+                [
+                    {
+                        "username": username,
+                        "firstname": "Test",
+                        "lastname": f"Integracion{uid}",
+                        "email": f"{username}@test.com",
+                        "createpassword": True,
+                    }
+                ]
+            )
             users = await ms.get_users("username", [username])
             assert users, "El usuario no se encontró después de crearlo"
             assert users[0]["username"] == username
@@ -155,32 +171,44 @@ class TestRealMoodleFlujoCompleto:
 
         try:
             # 1. Crear categoría
-            await ms.create_categories([{
-                "name": f"FLOW CAT {uid}",
-                "idnumber": cat_idn,
-                "parent": 0,
-            }])
+            await ms.create_categories(
+                [
+                    {
+                        "name": f"FLOW CAT {uid}",
+                        "idnumber": cat_idn,
+                        "parent": 0,
+                    }
+                ]
+            )
             cats = await ms.get_categories(idnumber=cat_idn)
             assert cats, "1. Crear categoría falló"
 
             # 2. Crear curso
-            r = await ms.create_courses([{
-                "shortname": sn,
-                "fullname": f"FLOW CURSO {uid}",
-                "categoryidnumber": cat_idn,
-                "format": "onetopic",
-                "visible": 1,
-            }])
+            r = await ms.create_courses(
+                [
+                    {
+                        "shortname": sn,
+                        "fullname": f"FLOW CURSO {uid}",
+                        "categoryidnumber": cat_idn,
+                        "format": "onetopic",
+                        "visible": 1,
+                    }
+                ]
+            )
             assert r and r[0].get("id"), "2. Crear curso falló"
 
             # 3. Crear usuario
-            await ms.create_users([{
-                "username": username,
-                "firstname": "Flow",
-                "lastname": uid,
-                "email": f"{username}@test.com",
-                "createpassword": True,
-            }])
+            await ms.create_users(
+                [
+                    {
+                        "username": username,
+                        "firstname": "Flow",
+                        "lastname": uid,
+                        "email": f"{username}@test.com",
+                        "createpassword": True,
+                    }
+                ]
+            )
             users = await ms.get_users("username", [username])
             assert users, "3. Crear usuario falló"
 
@@ -214,19 +242,27 @@ class TestRealMoodleCursoConTemplate:
         sn = f"TEST_INT_NTPL_{uid}"
 
         try:
-            await ms.create_categories([{
-                "name": f"CAT NTPL {uid}",
-                "idnumber": cat_idn,
-                "parent": 0,
-            }])
+            await ms.create_categories(
+                [
+                    {
+                        "name": f"CAT NTPL {uid}",
+                        "idnumber": cat_idn,
+                        "parent": 0,
+                    }
+                ]
+            )
 
-            r = await ms.create_courses([{
-                "shortname": sn,
-                "fullname": f"CURSO NTPL {uid}",
-                "categoryidnumber": cat_idn,
-                "format": "onetopic",
-                "visible": 1,
-            }])
+            r = await ms.create_courses(
+                [
+                    {
+                        "shortname": sn,
+                        "fullname": f"CURSO NTPL {uid}",
+                        "categoryidnumber": cat_idn,
+                        "format": "onetopic",
+                        "visible": 1,
+                    }
+                ]
+            )
             assert r and r[0].get("id"), "create_courses sin template falló"
 
             courses = await ms.get_courses(shortname=sn)
@@ -251,24 +287,32 @@ class TestRealMoodleCursoConTemplate:
         sn = f"TEST_INT_IMP_{uid}"
 
         try:
-            await ms.create_categories([{
-                "name": f"CAT IMP {uid}",
-                "idnumber": cat_idn,
-                "parent": 0,
-            }])
+            await ms.create_categories(
+                [
+                    {
+                        "name": f"CAT IMP {uid}",
+                        "idnumber": cat_idn,
+                        "parent": 0,
+                    }
+                ]
+            )
 
             templates = await ms.get_courses(shortname=settings.DEFAULT_COURSE_TEMPLATE)
             assert templates, f"Template '{settings.DEFAULT_COURSE_TEMPLATE}' no existe"
             template_id = int(templates[0]["id"])
 
             # Paso 1: crear curso vacío (activa instancia enrol manual)
-            r = await ms.create_courses([{
-                "shortname": sn,
-                "fullname": f"CURSO IMP {uid}",
-                "categoryidnumber": cat_idn,
-                "format": "onetopic",
-                "visible": 1,
-            }])
+            r = await ms.create_courses(
+                [
+                    {
+                        "shortname": sn,
+                        "fullname": f"CURSO IMP {uid}",
+                        "categoryidnumber": cat_idn,
+                        "format": "onetopic",
+                        "visible": 1,
+                    }
+                ]
+            )
             assert r and r[0].get("id"), "create_courses sin template falló"
             course_id = int(r[0]["id"])
 
@@ -295,11 +339,15 @@ class TestRealMoodleCursoConTemplate:
         sn = f"TEST_INT_DUP_{uid}"
 
         try:
-            await ms.create_categories([{
-                "name": f"CAT DUP {uid}",
-                "idnumber": cat_idn,
-                "parent": 0,
-            }])
+            await ms.create_categories(
+                [
+                    {
+                        "name": f"CAT DUP {uid}",
+                        "idnumber": cat_idn,
+                        "parent": 0,
+                    }
+                ]
+            )
             cats = await ms.get_categories(idnumber=cat_idn)
             cat_id = int(cats[0]["id"])
 

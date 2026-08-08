@@ -1,4 +1,5 @@
 """Pruebas del núcleo puro de clasificación de categorías."""
+
 from app.pipeline.categories import classify_categories
 
 
@@ -15,7 +16,9 @@ class TestClassifyCategories:
 
     def test_existing_category_not_missing(self):
         missing, _ = classify_categories(
-            [_cat()], {"IDE"}, {"IDE": {"id": 1, "parent": 0}},
+            [_cat()],
+            {"IDE"},
+            {"IDE": {"id": 1, "parent": 0}},
         )
         assert missing == []
 

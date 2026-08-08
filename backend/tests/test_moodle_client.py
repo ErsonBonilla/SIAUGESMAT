@@ -95,10 +95,15 @@ class TestRequest:
         mock_http.get.return_value = fake_resp
 
         unwrapped = c._request_with_retry.__func__.__wrapped__
+
         async def _call(*a, **kw):
             return await unwrapped(c, *a, **kw)
+
         mock_method = AsyncMock(side_effect=_call)
-        with patch.object(c, '_request_with_retry', mock_method), pytest.raises(MoodleAPIError, match="Respuesta inesperada"):
+        with (
+            patch.object(c, "_request_with_retry", mock_method),
+            pytest.raises(MoodleAPIError, match="Respuesta inesperada"),
+        ):
             await c._request("core_course_get_courses", {})
 
     @pytest.mark.asyncio
@@ -134,16 +139,19 @@ class TestRequest:
 class TestGeneratePassword:
     def test_default_length(self):
         from app.services.moodle_client import generate_moodle_password
+
         pwd = generate_moodle_password()
         assert len(pwd) == 14
 
     def test_custom_length(self):
         from app.services.moodle_client import generate_moodle_password
+
         pwd = generate_moodle_password(length=20)
         assert len(pwd) == 20
 
     def test_contains_required_chars(self):
         from app.services.moodle_client import generate_moodle_password
+
         pwd = generate_moodle_password()
         assert any(c.islower() for c in pwd)
         assert any(c.isupper() for c in pwd)

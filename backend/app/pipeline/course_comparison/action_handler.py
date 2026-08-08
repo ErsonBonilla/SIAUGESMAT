@@ -1,4 +1,3 @@
-
 from app.pipeline.course_comparison.thresholds import DEFAULT_COURSE_MAX_AGE_SECONDS
 from app.pipeline.course_comparison.utils import (
     get_course_age_seconds,

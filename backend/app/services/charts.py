@@ -27,13 +27,25 @@ PALETTE_DARK = {
 }
 
 PALETTE_CATEGORICAL_LIGHT = [
-    "#ED3237", "#00A859", "#1A1A1A", "#E63946",
-    "#2D6A4F", "#404040", "#FF6B6B", "#40916C",
+    "#ED3237",
+    "#00A859",
+    "#1A1A1A",
+    "#E63946",
+    "#2D6A4F",
+    "#404040",
+    "#FF6B6B",
+    "#40916C",
 ]
 
 PALETTE_CATEGORICAL_DARK = [
-    "#F87171", "#34D399", "#cdd6f4", "#FCA5A5",
-    "#6EE7B7", "#a6adc8", "#FCA5A5", "#A7F3D0",
+    "#F87171",
+    "#34D399",
+    "#cdd6f4",
+    "#FCA5A5",
+    "#6EE7B7",
+    "#a6adc8",
+    "#FCA5A5",
+    "#A7F3D0",
 ]
 
 
@@ -67,7 +79,6 @@ def _default_fig(title: str, theme: str = "light") -> go.Figure:
 
 
 class ChartService:
-
     CHART_NAMES: ClassVar[dict[str, str]] = {
         "resumen_ejecutivo": "1_resumen_ejecutivo",
         "tasa_exito": "2_tasa_exito",
@@ -108,7 +119,9 @@ class ChartService:
     # 1. Resumen ejecutivo — 4 KPIs en barras horizontales
     # ------------------------------------------------------------------
     @classmethod
-    def resumen_ejecutivo(cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light") -> go.Figure:
+    def resumen_ejecutivo(
+        cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light"
+    ) -> go.Figure:
         palette = _get_palette(theme)
         m = execution.metrics or {}
         labels = ["Cursos creados", "Usuarios nuevos", "Matrículas exitosas", "Errores totales"]
@@ -120,16 +133,23 @@ class ChartService:
         ]
         colors = [palette["verde"], palette["verde"], palette["verde"], palette["rojo"]]
         fig = _default_fig("", theme)
-        fig.add_trace(go.Bar(
-            y=labels, x=values, orientation="h",
-            marker_color=colors, text=values, textposition="outside",
-            textfont={"color": palette["negro"]},
-        ))
+        fig.add_trace(
+            go.Bar(
+                y=labels,
+                x=values,
+                orientation="h",
+                marker_color=colors,
+                text=values,
+                textposition="outside",
+                textfont={"color": palette["negro"]},
+            )
+        )
         fig.update_layout(
             title={"text": "Resumen ejecutivo", "font": {"size": 16, "color": palette["negro"]}},
             xaxis={"title": "Cantidad", "dtick": 1, "gridcolor": palette["grid"]},
             yaxis={"gridcolor": palette["grid"]},
-            showlegend=False, margin={"l": 150, "r": 80, "t": 50, "b": 30},
+            showlegend=False,
+            margin={"l": 150, "r": 80, "t": 50, "b": 30},
         )
         return fig
 
@@ -141,7 +161,9 @@ class ChartService:
     # 2. Tasa de éxito de matrícula — donut con % grande al centro
     # ------------------------------------------------------------------
     @classmethod
-    def tasa_exito(cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light") -> go.Figure:
+    def tasa_exito(
+        cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light"
+    ) -> go.Figure:
         palette = _get_palette(theme)
         m = execution.metrics or {}
         ok = m.get("enrolments", 0)
@@ -151,18 +173,32 @@ class ChartService:
         color = palette["verde"] if rate >= 95 else ("#F59E0B" if rate >= 85 else palette["rojo"])
 
         fig = _default_fig("", theme)
-        fig.add_trace(go.Pie(
-            labels=["Exitosas", "Fallidas"], values=[ok, fail],
-            hole=0.7, marker={"colors": [color, "#E5E7EB"]},
-            textinfo="none", sort=False,
-        ))
+        fig.add_trace(
+            go.Pie(
+                labels=["Exitosas", "Fallidas"],
+                values=[ok, fail],
+                hole=0.7,
+                marker={"colors": [color, "#E5E7EB"]},
+                textinfo="none",
+                sort=False,
+            )
+        )
         fig.add_annotation(
-            text=f"<b>{rate}%</b>", font={"size": 36, "color": color}, showarrow=False,
-            x=0.5, y=0.5, xref="paper", yref="paper",
+            text=f"<b>{rate}%</b>",
+            font={"size": 36, "color": color},
+            showarrow=False,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
         )
         fig.update_layout(
-            title={"text": "Tasa de éxito de matrícula", "font": {"size": 16, "color": palette["negro"]}},
-            showlegend=True, legend={"orientation": "h", "y": -0.1, "font": {"color": palette["negro"]}},
+            title={
+                "text": "Tasa de éxito de matrícula",
+                "font": {"size": 16, "color": palette["negro"]},
+            },
+            showlegend=True,
+            legend={"orientation": "h", "y": -0.1, "font": {"color": palette["negro"]}},
             margin={"l": 30, "r": 30, "t": 50, "b": 50},
         )
         return fig
@@ -175,14 +211,18 @@ class ChartService:
     # 3. Top 10 programas — barras horizontales por cantidad de cursos
     # ------------------------------------------------------------------
     @classmethod
-    def top_programas(cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light") -> go.Figure:
+    def top_programas(
+        cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light"
+    ) -> go.Figure:
         palette = _get_palette(theme)
         counts: dict[str, int] = defaultdict(int)
         for log_entry in logs:
             sn = log_entry.identifier or ""
             prefix = _cat_prefix_from_shortname(sn)
             if prefix and log_entry.action in (
-                "course_created", "course_created_with_template", "course_recreated",
+                "course_created",
+                "course_created_with_template",
+                "course_recreated",
             ):
                 counts[prefix] += 1
         program_names = {"IDE": "IDEAD", "URA": "Urabá", "FAC": "Facultad"}
@@ -190,16 +230,23 @@ class ChartService:
         labels = [program_names.get(k, k) for k, _ in sorted_items]
         values = [v for _, v in sorted_items]
         fig = _default_fig("", theme)
-        fig.add_trace(go.Bar(
-            y=labels, x=values, orientation="h",
-            marker_color=palette["verde"], text=values, textposition="outside",
-            textfont={"color": palette["negro"]},
-        ))
+        fig.add_trace(
+            go.Bar(
+                y=labels,
+                x=values,
+                orientation="h",
+                marker_color=palette["verde"],
+                text=values,
+                textposition="outside",
+                textfont={"color": palette["negro"]},
+            )
+        )
         fig.update_layout(
             title={"text": "Top programas", "font": {"size": 16, "color": palette["negro"]}},
             xaxis={"title": "Cursos", "dtick": 1, "gridcolor": palette["grid"]},
             yaxis={"gridcolor": palette["grid"]},
-            showlegend=False, margin={"l": 120, "r": 60, "t": 50, "b": 30},
+            showlegend=False,
+            margin={"l": 120, "r": 60, "t": 50, "b": 30},
         )
         fig.update_yaxes(autorange="reversed")
         return fig
@@ -212,31 +259,48 @@ class ChartService:
     # 4. Distribución de usuarios — donut nuevos vs existentes
     # ------------------------------------------------------------------
     @classmethod
-    def distribucion_usuarios(cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light") -> go.Figure:
+    def distribucion_usuarios(
+        cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light"
+    ) -> go.Figure:
         palette = _get_palette(theme)
         nuevos = sum(1 for log in logs if log.action == "user_created_createpassword")
         resueltos = sum(1 for log in logs if log.action == "user_resolved")
         total = nuevos + resueltos
         if total == 0:
             fig = _default_fig("", theme)
-            fig.update_layout(title={"text": "Usuarios", "font": {"size": 16, "color": palette["negro"]}})
+            fig.update_layout(
+                title={"text": "Usuarios", "font": {"size": 16, "color": palette["negro"]}}
+            )
             fig.add_annotation(text="Sin datos", showarrow=False, font={"color": palette["negro"]})
             return fig
         fig = _default_fig("", theme)
         pct_nuevos = round(nuevos / total * 100)
-        fig.add_trace(go.Pie(
-            labels=["Nuevos", "Existentes"], values=[nuevos, resueltos],
-            hole=0.6, marker={"colors": [palette["verde"], palette["negro"]]},
-            textinfo="label+percent", sort=False,
-        ))
+        fig.add_trace(
+            go.Pie(
+                labels=["Nuevos", "Existentes"],
+                values=[nuevos, resueltos],
+                hole=0.6,
+                marker={"colors": [palette["verde"], palette["negro"]]},
+                textinfo="label+percent",
+                sort=False,
+            )
+        )
         fig.add_annotation(
             text=f"<b>{pct_nuevos}%</b><br><span style='font-size:12px'>nuevos</span>",
-            font={"size": 28, "color": palette["verde"]}, showarrow=False,
-            x=0.5, y=0.5, xref="paper", yref="paper",
+            font={"size": 28, "color": palette["verde"]},
+            showarrow=False,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
         )
         fig.update_layout(
-            title={"text": "Distribución de usuarios", "font": {"size": 16, "color": palette["negro"]}},
-            showlegend=False, margin={"l": 30, "r": 30, "t": 50, "b": 30},
+            title={
+                "text": "Distribución de usuarios",
+                "font": {"size": 16, "color": palette["negro"]},
+            },
+            showlegend=False,
+            margin={"l": 30, "r": 30, "t": 50, "b": 30},
         )
         return fig
 
@@ -248,7 +312,9 @@ class ChartService:
     # 5. Top 5 incidencias — barras horizontales por frecuencia
     # ------------------------------------------------------------------
     @classmethod
-    def top_incidencias(cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light") -> go.Figure:
+    def top_incidencias(
+        cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light"
+    ) -> go.Figure:
         palette = _get_palette(theme)
         incidencia_labels = {
             "enrolment_failed": "Matrícula fallida",
@@ -264,23 +330,36 @@ class ChartService:
                 counts[label] += 1
         if not counts:
             fig = _default_fig("", theme)
-            fig.update_layout(title={"text": "Incidencias", "font": {"size": 16, "color": palette["negro"]}})
-            fig.add_annotation(text="Sin incidencias ✓", showarrow=False, font={"color": palette["verde"], "size": 18})
+            fig.update_layout(
+                title={"text": "Incidencias", "font": {"size": 16, "color": palette["negro"]}}
+            )
+            fig.add_annotation(
+                text="Sin incidencias ✓",
+                showarrow=False,
+                font={"color": palette["verde"], "size": 18},
+            )
             return fig
         sorted_items = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:5]
         labels = [k for k, _ in sorted_items]
         values = [v for _, v in sorted_items]
         fig = _default_fig("", theme)
-        fig.add_trace(go.Bar(
-            y=labels, x=values, orientation="h",
-            marker_color=palette["rojo"], text=values, textposition="outside",
-            textfont={"color": palette["negro"]},
-        ))
+        fig.add_trace(
+            go.Bar(
+                y=labels,
+                x=values,
+                orientation="h",
+                marker_color=palette["rojo"],
+                text=values,
+                textposition="outside",
+                textfont={"color": palette["negro"]},
+            )
+        )
         fig.update_layout(
             title={"text": "Top incidencias", "font": {"size": 16, "color": palette["negro"]}},
             xaxis={"title": "Ocurrencias", "dtick": 1, "gridcolor": palette["grid"]},
             yaxis={"gridcolor": palette["grid"]},
-            showlegend=False, margin={"l": 200, "r": 60, "t": 50, "b": 30},
+            showlegend=False,
+            margin={"l": 200, "r": 60, "t": 50, "b": 30},
         )
         fig.update_yaxes(autorange="reversed")
         return fig

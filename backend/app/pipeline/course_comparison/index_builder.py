@@ -1,4 +1,3 @@
-
 from app.pipeline.course_comparison.utils import build_base_key
 from app.pipeline.shortnames import parse_shortname
 

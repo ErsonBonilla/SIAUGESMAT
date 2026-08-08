@@ -49,8 +49,7 @@ class ConsultPhase(BasePhase):
                     f"en vez de list: {str(all_courses)[:200]}"
                 )
             ctx.existing_courses = [
-                c for c in all_courses
-                if SIAUGESMAT_PATTERN.match(c.get("shortname", ""))
+                c for c in all_courses if SIAUGESMAT_PATTERN.match(c.get("shortname", ""))
             ]
 
             update_progress(db, eid, 10, "Consultando usuarios…")
@@ -58,28 +57,36 @@ class ConsultPhase(BasePhase):
             etl_users = etl_data["users"]
 
             all_institutional = {u["email"] for u in etl_users if u.get("email")}
-            all_personal = {
-                u["email_personal"] for u in etl_users if u.get("email_personal")
-            }
+            all_personal = {u["email_personal"] for u in etl_users if u.get("email_personal")}
 
             def _persist_email_conflicts(integration=None):
                 conflicts = getattr(integration, "last_email_conflicts", [])
                 for conflict in conflicts:
-                    log_repo.save_log(db, eid, "1", "identity_by_email_duplicate",
-                                      conflict.get("email", ""), {
-                                          "usernames": conflict.get("usernames", []),
-                                          "selected": conflict.get("selected", ""),
-                                          "selected_id": conflict.get("selected_id"),
-                                          "criterion": "oldest",
-                                      })
+                    log_repo.save_log(
+                        db,
+                        eid,
+                        "1",
+                        "identity_by_email_duplicate",
+                        conflict.get("email", ""),
+                        {
+                            "usernames": conflict.get("usernames", []),
+                            "selected": conflict.get("selected", ""),
+                            "selected_id": conflict.get("selected_id"),
+                            "criterion": "oldest",
+                        },
+                    )
 
-            institutional_map = await integration.find_users_by_emails(
-                list(all_institutional)
-            ) if all_institutional else {}
+            institutional_map = (
+                await integration.find_users_by_emails(list(all_institutional))
+                if all_institutional
+                else {}
+            )
             _persist_email_conflicts(integration)
-            personal_map = await integration.find_users_by_emails(
-                list(all_personal - all_institutional)
-            ) if all_personal else {}
+            personal_map = (
+                await integration.find_users_by_emails(list(all_personal - all_institutional))
+                if all_personal
+                else {}
+            )
             _persist_email_conflicts(integration)
             username_index = await integration.find_users_by_usernames(
                 [u.get("username", "") for u in etl_users if u.get("username")]
@@ -107,19 +114,34 @@ class ConsultPhase(BasePhase):
                     )
             ctx.username_map = username_map
 
-            courses_by_sn = {c["shortname"]: c.get("fullname", "") for c in etl_data.get("courses", [])}
+            courses_by_sn = {
+                c["shortname"]: c.get("fullname", "") for c in etl_data.get("courses", [])
+            }
             for dup in etl_data.get("duplicates", []):
-                log_repo.save_log(db, eid, "1", "duplicate_email", dup["email"], {
-                    "usernames": dup.get("username", ""),
-                    "course": dup.get("course_shortname", ""),
-                    "fullname": courses_by_sn.get(dup.get("course_shortname", ""), ""),
-                })
+                log_repo.save_log(
+                    db,
+                    eid,
+                    "1",
+                    "duplicate_email",
+                    dup["email"],
+                    {
+                        "usernames": dup.get("username", ""),
+                        "course": dup.get("course_shortname", ""),
+                        "fullname": courses_by_sn.get(dup.get("course_shortname", ""), ""),
+                    },
+                )
 
-            log_repo.save_log(db, eid, "1", "phase1_complete", detail={
-                "categories_found": len(ctx.existing_cat_idnumbers),
-                "courses_found": len(ctx.existing_courses),
-                "users_resolved": len(username_map),
-            })
+            log_repo.save_log(
+                db,
+                eid,
+                "1",
+                "phase1_complete",
+                detail={
+                    "categories_found": len(ctx.existing_cat_idnumbers),
+                    "courses_found": len(ctx.existing_courses),
+                    "users_resolved": len(username_map),
+                },
+            )
             logger.info(
                 f"FASE 1: {len(ctx.existing_cat_idnumbers)} cats, "
                 f"{len(ctx.existing_courses)} cursos, "
@@ -132,6 +154,7 @@ class ConsultPhase(BasePhase):
                 teacher_index = index_teachers(etl_data["users"], etl_data["enrolments"])
 
                 import asyncio
+
                 sem = asyncio.Semaphore(10)
 
                 async def _fetch_teacher(c, idx):
@@ -139,7 +162,9 @@ class ConsultPhase(BasePhase):
                     emails, usernames, idnumbers = lookup_teacher_candidates(sn, teacher_index)
                     async with sem:
                         teachers = await moodle_service.get_enrolled_teachers(
-                            int(c["id"]), emails, teacher_usernames=usernames,
+                            int(c["id"]),
+                            emails,
+                            teacher_usernames=usernames,
                             teacher_idnumbers=idnumbers,
                         )
                     if idx > 0 and idx % 25 == 0:

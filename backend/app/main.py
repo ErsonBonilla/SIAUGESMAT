@@ -85,8 +85,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={
             "detail": (
-                "Error interno del servidor. "
-                "Intente nuevamente o contacte al administrador."
+                "Error interno del servidor. Intente nuevamente o contacte al administrador."
             )
         },
     )

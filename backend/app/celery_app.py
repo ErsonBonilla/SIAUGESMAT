@@ -34,23 +34,18 @@ celery_app.conf.update(
         "app.workers.operations_tasks",
         "app.workers.query_tasks",
     ),
-
     # Seguimiento
     task_track_started=True,
-
     # Serialización
     task_serializer="json",
     accept_content=["json"],
     result_serializer="json",
-
     # Zona horaria
     timezone="America/Bogota",
     enable_utc=True,
-
     # Timeouts de tareas
     task_time_limit=settings.JOB_TIMEOUT,
     task_soft_time_limit=max(0, settings.JOB_TIMEOUT - 3600),
-
     # ACK tardío + visibilidad
     task_acks_late=True,
     broker_transport_options={
@@ -60,15 +55,12 @@ celery_app.conf.update(
         "socket_timeout": 5,
         "socket_connect_timeout": 5,
     },
-
     # Resultados — expiran tras 1h para evitar llenar Redis
     task_ignore_result=True,
     result_expires=3600,
-
     # Pool de conexiones Redis
     redis_max_connections=20,
     broker_pool_limit=10,
-
     # Programación de tareas periódicas
     beat_schedule={
         "cleanup-pending-executions": {
@@ -95,6 +87,7 @@ def init_worker(**kwargs):
     """Descarta el pool de conexiones DB heredado del proceso padre (fork).
     Cada worker hijo crea su propio pool al abrir su primer SessionLocal()."""
     from app.db.session import engine
+
     engine.dispose()
     logger.debug("Engine DB disposed after fork")
 
@@ -108,9 +101,11 @@ def setup_dlq_handler(logger, **kwargs):
     dlq_logger = logging.getLogger("celery.dlq")
     dlq_logger.setLevel(logging.WARNING)
     handler = logging.FileHandler(os.path.join(settings.REPORT_DIR, "celery_dlq.log"))
-    handler.setFormatter(logging.Formatter(
-        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    ))
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        )
+    )
     dlq_logger.addHandler(handler)
 
 
@@ -121,5 +116,9 @@ def on_task_failure(sender, task_id, exception, args, kwargs, **kw):
     dlq_logger = logging.getLogger("celery.dlq")
     dlq_logger.warning(
         "TASK_DLQ | task=%s task_id=%s args=%s kwargs=%s error=%s",
-        sender.name, task_id, args, kwargs, exception,
+        sender.name,
+        task_id,
+        args,
+        kwargs,
+        exception,
     )

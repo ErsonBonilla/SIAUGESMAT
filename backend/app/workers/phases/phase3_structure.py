@@ -32,12 +32,16 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> d
     if _items_exist_for_execution(db, execution_id, "3"):
         pending = _get_pending_counts(db, execution_id, "3")
         if pending:
-            logger.info(f"Items FASE 3 ya existen con {sum(pending.values())} pendientes, retomando")
+            logger.info(
+                f"Items FASE 3 ya existen con {sum(pending.values())} pendientes, retomando"
+            )
             return pending
         logger.info("Items FASE 3 ya existen y todos procesados, saltando creación")
         return {}
     if not _acquire_advisory_lock(db, execution_id, "3"):
-        logger.info(f"Lock FASE 3 ya tomado para ejecución {execution_id}, otro worker crea los items")
+        logger.info(
+            f"Lock FASE 3 ya tomado para ejecución {execution_id}, otro worker crea los items"
+        )
         return {}
 
     counts: dict[str, int] = {}
@@ -52,13 +56,17 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> d
         if not identifiers:
             return
         batch_suffix = batch_suffix or action
-        batch = create_batch(db, _batch_id(batch_suffix), "courses", action, len(identifiers), modalidad)
+        batch = create_batch(
+            db, _batch_id(batch_suffix), "courses", action, len(identifiers), modalidad
+        )
         count = 0
         for identifier in identifiers:
             detail = {"action": action, "execution_id": execution_id, "modalidad": modalidad}
             if isinstance(identifier, dict):
                 detail.update({k: v for k, v in identifier.items() if k != "action"})
-                identifier = identifier.get("shortname", identifier.get("identifier", str(identifier)))
+                identifier = identifier.get(
+                    "shortname", identifier.get("identifier", str(identifier))
+                )
             add_item(db, batch.batch_id, str(identifier), detail)
             count += 1
         counts[action] = count
@@ -69,15 +77,21 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> d
 
     rename_items = comparison.get("to_update", [])
     if rename_items:
-        batch = create_batch(db, _batch_id("rename"), "courses", "rename", len(rename_items), modalidad)
+        batch = create_batch(
+            db, _batch_id("rename"), "courses", "rename", len(rename_items), modalidad
+        )
         count = 0
         for item in rename_items:
             sn = item["shortname"]
             course_data = courses.get(sn, {})
             detail = {
-                "action": "rename", "execution_id": execution_id, "modalidad": modalidad,
+                "action": "rename",
+                "execution_id": execution_id,
+                "modalidad": modalidad,
                 "old_shortname": item.get("old_shortname", sn),
-                "old_fullname": existing_by_sn.get(item.get("old_shortname", sn), {}).get("fullname", ""),
+                "old_fullname": existing_by_sn.get(item.get("old_shortname", sn), {}).get(
+                    "fullname", ""
+                ),
                 "fullname": course_data.get("fullname", sn),
                 "reason": item.get("reason", ""),
                 "professor": item.get("professor", ""),
@@ -95,6 +109,7 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> d
         async def _resolve_templates():
             ms = get_moodle_service(modalidad)
             try:
+
                 async def _resolve_single(item):
                     sn = item["shortname"]
                     course_data = courses.get(sn, {})
@@ -104,7 +119,9 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> d
                         if template not in _create_template_cache:
                             try:
                                 existing = await ms.get_courses(shortname=template)
-                                _create_template_cache[template] = existing[0]["id"] if existing else None
+                                _create_template_cache[template] = (
+                                    existing[0]["id"] if existing else None
+                                )
                             except Exception:
                                 _create_template_cache[template] = None
                         template_id = _create_template_cache.get(template)
@@ -118,11 +135,18 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> d
                                 _create_template_cache[fallback] = None
                         template_id = _create_template_cache.get(fallback) if fallback else None
                         if template and template.startswith("PORTAFOLIO_"):
-                            save_log(db, execution_id, "3", "template_not_found", sn, {
-                                "fullname": course_data.get("fullname", ""),
-                                "template_shortname": template,
-                                "fallback": fallback if template_id else "",
-                            })
+                            save_log(
+                                db,
+                                execution_id,
+                                "3",
+                                "template_not_found",
+                                sn,
+                                {
+                                    "fullname": course_data.get("fullname", ""),
+                                    "template_shortname": template,
+                                    "fallback": fallback if template_id else "",
+                                },
+                            )
                     return sn, course_data, template_id, item
 
                 return await asyncio.gather(*[_resolve_single(item) for item in create_items])
@@ -138,11 +162,15 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> d
                 for item in create_items
             ]
 
-        batch = create_batch(db, _batch_id("create"), "courses", "create", len(create_items), modalidad)
+        batch = create_batch(
+            db, _batch_id("create"), "courses", "create", len(create_items), modalidad
+        )
         count = 0
-        for (sn, course_data, template_id, item) in resolved:
+        for sn, course_data, template_id, item in resolved:
             detail = {
-                "action": "create", "execution_id": execution_id, "modalidad": modalidad,
+                "action": "create",
+                "execution_id": execution_id,
+                "modalidad": modalidad,
                 "fullname": course_data.get("fullname", sn),
                 "category_idnumber": course_data.get("category_idnumber", ""),
                 "template_id": template_id,
@@ -180,8 +208,14 @@ def _mark_delete_chord_active(execution_id):
         db.close()
 
 
-@celery_app.task(bind=True, autoretry_for=(MoodleOverloadedError,), max_retries=3,
-                  default_retry_delay=10, retry_backoff=True, retry_backoff_max=60)
+@celery_app.task(
+    bind=True,
+    autoretry_for=(MoodleOverloadedError,),
+    max_retries=3,
+    default_retry_delay=10,
+    retry_backoff=True,
+    retry_backoff_max=60,
+)
 def on_delete_items_done(self, results, execution_id):
     db = SessionLocal()
     try:
@@ -192,7 +226,10 @@ def on_delete_items_done(self, results, execution_id):
         clear_chord_active(db, execution_id)
 
         reset_stuck_items(
-            db, batch_id_prefix="etl_3_%", execution_id=execution_id, increment_attempt=True,
+            db,
+            batch_id_prefix="etl_3_%",
+            execution_id=execution_id,
+            increment_attempt=True,
         )
 
         pending_deletes = _get_pending_items(db, execution_id, "3", "delete")
@@ -222,6 +259,7 @@ def on_delete_items_done(self, results, execution_id):
         structure_items = _get_pending_items(db, execution_id, "3", "structure")
         if structure_items:
             from app.workers.phases.common import _launch_items_chord
+
             _launch_items_chord(execution_id, structure_items)
         else:
             on_phase_items_done.delay([], execution_id, "3")

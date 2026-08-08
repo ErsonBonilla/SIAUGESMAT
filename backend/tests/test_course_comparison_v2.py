@@ -12,9 +12,12 @@ from app.services.course_comparison import CourseComparisonService
 
 
 def _mc(sn, visible=1, timecreated=0, customfields=None):
-    return {"shortname": sn, "visible": visible,
-            "timecreated": timecreated or int(time.time()) - 3600,
-            "customfields": customfields or []}
+    return {
+        "shortname": sn,
+        "visible": visible,
+        "timecreated": timecreated or int(time.time()) - 3600,
+        "customfields": customfields or [],
+    }
 
 
 def _nc(sn):
@@ -27,8 +30,10 @@ class TestComplete:
     @pytest.mark.asyncio
     async def test_1_new(self):
         r = await CourseComparisonService.compare(
-            [], [_nc("IDE_0105_sI_202_G-01")],
-            [{"course_shortname": "IDE_0105_sI_202_G-01", "username": "p1"}])
+            [],
+            [_nc("IDE_0105_sI_202_G-01")],
+            [{"course_shortname": "IDE_0105_sI_202_G-01", "username": "p1"}],
+        )
         assert len(r["to_create"]) == 1
 
     @pytest.mark.asyncio
@@ -38,7 +43,8 @@ class TestComplete:
             [_mc(sn, customfields=[{"shortname": "professor", "value": "p1"}])],
             [_nc(sn)],
             [{"course_shortname": sn, "username": "p1"}],
-            courses_with_teacher={sn: "p1"})
+            courses_with_teacher={sn: "p1"},
+        )
         assert len(r["to_create"]) == 0
 
     @pytest.mark.asyncio
@@ -48,7 +54,8 @@ class TestComplete:
             [_mc(sn)],
             [_nc(sn)],
             [{"course_shortname": sn, "username": "new_prof"}],
-            courses_with_teacher={sn: "old_prof"})
+            courses_with_teacher={sn: "old_prof"},
+        )
         assert len(r["to_hide"]) >= 1 or any(d.get("shortname") == sn for d in r["to_delete"])
         assert len(r["to_create"]) >= 1
 
@@ -56,9 +63,11 @@ class TestComplete:
     async def test_4_orphan(self):
         sn = "IDE_0105_sI_202_G-01"
         r = await CourseComparisonService.compare(
-            [_mc(sn)], [_nc(sn)],
+            [_mc(sn)],
+            [_nc(sn)],
             [{"course_shortname": sn, "username": "p1"}],
-            courses_with_teacher={})
+            courses_with_teacher={},
+        )
         assert any(d.get("shortname") == sn for d in r["to_delete"])
         assert any(c["shortname"] == sn for c in r["to_create"])
 
@@ -70,7 +79,8 @@ class TestComplete:
             [_mc(old, customfields=[{"shortname": "professor", "value": "fandrade"}])],
             [_nc(new)],
             [{"course_shortname": new, "username": "fandrade"}],
-            courses_with_teacher={old: "fandrade"})
+            courses_with_teacher={old: "fandrade"},
+        )
         u = [x for x in r["to_update"] if x["shortname"] == new]
         assert len(u) == 1 and u[0]["old_shortname"] == old
 
@@ -82,7 +92,8 @@ class TestComplete:
             [_mc(old, customfields=[{"shortname": "professor", "value": "old_p"}])],
             [_nc(new)],
             [{"course_shortname": new, "username": "new_p"}],
-            courses_with_teacher={old: "old_p"})
+            courses_with_teacher={old: "old_p"},
+        )
         assert len(r["to_hide"]) >= 1 and len(r["to_create"]) >= 1
 
     @pytest.mark.asyncio
@@ -97,7 +108,8 @@ class TestComplete:
             [_mc(old, customfields=[{"shortname": "professor", "value": "fandrade_pes"}])],
             [_nc(new)],
             [{"course_shortname": new, "username": "fandrade_pes"}],
-            courses_with_teacher={old: "fandrade_pes"})
+            courses_with_teacher={old: "fandrade_pes"},
+        )
         u = [x for x in r["to_update"] if x["shortname"] == new]
         assert len(u) == 1 and u[0]["old_shortname"] == old
 
@@ -107,7 +119,8 @@ class TestComplete:
         r = await CourseComparisonService.compare(
             [_mc(sn, timecreated=100000)],
             [_nc("IDE_0105_sI_303_G-01")],
-            [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}])
+            [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}],
+        )
         assert any(d.get("shortname") == sn for d in r["to_delete"])
 
     @pytest.mark.asyncio
@@ -116,7 +129,8 @@ class TestComplete:
         r = await CourseComparisonService.compare(
             [_mc(sn, timecreated=int(time.time()) - 3600)],
             [_nc("IDE_0105_sI_303_G-01")],
-            [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}])
+            [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}],
+        )
         assert any(d.get("shortname") == sn for d in r["to_hide"])
 
     @pytest.mark.asyncio
@@ -125,7 +139,8 @@ class TestComplete:
         r = await CourseComparisonService.compare(
             [_mc(sn, visible=0, timecreated=int(time.time()) - 3600)],
             [_nc("IDE_0105_sI_303_G-01")],
-            [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}])
+            [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}],
+        )
         assert not any(d.get("shortname") == sn for d in r["to_hide"])
 
     @pytest.mark.asyncio
@@ -136,7 +151,8 @@ class TestComplete:
             [_mc(old, customfields=[{"shortname": "professor", "value": "p1"}])],
             [_nc(new)],
             [{"course_shortname": new, "username": "p1"}],
-            courses_with_teacher={old: "p1"})
+            courses_with_teacher={old: "p1"},
+        )
         u = [x for x in r["to_update"] if x["shortname"] == new]
         assert len(u) == 1 and u[0]["old_shortname"] == old
 
@@ -147,7 +163,8 @@ class TestComplete:
         r = await CourseComparisonService.compare(
             [_mc(old, customfields=[{"shortname": "professor", "value": "p1"}])],
             [_nc(new)],
-            [{"course_shortname": new, "username": "p1"}])
+            [{"course_shortname": new, "username": "p1"}],
+        )
         u = [x for x in r["to_update"] if x["shortname"] == new]
         assert len(u) == 1 and u[0]["old_shortname"] == old
 
@@ -158,8 +175,11 @@ class TestComplete:
         r = await CourseComparisonService.compare(
             [_mc(old, customfields=[{"shortname": "professor", "value": "p1"}])],
             [_nc(old), _nc(new2)],
-            [{"course_shortname": old, "username": "p1"},
-             {"course_shortname": new2, "username": "p1"}])
+            [
+                {"course_shortname": old, "username": "p1"},
+                {"course_shortname": new2, "username": "p1"},
+            ],
+        )
         c = [x for x in r["to_create"] if x["shortname"] == new2]
         assert len(c) == 1 and c[0].get("template_shortname") == old
 
@@ -167,9 +187,9 @@ class TestComplete:
     async def test_13_core_diff_prof_create(self):
         new = "IDE_0105_sI_202_G-02"
         r = await CourseComparisonService.compare(
-            [_mc("IDE_0105_sI_202_G-01",
-                 customfields=[{"shortname": "professor", "value": "p1"}])],
+            [_mc("IDE_0105_sI_202_G-01", customfields=[{"shortname": "professor", "value": "p1"}])],
             [_nc(new)],
-            [{"course_shortname": new, "username": "p2"}])
+            [{"course_shortname": new, "username": "p2"}],
+        )
         c = [x for x in r["to_create"] if x["shortname"] == new]
         assert len(c) == 1 and not c[0].get("template_shortname")

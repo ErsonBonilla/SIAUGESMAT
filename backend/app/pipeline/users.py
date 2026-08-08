@@ -4,6 +4,7 @@ Sin I/O: los mapas de usuarios de Moodle (institucional, personal, username,
 cédula) se reciben ya consultados y se devuelven eventos en lugar de persistir
 logs directamente.
 """
+
 import unicodedata
 
 from app.pipeline.course_index import build_base_key
@@ -41,8 +42,7 @@ def pick_oldest_user(users: list[dict]) -> dict | None:
 def normalize_name(name: str) -> str:
     """Normaliza un nombre para comparación: minúsculas y sin tildes."""
     text = "".join(
-        c for c in unicodedata.normalize("NFD", name)
-        if unicodedata.category(c) != "Mn"
+        c for c in unicodedata.normalize("NFD", name) if unicodedata.category(c) != "Mn"
     ).lower()
     return " ".join(text.split())
 
@@ -108,28 +108,35 @@ def resolve_users(
         if matched_by in ("username", "cedula"):
             etl_name = f"{user.get('firstname') or ''} {user.get('lastname') or ''}".strip()
             moodle_name = (
-                f"{moodle_user.get('firstname') or ''} "
-                f"{moodle_user.get('lastname') or ''}"
+                f"{moodle_user.get('firstname') or ''} {moodle_user.get('lastname') or ''}"
             ).strip()
             if names_differ(etl_name, moodle_name):
-                events.append((
-                    "user_identity_conflict", uname, {
-                        "email": email_lookup,
-                        "etl_fullname": etl_name,
-                        "moodle_fullname": moodle_name,
-                        "matched_by": matched_by,
-                    },
-                ))
+                events.append(
+                    (
+                        "user_identity_conflict",
+                        uname,
+                        {
+                            "email": email_lookup,
+                            "etl_fullname": etl_name,
+                            "moodle_fullname": moodle_name,
+                            "matched_by": matched_by,
+                        },
+                    )
+                )
                 continue
 
         username_map[user["username"]] = resolved_username
-        events.append((
-            "user_resolved", resolved_username, {
-                "email": user.get("email"),
-                "firstname": user.get("firstname", ""),
-                "lastname": user.get("lastname", ""),
-            },
-        ))
+        events.append(
+            (
+                "user_resolved",
+                resolved_username,
+                {
+                    "email": user.get("email"),
+                    "firstname": user.get("firstname", ""),
+                    "lastname": user.get("lastname", ""),
+                },
+            )
+        )
 
     return username_map, events
 

@@ -3,6 +3,7 @@
 La implementación vive en app.pipeline.shortnames. Este módulo se mantiene
 como puente para workers, tests y servicios existentes.
 """
+
 from app.pipeline.shortnames import (
     SHORTNAME_PATTERN,
     SIAUGESMAT_PATTERN,

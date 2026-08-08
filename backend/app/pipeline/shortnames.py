@@ -1,4 +1,5 @@
 """Parsing puro de shortnames de cursos SIAUGESMAT (núcleo del pipeline)."""
+
 import re
 
 SIAUGESMAT_PATTERN = re.compile(

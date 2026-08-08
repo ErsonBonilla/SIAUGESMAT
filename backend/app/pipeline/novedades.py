@@ -4,6 +4,7 @@ Compara el estado anterior y el nuevo de cursos/docentes y emite las
 novedades (cambio de profesor, curso eliminado, curso nuevo) sin tocar
 la base de datos ni el filesystem.
 """
+
 from typing import Any
 
 from app.pipeline.course_index import build_enrolment_map, index_courses
@@ -80,19 +81,21 @@ def detect_novedades(
         old_username = enrolment_map_old.get(old_sn, "")
         new_username = enrolment_map_new.get(new_sn, "")
 
-        novedades.append({
-            "id": f"nov_{bk}",
-            "base_key": bk,
-            "old_shortname": old_sn,
-            "new_shortname": new_sn,
-            "old_prof_cedula": old_suffix or None,
-            "new_prof_cedula": new_suffix or None,
-            "old_prof_name": _resolve_prof_name(old_username, old_users),
-            "new_prof_name": _new_prof_name(new_suffix, user_map_new, new_username),
-            "course_fullname": new_course.get("fullname", ""),
-            "action": "cambio_profesor",
-            "target_course_id": None,
-        })
+        novedades.append(
+            {
+                "id": f"nov_{bk}",
+                "base_key": bk,
+                "old_shortname": old_sn,
+                "new_shortname": new_sn,
+                "old_prof_cedula": old_suffix or None,
+                "new_prof_cedula": new_suffix or None,
+                "old_prof_name": _resolve_prof_name(old_username, old_users),
+                "new_prof_name": _new_prof_name(new_suffix, user_map_new, new_username),
+                "course_fullname": new_course.get("fullname", ""),
+                "action": "cambio_profesor",
+                "target_course_id": None,
+            }
+        )
 
     # Cursos que desaparecieron (en old pero no en new)
     for bk, courses in old_index.items():
@@ -102,19 +105,21 @@ def detect_novedades(
         old_sn = old_course["shortname"]
         old_suffix = (old_course["_parsed"].get("suffix") or "").strip()
         old_username = enrolment_map_old.get(old_sn, "")
-        novedades.append({
-            "id": f"des_{bk}",
-            "base_key": bk,
-            "old_shortname": old_sn,
-            "new_shortname": "",
-            "old_prof_cedula": old_suffix or None,
-            "new_prof_cedula": None,
-            "old_prof_name": _resolve_prof_name(old_username, old_users),
-            "new_prof_name": "",
-            "course_fullname": old_course.get("fullname", ""),
-            "action": "curso_eliminado",
-            "target_course_id": None,
-        })
+        novedades.append(
+            {
+                "id": f"des_{bk}",
+                "base_key": bk,
+                "old_shortname": old_sn,
+                "new_shortname": "",
+                "old_prof_cedula": old_suffix or None,
+                "new_prof_cedula": None,
+                "old_prof_name": _resolve_prof_name(old_username, old_users),
+                "new_prof_name": "",
+                "course_fullname": old_course.get("fullname", ""),
+                "action": "curso_eliminado",
+                "target_course_id": None,
+            }
+        )
 
     # Cursos nuevos (en new pero no en old)
     for bk, courses in new_index.items():
@@ -124,19 +129,21 @@ def detect_novedades(
         new_sn = new_course["shortname"]
         new_suffix = (new_course["_parsed"].get("suffix") or "").strip()
         new_username = enrolment_map_new.get(new_sn, "")
-        novedades.append({
-            "id": f"new_{bk}",
-            "base_key": bk,
-            "old_shortname": "",
-            "new_shortname": new_sn,
-            "old_prof_cedula": None,
-            "new_prof_cedula": new_suffix or None,
-            "old_prof_name": "",
-            "new_prof_name": _new_prof_name(new_suffix, user_map_new, new_username),
-            "course_fullname": new_course.get("fullname", ""),
-            "action": "curso_nuevo",
-            "target_course_id": None,
-        })
+        novedades.append(
+            {
+                "id": f"new_{bk}",
+                "base_key": bk,
+                "old_shortname": "",
+                "new_shortname": new_sn,
+                "old_prof_cedula": None,
+                "new_prof_cedula": new_suffix or None,
+                "old_prof_name": "",
+                "new_prof_name": _new_prof_name(new_suffix, user_map_new, new_username),
+                "course_fullname": new_course.get("fullname", ""),
+                "action": "curso_nuevo",
+                "target_course_id": None,
+            }
+        )
 
     stats = {
         "common": len(common_keys),

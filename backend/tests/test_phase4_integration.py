@@ -21,12 +21,23 @@ def _make_ctx_data(users=None, enrolments=None):
     }
 
 
-def _make_user(username="testuser", firstname="Test", lastname="User",
-               email="testuser@ut.edu.co", cedula="12345"):
+def _make_user(
+    username="testuser",
+    firstname="Test",
+    lastname="User",
+    email="testuser@ut.edu.co",
+    cedula="12345",
+):
     return {
-        "username": username, "firstname": firstname, "lastname": lastname,
-        "email": email, "cedula": cedula, "password": "",
-        "city": "", "description": "", "email_personal": "",
+        "username": username,
+        "firstname": firstname,
+        "lastname": lastname,
+        "email": email,
+        "cedula": cedula,
+        "password": "",
+        "city": "",
+        "description": "",
+        "email_personal": "",
     }
 
 
@@ -35,13 +46,13 @@ def _make_enrolment(username="testuser", course_shortname="TST_0001_sI_001_G-1_1
 
 
 class TestCreatePhase4Items:
-
     @pytest.mark.asyncio
     async def test_happy_path_users_and_enrolments(self, test_db):
         """Crea usuarios + enrolments correctamente."""
-        with patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True), \
-             patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory:
-
+        with (
+            patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True),
+            patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory,
+        ):
             instance = AsyncMock()
             instance.get_courses.return_value = [
                 {"id": 100, "shortname": "TST_0001_sI_001_G-1_12345"},
@@ -60,9 +71,8 @@ class TestCreatePhase4Items:
 
         # Verificar en DB
         from app.db.models import OperationItem
-        items = test_db.query(OperationItem).filter(
-            OperationItem.batch_id.like("etl_4_%_1")
-        ).all()
+
+        items = test_db.query(OperationItem).filter(OperationItem.batch_id.like("etl_4_%_1")).all()
         assert len(items) == 2
         usernames = [(i.identifier, (i.detail or {}).get("action")) for i in items]
         assert ("testuser", "create_user") in usernames
@@ -91,9 +101,10 @@ class TestCreatePhase4Items:
     @pytest.mark.asyncio
     async def test_already_exists(self, test_db):
         """Items ya existen → retomar sin duplicar."""
-        with patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True), \
-             patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory:
-
+        with (
+            patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True),
+            patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory,
+        ):
             instance = AsyncMock()
             instance.get_courses.return_value = []
             mock_factory.return_value = instance
@@ -107,8 +118,10 @@ class TestCreatePhase4Items:
             assert counts_1.get("create_users") == 1
 
         # Segunda llamada: ya existen, debe retomar
-        with patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True), \
-             patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory:
+        with (
+            patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True),
+            patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory,
+        ):
             instance = AsyncMock()
             instance.get_courses.return_value = []
             mock_factory.return_value = instance
@@ -121,9 +134,10 @@ class TestCreatePhase4Items:
     @pytest.mark.asyncio
     async def test_enrol_items_have_course_id(self, test_db):
         """Items de enrolment deben tener _course_id resuelto."""
-        with patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True), \
-             patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory:
-
+        with (
+            patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True),
+            patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory,
+        ):
             instance = AsyncMock()
             instance.get_courses.return_value = [
                 {"id": 200, "shortname": "TST_0001_sI_001_G-1_12345"},
@@ -136,9 +150,14 @@ class TestCreatePhase4Items:
             await _create_phase4_items(test_db, 4, ctx, "DISTANCIA")
 
         from app.db.models import OperationItem
-        enrol_item = test_db.query(OperationItem).filter(
-            OperationItem.batch_id.like("etl_4_%_4"),
-            OperationItem.detail["action"].as_string() == "enrol",
-        ).first()
+
+        enrol_item = (
+            test_db.query(OperationItem)
+            .filter(
+                OperationItem.batch_id.like("etl_4_%_4"),
+                OperationItem.detail["action"].as_string() == "enrol",
+            )
+            .first()
+        )
         assert enrol_item is not None
         assert (enrol_item.detail or {}).get("_course_id") == 200

@@ -35,7 +35,6 @@ def integration_execution(test_db):
 
 
 class TestPipelineIntegration:
-
     @pytest.mark.asyncio
     async def test_pipeline_detects_failure_on_consult_phase(self, test_db, integration_execution):
         mock = AsyncMock()

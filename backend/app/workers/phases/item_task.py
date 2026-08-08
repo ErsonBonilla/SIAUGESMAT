@@ -103,20 +103,28 @@ def process_etl_item(self, item_id: int):
                     recreate=detail.get("recreate", False),
                 )
             elif action == "create_user":
-                username, created = await integration.create_user_if_not_exists({
-                    "username": identifier,
-                    "firstname": detail.get("firstname", ""),
-                    "lastname": detail.get("lastname", ""),
-                    "email": detail.get("email", ""),
-                    "password": detail.get("password", ""),
-                    "cedula": detail.get("cedula", ""),
-                    "city": detail.get("city", ""),
-                    "description": detail.get("description", ""),
-                })
+                username, created = await integration.create_user_if_not_exists(
+                    {
+                        "username": identifier,
+                        "firstname": detail.get("firstname", ""),
+                        "lastname": detail.get("lastname", ""),
+                        "email": detail.get("email", ""),
+                        "password": detail.get("password", ""),
+                        "cedula": detail.get("cedula", ""),
+                        "city": detail.get("city", ""),
+                        "description": detail.get("description", ""),
+                    }
+                )
                 success = username is not None
                 if success and created and execution_id:
-                    save_log(db, execution_id, "4", "user_created_createpassword",
-                             username, {**detail, "auth": "manual", "base_db": "Manual"})
+                    save_log(
+                        db,
+                        execution_id,
+                        "4",
+                        "user_created_createpassword",
+                        username,
+                        {**detail, "auth": "manual", "base_db": "Manual"},
+                    )
             elif action == "enrol":
                 course_id = detail.get("_course_id")
                 course_map = {detail.get("course_shortname", ""): course_id} if course_id else None
@@ -188,25 +196,45 @@ def process_etl_item(self, item_id: int):
 def _refresh_phase_progress(execution_id, db):
     from app.db.models import Execution, OperationItem
     from app.pipeline.progress import compute_phase_progress
-    try:
-        phase3_total = db.query(func.count(OperationItem.id)).filter(
-            OperationItem.batch_id.like(f"etl_3_%_{execution_id}")
-        ).scalar() or 0
-        phase3_done = db.query(func.count(OperationItem.id)).filter(
-            OperationItem.batch_id.like(f"etl_3_%_{execution_id}"),
-            OperationItem.status.in_(["completed", "failed"]),
-        ).scalar() or 0
 
-        phase4_total = db.query(func.count(OperationItem.id)).filter(
-            OperationItem.batch_id.like(f"etl_4_%_{execution_id}")
-        ).scalar() or 0
-        phase4_done = db.query(func.count(OperationItem.id)).filter(
-            OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
-            OperationItem.status.in_(["completed", "failed"]),
-        ).scalar() or 0
+    try:
+        phase3_total = (
+            db.query(func.count(OperationItem.id))
+            .filter(OperationItem.batch_id.like(f"etl_3_%_{execution_id}"))
+            .scalar()
+            or 0
+        )
+        phase3_done = (
+            db.query(func.count(OperationItem.id))
+            .filter(
+                OperationItem.batch_id.like(f"etl_3_%_{execution_id}"),
+                OperationItem.status.in_(["completed", "failed"]),
+            )
+            .scalar()
+            or 0
+        )
+
+        phase4_total = (
+            db.query(func.count(OperationItem.id))
+            .filter(OperationItem.batch_id.like(f"etl_4_%_{execution_id}"))
+            .scalar()
+            or 0
+        )
+        phase4_done = (
+            db.query(func.count(OperationItem.id))
+            .filter(
+                OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
+                OperationItem.status.in_(["completed", "failed"]),
+            )
+            .scalar()
+            or 0
+        )
 
         pct = compute_phase_progress(
-            phase3_total, phase3_done, phase4_total, phase4_done,
+            phase3_total,
+            phase3_done,
+            phase4_total,
+            phase4_done,
         )
         ex = db.query(Execution).filter(Execution.id == execution_id).first()
         if ex and (ex.progress_pct is None or pct > ex.progress_pct):
@@ -247,9 +275,17 @@ def _log_success(db, execution_id, action, identifier, detail):
         }
     elif action in ("delete", "activate", "hide", "create"):
         for key in (
-            "reason", "old_shortname", "old_professor", "professor",
-            "template_shortname", "age_seconds", "recreate", "fullname",
-            "category_idnumber", "firstname", "lastname",
+            "reason",
+            "old_shortname",
+            "old_professor",
+            "professor",
+            "template_shortname",
+            "age_seconds",
+            "recreate",
+            "fullname",
+            "category_idnumber",
+            "firstname",
+            "lastname",
         ):
             if key in detail:
                 log_detail[key] = detail.get(key)
@@ -294,8 +330,15 @@ def _normalize_enrol_reason(error_msg: str) -> str:
 def _log_enrol_failure(db, execution_id, identifier, detail, error_msg):
     if not execution_id:
         return
-    save_log(db, execution_id, "4", "enrolment_failed", identifier, {
-        "course": detail.get("course_shortname", ""),
-        "fullname": detail.get("fullname", ""),
-        "reason": _normalize_enrol_reason(error_msg),
-    })
+    save_log(
+        db,
+        execution_id,
+        "4",
+        "enrolment_failed",
+        identifier,
+        {
+            "course": detail.get("course_shortname", ""),
+            "fullname": detail.get("fullname", ""),
+            "reason": _normalize_enrol_reason(error_msg),
+        },
+    )

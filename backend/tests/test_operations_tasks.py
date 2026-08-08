@@ -17,7 +17,9 @@ def _make_moodle():
     return m
 
 
-def _make_batch(batch_id="BATCH_001", entity_type="courses", action="delete", modalidad="DISTANCIA"):
+def _make_batch(
+    batch_id="BATCH_001", entity_type="courses", action="delete", modalidad="DISTANCIA"
+):
     batch = MagicMock()
     batch.batch_id = batch_id
     batch.entity_type = entity_type
@@ -64,8 +66,10 @@ class TestFormatMoodleError:
 
 class TestProcessOperationBatch:
     def test_batch_not_found(self):
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch", return_value=None):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch", return_value=None),
+        ):
             db = MagicMock()
             mock_sl.return_value = db
             process_operation_batch("BATCH_001")
@@ -74,11 +78,15 @@ class TestProcessOperationBatch:
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
     def test_delete_courses(self, mock_pending, mock_complete):
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
-             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
-             patch("app.workers.operations_tasks.update_item"), \
-             patch("app.workers.operations_tasks.update_batch_counts"):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item"),
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
             batch = _make_batch(entity_type="courses", action="delete")
             mock_get_batch.return_value = batch
             item = _make_item()
@@ -96,11 +104,15 @@ class TestProcessOperationBatch:
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
     def test_delete_course_not_found_idempotent(self, mock_pending, mock_complete):
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
-             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
-             patch("app.workers.operations_tasks.update_item") as mock_update, \
-             patch("app.workers.operations_tasks.update_batch_counts"):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item") as mock_update,
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
             batch = _make_batch(entity_type="courses", action="delete")
             mock_get_batch.return_value = batch
             item = _make_item()
@@ -119,19 +131,21 @@ class TestProcessOperationBatch:
     @patch("app.workers.operations_tasks.get_pending_items")
     def test_delete_user_transient_error_but_deleted(self, mock_pending, mock_complete):
         """Error transitorio al borrar pero la entidad ya no existe → completed."""
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
-             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
-             patch("app.workers.operations_tasks.update_item") as mock_update, \
-             patch("app.workers.operations_tasks.update_batch_counts"):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item") as mock_update,
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
             batch = _make_batch(entity_type="users", action="delete")
             mock_get_batch.return_value = batch
             item = _make_item("user1")
             mock_pending.return_value = [item]
             moodle = _make_moodle()
-            moodle.delete_users = AsyncMock(
-                side_effect=MoodleOverloadedError("gateway time-out")
-            )
+            moodle.delete_users = AsyncMock(side_effect=MoodleOverloadedError("gateway time-out"))
             moodle.get_user_by_username = AsyncMock(return_value=None)
             mock_get_ms.return_value = moodle
             db = MagicMock()
@@ -143,19 +157,21 @@ class TestProcessOperationBatch:
     @patch("app.workers.operations_tasks.get_pending_items")
     def test_delete_user_transient_error_still_exists(self, mock_pending, mock_complete):
         """Error transitorio y la entidad sigue existiendo → failed."""
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
-             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
-             patch("app.workers.operations_tasks.update_item") as mock_update, \
-             patch("app.workers.operations_tasks.update_batch_counts"):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item") as mock_update,
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
             batch = _make_batch(entity_type="users", action="delete")
             mock_get_batch.return_value = batch
             item = _make_item("user1")
             mock_pending.return_value = [item]
             moodle = _make_moodle()
-            moodle.delete_users = AsyncMock(
-                side_effect=MoodleOverloadedError("gateway time-out")
-            )
+            moodle.delete_users = AsyncMock(side_effect=MoodleOverloadedError("gateway time-out"))
             moodle.get_user_by_username = AsyncMock(return_value={"id": 1})
             mock_get_ms.return_value = moodle
             db = MagicMock()
@@ -167,11 +183,15 @@ class TestProcessOperationBatch:
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
     def test_delete_user_not_found_idempotent(self, mock_pending, mock_complete):
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
-             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
-             patch("app.workers.operations_tasks.update_item") as mock_update, \
-             patch("app.workers.operations_tasks.update_batch_counts"):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item") as mock_update,
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
             batch = _make_batch(entity_type="users", action="delete")
             mock_get_batch.return_value = batch
             item = _make_item("user1")
@@ -189,11 +209,15 @@ class TestProcessOperationBatch:
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
     def test_delete_categories(self, mock_pending, mock_complete):
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
-             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
-             patch("app.workers.operations_tasks.update_item"), \
-             patch("app.workers.operations_tasks.update_batch_counts"):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item"),
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
             batch = _make_batch(entity_type="categories", action="delete")
             mock_get_batch.return_value = batch
             item = _make_item()
@@ -209,11 +233,15 @@ class TestProcessOperationBatch:
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
     def test_delete_users(self, mock_pending, mock_complete):
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
-             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
-             patch("app.workers.operations_tasks.update_item"), \
-             patch("app.workers.operations_tasks.update_batch_counts"):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item"),
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
             batch = _make_batch(entity_type="users", action="delete")
             mock_get_batch.return_value = batch
             item = _make_item("user1")
@@ -228,11 +256,15 @@ class TestProcessOperationBatch:
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
     def test_create_users(self, mock_pending, mock_complete):
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
-             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
-             patch("app.workers.operations_tasks.update_item"), \
-             patch("app.workers.operations_tasks.update_batch_counts"):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item"),
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
             batch = _make_batch(entity_type="users", action="create")
             mock_get_batch.return_value = batch
             item = _make_item("newuser", firstname="New", lastname="User", email="new@test.com")
@@ -247,11 +279,15 @@ class TestProcessOperationBatch:
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
     def test_create_categories(self, mock_pending, mock_complete):
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
-             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
-             patch("app.workers.operations_tasks.update_item"), \
-             patch("app.workers.operations_tasks.update_batch_counts"):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item"),
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
             batch = _make_batch(entity_type="categories", action="create")
             mock_get_batch.return_value = batch
             item = _make_item("NEWCAT", idnumber="NEWCAT_01")
@@ -267,11 +303,15 @@ class TestProcessOperationBatch:
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
     def test_visibility_show(self, mock_pending, mock_complete):
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
-             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
-             patch("app.workers.operations_tasks.update_item"), \
-             patch("app.workers.operations_tasks.update_batch_counts"):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item"),
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
             batch = _make_batch(entity_type="courses", action="visibility")
             mock_get_batch.return_value = batch
             item = _make_item("CURSE_001", visibility="show")
@@ -287,17 +327,23 @@ class TestProcessOperationBatch:
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
     def test_moodle_api_error_per_item(self, mock_pending, mock_complete):
-        with patch("app.workers.operations_tasks.SessionLocal") as mock_sl, \
-             patch("app.workers.operations_tasks.get_batch") as mock_get_batch, \
-             patch("app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()) as mock_get_ms, \
-             patch("app.workers.operations_tasks.update_item") as mock_update, \
-             patch("app.workers.operations_tasks.update_batch_counts"):
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item") as mock_update,
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
             batch = _make_batch(entity_type="courses", action="delete")
             mock_get_batch.return_value = batch
             item = _make_item()
             mock_pending.return_value = [item]
             moodle = _make_moodle()
-            moodle.delete_courses = AsyncMock(side_effect=MoodleAPIError("API error", "unknownerror"))
+            moodle.delete_courses = AsyncMock(
+                side_effect=MoodleAPIError("API error", "unknownerror")
+            )
             moodle.get_courses = AsyncMock(return_value=[{"id": 1}])
             mock_get_ms.return_value = moodle
             db = MagicMock()

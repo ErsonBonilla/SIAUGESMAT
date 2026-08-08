@@ -55,11 +55,15 @@ async def handle_visibility_upload(file: UploadFile, db, current_user, visibilit
     process_operation_batch.delay(batch_id)
 
     verb_label = "mostrar" if visibility == "show" else "ocultar"
-    logger.info(f"Lote {batch_id} (cambiar visibilidad a {visibility} de {len(identifiers)} cursos) "
-                f"encolado por {current_user.username}")
+    logger.info(
+        f"Lote {batch_id} (cambiar visibilidad a {visibility} de {len(identifiers)} cursos) "
+        f"encolado por {current_user.username}"
+    )
 
     return CsvUploadResponse(
-        batch_id=batch_id, entity_type="courses", action="visibility",
+        batch_id=batch_id,
+        entity_type="courses",
+        action="visibility",
         total=len(identifiers),
         message=f"Se encolaron {len(identifiers)} cursos para {verb_label}.",
     )
@@ -97,18 +101,32 @@ async def handle_upload(file: UploadFile, db, current_user, entity_type, action,
 
     if is_create_users:
         for user in users:
-            add_item(db, batch_id, user["username"], detail={
-                "firstname": user["firstname"], "lastname": user["lastname"],
-                "email": user["email"], "password": user.get("password"),
-                "role1": user.get("role1"),
-                "forcepasswordchange": user.get("forcepasswordchange"),
-            })
+            add_item(
+                db,
+                batch_id,
+                user["username"],
+                detail={
+                    "firstname": user["firstname"],
+                    "lastname": user["lastname"],
+                    "email": user["email"],
+                    "password": user.get("password"),
+                    "role1": user.get("role1"),
+                    "forcepasswordchange": user.get("forcepasswordchange"),
+                },
+            )
     elif is_create_categories:
         for cat in categories:
-            add_item(db, batch_id, cat["name"], detail={
-                "idnumber": cat.get("idnumber"), "parent": cat.get("parent"),
-                "description": cat.get("description"), "visible": cat.get("visible"),
-            })
+            add_item(
+                db,
+                batch_id,
+                cat["name"],
+                detail={
+                    "idnumber": cat.get("idnumber"),
+                    "parent": cat.get("parent"),
+                    "description": cat.get("description"),
+                    "visible": cat.get("visible"),
+                },
+            )
     else:
         for identifier in identifiers:
             add_item(db, batch_id, identifier)
@@ -117,11 +135,15 @@ async def handle_upload(file: UploadFile, db, current_user, entity_type, action,
     process_operation_batch.delay(batch_id)
 
     verb = "eliminación" if action == "delete" else "creación"
-    logger.info(f"Lote {batch_id} ({verb} de {len(identifiers)} {config['label_plural']}) "
-                f"encolado por {current_user.username}")
+    logger.info(
+        f"Lote {batch_id} ({verb} de {len(identifiers)} {config['label_plural']}) "
+        f"encolado por {current_user.username}"
+    )
 
     return CsvUploadResponse(
-        batch_id=batch_id, entity_type=entity_type, action=action,
+        batch_id=batch_id,
+        entity_type=entity_type,
+        action=action,
         total=len(identifiers),
         message=f"Se encolaron {len(identifiers)} {config['label_plural']} para {verb}.",
     )

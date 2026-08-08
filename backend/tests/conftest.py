@@ -7,22 +7,30 @@ Proporciona:
 - Cabeceras de autenticación con JWT de prueba.
 - Mock del servicio de Moodle para aislar las pruebas de la API externa.
 """
+
 import os
 import tempfile
 
 import pytest
 
-# Cargar variables de entorno del .env para tests de integración real
-try:
-    from dotenv import load_dotenv
-    _env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
-    load_dotenv(_env_path)
-except ImportError:
-    pass
+# Cargar variables de entorno del .env SOLO cuando se solicita explícitamente
+# (SIAUGESMAT_TESTS_USE_DOTENV=1). Por defecto los tests corren contra una
+# SQLite temporal, evitando que drop_all/create_all de cada test toque una
+# base de datos real. En CI no existe backend/.env, así que también se usa
+# SQLite, manteniendo consistencia con el entorno local.
+if os.environ.get("SIAUGESMAT_TESTS_USE_DOTENV") == "1":
+    try:
+        from dotenv import load_dotenv
+
+        _env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+        load_dotenv(_env_path, override=True)
+    except ImportError:
+        pass
 
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "integration: test de integración real contra Moodle")
+
 
 # Usar base de datos basada en archivo para que todas las conexiones / hilos
 # compartan los mismos datos. El path se genera una vez al importar el módulo.
@@ -84,6 +92,7 @@ def test_db():
 @pytest.fixture(scope="function")
 def client(test_db):
     """Cliente de pruebas que inyecta la sesión en memoria en los endpoints."""
+
     def override_get_db():
         try:
             yield test_db

@@ -1,4 +1,5 @@
 """Pruebas del núcleo puro de progreso por fases."""
+
 from app.pipeline.progress import compute_phase_progress
 
 

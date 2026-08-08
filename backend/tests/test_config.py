@@ -92,6 +92,7 @@ class TestSettings:
             DATABASE_URL="sqlite:///test.db",
             REDIS_URL="redis://localhost:6379/0",
             JWT_SECRET_KEY="test-secret",
+            CORS_ORIGINS="http://localhost:3000",
         )
         s.validate_critical()
 

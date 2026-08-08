@@ -18,6 +18,7 @@ def _sync_wrap(async_fn):
     @wraps(async_fn)
     def wrapper(*args, **kwargs):
         return _run_async(async_fn(*args, **kwargs))
+
     return wrapper
 
 
@@ -26,12 +27,14 @@ async def _resolve_course_map(modalidad, all_sns):
     try:
         all_courses = await ms.get_courses()
         course_map = {c["shortname"]: int(c["id"]) for c in all_courses if c.get("shortname")}
-        course_fullname = {c["shortname"]: c.get("fullname", "") for c in all_courses if c.get("shortname")}
+        course_fullname = {
+            c["shortname"]: c.get("fullname", "") for c in all_courses if c.get("shortname")
+        }
         missing = [sn for sn in all_sns if sn and sn not in course_map]
         if missing:
             BATCH = 5
             for i in range(0, len(missing), BATCH):
-                chunk = missing[i:i + BATCH]
+                chunk = missing[i : i + BATCH]
                 try:
                     resolved = await ms.get_courses_by_shortnames(chunk)
                     for c in resolved:
@@ -59,7 +62,7 @@ async def _resolve_fallback(modalidad, all_sns):
         fallback_fullname = {}
         BATCH = 5
         for i in range(0, len(all_sns), BATCH):
-            chunk = all_sns[i:i + BATCH]
+            chunk = all_sns[i : i + BATCH]
             try:
                 resolved = await ms.get_courses_by_shortnames(chunk)
                 for c in resolved:
@@ -84,12 +87,16 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> d
     if _items_exist_for_execution(db, execution_id, "4"):
         pending = _get_pending_counts(db, execution_id, "4")
         if pending:
-            logger.info(f"Items FASE 4 ya existen con {sum(pending.values())} pendientes, retomando")
+            logger.info(
+                f"Items FASE 4 ya existen con {sum(pending.values())} pendientes, retomando"
+            )
             return pending
         logger.info("Items FASE 4 ya existen y todos procesados, saltando creación")
         return {}
     if not _acquire_advisory_lock(db, execution_id, "4"):
-        logger.info(f"Lock FASE 4 ya tomado para ejecución {execution_id}, otro worker crea los items")
+        logger.info(
+            f"Lock FASE 4 ya tomado para ejecución {execution_id}, otro worker crea los items"
+        )
         return {}
 
     counts: dict[str, int] = {}
@@ -100,12 +107,20 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> d
         return f"etl_4_{suffix}_{execution_id}"
 
     if users_to_create:
-        batch = create_batch(db, _batch_id("users"), "users", "create", len(users_to_create), modalidad)
+        batch = create_batch(
+            db, _batch_id("users"), "users", "create", len(users_to_create), modalidad
+        )
         count = 0
         for user in users_to_create:
-            username = user.get("email", "").split("@")[0] if user.get("email") else user.get("username", str(uuid.uuid4()))
+            username = (
+                user.get("email", "").split("@")[0]
+                if user.get("email")
+                else user.get("username", str(uuid.uuid4()))
+            )
             detail = {
-                "action": "create_user", "execution_id": execution_id, "modalidad": modalidad,
+                "action": "create_user",
+                "execution_id": execution_id,
+                "modalidad": modalidad,
                 "username": user.get("username", username),
                 "firstname": user.get("firstname", ""),
                 "lastname": user.get("lastname", ""),
@@ -122,12 +137,20 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> d
         counts["create_users"] = count
 
     if resolved_enrolments:
-        batch = create_batch(db, _batch_id("enrol"), "enrolments", "enrol", len(resolved_enrolments), modalidad)
+        batch = create_batch(
+            db, _batch_id("enrol"), "enrolments", "enrol", len(resolved_enrolments), modalidad
+        )
         count = 0
 
         users_by_username = {u["username"]: u for u in ctx_data.get("users", [])}
 
-        all_sns = list({enrol.get("course_shortname", "") for enrol in resolved_enrolments if enrol.get("course_shortname")})
+        all_sns = list(
+            {
+                enrol.get("course_shortname", "")
+                for enrol in resolved_enrolments
+                if enrol.get("course_shortname")
+            }
+        )
         try:
             course_map, course_fullname = await _resolve_course_map(modalidad, all_sns)
         except Exception as e:
@@ -143,7 +166,9 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> d
             course_sn = enrol.get("course_shortname", "")
             course_id = course_map.get(course_sn)
             detail = {
-                "action": "enrol", "execution_id": execution_id, "modalidad": modalidad,
+                "action": "enrol",
+                "execution_id": execution_id,
+                "modalidad": modalidad,
                 "course_shortname": course_sn,
                 "fullname": course_fullname.get(course_sn, ""),
                 "_course_id": course_id,

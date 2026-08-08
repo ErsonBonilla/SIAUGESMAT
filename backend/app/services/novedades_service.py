@@ -39,7 +39,10 @@ async def detect(
 
     old_file_path = os.path.join(settings.UPLOAD_DIR, previous.filename)
     if not os.path.exists(old_file_path):
-        return {}, f"El archivo de la ejecución anterior ({previous.filename}) ya no existe en el servidor."
+        return (
+            {},
+            f"El archivo de la ejecución anterior ({previous.filename}) ya no existe en el servidor.",
+        )
 
     old_data = ETLService.process(old_file_path, modalidad)
 

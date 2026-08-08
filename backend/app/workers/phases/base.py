@@ -64,5 +64,4 @@ class BasePhase(ABC):
     phase_name: str = ""
 
     @abstractmethod
-    async def run(self, ctx: PhaseContext) -> None:
-        ...
+    async def run(self, ctx: PhaseContext) -> None: ...

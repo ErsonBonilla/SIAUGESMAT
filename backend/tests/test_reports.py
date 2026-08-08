@@ -16,8 +16,7 @@ from app.services.report_utils import write_csv
 from app.services.reports import ReportService
 
 
-def _make_log(action: str, phase: str = "2", identifier: str = "",
-              detail: dict = None):
+def _make_log(action: str, phase: str = "2", identifier: str = "", detail: dict = None):
     obj = type("FakeLog", (), {})()
     obj.action = action
     obj.phase = phase
@@ -38,7 +37,6 @@ def _process_report_config(report_dir: str, key: str, logs: list):
 
 
 class TestReportGeneration:
-
     def setup_method(self):
         self.tmpdir = tempfile.mkdtemp()
 
@@ -64,12 +62,17 @@ class TestReportGeneration:
 
     def test_inc_usuarios_inactivos(self):
         logs = [
-            _make_log("enrolment_failed", identifier="a@b.com",
-                      detail={"reason": "user_not_found", "course": "C1"}),
-            _make_log("enrolment_failed", identifier="b@b.com",
-                      detail={"reason": "user_inactive", "course": "C2"}),
-            _make_log("enrolment_ok", identifier="c@b.com",
-                      detail={"reason": "enrolled"}),
+            _make_log(
+                "enrolment_failed",
+                identifier="a@b.com",
+                detail={"reason": "user_not_found", "course": "C1"},
+            ),
+            _make_log(
+                "enrolment_failed",
+                identifier="b@b.com",
+                detail={"reason": "user_inactive", "course": "C2"},
+            ),
+            _make_log("enrolment_ok", identifier="c@b.com", detail={"reason": "enrolled"}),
         ]
         _process_report_config(self.tmpdir, "inc_usuarios_inactivos", logs)
         data = self._read_csv("02_inc_usuarios_inactivos.csv")
@@ -78,11 +81,14 @@ class TestReportGeneration:
 
     def test_audit_cursos_creados(self):
         logs = [
-            _make_log("course_created", identifier="C1",
-                      detail={"reason": "new", "professor": "p1"}),
-            _make_log("course_created_with_template", identifier="C2",
-                      detail={"reason": "same_professor_new_group",
-                              "professor": "p1"}),
+            _make_log(
+                "course_created", identifier="C1", detail={"reason": "new", "professor": "p1"}
+            ),
+            _make_log(
+                "course_created_with_template",
+                identifier="C2",
+                detail={"reason": "same_professor_new_group", "professor": "p1"},
+            ),
         ]
         _process_report_config(self.tmpdir, "audit_cursos_creados", logs)
         data = self._read_csv("07_audit_cursos_creados.csv")
@@ -92,13 +98,20 @@ class TestReportGeneration:
 
     def test_audit_conflictos_identidad(self):
         logs = [
-            _make_log("user_identity_conflict", phase="1", identifier="mbermudez",
-                      detail={"email": "mbermudez@univ.edu",
-                              "etl_fullname": "María Bermúdez",
-                              "moodle_fullname": "Juan Bermúdez",
-                              "matched_by": "username"}),
-            _make_log("user_resolved", phase="1", identifier="otro",
-                      detail={"email": "otro@univ.edu"}),
+            _make_log(
+                "user_identity_conflict",
+                phase="1",
+                identifier="mbermudez",
+                detail={
+                    "email": "mbermudez@univ.edu",
+                    "etl_fullname": "María Bermúdez",
+                    "moodle_fullname": "Juan Bermúdez",
+                    "matched_by": "username",
+                },
+            ),
+            _make_log(
+                "user_resolved", phase="1", identifier="otro", detail={"email": "otro@univ.edu"}
+            ),
         ]
         _process_report_config(self.tmpdir, "audit_conflictos_identidad", logs)
         data = self._read_csv("14_audit_conflictos_identidad.csv")
@@ -110,12 +123,17 @@ class TestReportGeneration:
 
     def test_audit_plan_acciones(self):
         logs = [
-            _make_log("planned_course_created", identifier="C1",
-                      detail={"reason": "new", "professor": "p1"}),
-            _make_log("planned_course_deleted", identifier="C2",
-                      detail={"reason": "disappeared", "age_seconds": 864000}),
-            _make_log("course_created", identifier="C3",
-                      detail={"reason": "new"}),
+            _make_log(
+                "planned_course_created",
+                identifier="C1",
+                detail={"reason": "new", "professor": "p1"},
+            ),
+            _make_log(
+                "planned_course_deleted",
+                identifier="C2",
+                detail={"reason": "disappeared", "age_seconds": 864000},
+            ),
+            _make_log("course_created", identifier="C3", detail={"reason": "new"}),
         ]
         _process_report_config(self.tmpdir, "audit_plan_acciones", logs)
         data = self._read_csv("15_audit_plan_acciones.csv")
@@ -131,20 +149,29 @@ class TestReportGeneration:
 
     def test_usuarios_creados_manual(self):
         logs = [
-            _make_log("user_created_createpassword", phase="4",
-                      identifier="maria.perez",
-                      detail={"firstname": "María", "lastname": "Pérez",
-                              "email": "mperez@ut.edu.co"}),
-            _make_log("user_resolved", phase="1", identifier="doc.existente",
-                      detail={"firstname": "Juan", "lastname": "Díaz",
-                              "email": "jdiaz@ut.edu.co"}),
+            _make_log(
+                "user_created_createpassword",
+                phase="4",
+                identifier="maria.perez",
+                detail={"firstname": "María", "lastname": "Pérez", "email": "mperez@ut.edu.co"},
+            ),
+            _make_log(
+                "user_resolved",
+                phase="1",
+                identifier="doc.existente",
+                detail={"firstname": "Juan", "lastname": "Díaz", "email": "jdiaz@ut.edu.co"},
+            ),
         ]
         _process_report_config(self.tmpdir, "usuarios_creados_manual", logs)
         data = self._read_csv("17_usuarios_creados_manual.csv")
         assert data is not None
         assert len(data) == 2  # header + 1 row (solo creados, no resueltos)
-        assert data[0] == ["Username", "Correo institucional",
-                           "Nombre y Apellidos", "Base de datos"]
+        assert data[0] == [
+            "Username",
+            "Correo institucional",
+            "Nombre y Apellidos",
+            "Base de datos",
+        ]
         assert data[1][0] == "maria.perez"
         assert data[1][1] == "mperez@ut.edu.co"
         assert data[1][2] == "María Pérez"
@@ -152,13 +179,15 @@ class TestReportGeneration:
 
 
 class TestReportServiceIntegration:
-
     def test_generate_all_creates_csvs(self):
         logs = [
-            _make_log("course_created", phase="2", identifier="C1",
-                      detail={"reason": "new", "professor": "p1"}),
-            _make_log("enrolment_ok", phase="3", identifier="user1",
-                      detail={"course": "C1"}),
+            _make_log(
+                "course_created",
+                phase="2",
+                identifier="C1",
+                detail={"reason": "new", "professor": "p1"},
+            ),
+            _make_log("enrolment_ok", phase="3", identifier="user1", detail={"course": "C1"}),
         ]
 
         class FakeExec:
@@ -170,10 +199,14 @@ class TestReportServiceIntegration:
             moodle_version = "3.9"
             modalidad = "DISTANCIA"
             metrics: ClassVar[dict] = {
-                "categories_created": 1, "courses_created": 1,
-                "courses_deleted": 0, "courses_activated": 0,
-                "users_created": 0, "enrolments": 1,
-                "enrolment_errors": 0, "alerts": 0,
+                "categories_created": 1,
+                "courses_created": 1,
+                "courses_deleted": 0,
+                "courses_activated": 0,
+                "users_created": 0,
+                "enrolments": 1,
+                "enrolment_errors": 0,
+                "alerts": 0,
             }
 
         class FakeFiltered:
@@ -196,9 +229,11 @@ class TestReportServiceIntegration:
                 return FakeQuery()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch.object(settings, "REPORT_DIR", tmpdir), \
-                 patch.object(ReportService, "_write_audit_errores"), \
-                 patch("app.services.charts.ChartService.generate_all"):
+            with (
+                patch.object(settings, "REPORT_DIR", tmpdir),
+                patch.object(ReportService, "_write_audit_errores"),
+                patch("app.services.charts.ChartService.generate_all"),
+            ):
                 report_dir = ReportService.generate_all(999, FakeDB())
 
             assert os.path.exists(report_dir)

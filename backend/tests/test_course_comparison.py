@@ -32,7 +32,6 @@ def _make_new_course(shortname: str) -> dict:
 
 
 class TestParseShortname:
-
     def test_valid_shortname(self):
         result = parse_shortname("IDE_0105_sI_202_G-01")
         assert result == {
@@ -55,7 +54,6 @@ class TestParseShortname:
 
 
 class TestBuildIndex:
-
     def test_shortname_index(self):
         courses = [
             _make_moodle_course("IDE_0105_sI_202_G-01"),
@@ -68,7 +66,6 @@ class TestBuildIndex:
 
 
 class TestCourseAge:
-
     def test_age_from_timecreated(self):
         course = _make_moodle_course("TEST", timecreated=100000)
         age = get_course_age_seconds(course)
@@ -76,7 +73,6 @@ class TestCourseAge:
 
 
 class TestIsCourseHidden:
-
     def test_hidden_course(self):
         course = _make_moodle_course("TEST", visible=0)
         assert is_course_hidden(course) is True
@@ -97,7 +93,9 @@ class TestComparison:
         new_courses = [_make_new_course("IDE_0105_sI_202_G-01")]
         new_enrolments = [{"course_shortname": "IDE_0105_sI_202_G-01", "username": "prof1"}]
 
-        result = await CourseComparisonService.compare(existing_courses, new_courses, new_enrolments)
+        result = await CourseComparisonService.compare(
+            existing_courses, new_courses, new_enrolments
+        )
 
         assert len(result["to_create"]) == 1
         assert result["to_create"][0]["shortname"] == "IDE_0105_sI_202_G-01"
@@ -110,16 +108,23 @@ class TestComparison:
         sn = "IDE_0105_sI_202_G-01"
         recent_time = int(__import__("time").time()) - 1000
         existing_courses = [
-            _make_moodle_course(sn, visible=1, timecreated=recent_time, customfields=[
-                {"shortname": "professor", "value": "prof1"},
-            ]),
+            _make_moodle_course(
+                sn,
+                visible=1,
+                timecreated=recent_time,
+                customfields=[
+                    {"shortname": "professor", "value": "prof1"},
+                ],
+            ),
         ]
 
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "prof1"}]
 
         result = await CourseComparisonService.compare(
-            existing_courses, new_courses, new_enrolments,
+            existing_courses,
+            new_courses,
+            new_enrolments,
             courses_with_teacher={sn: "prof1"},
         )
 
@@ -133,16 +138,22 @@ class TestComparison:
         sn = "IDE_0105_sI_202_G-01"
         old_time = 100000  # más de 18 meses
         existing_courses = [
-            _make_moodle_course(sn, timecreated=old_time, customfields=[
-                {"shortname": "professor", "value": "prof1"},
-            ]),
+            _make_moodle_course(
+                sn,
+                timecreated=old_time,
+                customfields=[
+                    {"shortname": "professor", "value": "prof1"},
+                ],
+            ),
         ]
 
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "prof1"}]
 
         result = await CourseComparisonService.compare(
-            existing_courses, new_courses, new_enrolments,
+            existing_courses,
+            new_courses,
+            new_enrolments,
             courses_with_teacher={sn: "prof1"},
         )
 
@@ -157,16 +168,23 @@ class TestComparison:
         sn = "IDE_0105_sI_202_G-01"
         recent_time = int(__import__("time").time()) - 1000
         existing_courses = [
-            _make_moodle_course(sn, visible=0, timecreated=recent_time, customfields=[
-                {"shortname": "professor", "value": "prof1"},
-            ]),
+            _make_moodle_course(
+                sn,
+                visible=0,
+                timecreated=recent_time,
+                customfields=[
+                    {"shortname": "professor", "value": "prof1"},
+                ],
+            ),
         ]
 
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "prof1"}]
 
         result = await CourseComparisonService.compare(
-            existing_courses, new_courses, new_enrolments,
+            existing_courses,
+            new_courses,
+            new_enrolments,
             courses_with_teacher={sn: "prof1"},
         )
 
@@ -179,16 +197,22 @@ class TestComparison:
         sn = "IDE_0105_sI_202_G-01"
         recent_time = int(__import__("time").time()) - 1000
         existing_courses = [
-            _make_moodle_course(sn, timecreated=recent_time, customfields=[
-                {"shortname": "professor", "value": "old_prof"},
-            ]),
+            _make_moodle_course(
+                sn,
+                timecreated=recent_time,
+                customfields=[
+                    {"shortname": "professor", "value": "old_prof"},
+                ],
+            ),
         ]
 
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "new_prof"}]
 
         result = await CourseComparisonService.compare(
-            existing_courses, new_courses, new_enrolments,
+            existing_courses,
+            new_courses,
+            new_enrolments,
             courses_with_teacher={sn: "old_prof"},
         )
 
@@ -205,15 +229,20 @@ class TestComparison:
         new_sn = "IDE_0105_sI_202_G-02"
 
         existing_courses = [
-            _make_moodle_course(existing_sn, customfields=[
-                {"shortname": "professor", "value": "prof1"},
-            ]),
+            _make_moodle_course(
+                existing_sn,
+                customfields=[
+                    {"shortname": "professor", "value": "prof1"},
+                ],
+            ),
         ]
 
         new_courses = [_make_new_course(new_sn)]
         new_enrolments = [{"course_shortname": new_sn, "username": "prof1"}]
 
-        result = await CourseComparisonService.compare(existing_courses, new_courses, new_enrolments)
+        result = await CourseComparisonService.compare(
+            existing_courses, new_courses, new_enrolments
+        )
 
         updated = [u for u in result.get("to_update", []) if u["shortname"] == new_sn]
         assert len(updated) == 1
@@ -229,9 +258,12 @@ class TestComparison:
         new_sn_2 = "IDE_0105_sI_202_G-02"
 
         existing_courses = [
-            _make_moodle_course(existing_sn, customfields=[
-                {"shortname": "professor", "value": "prof1"},
-            ]),
+            _make_moodle_course(
+                existing_sn,
+                customfields=[
+                    {"shortname": "professor", "value": "prof1"},
+                ],
+            ),
         ]
 
         new_courses = [_make_new_course(new_sn_1), _make_new_course(new_sn_2)]
@@ -240,7 +272,9 @@ class TestComparison:
             {"course_shortname": new_sn_2, "username": "prof1"},
         ]
 
-        result = await CourseComparisonService.compare(existing_courses, new_courses, new_enrolments)
+        result = await CourseComparisonService.compare(
+            existing_courses, new_courses, new_enrolments
+        )
 
         created = [c for c in result["to_create"] if c["shortname"] == new_sn_2]
         assert len(created) == 1
@@ -253,15 +287,20 @@ class TestComparison:
         new_sn = "IDE_0105_sI_202_G-02"
 
         existing_courses = [
-            _make_moodle_course(existing_sn, customfields=[
-                {"shortname": "professor", "value": "prof1"},
-            ]),
+            _make_moodle_course(
+                existing_sn,
+                customfields=[
+                    {"shortname": "professor", "value": "prof1"},
+                ],
+            ),
         ]
 
         new_courses = [_make_new_course(new_sn)]
         new_enrolments = [{"course_shortname": new_sn, "username": "prof2"}]
 
-        result = await CourseComparisonService.compare(existing_courses, new_courses, new_enrolments)
+        result = await CourseComparisonService.compare(
+            existing_courses, new_courses, new_enrolments
+        )
 
         created = [c for c in result["to_create"] if c["shortname"] == new_sn]
         assert len(created) == 1
@@ -278,7 +317,9 @@ class TestComparison:
 
         # Excel vacío → no se elimina nada (sin programas en scope)
         result = await CourseComparisonService.compare(existing_courses, [], [])
-        assert not any(d.get("shortname") == sn for d in result["to_delete"]), "Excel vacío no debe eliminar cursos"
+        assert not any(d.get("shortname") == sn for d in result["to_delete"]), (
+            "Excel vacío no debe eliminar cursos"
+        )
         assert len(result["alerts"]) == 0
 
         # Excel con un curso de OTRO programa → el curso 0105 no se toca
@@ -288,7 +329,9 @@ class TestComparison:
             [_make_new_course(other_sn)],
             [],
         )
-        assert not any(d.get("shortname") == sn for d in result2["to_delete"]), "Curso de otro programa no debe eliminarse"
+        assert not any(d.get("shortname") == sn for d in result2["to_delete"]), (
+            "Curso de otro programa no debe eliminarse"
+        )
 
         # Excel con cursos del MISMO programa → si desapareció, se elimina
         same_prog_sn = "IDE_0105_sI_303_G-01"
@@ -297,5 +340,7 @@ class TestComparison:
             [_make_new_course(same_prog_sn)],
             [{"course_shortname": same_prog_sn, "username": "prof1"}],
         )
-        assert any(d.get("shortname") == sn for d in result3["to_delete"]), "Curso desaparecido del mismo programa debe eliminarse"
+        assert any(d.get("shortname") == sn for d in result3["to_delete"]), (
+            "Curso desaparecido del mismo programa debe eliminarse"
+        )
         assert result3["to_delete"][0]["reason"] == "disappeared"

@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 def generate_moodle_password(length: int = 14) -> str:
     import string as _string
+
     lower = secrets.choice(_string.ascii_lowercase)
     upper = secrets.choice(_string.ascii_uppercase)
     digit = secrets.choice(_string.digits)
@@ -49,14 +50,20 @@ class MoodleClient:
             )
         else:
             from app.services.rate_limiter import RateLimiter
+
             self._rate_limiter = RateLimiter(
                 rate=settings.MOODLE_MAX_REQUESTS_PER_SECOND,
                 burst=settings.MOODLE_BURST_SIZE,
             )
         self._client = httpx.AsyncClient(timeout=settings.MOODLE_REQUEST_TIMEOUT)
 
-    async def _request(self, wsfunction: str, params: dict[str, Any], use_post: bool = False,
-                       timeout: float | None = None) -> Any:
+    async def _request(
+        self,
+        wsfunction: str,
+        params: dict[str, Any],
+        use_post: bool = False,
+        timeout: float | None = None,
+    ) -> Any:
         _t0 = time.monotonic()
         await self._rate_limiter.acquire()
         return await self._request_with_retry(wsfunction, params, use_post, timeout, _t0)
@@ -68,9 +75,14 @@ class MoodleClient:
         before=before_log(logger, logging.WARNING),
         reraise=True,
     )
-    async def _request_with_retry(self, wsfunction: str, params: dict[str, Any],
-                                   use_post: bool, timeout: float | None,
-                                   _t0: float) -> Any:
+    async def _request_with_retry(
+        self,
+        wsfunction: str,
+        params: dict[str, Any],
+        use_post: bool,
+        timeout: float | None,
+        _t0: float,
+    ) -> Any:
         payload = {
             "wstoken": self._token,
             "wsfunction": wsfunction,
@@ -99,9 +111,7 @@ class MoodleClient:
         _duration = (time.monotonic() - _t0) * 1000
 
         if data is not None and not isinstance(data, (dict, list)):
-            raise MoodleAPIError(
-                f"Respuesta inesperada de {wsfunction}: {str(data)[:300]}"
-            )
+            raise MoodleAPIError(f"Respuesta inesperada de {wsfunction}: {str(data)[:300]}")
 
         if isinstance(data, dict) and ("error" in data or "exception" in data):
             error_code = data.get("errorcode", "")

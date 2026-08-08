@@ -235,7 +235,7 @@ SIAUGESMAT/
 │   │   ├── scripts/            # bulk_course_visibility.py, diagnostic_sibate.py
 │   │   ├── celery_app.py       # Config Celery + beat schedule
 │   │   └── main.py
-│   ├── tests/                  # ~495 tests (ETL, repos, phases, pipeline, analytics, API, workers)
+│   ├── tests/                  # ~553 tests (ETL, repos, phases, pipeline, analytics, API, workers)
 │   ├── alembic/                # Migraciones de base de datos
 │   ├── reports/                # Reportes generados (CSV, ZIP)
 │   ├── uploads/                # Archivos Excel subidos
@@ -309,6 +309,10 @@ source .venv/bin/activate  # Linux/macOS
 # Para desarrollo instalar requirements-dev.txt (incluye ruff, vulture y pytest).
 # La imagen Docker de producción instala solo requirements.txt.
 pip install -r requirements-dev.txt
+# Las versiones exactas se fijan en requirements.lock / requirements-dev.lock
+# (geradas con `uv pip compile`). Regenerarlas cuando cambie requirements*.txt:
+#   uv pip compile requirements.txt -o requirements.lock
+#   uv pip compile requirements-dev.txt -o requirements-dev.lock
 # Copiar las variables de entorno a la RAÍZ del proyecto (config.py lee el .env raíz)
 # desde la raíz:  copy .env.example .env
 # Opcional: backend/.env solo para overrides de dev (p. ej. DATABASE_URL apuntando a localhost)
@@ -329,7 +333,12 @@ cd backend
 alembic stamp head     # init_db() ya crea las tablas. Usar stamp, no upgrade.
 ```
 
-> **Nota:** `init_db()` crea las tablas automáticamente al arrancar. Usá `stamp head` en vez de `upgrade head` para marcar la versión sin intentar recrear tablas existentes.
+> **Nota:** `init_db()` crea las tablas automáticamente solo en desarrollo
+> (`DEBUG=true`). En el despliegue Docker el servicio `migrate` ejecuta
+> `alembic upgrade head` automáticamente antes de que arranquen backend,
+> worker y beat. En entornos locales donde las tablas ya existen (creadas por
+> `init_db()` sin marcar), usá `alembic stamp head` para sincronizar la
+> versión sin recrear tablas.
 
 ### 4. Servicios
 
@@ -410,7 +419,7 @@ El archivo `.env.example` en la raíz contiene todas las variables con valores d
 
 ## Tests y calidad de código
 
-### Backend (~495 tests)
+### Backend (~553 tests)
 
 ```bash
 cd backend
@@ -422,6 +431,12 @@ pytest --deselect tests/test_moodle.py   # sin Redis local (los tests de cache d
 > (`REDIS_URL`). En CI se levanta un servicio Redis y corre la suite completa.
 
 Cubre: parser ETL, repositorios, fases del pipeline, núcleo puro, integración, endpoints API, analítica, workers, tareas Celery, cliente Moodle, adaptadores y más.
+
+> **Entorno de tests:** los tests corren por defecto contra una SQLite temporal
+> (mismo comportamiento en local que en CI, evitando tocar bases reales). Para
+> correr contra la base del `.env` hay que pedirlo explícitamente:
+> `SIAUGESMAT_TESTS_USE_DOTENV=1 pytest` (con precaución: el fixture recrea el
+> esquema en cada test).
 
 ### Frontend (Fresh/Deno)
 
@@ -464,7 +479,7 @@ El flujo de CI en `.github/workflows/ci.yml` corre en cada push a `main` y en ca
 
 | Job | Pasos |
 |---|---|
-| **backend** | Python 3.12 + servicio Redis → `ruff check app tests` → `vulture app --min-confidence 70` → `pytest` (suite completa, incl. tests de cache de Moodle) |
+| **backend** | Python 3.12 + servicio Redis → `ruff check app tests` → `ruff format --check app tests` → `vulture app --min-confidence 70` → `pytest` (suite completa, incl. tests de cache de Moodle) |
 | **frontend** | Deno 2.5.6 → `deno task check` (fmt + lint + typecheck) → `deno task test` → `deno task build` |
 
 ---
@@ -482,17 +497,22 @@ docker compose logs -f
 docker compose down
 ```
 
-El `docker-compose.yml` incluye 7 servicios:
+El `docker-compose.yml` incluye 8 servicios:
 
 | Servicio | Imagen | Puerto | Función |
 |---|---|---|---|
 | `db` | `postgres:17` | — | Base de datos (solo red interna) |
 | `redis` | `redis:7-alpine` | — | Cola de tareas (solo red interna) |
+| `migrate` | `siaugesmat-backend` | — | Aplica migraciones Alembic (`alembic upgrade head`) y termina |
 | `backend` | `siaugesmat-backend` | — | API FastAPI |
 | `worker` | `siaugesmat-backend` | — | Worker Celery (ETL + operaciones) |
 | `beat` | `siaugesmat-backend` | — | Celery Beat (limpieza cada 6h) |
 | `frontend` | `siaugesmat-frontend` | — | Servidor Fresh con Deno |
 | `nginx` | `nginx:alpine` | 80, 443 | Reverse proxy HTTPS — único punto de entrada público |
+
+> `migrate` corre una sola vez (`restart: "no"`) y `backend`, `worker` y
+> `beat` esperan su finalización (`depends_on: migrate: condition:
+> service_completed_successfully`) antes de arrancar.
 
 ### SSL / HTTPS
 
@@ -528,9 +548,12 @@ services:
   redis:
     ports: ["6379:6379"]
   backend:
-    ports: ["8000:8000"]
+    ports: ["8100:8000"]
   frontend:
     ports: ["3000:3000"]
 ```
 
-`docker compose up` leerá automáticamente el override y expondrá los puertos para desarrollo.
+`docker compose up` leerá automáticamente el override y expondrá los puertos
+para desarrollo. El backend Dockerizado queda accesible en
+`http://localhost:8100` (mientras que el backend de desarrollo local corre
+en `http://localhost:8000`).

@@ -39,7 +39,7 @@ def sample_executions(test_db):
             "users_created": 20,
             "enrolments": 150,
             "categories_created": 3,
-            "total_operations": 320
+            "total_operations": 320,
         },
         errors_count=2,
         started_at=datetime(2025, 3, 1, 10, 0, 0, tzinfo=UTC),
@@ -56,7 +56,7 @@ def sample_executions(test_db):
             "users_created": 0,
             "enrolments": 10,
             "categories_created": 1,
-            "total_operations": 20
+            "total_operations": 20,
         },
         errors_count=0,
         started_at=datetime(2025, 3, 15, 8, 0, 0, tzinfo=UTC),
@@ -73,7 +73,7 @@ def sample_executions(test_db):
             "users_created": 30,
             "enrolments": 200,
             "categories_created": 4,
-            "total_operations": 430
+            "total_operations": 430,
         },
         errors_count=10,
         started_at=datetime(2024, 9, 1, 10, 0, 0, tzinfo=UTC),
@@ -161,7 +161,12 @@ def test_semaphore_yellow(sample_executions):
         semester="2025B",
         mode="both",
         status="completed",
-        metrics={"courses_created": 100, "users_created": 0, "enrollments": 0, "total_operations": 100},
+        metrics={
+            "courses_created": 100,
+            "users_created": 0,
+            "enrollments": 0,
+            "total_operations": 100,
+        },
         errors_count=2,
         started_at=datetime(2025, 6, 1, 10, 0, 0, tzinfo=UTC),
         completed_at=datetime(2025, 6, 1, 11, 0, 0, tzinfo=UTC),

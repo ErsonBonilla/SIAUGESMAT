@@ -130,11 +130,11 @@ class TestExecutionRepo:
 
 class TestLogRepo:
     def test_save_log(self, test_db, execution):
-        save_log(test_db, execution.id, "1", "phase1_complete", identifier="test_sn", detail={"k": "v"})
+        save_log(
+            test_db, execution.id, "1", "phase1_complete", identifier="test_sn", detail={"k": "v"}
+        )
         test_db.commit()
-        logs = test_db.query(ExecutionLog).filter(
-            ExecutionLog.execution_id == execution.id
-        ).all()
+        logs = test_db.query(ExecutionLog).filter(ExecutionLog.execution_id == execution.id).all()
         assert len(logs) == 1
         assert logs[0].phase == "1"
         assert logs[0].action == "phase1_complete"
@@ -151,9 +151,7 @@ class TestLogRepo:
     def test_save_error(self, test_db, execution):
         save_error(test_db, execution.id, "3", identifier="bad_course", message="Fallo")
         test_db.commit()
-        errors = test_db.query(ErrorLog).filter(
-            ErrorLog.execution_id == execution.id
-        ).all()
+        errors = test_db.query(ErrorLog).filter(ErrorLog.execution_id == execution.id).all()
         assert len(errors) == 1
         assert errors[0].type == "3"
         assert errors[0].identifier == "bad_course"
