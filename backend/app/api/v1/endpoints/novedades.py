@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 MAX_FILE_SIZE_MB = 50
-ALLOWED_EXTENSIONS = {".xlsx"}
+ALLOWED_EXTENSIONS = {".xlsx", ".xls"}
 
 
 @router.post("/compare", response_model=NovedadesResponse,

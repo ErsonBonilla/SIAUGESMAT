@@ -10,7 +10,7 @@ export default function UploadIsland() {
         </h2>
         <ul class="list-disc list-inside text-sm text-[var(--text-secondary)] flex flex-col gap-1">
           <li>
-            Seleccione el archivo Excel (.xlsx) con los datos de la carga
+            Seleccione el archivo Excel (.xlsx o .xls) con los datos de la carga
             académica.
           </li>
           <li>

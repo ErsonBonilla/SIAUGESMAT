@@ -75,6 +75,16 @@ class TestUploadEndpoint:
         )
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
+    def test_upload_accepts_xls_extension(self, client, auth_headers):
+        """Archivo .xls debe ser aceptado (formato legacy Excel 97-2003)."""
+        response = client.post(
+            self.UPLOAD_URL,
+            files={"file": ("test.xls", b"dummy", "application/vnd.ms-excel")},
+            data={"semester": "2025B", "mode": "both", "modalidad": "DISTANCIA"},
+            headers=auth_headers,
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+
     def test_upload_invalid_semester_format(self, client, auth_headers):
         """Semestre con formato inválido debe ser rechazado."""
         response = client.post(

@@ -24,6 +24,14 @@ def _base_dataframe(rows: list[dict]) -> pd.DataFrame:
     return pd.DataFrame(rows, dtype=str)
 
 
+def test_excel_engine_selection():
+    """El motor de lectura se elige según la extensión del archivo."""
+    assert DistanciaParser._excel_engine("carga.xls") == "calamine"
+    assert DistanciaParser._excel_engine("carga.XLS") == "calamine"
+    assert DistanciaParser._excel_engine("carga.xlsx") is None
+    assert DistanciaParser._excel_engine("carga.csv") is None
+
+
 # ---------------------------------------------------------------------------
 # Escenario 1: curso y docente básicos
 # ---------------------------------------------------------------------------

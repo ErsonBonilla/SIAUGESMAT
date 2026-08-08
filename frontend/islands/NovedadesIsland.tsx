@@ -90,8 +90,11 @@ export default function NovedadesIsland() {
     const target = e.target as HTMLInputElement;
     const f = target.files?.[0];
     if (f) {
-      if (!f.name.toLowerCase().endsWith(".xlsx")) {
-        error.value = "Solo se permiten archivos .xlsx";
+      if (
+        !f.name.toLowerCase().endsWith(".xlsx") &&
+        !f.name.toLowerCase().endsWith(".xls")
+      ) {
+        error.value = "Solo se permiten archivos .xlsx o .xls";
         file.value = null;
         return;
       }
@@ -109,7 +112,7 @@ export default function NovedadesIsland() {
       return;
     }
     if (!file.value) {
-      error.value = "Seleccione un archivo Excel (.xlsx).";
+      error.value = "Seleccione un archivo Excel (.xlsx o .xls).";
       return;
     }
     loading.value = true;
@@ -144,12 +147,12 @@ export default function NovedadesIsland() {
                 for="file"
                 class="block text-sm font-medium text-[var(--text-secondary)] mb-2"
               >
-                Archivo Excel (.xlsx)
+                Archivo Excel (.xlsx o .xls)
               </label>
               <input
                 id="file"
                 type="file"
-                accept=".xlsx"
+                accept=".xlsx,.xls"
                 onChange={handleFileChange}
                 disabled={loading.value || !allowed}
                 class="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--file-btn-bg)] file:text-[var(--file-btn-text)] hover:file:bg-[var(--file-btn-hover)] transition disabled:opacity-40 disabled:cursor-not-allowed"
