@@ -331,14 +331,14 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                                   getBatchReportUrl(b.batch_id),
                                   `reportes_${b.batch_id.slice(0, 8)}.zip`,
                                 )}
-                              class="gradient-text hover:brightness-110 text-sm font-medium ml-1 cursor-pointer bg-transparent border-none p-0 font-inherit"
+                              class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium ml-1 cursor-pointer bg-transparent border-none p-0 font-inherit"
                             >
                               Reportes
                             </button>
                           )}
                           <a
                             href={`/operaciones/lotes/${b.batch_id}`}
-                            class="gradient-text hover:brightness-110 text-sm font-medium ml-1"
+                            class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium ml-1 no-underline"
                           >
                             Detalle
                           </a>

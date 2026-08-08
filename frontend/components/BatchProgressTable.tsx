@@ -84,7 +84,7 @@ export default function BatchProgressTable(
                 <BatchReportsSection batchId={batchId} />
                 <a
                   href={`/operaciones/lotes/${batchId}`}
-                  class="mt-3 inline-block text-sm gradient-text hover:underline"
+                  class="mt-3 inline-block text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] no-underline"
                 >
                   Ver detalle completo →
                 </a>
