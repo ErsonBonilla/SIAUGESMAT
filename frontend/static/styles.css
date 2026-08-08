@@ -231,6 +231,30 @@ html.dark .status-orange {
   text-align: center;
 }
 
+/* --- Efectos hover globales en botones --- */
+button:not(:disabled),
+input[type="button"],
+input[type="submit"],
+input[type="file"]::file-selector-button,
+[role="button"] {
+  cursor: pointer;
+}
+
+button:disabled,
+input:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+button:not(:disabled):hover,
+input[type="button"]:not(:disabled):hover,
+input[type="submit"]:not(:disabled):hover,
+input[type="file"]:not(:disabled)::file-selector-button:hover,
+[role="button"]:hover {
+  filter: brightness(1.07) !important;
+  transition: filter 0.15s ease;
+}
+
 /* Ocultar ojo nativo del navegador en inputs password */
 input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
