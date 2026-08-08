@@ -36,6 +36,20 @@ def translate_error(e: Exception) -> str:
             "Posiblemente esté en mantenimiento o sobrecargado."
         )
 
+    # Errores de lectura del archivo Excel (calamine/openpyxl)
+    if "cannot detect file format" in msg.lower():
+        return (
+            "El archivo cargado no es un Excel válido (.xlsx o .xls). "
+            "Verifique que el archivo no esté dañado o que no haya sido "
+            "guardado con otro formato (por ejemplo, HTML o CSV)."
+        )
+
+    if "not a zip file" in msg.lower() or "invalidfileexception" in msg.lower():
+        return (
+            "El archivo cargado está dañado o no es un Excel válido (.xlsx). "
+            "Vuelva a exportar el archivo desde Excel y subirlo de nuevo."
+        )
+
     # Errores de Moodle API (ya tienen mensaje en español)
     if isinstance(e, MoodleAPIError):
         return e.spanish_message

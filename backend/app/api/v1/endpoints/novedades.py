@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
 from app.schemas.novedades import NovedadesResponse, NovedadItem
 from app.schemas.user import UserInToken
+from app.services.excel_validation import is_excel_content
 from app.services.novedades_service import detect as detect_novedades
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,16 @@ async def compare_novedades(
         raise HTTPException(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"El archivo excede {MAX_FILE_SIZE_MB} MB.",
+        )
+
+    if not is_excel_content(file_bytes):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "El archivo no es un Excel válido. Verifique que sea un "
+                "archivo .xlsx o .xls real, que no esté dañado y vuelva a "
+                "intentarlo."
+            ),
         )
 
     upload_dir = settings.UPLOAD_DIR

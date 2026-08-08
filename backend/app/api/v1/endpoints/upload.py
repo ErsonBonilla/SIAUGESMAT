@@ -17,6 +17,7 @@ from app.repositories.operation_repo import get_active_batch
 from app.schemas.api import UploadStatusResponse
 from app.schemas.upload import SemesterResponse, UploadResponse
 from app.schemas.user import UserInToken
+from app.services.excel_validation import is_excel_content
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +126,16 @@ async def upload_excel(
         raise HTTPException(
             status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail=f"El archivo excede {MAX_FILE_SIZE_MB} MB.",
+        )
+
+    if not is_excel_content(file_bytes):
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "El archivo no es un Excel válido. Verifique que sea un "
+                "archivo .xlsx o .xls real, que no esté dañado y vuelva a "
+                "intentarlo."
+            ),
         )
 
     upload_dir = settings.UPLOAD_DIR
