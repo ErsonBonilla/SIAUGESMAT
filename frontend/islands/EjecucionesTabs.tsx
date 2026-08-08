@@ -9,8 +9,17 @@ const INACTIVE =
   "border bg-[var(--bg-primary)] border-[var(--border-secondary)] " +
   "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]";
 
+function initialTab(): TabKey {
+  if (typeof window !== "undefined") {
+    const fromUrl = new URLSearchParams(window.location.search).get("tab");
+    const match = OPERATIONS_TABS.find((t) => t.key === fromUrl);
+    if (match) return match.key as TabKey;
+  }
+  return OPERATIONS_TABS[0].key;
+}
+
 export default function EjecucionesTabs() {
-  const tab = useSignal<TabKey>(OPERATIONS_TABS[0].key);
+  const tab = useSignal<TabKey>(initialTab());
   const current = OPERATIONS_TABS.find((t) => t.key === tab.value)!;
 
   return (

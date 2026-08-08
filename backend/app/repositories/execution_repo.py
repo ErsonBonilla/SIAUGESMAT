@@ -12,6 +12,27 @@ def get_execution(db: Session, execution_id: int) -> Execution | None:
     return db.query(Execution).filter(Execution.id == execution_id).first()
 
 
+ACTIVE_EXECUTION_STATUSES = ("queued", "running", "paused", "review_required")
+
+
+def get_active_execution(db: Session, modalidad: str,
+                         exclude_id: int | None = None) -> Execution | None:
+    """Devuelve la ejecución en curso (no terminada) de una modalidad.
+
+    Estados considerados activos: queued, running, paused, review_required.
+    ``exclude_id`` permite ignorar una ejecución concreta (p. ej. la propia
+    al reanudar/confirmar una ejecución).
+    """
+    query = db.query(Execution).filter(
+        Execution.status.in_(ACTIVE_EXECUTION_STATUSES),
+    )
+    if modalidad:
+        query = query.filter(Execution.modalidad == modalidad)
+    if exclude_id is not None:
+        query = query.filter(Execution.id != exclude_id)
+    return query.order_by(Execution.created_at.desc()).first()
+
+
 def create_execution(db: Session, filename: str, semester: str, mode: str,
                      modalidad: str, moodle_version: str) -> Execution:
     execution = Execution(

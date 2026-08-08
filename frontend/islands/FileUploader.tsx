@@ -6,8 +6,10 @@ import {
   startProcess,
   uploadFile,
 } from "../services/api.ts";
+import { useUploadGate } from "../hooks/useUploadGate.ts";
 import { SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
+import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
 
 export default function FileUploader() {
   const file = useSignal<File | null>(null);
@@ -18,6 +20,10 @@ export default function FileUploader() {
   const error = useSignal("");
   const successExecutionId = useSignal<number | null>(null);
   const semesterLoading = useSignal(true);
+
+  const { allowed, status, error: gateError } = useUploadGate(() =>
+    modalidad.value
+  );
 
   useEffect(() => {
     getCurrentSemester()
@@ -47,6 +53,12 @@ export default function FileUploader() {
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     error.value = "";
+
+    if (!allowed) {
+      error.value =
+        "No se pueden subir archivos mientras haya un proceso en ejecución.";
+      return;
+    }
 
     if (!file.value) {
       error.value = "Seleccione un archivo Excel (.xlsx).";
@@ -99,8 +111,8 @@ export default function FileUploader() {
             type="file"
             accept=".xlsx"
             onChange={handleFileChange}
-            disabled={uploading.value}
-            class="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--file-btn-bg)] file:text-[var(--file-btn-text)] hover:file:bg-[var(--file-btn-hover)] transition disabled:opacity-50"
+            disabled={uploading.value || !allowed}
+            class="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--file-btn-bg)] file:text-[var(--file-btn-text)] hover:file:bg-[var(--file-btn-hover)] transition disabled:opacity-40 disabled:cursor-not-allowed"
           />
         </div>
       </div>
@@ -121,14 +133,18 @@ export default function FileUploader() {
 
       <input type="hidden" name="modalidad" value={modalidad.value} />
 
+      {/* Proceso en curso: no se pueden subir archivos */}
+      {!allowed && <ProcessInProgressBanner status={status.value} />}
+      {gateError.value && <ErrorBox message={gateError.value} />}
+
       {/* Error */}
       {error.value && <ErrorBox message={error.value} />}
 
       {/* Botón de envío */}
       <button
         type="submit"
-        disabled={uploading.value}
-        class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white font-semibold hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[rgba(var(--brand-green-rgb),0.4)] transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        disabled={uploading.value || !allowed}
+        class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white font-semibold hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[rgba(var(--brand-green-rgb),0.4)] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         {uploading.value
           ? (
@@ -137,9 +153,9 @@ export default function FileUploader() {
               <span>Subiendo y encolando...</span>
             </>
           )
-          : (
-            "Subir y procesar archivo"
-          )}
+          : !allowed
+          ? "Esperando a que finalice el proceso en curso"
+          : "Subir y procesar archivo"}
       </button>
     </form>
   );

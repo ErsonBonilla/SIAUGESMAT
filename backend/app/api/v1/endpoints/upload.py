@@ -7,12 +7,13 @@ import os
 import uuid
 from datetime import UTC
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
-from app.repositories.execution_repo import create_execution
+from app.repositories.execution_repo import create_execution, get_active_execution
+from app.repositories.operation_repo import get_active_batch
 from app.schemas.upload import SemesterResponse, UploadResponse
 from app.schemas.user import UserInToken
 
@@ -32,6 +33,31 @@ def get_current_semester():
     now = datetime.now(UTC)
     period = "A" if now.month <= 6 else "B"
     return SemesterResponse(semester=f"{now.year}{period}")
+
+
+@router.get("/status",
+            summary="Indica si se permite subir archivos para una modalidad")
+def get_upload_status(
+    modalidad: str | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: UserInToken = Depends(get_current_user),
+):
+    mod = (modalidad or current_user.modalidad or "DISTANCIA").strip().upper()
+    execution = get_active_execution(db, mod)
+    batch = get_active_batch(db, mod)
+    return {
+        "allowed": not (execution or batch),
+        "execution": {
+            "id": execution.id,
+            "status": execution.status,
+            "filename": execution.filename,
+        } if execution else None,
+        "batch": {
+            "batch_id": batch.batch_id,
+            "entity_type": batch.entity_type,
+            "action": batch.action,
+        } if batch else None,
+    }
 
 
 @router.post("", response_model=UploadResponse, summary="Subir archivo Excel",
@@ -60,6 +86,13 @@ async def upload_excel(
     if modalidad not in allowed_modalidades:
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
                             detail="Modalidad inválida. Solo DISTANCIA está disponible.")
+
+    if get_active_execution(db, modalidad) or get_active_batch(db, modalidad):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            detail="Hay un proceso en curso en esta modalidad. "
+                   "No se pueden subir archivos hasta que el proceso en ejecución finalice.",
+        )
 
     if not file.filename:
         raise HTTPException(status.HTTP_400_BAD_REQUEST,

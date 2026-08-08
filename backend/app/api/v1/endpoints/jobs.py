@@ -17,11 +17,13 @@ from app.repositories.execution_repo import (
     atomic_mark_queued,
     cancel_execution,
     delete_execution,
+    get_active_execution,
     get_execution,
     get_execution_errors,
     list_executions,
     pause_execution,
 )
+from app.repositories.operation_repo import get_active_batch
 from app.schemas.job import (
     ErrorOut,
     ExecutionList,
@@ -73,6 +75,14 @@ async def start_process(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No se puede procesar una ejecución de modalidad PRESENCIAL.",
+        )
+
+    if (get_active_execution(db, execution.modalidad, exclude_id=execution_id)
+            or get_active_batch(db, execution.modalidad)):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe un proceso en ejecución en esta modalidad. "
+                   "Espere a que finalice antes de iniciar otro.",
         )
 
     file_path = os.path.join(settings.UPLOAD_DIR, execution.filename)

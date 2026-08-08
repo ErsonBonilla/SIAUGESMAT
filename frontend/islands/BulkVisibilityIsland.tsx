@@ -1,5 +1,6 @@
 import { useSignal } from "@preact/signals";
 import { useBatchUpload } from "../hooks/useBatchUpload.ts";
+import { useUploadGate } from "../hooks/useUploadGate.ts";
 import {
   cancelBatch,
   getBatchStatus,
@@ -9,6 +10,7 @@ import {
 } from "../services/api.ts";
 import { SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
+import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
 import OperationHistorySection from "../components/OperationHistorySection.tsx";
 import BatchProgressTable from "../components/BatchProgressTable.tsx";
 
@@ -17,6 +19,7 @@ export default function BulkVisibilityIsland() {
   const refreshKey = useSignal(0);
   const detailOffset = useSignal(0);
   const PAGE_SIZE = 20;
+  const { allowed, status, error: gateError } = useUploadGate(() => "");
 
   const {
     uploading,
@@ -117,17 +120,19 @@ export default function BulkVisibilityIsland() {
             type="file"
             accept=".csv"
             onChange={handleFileChange}
-            disabled={uploading.value}
-            class="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--file-btn-bg)] file:text-[var(--file-btn-text)] hover:file:bg-[var(--file-btn-hover)] transition disabled:opacity-50"
+            disabled={uploading.value || !allowed}
+            class="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--file-btn-bg)] file:text-[var(--file-btn-text)] hover:file:bg-[var(--file-btn-hover)] transition disabled:opacity-40 disabled:cursor-not-allowed"
           />
         </div>
 
+        {!allowed && <ProcessInProgressBanner status={status.value} />}
+        {gateError.value && <ErrorBox message={gateError.value} />}
         {error.value && <ErrorBox message={error.value} />}
 
         <button
           type="submit"
-          disabled={uploading.value}
-          class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white font-semibold hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[rgba(var(--brand-green-rgb),0.4)] transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          disabled={uploading.value || !allowed}
+          class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white font-semibold hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[rgba(var(--brand-green-rgb),0.4)] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {uploading.value
             ? (
@@ -136,9 +141,9 @@ export default function BulkVisibilityIsland() {
                 <span>Subiendo y encolando...</span>
               </>
             )
-            : (
-              `${visibility.value === "show" ? "Mostrar" : "Ocultar"} cursos`
-            )}
+            : !allowed
+            ? "Esperando a que finalice el proceso en curso"
+            : `${visibility.value === "show" ? "Mostrar" : "Ocultar"} cursos`}
         </button>
       </form>
 

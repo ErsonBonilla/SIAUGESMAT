@@ -2,9 +2,11 @@ import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { getCurrentSemester } from "../services/api.ts";
 import { compareNovedades } from "../services/api/novedades.ts";
+import { useUploadGate } from "../hooks/useUploadGate.ts";
 import type { NovedadItem } from "../services/api/types.ts";
 import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
+import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
 
 type Step = "upload" | "results";
 
@@ -69,6 +71,10 @@ export default function NovedadesIsland() {
   const totalCompared = useSignal(0);
   const novedades = useSignal<NovedadItem[]>([]);
 
+  const { allowed, status, error: gateError } = useUploadGate(() =>
+    modalidad.value
+  );
+
   useEffect(() => {
     getCurrentSemester()
       .then((s) => {
@@ -97,6 +103,11 @@ export default function NovedadesIsland() {
   const handleCompare = async (e: Event) => {
     e.preventDefault();
     error.value = "";
+    if (!allowed) {
+      error.value =
+        "No se pueden subir archivos mientras haya un proceso en ejecución.";
+      return;
+    }
     if (!file.value) {
       error.value = "Seleccione un archivo Excel (.xlsx).";
       return;
@@ -140,8 +151,8 @@ export default function NovedadesIsland() {
                 type="file"
                 accept=".xlsx"
                 onChange={handleFileChange}
-                disabled={loading.value}
-                class="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--file-btn-bg)] file:text-[var(--file-btn-text)] hover:file:bg-[var(--file-btn-hover)] transition disabled:opacity-50"
+                disabled={loading.value || !allowed}
+                class="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--file-btn-bg)] file:text-[var(--file-btn-text)] hover:file:bg-[var(--file-btn-hover)] transition disabled:opacity-40 disabled:cursor-not-allowed"
               />
             </div>
 
@@ -162,12 +173,14 @@ export default function NovedadesIsland() {
                 )}
             </div>
 
+            {!allowed && <ProcessInProgressBanner status={status.value} />}
+            {gateError.value && <ErrorBox message={gateError.value} />}
             {error.value && <ErrorBox message={error.value} />}
 
             <button
               type="submit"
-              disabled={loading.value}
-              class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white font-semibold hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[rgba(var(--brand-green-rgb),0.4)] transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={loading.value || !allowed}
+              class="w-full py-2.5 px-4 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white font-semibold hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-[rgba(var(--brand-green-rgb),0.4)] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading.value
                 ? (
@@ -176,6 +189,8 @@ export default function NovedadesIsland() {
                     <span>Comparando...</span>
                   </>
                 )
+                : !allowed
+                ? "Esperando a que finalice el proceso en curso"
                 : "Comparar con carga anterior"}
             </button>
           </form>
