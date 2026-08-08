@@ -17,6 +17,13 @@ from app.repositories.operation_repo import (
     pause_batch,
     resume_batch,
 )
+from app.schemas.api import (
+    BatchActionResponse,
+    BatchCancelResponse,
+    BatchPauseResponse,
+    BatchReportsListResponse,
+    BatchResumeResponse,
+)
 from app.schemas.operations import BatchStatusResponse, OperationItemOut
 from app.schemas.user import UserInToken
 from app.services.batch_report_service import (
@@ -78,7 +85,11 @@ def get_batch_status_endpoint(
     )
 
 
-@router.post("/batch/{batch_id}/pause", summary="Pausar un lote de operaciones")
+@router.post(
+    "/batch/{batch_id}/pause",
+    response_model=BatchPauseResponse,
+    summary="Pausar un lote de operaciones",
+)
 def pause_batch_endpoint(
     batch_id: str,
     db: Session = Depends(get_db),
@@ -96,7 +107,11 @@ def pause_batch_endpoint(
     }
 
 
-@router.post("/batch/{batch_id}/resume", summary="Reanudar un lote de operaciones pausado")
+@router.post(
+    "/batch/{batch_id}/resume",
+    response_model=BatchResumeResponse,
+    summary="Reanudar un lote de operaciones pausado",
+)
 def resume_batch_endpoint(
     batch_id: str,
     db: Session = Depends(get_db),
@@ -114,7 +129,11 @@ def resume_batch_endpoint(
     }
 
 
-@router.post("/batch/{batch_id}/cancel", summary="Cancelar un lote de operaciones")
+@router.post(
+    "/batch/{batch_id}/cancel",
+    response_model=BatchCancelResponse,
+    summary="Cancelar un lote de operaciones",
+)
 def cancel_batch_endpoint(
     batch_id: str,
     db: Session = Depends(get_db),
@@ -132,7 +151,11 @@ def cancel_batch_endpoint(
     }
 
 
-@router.delete("/batch/{batch_id}", summary="Eliminar un lote de operaciones")
+@router.delete(
+    "/batch/{batch_id}",
+    response_model=BatchActionResponse,
+    summary="Eliminar un lote de operaciones",
+)
 def delete_batch_endpoint(
     batch_id: str,
     db: Session = Depends(get_db),
@@ -147,7 +170,11 @@ def delete_batch_endpoint(
     return {"batch_id": batch_id, "message": "Lote eliminado correctamente."}
 
 
-@router.get("/batch/{batch_id}/reports", summary="Listar reportes individuales de un lote")
+@router.get(
+    "/batch/{batch_id}/reports",
+    response_model=BatchReportsListResponse,
+    summary="Listar reportes individuales de un lote",
+)
 def list_batch_reports_endpoint(
     batch_id: str,
     db: Session = Depends(get_db),

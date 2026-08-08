@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
 from app.repositories.execution_repo import create_execution, get_active_execution
 from app.repositories.operation_repo import get_active_batch
+from app.schemas.api import UploadStatusResponse
 from app.schemas.upload import SemesterResponse, UploadResponse
 from app.schemas.user import UserInToken
 
@@ -39,7 +40,11 @@ def get_current_semester():
     return SemesterResponse(semester=f"{now.year}{period}")
 
 
-@router.get("/status", summary="Indica si se permite subir archivos para una modalidad")
+@router.get(
+    "/status",
+    response_model=UploadStatusResponse,
+    summary="Indica si se permite subir archivos para una modalidad",
+)
 def get_upload_status(
     modalidad: str | None = Query(None),
     db: Session = Depends(get_db),

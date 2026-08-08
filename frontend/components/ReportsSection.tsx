@@ -1,12 +1,6 @@
-import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import {
-  downloadReport,
-  getReportDownloadUrl,
-  getReportFileUrl,
-  listReports,
-  type ReportInfo,
-} from "../services/api.ts";
+import { useReports } from "../hooks/useReports.ts";
+import type { ReportInfo } from "../services/api.ts";
 import Button from "./Button.tsx";
 import LoadingSkeleton from "./LoadingSkeleton.tsx";
 import { formatSize, REPORT_LABELS } from "../utils/reports.ts";
@@ -53,25 +47,9 @@ interface ReportsSectionProps {
 
 export default function ReportsSection({ executionId }: ReportsSectionProps) {
   const open = useSignal(false);
-  const reports = useSignal<ReportInfo[]>([]);
-  const loading = useSignal(true);
-  const error = useSignal("");
-
-  useEffect(() => {
-    loading.value = true;
-    listReports(executionId)
-      .then((data) => {
-        reports.value = data.reports;
-      })
-      .catch((e) => {
-        error.value = e instanceof Error
-          ? e.message
-          : "Error al cargar reportes.";
-      })
-      .finally(() => {
-        loading.value = false;
-      });
-  }, [executionId]);
+  const { reports, loading, error, download, downloadAll } = useReports({
+    executionId,
+  });
 
   if (loading.value) return <LoadingSkeleton />;
   if (error.value || reports.value.length === 0) return null;
@@ -79,14 +57,11 @@ export default function ReportsSection({ executionId }: ReportsSectionProps) {
   const reportsMap = new Map(reports.value.map((r) => [r.name, r]));
 
   const handleDownload = (name: string, filename: string) => {
-    downloadReport(getReportFileUrl(executionId, name), filename);
+    download({ name, filename, size: 0 });
   };
 
   const handleDownloadAll = () => {
-    downloadReport(
-      getReportDownloadUrl(executionId),
-      `reportes_ejecucion_${executionId}.zip`,
-    );
+    downloadAll();
   };
 
   return (

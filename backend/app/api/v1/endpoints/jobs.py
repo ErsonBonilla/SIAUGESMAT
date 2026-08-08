@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.celery_app import celery_app
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_db
 from app.repositories.execution_repo import (
@@ -31,7 +30,7 @@ from app.schemas.job import (
     ProcessResponse,
 )
 from app.schemas.user import UserInToken
-from app.workers.tasks import process_etl_file
+from app.services.orchestration import enqueue_etl, revoke_task
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +98,7 @@ async def start_process(
         )
 
     try:
-        job = process_etl_file.delay(execution_id, file_path, execution.semester)
+        job = enqueue_etl(execution_id, file_path, execution.semester)
     except Exception:
         logger.exception("Error al encolar la tarea ETL")
         raise HTTPException(
@@ -111,10 +110,7 @@ async def start_process(
     ALLOWED = ("pending", "failed", "queued", "review_required", "paused")
     if not atomic_mark_queued(db, execution_id, job.id, ALLOWED):
         # Otro request ya ganó la carrera — revocar task y responder 409
-        try:
-            celery_app.control.revoke(job.id, terminate=False)
-        except Exception:
-            logger.debug(f"No se pudo revocar la tarea {job.id} tras race condition")
+        revoke_task(job.id)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="La ejecución ya fue procesada por otra solicitud concurrente.",
@@ -249,7 +245,7 @@ async def confirm_mass_delete(
 
     # 2. Encolar Celery task
     try:
-        job = process_etl_file.delay(execution_id, file_path, execution.semester)
+        job = enqueue_etl(execution_id, file_path, execution.semester)
     except Exception:
         logger.exception("Error al encolar la tarea ETL")
         raise HTTPException(
@@ -307,11 +303,8 @@ async def pause_execution_endpoint(
         )
 
     if task_id:
-        try:
-            celery_app.control.revoke(task_id, terminate=False)
-            logger.info(f"Tarea Celery {task_id} revocada para ejecución {execution_id}")
-        except Exception as e:
-            logger.warning(f"No se pudo revocar tarea {task_id}: {e}")
+        revoke_task(task_id)
+        logger.info(f"Tarea Celery {task_id} revocada para ejecución {execution_id}")
 
     logger.info(f"Ejecución {execution_id} pausada por {current_user.username}")
     return ProcessResponse(
@@ -348,11 +341,8 @@ async def cancel_execution_endpoint(
         )
 
     if task_id:
-        try:
-            celery_app.control.revoke(task_id, terminate=False)
-            logger.info(f"Tarea Celery {task_id} revocada para ejecución {execution_id}")
-        except Exception as e:
-            logger.warning(f"No se pudo revocar tarea {task_id}: {e}")
+        revoke_task(task_id)
+        logger.info(f"Tarea Celery {task_id} revocada para ejecución {execution_id}")
 
     logger.info(f"Ejecución {execution_id} cancelada por {current_user.username}")
     return ProcessResponse(

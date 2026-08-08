@@ -13,13 +13,14 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, get_db
 from app.repositories.execution_repo import get_execution
+from app.schemas.api import ReportsListResponse
 from app.schemas.user import UserInToken
 from app.services.reports import ReportService
 
 router = APIRouter()
 
 
-@router.get("/{execution_id}/reports")
+@router.get("/{execution_id}/reports", response_model=ReportsListResponse)
 async def list_reports(
     execution_id: int,
     db: Session = Depends(get_db),

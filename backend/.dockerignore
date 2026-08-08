@@ -22,6 +22,9 @@ requirements-dev.txt
 tests/
 e2e/
 
+# --- Scripts de mantenimiento (CLI manual, no va en la imagen) ---
+tools/
+
 # --- Datos de runtime (los manejan los volúmenes de compose) ---
 uploads/
 reports/

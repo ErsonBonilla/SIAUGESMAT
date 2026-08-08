@@ -12,7 +12,7 @@ from app.services.csv_validator import (
     validate_categories_csv,
     validate_users_csv,
 )
-from app.workers.operations_tasks import process_operation_batch
+from app.services.orchestration import enqueue_operation_batch
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ async def handle_visibility_upload(file: UploadFile, db, current_user, visibilit
         add_item(db, batch_id, identifier, detail={"visibility": visibility})
     db.commit()
 
-    process_operation_batch.delay(batch_id)
+    enqueue_operation_batch(batch_id)
 
     verb_label = "mostrar" if visibility == "show" else "ocultar"
     logger.info(
@@ -132,7 +132,7 @@ async def handle_upload(file: UploadFile, db, current_user, entity_type, action,
             add_item(db, batch_id, identifier)
     db.commit()
 
-    process_operation_batch.delay(batch_id)
+    enqueue_operation_batch(batch_id)
 
     verb = "eliminación" if action == "delete" else "creación"
     logger.info(

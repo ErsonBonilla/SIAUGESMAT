@@ -4,17 +4,15 @@ import { useEffect } from "preact/hooks";
 import Chart from "./Chart.tsx";
 import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
+import ReportCard from "../components/ReportCard.tsx";
+import { useReports } from "../hooks/useReports.ts";
 import {
   type ChartsListResponse,
   downloadReport,
   getReportDownloadUrl,
   getReportFileUrl,
   listCharts,
-  listReports,
-  type ReportInfo,
-  type ReportsListResponse,
 } from "../services/api.ts";
-import { formatSize, REPORT_LABELS } from "../utils/reports.ts";
 import { toast } from "../utils/toast.ts";
 
 const CHART_NAMES: Record<string, string> = {
@@ -31,21 +29,21 @@ interface Props {
 
 export default function Reportes({ executionId }: Props) {
   const meta = useSignal<ChartsListResponse | null>(null);
-  const reports = useSignal<ReportsListResponse | null>(null);
   const downloading = useSignal<string | null>(null);
   const loading = useSignal(true);
   const error = useSignal("");
+
+  const {
+    reports,
+    loading: reportsLoading,
+  } = useReports({ executionId });
 
   useEffect(() => {
     if (!executionId) return;
     (async () => {
       try {
-        const [chartsData, reportsData] = await Promise.all([
-          listCharts(executionId),
-          listReports(executionId),
-        ]);
+        const chartsData = await listCharts(executionId);
         meta.value = chartsData;
-        reports.value = reportsData;
       } catch (e) {
         error.value = e instanceof Error
           ? e.message
@@ -67,7 +65,9 @@ export default function Reportes({ executionId }: Props) {
     }
   }
 
-  if (loading.value) return <LoadingSkeleton variant="chart" />;
+  if (loading.value || reportsLoading.value) {
+    return <LoadingSkeleton variant="chart" />;
+  }
   if (error.value) return <ErrorBox message={error.value} />;
 
   const charts = Object.entries(CHART_NAMES).map(([id, title]) => ({
@@ -77,7 +77,7 @@ export default function Reportes({ executionId }: Props) {
 
   return (
     <>
-      {reports.value && reports.value.reports.length > 0 && (
+      {reports.value.length > 0 && (
         <section class="mb-10">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-[var(--text-primary)]">
@@ -103,38 +103,19 @@ export default function Reportes({ executionId }: Props) {
             </button>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {(reports.value.reports as ReportInfo[]).map((r) => {
-              const label = REPORT_LABELS[r.name] || r.name;
-              const isDownloading = downloading.value === r.filename;
-              return (
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleDownload(
-                      getReportFileUrl(executionId, r.name),
-                      r.filename,
-                    )}
-                  disabled={downloading.value !== null}
-                  class="text-left px-4 py-3 rounded border border-[var(--border-secondary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 transition-colors"
-                >
-                  <div class="flex items-center gap-2">
-                    <span>📄</span>
-                    <span class="flex-1 text-sm font-medium text-[var(--text-primary)] truncate">
-                      {label}
-                    </span>
-                    {isDownloading
-                      ? (
-                        <span class="inline-block w-4 h-4 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin shrink-0" />
-                      )
-                      : (
-                        <span class="text-xs text-[var(--text-secondary)] shrink-0">
-                          {formatSize(r.size)}
-                        </span>
-                      )}
-                  </div>
-                </button>
-              );
-            })}
+            {reports.value.map((r) => (
+              <ReportCard
+                key={r.name}
+                report={r}
+                downloading={downloading.value === r.filename}
+                disabled={downloading.value !== null}
+                onClick={(report) =>
+                  handleDownload(
+                    getReportFileUrl(executionId, report.name),
+                    report.filename,
+                  )}
+              />
+            ))}
           </div>
         </section>
       )}
@@ -145,7 +126,7 @@ export default function Reportes({ executionId }: Props) {
             Gráficos
           </h2>
           <p class="text-[var(--text-secondary)] text-sm">
-            Visualización de datos generados con Plotly.js
+            Visualización de datos generados con Chart.js
           </p>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">

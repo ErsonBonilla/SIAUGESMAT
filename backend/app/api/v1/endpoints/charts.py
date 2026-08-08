@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user, get_db
 from app.repositories.execution_repo import get_execution
 from app.repositories.log_repo import get_execution_logs
+from app.schemas.api import ChartsListResponse
 from app.schemas.user import UserInToken
 from app.services.charts import ChartService
 
@@ -39,7 +40,7 @@ def _get_execution_and_logs(execution_id: int, db: Session):
     return execution, logs
 
 
-@router.get("/executions/{execution_id}/charts")
+@router.get("/executions/{execution_id}/charts", response_model=ChartsListResponse)
 async def list_charts(
     execution_id: int,
     db: Session = Depends(get_db),

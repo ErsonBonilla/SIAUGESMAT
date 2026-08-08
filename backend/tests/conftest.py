@@ -124,7 +124,7 @@ def mock_moodle_service():
     Crea un AsyncMock que reemplaza a MoodleService en todas sus llamadas.
     Se puede personalizar en cada test (ej. mock_moodle_service.create_courses.return_value = [...]).
     """
-    with patch("app.services.moodle.MoodleService", autospec=True) as mock_class:
+    with patch("app.services.moodle_operations.MoodleService", autospec=True) as mock_class:
         mock_instance = AsyncMock()
         mock_class.return_value = mock_instance
         # Configurar métodos comunes con valores por defecto que indiquen éxito

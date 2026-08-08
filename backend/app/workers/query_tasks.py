@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 
 from app.celery_app import celery_app
 from app.db.session import SessionLocal
+from app.pipeline.shortnames import SIAUGESMAT_PATTERN, parse_shortname
 from app.repositories.query_repo import (
     get_query,
     set_query_completed,
@@ -18,7 +19,6 @@ from app.repositories.query_repo import (
 )
 from app.services.moodle_factory import get_moodle_service
 from app.services.moodle_operations import MoodleService
-from app.services.parsers.patterns import SIAUGESMAT_PATTERN, parse_shortname
 from app.workers.utils import run_moodle_async
 
 logger = logging.getLogger(__name__)

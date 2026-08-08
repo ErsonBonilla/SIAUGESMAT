@@ -2,11 +2,11 @@ import logging
 
 from app.core.config import settings
 from app.pipeline.categories import classify_categories
+from app.pipeline.course_comparison import CourseComparisonService
 from app.pipeline.enrolments import resolve_enrolments, users_to_create
 from app.pipeline.plan import plan_log_entries
 from app.repositories import log_repo
 from app.repositories.execution_repo import is_reupload, update_progress
-from app.services.course_comparison import CourseComparisonService
 from app.services.error_messages import translate_error
 from app.workers.phases.base import BasePhase, PhaseContext
 
