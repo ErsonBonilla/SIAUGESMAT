@@ -11,11 +11,15 @@ from app.workers.query_tasks import (
     DEFAULT_INACTIVE_DAYS,
     DEFAULT_INACTIVE_MONTHS,
     DEFAULT_INACTIVE_YEARS,
+    _build_duplicate_email_rows,
     _build_inactive_rows,
     _days_to_cutoff,
     _do_query,
     _filter_orphan_courses,
+    _get_all_known_usernames,
+    _group_users_by_email,
     _months_to_cutoff,
+    _normalize_email,
     _parse_cutoff,
     _semester_to_cutoff,
     _years_to_cutoff,
@@ -394,3 +398,144 @@ class TestDoQueryInactiveCourses:
         qr = SimpleNamespace(entity="inactive_courses", params={"semester": "2024B"})
         rows = await _do_query(moodle, qr)
         assert [r["shortname"] for r in rows] == [SIA_COURSE]
+
+
+class TestGroupUsersByEmail:
+    def _user(self, uid, username, email):
+        return {"id": uid, "username": username, "email": email}
+
+    def test_groups_by_normalized_email(self):
+        users = [
+            self._user(1, "u1", " A@UT.EDU.CO "),
+            self._user(2, "u2", "a@ut.edu.co"),
+            self._user(3, "u3", "b@ut.edu.co"),
+        ]
+        grouped = _group_users_by_email(users)
+        assert len(grouped["a@ut.edu.co"]) == 2
+        assert len(grouped["b@ut.edu.co"]) == 1
+
+    def test_ignores_empty_emails(self):
+        users = [self._user(1, "u1", ""), self._user(2, "u2", None)]
+        assert _group_users_by_email(users) == {}
+
+    def test_normalize_email(self):
+        assert _normalize_email("  A@UT.EDU.CO ") == "a@ut.edu.co"
+        assert _normalize_email(None) == ""
+
+
+class TestBuildDuplicateEmailRows:
+    def _user(self, uid, username, email):
+        return {"id": uid, "username": username, "email": email}
+
+    def test_only_groups_with_more_than_one_user(self):
+        by_email = {
+            "dup@ut.edu.co": [
+                self._user(1, "u1", "dup@ut.edu.co"),
+                self._user(2, "u2", "dup@ut.edu.co"),
+            ],
+            "single@ut.edu.co": [self._user(3, "u3", "single@ut.edu.co")],
+        }
+        rows = _build_duplicate_email_rows(by_email)
+        assert len(rows) == 2
+        assert all(r["email"] == "dup@ut.edu.co" for r in rows)
+        assert all(r["duplicate_count"] == 2 for r in rows)
+
+    def test_deduplicates_by_user_id(self):
+        by_email = {
+            "dup@ut.edu.co": [
+                self._user(1, "u1", "dup@ut.edu.co"),
+                self._user(2, "u2", "dup@ut.edu.co"),
+                self._user(1, "u1", "dup@ut.edu.co"),
+            ]
+        }
+        rows = _build_duplicate_email_rows(by_email)
+        assert len(rows) == 2
+        assert {r["username"] for r in rows} == {"u1", "u2"}
+
+    def test_sorted_by_email_then_user_id(self):
+        by_email = {
+            "b@ut.edu.co": [self._user(2, "u2", "b@ut.edu.co"), self._user(1, "u1", "b@ut.edu.co")],
+            "a@ut.edu.co": [self._user(3, "u3", "a@ut.edu.co"), self._user(4, "u4", "a@ut.edu.co")],
+        }
+        rows = _build_duplicate_email_rows(by_email)
+        assert [r["email"] for r in rows] == ["a@ut.edu.co"] * 2 + ["b@ut.edu.co"] * 2
+        assert [r["username"] for r in rows[:2]] == ["u3", "u4"]
+
+
+class TestDoQueryDuplicateEmails:
+    def _moodle(self, courses, users_pool, enrolled_by_course):
+        moodle = AsyncMock()
+        moodle.get_courses.return_value = courses
+
+        async def fake_get_users(field, values):
+            values_set = {str(v).lower() for v in values}
+            if field == "email":
+                return [u for u in users_pool if _normalize_email(u.get("email", "")) in values_set]
+            return [u for u in users_pool if u.get("username") in values]
+
+        moodle.get_users.side_effect = fake_get_users
+        moodle.get_all_enrolled_users.side_effect = lambda cid: enrolled_by_course.get(int(cid), [])
+        return moodle
+
+    def _user(self, uid, username, email):
+        return {
+            "id": uid,
+            "username": username,
+            "firstname": f"Nombre{uid}",
+            "lastname": f"Apellido{uid}",
+            "email": email,
+        }
+
+    @pytest.mark.asyncio
+    async def test_combines_logs_and_enrolled_sources(self, monkeypatch):
+        monkeypatch.setattr(
+            _get_all_known_usernames.__module__ + "._get_all_known_usernames",
+            lambda: ["u1"],
+        )
+        pool = [
+            self._user(1, "u1", "dup@ut.edu.co"),
+            self._user(2, "u2", "dup@ut.edu.co"),
+            self._user(3, "u3", "single@ut.edu.co"),
+        ]
+        moodle = self._moodle(
+            [_course(SIA_COURSE, cid=1), _course("NO-SIAUGE-001", cid=2)],
+            pool,
+            {1: [pool[1], pool[2]]},
+        )
+        qr = SimpleNamespace(entity="duplicate_emails", params={})
+        rows = await _do_query(moodle, qr)
+        assert [r["email"] for r in rows] == ["dup@ut.edu.co"] * 2
+        assert {r["username"] for r in rows} == {"u1", "u2"}
+        assert all(r["duplicate_count"] == 2 for r in rows)
+        # u2 fue encontrado via cursos (no en logs) y re-verificado por email
+        assert moodle.get_all_enrolled_users.call_count == 1
+        assert moodle.get_users.call_args_list[0][0] == ("username", ["u1"])
+
+    @pytest.mark.asyncio
+    async def test_reports_email_present_only_in_moodle(self, monkeypatch):
+        monkeypatch.setattr(
+            _get_all_known_usernames.__module__ + "._get_all_known_usernames",
+            lambda: ["u1"],
+        )
+        # u2 comparte el correo con u1 pero no está en logs ni matriculado:
+        # la re-consulta por email (field=email) lo descubre
+        pool = [
+            self._user(1, "u1", "dup@ut.edu.co"),
+            self._user(2, "u2", "dup@ut.edu.co"),
+        ]
+        moodle = self._moodle([_course(SIA_COURSE, cid=1)], pool, {1: [pool[0]]})
+        qr = SimpleNamespace(entity="duplicate_emails", params={})
+        rows = await _do_query(moodle, qr)
+        assert {r["username"] for r in rows} == {"u1", "u2"}
+
+    @pytest.mark.asyncio
+    async def test_ignores_unique_emails(self, monkeypatch):
+        monkeypatch.setattr(
+            _get_all_known_usernames.__module__ + "._get_all_known_usernames",
+            lambda: ["u3"],
+        )
+        pool = [self._user(3, "u3", "single@ut.edu.co")]
+        moodle = self._moodle([], pool, {})
+        qr = SimpleNamespace(entity="duplicate_emails", params={})
+        rows = await _do_query(moodle, qr)
+        assert rows == []

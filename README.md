@@ -123,6 +123,7 @@ Consulta cursos, categorías, usuarios y docentes inactivos en Moodle sin timeou
 - `courses` — filtros por shortname, estado (>6 meses sin uso; o sin docente/no matriculados), formato de código (5 o 6 segmentos)
 - `categories` — búsqueda por idnumber
 - `users` — búsqueda por username/email/nombre (coincidencia exacta; el webservice Moodle no expone búsqueda por substring ni listado completo de usuarios)
+- `duplicate_emails` — correos con más de un usuario registrado. Moodle 3.9 no permite listar todos los usuarios, por lo que combina dos fuentes semilla (usernames de `execution_logs` + matriculados en cursos SIAUGESMAT vía `core_enrol_get_enrolled_users`) y luego re-consulta cada correo candidato con `core_user_get_users_by_field` (field=email) para capturar TODAS las cuentas que lo comparten. Devuelve una fila por cuenta: email, username, nombres, apellidos, ID de Moodle y número de cuentas que comparten el correo. Sin filtro por dominio. Puede tardar 15–25 min.
 - `inactive_teachers` — docentes (**editingteacher**) que no han accedido a sus cursos desde un corte: **por días** (1–30, default 15), **por meses** (1–12, default 1), **por años** (≥ 1, default 1, sin tope superior) o **por semestre** (ej. `2026A`). Se requiere exactamente un corte por consulta. Consulta todos los cursos SIAUGESMAT en Moodle, obtiene los profesores matriculados con su `lastcourseaccess` y los filtra por la fecha de corte (el semestre usa la fecha de inicio). Devuelve: nombre del docente, username, correo, curso, programa académico (código de 4 dígitos), CAT (prefijo de 3 letras) y días sin acceso. Procesado en lotes paralelos (5 cursos simultáneos).
 - `inactive_courses` — cursos SIAUGESMAT **sin uso** desde un corte: **días** (1–30, default 15), **meses** (1–12, default 1), **años** (≥ 1, default 1) o **semestre** (ej. `2026A`); exactamente un corte por consulta. Usa el campo `timemodified` (última modificación) de cada curso y devuelve: shortname, nombre, categoría, programa, CAT, fechas de creación y última modificación, y días sin uso. Rápido: recorre `get_courses` una sola vez (sin consultar docentes por curso).
 
@@ -164,7 +165,7 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | `/cursos/eliminar` | CsvUploader — eliminación masiva de cursos vía CSV |
 | `/cursos/visibilidad` | VisibilidadMasivaIsland — mostrar/ocultar cursos masivamente vía CSV |
 | `/usuarios/crear` | CsvUploader — creación masiva de usuarios |
-| `/usuarios/consultar` | TablaConsultaIsland (QueryTable) + ConsultaDocentesSinAcceso — búsqueda de usuarios por username/email (modo normal) y consulta de **docentes que no han accedido a sus cursos** (por días, default 15, o por semestre), con datos de programa y CAT |
+| `/usuarios/consultar` | TablaConsultaIsland (QueryTable) + ConsultaDocentesSinAcceso + ConsultaCorreosDuplicados — búsqueda de usuarios por username/email (modo normal), consulta de **docentes que no han accedido a sus cursos** (por días, default 15, o por semestre), con datos de programa y CAT, y consulta de **correos duplicados** (más de un usuario con el mismo correo) |
 | `/usuarios/eliminar` | CsvUploader — eliminación masiva de usuarios |
 | `/categorias/crear` | CsvUploader — creación masiva de categorías |
 | `/categorias/consultar` | TablaConsultaIsland (QueryTable) — búsqueda de categorías por idnumber |
@@ -187,6 +188,7 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | `TablaConsultaIsland` | Búsqueda asíncrona con polling y descarga CSV |
 | `NovedadesIsland` | Subir Excel de nueva carga académica, comparar con la ejecución anterior del mismo semestre, detectar cambios de profesores y aplicar acciones (ocultar/crear/rehabilitar cursos) |
 | `ConsultaDocentesSinAcceso` | Seleccionar corte (días de inactividad, default 15, o semestre) y consultar docentes editingteacher que no han accedido a sus cursos desde esa fecha, con resultados de programa y CAT |
+| `ConsultaCorreosDuplicados` | Buscar correos con más de un usuario registrado en Moodle (combina logs de la app + matriculados en cursos SIAUGESMAT), con una fila por cuenta y el número de cuentas que comparten el correo |
 | `ConsultaCursosSinUso` | Seleccionar corte (días/meses/años/semestre) y consultar cursos SIAUGESMAT sin uso (por `timemodified`), con datos del curso: programa, CAT, fechas y días sin uso |
 | `CursosConsultas` | Tabs **Consulta normal**/**Cursos sin uso** para la página `/cursos/consultar` |
 | `Historico` | Evolución semestral y comparación con Chart.js |
