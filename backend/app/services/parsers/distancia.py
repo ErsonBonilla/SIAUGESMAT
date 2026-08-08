@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Any, ClassVar
 
 import pandas as pd
@@ -23,9 +24,21 @@ class DistanciaParser(BaseExcelParser):
         "perfil_del_docente": "docente_perfil",
     }
 
+    @staticmethod
+    def _excel_engine(file_path: str) -> str | None:
+        """Devuelve el motor de pandas para el archivo.
+
+        Los archivos .xls (formato binario Excel 97-2003) se leen con
+        calamine; los .xlsx usan el motor por defecto (openpyxl).
+        """
+        if os.path.splitext(file_path)[1].lower() == ".xls":
+            return "calamine"
+        return None
+
     @classmethod
     def read_excel(cls, file_path: str) -> pd.DataFrame:
-        raw = pd.read_excel(file_path, header=None, dtype=str)
+        engine = cls._excel_engine(file_path)
+        raw = pd.read_excel(file_path, header=None, dtype=str, engine=engine)
         expected_keys = set(cls.CANONICAL_MAP.keys())
 
         for i, row in raw.iterrows():
@@ -35,14 +48,15 @@ class DistanciaParser(BaseExcelParser):
             }
             matches = len(expected_keys & normalized)
             if matches >= 5:
-                return pd.read_excel(file_path, header=i, dtype=str)
+                return pd.read_excel(file_path, header=i, dtype=str,
+                                     engine=engine)
 
         logger.warning(
             "No se detectó fila de encabezados en '%s', "
             "se asume primera fila como encabezado.",
             file_path,
         )
-        return pd.read_excel(file_path, dtype=str)
+        return pd.read_excel(file_path, dtype=str, engine=engine)
 
     @classmethod
     def parse(cls, df: pd.DataFrame, modalidad: str) -> dict[str, Any]:

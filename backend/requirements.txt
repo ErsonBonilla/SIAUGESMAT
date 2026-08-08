@@ -18,6 +18,7 @@ tenacity>=8.2.0
 # Procesamiento de Excel
 pandas>=2.2.0
 openpyxl>=3.1.0
+python-calamine>=0.2.0
 
 # Visualización (gráficos Plotly)
 plotly>=6.0.0
