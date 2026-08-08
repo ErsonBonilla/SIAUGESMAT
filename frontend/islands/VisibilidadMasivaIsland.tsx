@@ -15,6 +15,7 @@ import OperationHistorySection from "../components/OperationHistorySection.tsx";
 import BatchProgressTable from "../components/BatchProgressTable.tsx";
 import ExecutionButton from "../components/ExecutionButton.tsx";
 import QueryHelp from "../components/QueryHelp.tsx";
+import FilePicker from "../components/FilePicker.tsx";
 
 export default function BulkVisibilityIsland() {
   const visibility = useSignal<"show" | "hide">("show");
@@ -28,6 +29,7 @@ export default function BulkVisibilityIsland() {
     error,
     batchId,
     batchStatus,
+    file,
     handleFileChange,
     handleSubmit,
     startPolling,
@@ -125,19 +127,16 @@ export default function BulkVisibilityIsland() {
         </div>
 
         <div>
-          <label
-            for="csv-file"
-            class="block text-sm font-medium text-[var(--text-secondary)] mb-2"
-          >
-            Archivo CSV
-          </label>
-          <input
+          <FilePicker
             id="csv-file"
-            type="file"
+            label="Archivo CSV"
             accept=".csv"
+            file={file}
             onChange={handleFileChange}
             disabled={uploading.value || !allowed}
-            class="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--file-btn-bg)] file:text-[var(--file-btn-text)] hover:file:bg-[var(--file-btn-hover)] transition disabled:opacity-40 disabled:cursor-not-allowed"
+            onClear={() => {
+              error.value = "";
+            }}
           />
         </div>
 

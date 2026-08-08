@@ -13,6 +13,7 @@ import ErrorBox from "../components/ErrorBox.tsx";
 import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
 import BatchProgressTable from "../components/BatchProgressTable.tsx";
 import QueryHelp, { type QueryHelpSection } from "../components/QueryHelp.tsx";
+import FilePicker from "../components/FilePicker.tsx";
 
 interface CsvUploaderProps {
   description: string;
@@ -42,6 +43,7 @@ export default function CsvUploader(
     error,
     batchId,
     batchStatus,
+    file,
     handleFileChange,
     handleSubmit,
     startPolling,
@@ -73,19 +75,16 @@ export default function CsvUploader(
         class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 space-y-5"
       >
         <div>
-          <label
-            for="csv-file"
-            class="block text-sm font-medium text-[var(--text-secondary)] mb-2"
-          >
-            Archivo CSV
-          </label>
-          <input
+          <FilePicker
             id="csv-file"
-            type="file"
+            label="Archivo CSV"
             accept=".csv"
+            file={file}
             onChange={handleFileChange}
             disabled={uploading.value || !allowed}
-            class="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--file-btn-bg)] file:text-[var(--file-btn-text)] hover:file:bg-[var(--file-btn-hover)] transition disabled:opacity-40 disabled:cursor-not-allowed"
+            onClear={() => {
+              error.value = "";
+            }}
           />
         </div>
 

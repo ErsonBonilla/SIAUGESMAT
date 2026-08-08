@@ -7,6 +7,7 @@ import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
 import QueryHelp from "../components/QueryHelp.tsx";
+import FilePicker from "../components/FilePicker.tsx";
 
 type Step = "upload" | "results";
 
@@ -168,19 +169,16 @@ export default function NovedadesIsland() {
           </h2>
           <form onSubmit={handleCompare} class="space-y-4">
             <div>
-              <label
-                for="file"
-                class="block text-sm font-medium text-[var(--text-secondary)] mb-2"
-              >
-                Archivo Excel (.xlsx o .xls)
-              </label>
-              <input
+              <FilePicker
                 id="file"
-                type="file"
+                label="Archivo Excel (.xlsx o .xls)"
                 accept=".xlsx,.xls"
+                file={file}
                 onChange={handleFileChange}
                 disabled={loading.value || !allowed}
-                class="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--file-btn-bg)] file:text-[var(--file-btn-text)] hover:file:bg-[var(--file-btn-hover)] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                onClear={() => {
+                  error.value = "";
+                }}
               />
             </div>
 
