@@ -246,10 +246,13 @@ export default function InactiveTeachersQuery() {
           onClick={startQuery}
           disabled={loading.value ||
             (cutoffMode.value === "days" &&
-              (!Number.isInteger(days.value) || days.value < 1 || days.value > 30)) ||
+              (!Number.isInteger(days.value) || days.value < 1 ||
+                days.value > 30)) ||
             (cutoffMode.value === "months" &&
-              (!Number.isInteger(months.value) || months.value < 1 || months.value > 12)) ||
-            (cutoffMode.value === "years" && (!Number.isInteger(years.value) || years.value < 1)) ||
+              (!Number.isInteger(months.value) || months.value < 1 ||
+                months.value > 12)) ||
+            (cutoffMode.value === "years" &&
+              (!Number.isInteger(years.value) || years.value < 1)) ||
             (cutoffMode.value === "semester" && !semester.value)}
           class="px-3 py-1.5 bg-[var(--brand-green)] text-white rounded text-sm hover:brightness-90 disabled:opacity-60 self-start mt-6"
         >
@@ -325,7 +328,8 @@ export default function InactiveTeachersQuery() {
                       colSpan={COLUMNS.length}
                       class="py-12 text-center text-[var(--text-muted)]"
                     >
-                      Seleccione el corte (días o semestre) y presione "Consultar".
+                      Seleccione el corte (días o semestre) y presione
+                      "Consultar".
                     </td>
                   </tr>
                 )

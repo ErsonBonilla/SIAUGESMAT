@@ -62,6 +62,57 @@ def _years_to_cutoff(years: int) -> int:
     return int(time.time()) - years * 365 * 86400
 
 
+def _parse_cutoff(params: dict) -> int:
+    """Valida que se provea exactamente un corte temporal y devuelve su timestamp.
+
+    Acepta semestre ("2025A"/"2025B"), días (1-30), meses (1-12) o años (>=1).
+    """
+    semester = params.get("semester", "")
+    days = params.get("days")
+    months = params.get("months")
+    years = params.get("years")
+    provided = sum([
+        bool(semester and len(semester) == 5 and semester[-1] in ("A", "B")),
+        days is not None,
+        months is not None,
+        years is not None,
+    ])
+    if provided != 1:
+        raise ValueError(
+            "Se requiere exactamente un corte: semestre (ej. 2026A), "
+            "días, meses o años."
+        )
+    if semester:
+        return _semester_to_cutoff(semester)
+    if days is not None:
+        try:
+            days = int(days)
+        except (TypeError, ValueError):
+            raise ValueError("'days' debe ser un número entero.") from None
+        if days < 1 or days > MAX_INACTIVE_DAYS:
+            raise ValueError(
+                f"'days' debe estar entre 1 y {MAX_INACTIVE_DAYS}."
+            )
+        return _days_to_cutoff(days)
+    if months is not None:
+        try:
+            months = int(months)
+        except (TypeError, ValueError):
+            raise ValueError("'months' debe ser un número entero.") from None
+        if months < 1 or months > MAX_INACTIVE_MONTHS:
+            raise ValueError(
+                f"'months' debe estar entre 1 y {MAX_INACTIVE_MONTHS}."
+            )
+        return _months_to_cutoff(months)
+    try:
+        years = int(years)
+    except (TypeError, ValueError):
+        raise ValueError("'years' debe ser un número entero.") from None
+    if years < 1:
+        raise ValueError("'years' debe ser al menos 1.")
+    return _years_to_cutoff(years)
+
+
 def _build_inactive_rows(teachers: list[dict], course: dict, cutoff: int) -> list[dict]:
     """Filtra y arma las filas de docentes inactivos (pura, sin I/O)."""
     now = int(time.time())
@@ -151,51 +202,7 @@ async def _do_query(moodle: MoodleService, qr):
         return raw
 
     if qr.entity == "inactive_teachers":
-        semester = params.get("semester", "")
-        days = params.get("days")
-        months = params.get("months")
-        years = params.get("years")
-        provided = sum([
-            bool(semester and len(semester) == 5 and semester[-1] in ("A", "B")),
-            days is not None,
-            months is not None,
-            years is not None,
-        ])
-        if provided != 1:
-            raise ValueError(
-                "Se requiere exactamente un corte: semestre (ej. 2026A), "
-                "días, meses o años."
-            )
-        if semester:
-            cutoff = _semester_to_cutoff(semester)
-        elif days is not None:
-            try:
-                days = int(days)
-            except (TypeError, ValueError):
-                raise ValueError("'days' debe ser un número entero.") from None
-            if days < 1 or days > MAX_INACTIVE_DAYS:
-                raise ValueError(
-                    f"'days' debe estar entre 1 y {MAX_INACTIVE_DAYS}."
-                )
-            cutoff = _days_to_cutoff(days)
-        elif months is not None:
-            try:
-                months = int(months)
-            except (TypeError, ValueError):
-                raise ValueError("'months' debe ser un número entero.") from None
-            if months < 1 or months > MAX_INACTIVE_MONTHS:
-                raise ValueError(
-                    f"'months' debe estar entre 1 y {MAX_INACTIVE_MONTHS}."
-                )
-            cutoff = _months_to_cutoff(months)
-        else:
-            try:
-                years = int(years)
-            except (TypeError, ValueError):
-                raise ValueError("'years' debe ser un número entero.") from None
-            if years < 1:
-                raise ValueError("'years' debe ser al menos 1.")
-            cutoff = _years_to_cutoff(years)
+        cutoff = _parse_cutoff(params)
 
         all_courses = await moodle.get_courses()
         siau_courses = [c for c in all_courses if SIAUGESMAT_RE.match(c.get("shortname", ""))]
@@ -218,6 +225,39 @@ async def _do_query(moodle: MoodleService, qr):
             batch = siau_courses[i:i + batch_size]
             await asyncio.gather(*[process_course(c) for c in batch])
 
+        return results
+
+    if qr.entity == "inactive_courses":
+        cutoff = _parse_cutoff(params)
+        now = int(time.time())
+
+        all_courses = await moodle.get_courses()
+        siau_courses = [
+            c for c in all_courses if SIAUGESMAT_RE.match(c.get("shortname", ""))
+        ]
+
+        results = []
+        for course in siau_courses:
+            last_modified = int(course.get("timemodified", 0) or 0)
+            if not last_modified or last_modified >= cutoff:
+                continue
+            sn = course.get("shortname", "")
+            parsed = parse_shortname(sn)
+            program = parsed["cod_prog"] if parsed else ""
+            cat_prefix = parsed["cat_prefix"] if parsed else ""
+            days_since_modified = (now - last_modified) // 86400 if last_modified else 0
+            results.append({
+                "id": course.get("id", ""),
+                "shortname": sn,
+                "fullname": course.get("fullname", ""),
+                "categoryname": course.get("categoryname", ""),
+                "program": program,
+                "cat_prefix": cat_prefix,
+                "cat": CAT_NAMES.get(cat_prefix, cat_prefix) if cat_prefix else "",
+                "timecreated": course.get("timecreated", ""),
+                "timemodified": last_modified,
+                "days_since_modified": days_since_modified,
+            })
         return results
 
     raise ValueError(f"Entidad desconocida: {qr.entity}")

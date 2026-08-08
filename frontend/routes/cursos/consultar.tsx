@@ -1,8 +1,13 @@
 import { requireAuth } from "../../utils/auth-guard.ts";
-import ConsultPage from "../../components/ConsultPage.tsx";
+import Layout from "../../components/Layout.tsx";
+import CursosConsultas from "../../islands/CursosConsultas.tsx";
 
 export const handler = requireAuth();
 
 export default function ConsultasCursosPage() {
-  return <ConsultPage entity="courses" />;
+  return (
+    <Layout title="Consultar cursos">
+      <CursosConsultas />
+    </Layout>
+  );
 }
