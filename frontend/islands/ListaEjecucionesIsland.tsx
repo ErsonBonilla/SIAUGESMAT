@@ -415,7 +415,7 @@ export default function ExecutionList() {
                               type="button"
                               onClick={() => handleProcess(exec.id)}
                               disabled={processing.value !== null}
-                              class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium disabled:opacity-50"
+                              class="px-2 py-1 text-xs rounded bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 hover:brightness-90 disabled:opacity-40"
                             >
                               {processing.value === exec.id
                                 ? (
@@ -439,7 +439,7 @@ export default function ExecutionList() {
                               type="button"
                               onClick={() => handleDelete(exec.id)}
                               disabled={deleting.value !== null}
-                              class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium disabled:opacity-50"
+                              class="px-2 py-1 text-xs rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:brightness-90 disabled:opacity-40"
                             >
                               {deleting.value === exec.id
                                 ? (
@@ -459,7 +459,7 @@ export default function ExecutionList() {
                               type="button"
                               onClick={() => handleConfirm(exec.id)}
                               disabled={confirming.value !== null}
-                              class="text-[var(--brand-orange)] hover:text-[var(--brand-orange)] text-sm font-semibold disabled:opacity-50"
+                              class="px-2 py-1 text-xs rounded bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 hover:brightness-90 disabled:opacity-40"
                             >
                               {confirming.value === exec.id
                                 ? (
@@ -479,7 +479,7 @@ export default function ExecutionList() {
                               type="button"
                               onClick={() => handleResume(exec.id)}
                               disabled={resuming.value !== null}
-                              class="text-[var(--brand-orange)] hover:text-[var(--brand-orange)] text-sm font-semibold disabled:opacity-50"
+                              class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 hover:brightness-90 disabled:opacity-40"
                             >
                               {resuming.value === exec.id
                                 ? (
@@ -499,7 +499,7 @@ export default function ExecutionList() {
                               type="button"
                               onClick={() => handlePause(exec.id)}
                               disabled={pausing.value !== null}
-                              class="text-[var(--accent)] hover:text-[var(--accent)] text-sm font-medium disabled:opacity-50"
+                              class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:brightness-90 disabled:opacity-40"
                             >
                               {pausing.value === exec.id
                                 ? (
@@ -521,7 +521,7 @@ export default function ExecutionList() {
                               type="button"
                               onClick={() => handleCancel(exec.id)}
                               disabled={cancelling.value !== null}
-                              class="text-red-500 hover:text-red-600 text-sm font-medium disabled:opacity-50"
+                              class="px-2 py-1 text-xs rounded bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 hover:brightness-90 disabled:opacity-40"
                             >
                               {cancelling.value === exec.id
                                 ? (
