@@ -240,6 +240,13 @@ class MoodleService(MoodleClient):
             },
         )
 
+    async def get_all_enrolled_users(self, course_id: int) -> list[dict]:
+        """Devuelve TODOS los usuarios matriculados en un curso (sin filtrar por rol)."""
+        return await self._request(
+            "core_enrol_get_enrolled_users",
+            params={"courseid": course_id},
+        )
+
     async def get_courses(self, shortname: str | None = None) -> list[dict]:
         return await self._adapter.get_courses(shortname, self._request)
 

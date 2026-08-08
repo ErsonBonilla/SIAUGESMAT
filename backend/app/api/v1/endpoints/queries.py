@@ -31,6 +31,7 @@ ENTITY_LABELS = {
     "users": "Usuarios",
     "inactive_teachers": "Docentes sin acceso",
     "inactive_courses": "Cursos sin uso",
+    "duplicate_emails": "Correos duplicados",
 }
 
 ENTITY_CSV_HEADERS = {
@@ -58,6 +59,7 @@ ENTITY_CSV_HEADERS = {
         "Última modificación",
         "Días sin uso",
     ],
+    "duplicate_emails": ["Email", "Username", "Nombres", "Apellidos", "ID Moodle", "Nº de cuentas"],
 }
 
 ENTITY_CSV_EXTRACT = {
@@ -108,6 +110,14 @@ ENTITY_CSV_EXTRACT = {
         if not c.get("timemodified")
         else datetime.fromtimestamp(c["timemodified"], tz=UTC).strftime("%Y-%m-%d %H:%M"),
         "Nunca" if not c.get("timemodified") else str(c.get("days_since_modified", "")),
+    ],
+    "duplicate_emails": lambda r: [
+        r.get("email", ""),
+        r.get("username", ""),
+        r.get("firstname", ""),
+        r.get("lastname", ""),
+        r.get("user_id", ""),
+        r.get("duplicate_count", ""),
     ],
 }
 

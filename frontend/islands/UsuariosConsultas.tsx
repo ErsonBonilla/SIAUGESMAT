@@ -1,9 +1,10 @@
 import { useSignal } from "@preact/signals";
 import TablaConsultaIsland from "./TablaConsultaIsland.tsx";
 import ConsultaDocentesSinAcceso from "./ConsultaDocentesSinAcceso.tsx";
+import ConsultaCorreosDuplicados from "./ConsultaCorreosDuplicados.tsx";
 import { ENTITY_CONSULT_CONFIGS } from "../utils/entity-configs.ts";
 
-type Mode = "normal" | "inactive";
+type Mode = "normal" | "inactive" | "duplicates";
 
 export default function UsuariosConsultas() {
   const mode = useSignal<Mode>("normal");
@@ -34,11 +35,24 @@ export default function UsuariosConsultas() {
         >
           Docentes sin acceso
         </button>
+        <button
+          type="button"
+          onClick={() => mode.value = "duplicates"}
+          class={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
+            mode.value === "duplicates"
+              ? "bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-sm"
+              : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+          }`}
+        >
+          Correos duplicados
+        </button>
       </div>
 
       {mode.value === "normal"
         ? <TablaConsultaIsland entity="users" {...usersConfig} />
-        : <ConsultaDocentesSinAcceso />}
+        : mode.value === "inactive"
+        ? <ConsultaDocentesSinAcceso />
+        : <ConsultaCorreosDuplicados />}
     </div>
   );
 }

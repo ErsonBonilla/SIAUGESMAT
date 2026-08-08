@@ -8,6 +8,8 @@ import re
 import time
 from datetime import UTC, datetime
 
+from sqlalchemy import text
+
 from app.celery_app import celery_app
 from app.db.session import SessionLocal
 from app.pipeline.shortnames import SIAUGESMAT_PATTERN, parse_shortname
@@ -168,6 +170,126 @@ async def _filter_orphan_courses(moodle: MoodleService, courses: list[dict]) -> 
     return results
 
 
+def _get_all_known_usernames() -> list:
+    """Usernames que la app ha creado o matriculado (execution_logs, sin límite de tiempo)."""
+    db = SessionLocal()
+    try:
+        rows = db.execute(
+            text(
+                "SELECT DISTINCT identifier FROM execution_logs "
+                "WHERE action IN ('enrolment_ok', 'user_created_createpassword') "
+                "ORDER BY identifier"
+            )
+        ).fetchall()
+        return [r[0] for r in rows]
+    finally:
+        db.close()
+
+
+def _normalize_email(email: str) -> str:
+    """Normaliza un correo para agrupar: minúsculas y sin espacios."""
+    return (email or "").strip().lower()
+
+
+def _group_users_by_email(users: list[dict]) -> dict[str, list[dict]]:
+    """Agrupa usuarios por correo normalizado, ignorando correos vacíos."""
+    by_email: dict[str, list[dict]] = {}
+    for u in users:
+        email = _normalize_email(u.get("email", ""))
+        if not email:
+            continue
+        by_email.setdefault(email, []).append(u)
+    return by_email
+
+
+def _build_duplicate_email_rows(by_email: dict[str, list[dict]]) -> list[dict]:
+    """Convierte los grupos en una fila por usuario (solo correos con más de una cuenta)."""
+    rows = []
+    for email, users in by_email.items():
+        if len(users) <= 1:
+            continue
+        deduped: dict[int, dict] = {}
+        for u in users:
+            deduped.setdefault(int(u.get("id", 0)), u)
+        account_list = list(deduped.values())
+        for u in account_list:
+            rows.append(
+                {
+                    "email": email,
+                    "username": u.get("username", ""),
+                    "firstname": u.get("firstname", ""),
+                    "lastname": u.get("lastname", ""),
+                    "user_id": u.get("id", ""),
+                    "duplicate_count": len(account_list),
+                }
+            )
+    rows.sort(key=lambda r: (r["email"], str(r["user_id"])))
+    return rows
+
+
+async def _query_duplicate_emails(moodle: MoodleService) -> list[dict]:
+    """Correos con más de un usuario en Moodle.
+
+    Moodle 3.9 no permite listar todos los usuarios por webservice, así que se
+    siembra el escaneo con dos fuentes (logs de la app + matriculados en cursos
+    SIAUGESMAT) y luego se re-consulta cada correo candidato en Moodle
+    (core_user_get_users_by_field) para capturar TODAS las cuentas que lo
+    comparten, incluidas las que la app nunca tocó.
+    """
+    seed_emails: set[str] = set()
+
+    usernames = _get_all_known_usernames()
+    for i in range(0, len(usernames), 100):
+        batch = usernames[i : i + 100]
+        try:
+            users = await moodle.get_users("username", batch)
+        except Exception as e:
+            logger.warning(f"Error consultando usernames por lote: {e}")
+            continue
+        for u in users:
+            email = _normalize_email(u.get("email", ""))
+            if email:
+                seed_emails.add(email)
+
+    all_courses = await moodle.get_courses()
+    siau_courses = [c for c in all_courses if SIAUGESMAT_RE.match(c.get("shortname", ""))]
+
+    sem = asyncio.Semaphore(5)
+
+    async def collect_enrolled(course):
+        async with sem:
+            try:
+                users = await moodle.get_all_enrolled_users(int(course["id"]))
+            except Exception as e:
+                logger.warning(
+                    f"Error obteniendo matriculados del curso {course.get('shortname')}: {e}"
+                )
+                return
+            for u in users:
+                email = _normalize_email(u.get("email", ""))
+                if email:
+                    seed_emails.add(email)
+
+    batch_size = 5
+    for i in range(0, len(siau_courses), batch_size):
+        batch = siau_courses[i : i + batch_size]
+        await asyncio.gather(*[collect_enrolled(c) for c in batch])
+
+    all_users: list[dict] = []
+    seed_list = sorted(seed_emails)
+    for i in range(0, len(seed_list), 100):
+        batch = seed_list[i : i + 100]
+        try:
+            users = await moodle.get_users("email", batch)
+        except Exception as e:
+            logger.warning(f"Error consultando correos por lote: {e}")
+            continue
+        all_users.extend(users)
+
+    by_email = _group_users_by_email(all_users)
+    return _build_duplicate_email_rows(by_email)
+
+
 async def _do_query(moodle: MoodleService, qr):
     params = qr.params or {}
 
@@ -200,6 +322,9 @@ async def _do_query(moodle: MoodleService, qr):
         if status_filter == "never_logged_in":
             raw = [u for u in raw if u.get("lastlogin", 1) == 0]
         return raw
+
+    if qr.entity == "duplicate_emails":
+        return await _query_duplicate_emails(moodle)
 
     if qr.entity == "inactive_teachers":
         cutoff = _parse_cutoff(params)
