@@ -10,6 +10,7 @@ import { useUploadGate } from "../hooks/useUploadGate.ts";
 import { SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
+import FilePicker from "../components/FilePicker.tsx";
 
 export default function FileUploader() {
   const file = useSignal<File | null>(null);
@@ -102,22 +103,17 @@ export default function FileUploader() {
     >
       {/* Archivo */}
       <div>
-        <label
-          for="file"
-          class="block text-sm font-medium text-[var(--text-secondary)] mb-2"
-        >
-          Archivo Excel
-        </label>
-        <div class="flex items-center gap-4">
-          <input
-            id="file"
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleFileChange}
-            disabled={uploading.value || !allowed}
-            class="block w-full text-sm text-[var(--text-muted)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[var(--file-btn-bg)] file:text-[var(--file-btn-text)] hover:file:bg-[var(--file-btn-hover)] transition disabled:opacity-40 disabled:cursor-not-allowed"
-          />
-        </div>
+        <FilePicker
+          id="file"
+          label="Archivo Excel"
+          accept=".xlsx,.xls"
+          file={file}
+          onChange={handleFileChange}
+          disabled={uploading.value || !allowed}
+          onClear={() => {
+            error.value = "";
+          }}
+        />
       </div>
 
       {/* Semestre */}
