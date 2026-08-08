@@ -1,7 +1,7 @@
-// islands/LoginPageIsland.tsx
+// islands/PaginaLoginIsland.tsx
 import { useComputed, useSignal } from "@preact/signals";
-import LoginForm from "./LoginForm.tsx";
-import ThemeToggle from "./ThemeToggle.tsx";
+import LoginForm from "./FormularioLogin.tsx";
+import ThemeToggle from "./AlternadorTema.tsx";
 import { darkSignal } from "../utils/theme.ts";
 
 export default function LoginPageIsland() {

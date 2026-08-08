@@ -1,12 +1,14 @@
 import { render } from "preact-render-to-string";
 import { assert, assertStringIncludes } from "@std/assert";
 
-import LoginForm from "../../islands/LoginForm.tsx";
+import FormularioLogin from "../../islands/FormularioLogin.tsx";
 import { darkSignal } from "../../utils/theme.ts";
 
-Deno.test("LoginForm - muestra selector de modalidad sin campos de login", () => {
+Deno.test("FormularioLogin - muestra selector de modalidad sin campos de login", () => {
   darkSignal.value = false;
-  const html = render(<LoginForm modalidad="" onModalidadChange={() => {}} />);
+  const html = render(
+    <FormularioLogin modalidad="" onModalidadChange={() => {}} />,
+  );
 
   assertStringIncludes(html, "PRESENCIAL");
   assertStringIncludes(html, "DISTANCIA");
@@ -15,10 +17,10 @@ Deno.test("LoginForm - muestra selector de modalidad sin campos de login", () =>
   assert(!html.includes("Usuario"), "no debe mostrar Usuario sin modalidad");
 });
 
-Deno.test("LoginForm - muestra campos de login cuando se selecciona modalidad", () => {
+Deno.test("FormularioLogin - muestra campos de login cuando se selecciona modalidad", () => {
   darkSignal.value = false;
   const html = render(
-    <LoginForm modalidad="DISTANCIA" onModalidadChange={() => {}} />,
+    <FormularioLogin modalidad="DISTANCIA" onModalidadChange={() => {}} />,
   );
 
   assertStringIncludes(html, "Usuario");

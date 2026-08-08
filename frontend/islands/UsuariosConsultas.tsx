@@ -1,6 +1,6 @@
 import { useSignal } from "@preact/signals";
-import QueryTable from "./QueryTable.tsx";
-import InactiveTeachersQuery from "./InactiveTeachersQuery.tsx";
+import TablaConsultaIsland from "./TablaConsultaIsland.tsx";
+import ConsultaDocentesSinAcceso from "./ConsultaDocentesSinAcceso.tsx";
 import { ENTITY_CONSULT_CONFIGS } from "../utils/entity-configs.ts";
 
 type Mode = "normal" | "inactive";
@@ -37,8 +37,8 @@ export default function UsuariosConsultas() {
       </div>
 
       {mode.value === "normal"
-        ? <QueryTable entity="users" {...usersConfig} />
-        : <InactiveTeachersQuery />}
+        ? <TablaConsultaIsland entity="users" {...usersConfig} />
+        : <ConsultaDocentesSinAcceso />}
     </div>
   );
 }

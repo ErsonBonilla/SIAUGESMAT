@@ -13,6 +13,8 @@ import ErrorBox from "../components/ErrorBox.tsx";
 import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
 import OperationHistorySection from "../components/OperationHistorySection.tsx";
 import BatchProgressTable from "../components/BatchProgressTable.tsx";
+import ExecutionButton from "../components/ExecutionButton.tsx";
+import QueryHelp from "../components/QueryHelp.tsx";
 
 export default function BulkVisibilityIsland() {
   const visibility = useSignal<"show" | "hide">("show");
@@ -57,13 +59,27 @@ export default function BulkVisibilityIsland() {
 
   return (
     <div>
-      <p class="text-[var(--text-secondary)] text-sm mb-6">
-        Suba un archivo CSV con la columna{" "}
-        <code class="bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded text-xs">
-          shortname
-        </code>{" "}
-        conteniendo los shortnames de los cursos a mostrar u ocultar.
-      </p>
+      <QueryHelp
+        sections={[
+          {
+            title: "Archivo CSV requerido",
+            body:
+              "Suba un archivo CSV con la columna shortname conteniendo los códigos cortos de los cursos a mostrar u ocultar.",
+          },
+          {
+            title: "Acción",
+            body: [
+              "Mostrar: pone el curso visible en Moodle (visible = 1).",
+              "Ocultar: oculta el curso en Moodle (visible = 0).",
+            ],
+          },
+          {
+            title: "Procesamiento",
+            body:
+              "El archivo se procesa como un lote: puede pausar, reanudar o cancelar desde la tabla de progreso.",
+          },
+        ]}
+      />
 
       <form
         onSubmit={handleSubmit}
@@ -173,6 +189,8 @@ export default function BulkVisibilityIsland() {
           refreshTrigger={refreshKey.value}
         />
       </div>
+
+      <ExecutionButton tab="visibilidad_cursos" />
     </div>
   );
 }

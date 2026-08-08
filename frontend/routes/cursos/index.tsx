@@ -26,7 +26,6 @@ export default function CursosHub() {
         description:
           "Crea cursos en Moodle desde el archivo de carga académica (Excel).",
         href: "/cursos/crear",
-        executionTab: "crear_cursos",
       },
       {
         icon: TrashIcon,
@@ -34,7 +33,6 @@ export default function CursosHub() {
         description:
           "Elimina cursos de Moodle masivamente desde un archivo CSV.",
         href: "/cursos/eliminar",
-        executionTab: "eliminar_cursos",
       },
       {
         icon: EyeIcon,
@@ -42,7 +40,6 @@ export default function CursosHub() {
         description:
           "Muestra u oculta cursos existentes en Moodle masivamente.",
         href: "/cursos/visibilidad",
-        executionTab: "visibilidad_cursos",
       },
       {
         icon: SwitchIcon,

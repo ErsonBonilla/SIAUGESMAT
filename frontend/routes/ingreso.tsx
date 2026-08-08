@@ -1,9 +1,9 @@
-// routes/login.tsx
+// routes/ingreso.tsx
 import { redirectIfAuth } from "../utils/auth-guard.ts";
-import LoginPageIsland from "../islands/LoginPageIsland.tsx";
+import PaginaLoginIsland from "../islands/PaginaLoginIsland.tsx";
 
 export const handler = redirectIfAuth();
 
 export default function LoginPage() {
-  return <LoginPageIsland />;
+  return <PaginaLoginIsland />;
 }

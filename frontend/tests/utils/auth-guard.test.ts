@@ -13,11 +13,11 @@ function makeCtx(cookie?: string) {
   return ctx;
 }
 
-Deno.test("requireAuth - redirects to /login when no auth cookie", async () => {
+Deno.test("requireAuth - redirects to /ingreso when no auth cookie", async () => {
   const handlers = requireAuth();
   const res = await handlers.GET!(makeCtx());
   assertEquals((res as Response).status, 302);
-  assertEquals((res as Response).headers.get("Location"), "/login");
+  assertEquals((res as Response).headers.get("Location"), "/ingreso");
 });
 
 Deno.test("requireAuth - continues when auth cookie present", async () => {
@@ -26,11 +26,11 @@ Deno.test("requireAuth - continues when auth cookie present", async () => {
   assertEquals(res, { data: {} });
 });
 
-Deno.test("redirectIfAuth - redirects to /dashboard when auth cookie present", async () => {
+Deno.test("redirectIfAuth - redirects to /panel when auth cookie present", async () => {
   const handlers = redirectIfAuth();
   const res = await handlers.GET!(makeCtx("auth_token=abc"));
   assertEquals((res as Response).status, 302);
-  assertEquals((res as Response).headers.get("Location"), "/dashboard");
+  assertEquals((res as Response).headers.get("Location"), "/panel");
 });
 
 Deno.test("redirectIfAuth - continues when no auth cookie", async () => {

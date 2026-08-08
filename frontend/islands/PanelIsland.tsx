@@ -267,7 +267,7 @@ export default function DashboardIsland() {
                     </span>
                   </div>
                   <a
-                    href={`/jobs/${latestExec.value.id}`}
+                    href={`/ejecuciones/${latestExec.value.id}`}
                     class="text-xs font-medium no-underline text-[var(--accent)] hover:underline"
                   >
                     Ver detalle →
@@ -347,7 +347,7 @@ export default function DashboardIsland() {
                           </td>
                           <td class="px-4 py-3 border-b border-[var(--border-secondary)]">
                             <a
-                              href={`/jobs/${ex.id}`}
+                              href={`/ejecuciones/${ex.id}`}
                               class="text-xs text-[var(--accent)] no-underline font-medium hover:underline"
                             >
                               Detalle

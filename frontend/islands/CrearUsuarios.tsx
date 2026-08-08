@@ -1,5 +1,6 @@
 import { useSignal } from "@preact/signals";
 import CsvUploader from "./CsvUploader.tsx";
+import ExecutionButton from "../components/ExecutionButton.tsx";
 
 type UserRole = "student" | "editingteacher" | "all";
 
@@ -61,7 +62,24 @@ export default function CrearUsuarios() {
         labelSingular="usuario"
         labelPlural="usuarios"
         action="create"
+        help={[
+          {
+            title: "Archivo CSV requerido",
+            body: [
+              "Columnas obligatorias: username, firstname, lastname y email.",
+              ...(role.value === "all"
+                ? [
+                  "Rol (opcional): role1 con 'student', 'editingteacher', 'teacher', 'manager' o su ID (1,3,4,5).",
+                  "Opcional: forcepasswordchange (1/0).",
+                ]
+                : role.value === "editingteacher"
+                ? ["Los usuarios se crean con rol editingteacher."]
+                : ["Los usuarios se crean con rol student."]),
+            ],
+          },
+        ]}
       />
+      <ExecutionButton tab="crear_usuarios" />
     </div>
   );
 }

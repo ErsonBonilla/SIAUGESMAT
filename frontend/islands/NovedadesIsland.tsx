@@ -6,6 +6,7 @@ import type { NovedadItem } from "../services/api.ts";
 import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
+import QueryHelp from "../components/QueryHelp.tsx";
 
 type Step = "upload" | "results";
 
@@ -134,6 +135,31 @@ export default function NovedadesIsland() {
 
   return (
     <div class="max-w-5xl mx-auto space-y-6">
+      <QueryHelp
+        sections={[
+          {
+            title: "Qué hace esta comparación",
+            body:
+              "Compara la nueva carga académica (Excel) con la carga anterior del mismo semestre almacenada en Moodle, y detecta los cambios de asignación docente.",
+          },
+          {
+            title: "Pasos",
+            body: [
+              "1. Seleccione el archivo Excel (.xlsx o .xls) de la nueva carga académica.",
+              "2. Verifique el semestre (se detecta automáticamente según la fecha del servidor).",
+              '3. Presione "Comparar con carga anterior".',
+            ],
+          },
+          {
+            title: "Tipos de novedades",
+            body: [
+              "Cambio de profesor: el curso cambia de docente asignado.",
+              "Curso eliminado: el curso ya no aparece en la nueva carga.",
+              "Curso nuevo: el curso no existía en la carga anterior.",
+            ],
+          },
+        ]}
+      />
       {/* Upload step */}
       {(step.value === "upload" || step.value === "results") && (
         <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6">

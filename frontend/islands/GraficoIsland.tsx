@@ -1,4 +1,4 @@
-// islands/Chart.tsx
+// islands/GraficoIsland.tsx
 import { useEffect } from "preact/hooks";
 import { getChartData } from "../services/api.ts";
 import { darkSignal } from "../utils/theme.ts";

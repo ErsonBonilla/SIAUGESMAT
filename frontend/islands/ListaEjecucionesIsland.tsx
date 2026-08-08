@@ -1,4 +1,4 @@
-// islands/ExecutionList.tsx
+// islands/ListaEjecucionesIsland.tsx
 import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import {
@@ -399,7 +399,7 @@ export default function ExecutionList() {
                           </>
                         )}
                         <a
-                          href={`/jobs/${exec.id}`}
+                          href={`/ejecuciones/${exec.id}`}
                           class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm"
                         >
                           Detalle

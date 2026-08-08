@@ -7,7 +7,6 @@ export interface HubCardDef {
   title: string;
   description: string;
   href: string;
-  executionTab?: string | null;
 }
 
 interface Props {

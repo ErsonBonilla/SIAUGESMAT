@@ -1,13 +1,13 @@
 import { render } from "preact-render-to-string";
 import { assert, assertStringIncludes } from "@std/assert";
 
-import FileUploader from "../../islands/FileUploader.tsx";
+import SubirArchivoIsland from "../../islands/SubirArchivoIsland.tsx";
 import ProcessInProgressBanner from "../../components/ProcessInProgressBanner.tsx";
 import { darkSignal } from "../../utils/theme.ts";
 
-Deno.test("FileUploader - muestra el formulario de subida con todos los elementos", () => {
+Deno.test("SubirArchivoIsland - muestra el formulario de subida con todos los elementos", () => {
   darkSignal.value = false;
-  const html = render(<FileUploader />);
+  const html = render(<SubirArchivoIsland />);
 
   assertStringIncludes(html, "Archivo Excel");
   assertStringIncludes(html, "Subir y procesar archivo");

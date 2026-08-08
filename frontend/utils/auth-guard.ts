@@ -18,7 +18,7 @@ export function requireAuth() {
   return {
     GET(ctx: FreshContext) {
       if (!tokenPresent(ctx.req.headers)) {
-        return ctx.redirect("/login");
+        return ctx.redirect("/ingreso");
       }
       return { data: {} };
     },
@@ -29,7 +29,7 @@ export function redirectIfAuth() {
   return {
     GET(ctx: FreshContext) {
       if (tokenPresent(ctx.req.headers)) {
-        return ctx.redirect("/dashboard");
+        return ctx.redirect("/panel");
       }
       return { data: {} };
     },

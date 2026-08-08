@@ -12,6 +12,7 @@ import { SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
 import BatchProgressTable from "../components/BatchProgressTable.tsx";
+import QueryHelp, { type QueryHelpSection } from "../components/QueryHelp.tsx";
 
 interface CsvUploaderProps {
   description: string;
@@ -19,11 +20,18 @@ interface CsvUploaderProps {
   labelSingular: string;
   labelPlural: string;
   action: "create" | "delete";
+  help?: QueryHelpSection[];
 }
 
 export default function CsvUploader(
-  { description, uploadEndpoint, labelSingular, labelPlural, action }:
-    CsvUploaderProps,
+  {
+    description,
+    uploadEndpoint,
+    labelSingular,
+    labelPlural,
+    action,
+    help,
+  }: CsvUploaderProps,
 ) {
   const detailOffset = useSignal(0);
   const PAGE_SIZE = 20;
@@ -55,7 +63,10 @@ export default function CsvUploader(
 
   return (
     <div>
-      <p class="text-[var(--text-secondary)] text-sm mb-6">{description}</p>
+      {help && help.length > 0
+        ? <QueryHelp sections={help} />
+        : <p class="text-[var(--text-secondary)] text-sm mb-6">{description}
+        </p>}
 
       <form
         onSubmit={handleSubmit}

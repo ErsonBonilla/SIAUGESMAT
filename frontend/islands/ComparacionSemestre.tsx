@@ -1,4 +1,4 @@
-// islands/SemesterComparison.tsx
+// islands/ComparacionSemestre.tsx
 import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { SemesterMetrics } from "../services/api.ts";

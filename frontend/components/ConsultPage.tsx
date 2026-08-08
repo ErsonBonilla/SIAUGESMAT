@@ -1,5 +1,5 @@
 import Layout from "./Layout.tsx";
-import QueryTable from "../islands/QueryTable.tsx";
+import TablaConsultaIsland from "../islands/TablaConsultaIsland.tsx";
 import { ENTITY_CONSULT_CONFIGS } from "../utils/entity-configs.ts";
 
 interface Props {
@@ -11,7 +11,7 @@ export default function ConsultPage({ entity }: Props) {
   if (!config) return null;
   return (
     <Layout title={config.title}>
-      <QueryTable entity={entity} {...config} />
+      <TablaConsultaIsland entity={entity} {...config} />
     </Layout>
   );
 }

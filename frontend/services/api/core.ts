@@ -19,7 +19,7 @@ export async function handleResponse<T>(response: Response): Promise<T> {
       } catch {
         // best-effort: el estado local ya se limpió
       }
-      if (typeof window !== "undefined") window.location.href = "/login";
+      if (typeof window !== "undefined") window.location.href = "/ingreso";
       throw new Error("Sesión expirada. Vuelva a iniciar sesión.");
     }
     const body = await response.json().catch(() => null);

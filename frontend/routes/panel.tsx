@@ -1,9 +1,9 @@
-// routes/dashboard.tsx
+// routes/panel.tsx
 import { requireAuth } from "../utils/auth-guard.ts";
-import DashboardIsland from "../islands/DashboardIsland.tsx";
+import PanelIsland from "../islands/PanelIsland.tsx";
 
 export const handler = requireAuth();
 
 export default function DashboardPage() {
-  return <DashboardIsland />;
+  return <PanelIsland />;
 }

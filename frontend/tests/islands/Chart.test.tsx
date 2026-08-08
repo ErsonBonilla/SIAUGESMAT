@@ -1,7 +1,7 @@
 import { render } from "preact-render-to-string";
 import { assertStringIncludes } from "@std/assert";
 
-import Chart from "../../islands/Chart.tsx";
+import Chart from "../../islands/GraficoIsland.tsx";
 import { darkSignal } from "../../utils/theme.ts";
 
 Deno.test("Chart - renderiza contenedor con título", () => {

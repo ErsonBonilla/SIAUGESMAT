@@ -142,7 +142,7 @@ Procesado por `query_tasks.py` (Celery).
 
 ## Interfaz de usuario
 
-### Sidebar con 4 tarjetas principales
+### BarraLateral con 4 tarjetas principales
 
 | Tarjeta | Hub page | Sub-opciones |
 |---|---|---|
@@ -157,41 +157,42 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 
 | Ruta | Contenido |
 |---|---|
-| `/dashboard` | KPI cards, minigráfico SVG, última ejecución, tabla de ejecuciones recientes |
-| `/cursos/crear` | FileUploader — sube Excel y lanza ETL. Incluye botón **Gestionar novedades** que redirige a `/cursos/novedades` |
+| `/panel` | KPI cards, minigráfico SVG, última ejecución, tabla de ejecuciones recientes |
+| `/cursos/crear` | CargaIsland (SubirArchivoIsland) — sube Excel y lanza ETL. Incluye botón **Ejecución** que lleva a `/operaciones/ejecuciones?tab=crear_cursos` |
 | `/cursos/novedades` | NovedadesIsland — compara dos cargas académicas del mismo semestre (re-parsing del Excel anterior), detecta cambios de asignación docente (profesores que ya no dictan el curso) y permite aplicar acciones: ocultar curso viejo + crear nuevo, o rehabilitar curso oculto del nuevo profesor |
-| `/cursos/consultar` | CursosConsultas — **consulta normal**: QueryTable con filtros de shortname, estado (huérfanos/>6 meses sin uso) y formato de código; **cursos sin uso**: cortes por días/meses/años/semestre con datos del curso |
+| `/cursos/consultar` | CursosConsultas — **consulta normal**: TablaConsultaIsland (QueryTable) con filtros de shortname, estado (huérfanos) y formato de código; **cursos sin uso**: ConsultaCursosSinUso con cortes por días/meses/años/semestre |
 | `/cursos/eliminar` | CsvUploader — eliminación masiva de cursos vía CSV |
-| `/cursos/visibilidad` | BulkVisibilityIsland — mostrar/ocultar cursos masivamente vía CSV |
+| `/cursos/visibilidad` | VisibilidadMasivaIsland — mostrar/ocultar cursos masivamente vía CSV |
 | `/usuarios/crear` | CsvUploader — creación masiva de usuarios |
-| `/usuarios/consultar` | QueryTable + InactiveTeachersQuery — búsqueda de usuarios por username/email (modo normal) y consulta de **docentes que no han accedido a sus cursos** (por días, default 15, o por semestre), con datos de programa y CAT |
+| `/usuarios/consultar` | TablaConsultaIsland (QueryTable) + ConsultaDocentesSinAcceso — búsqueda de usuarios por username/email (modo normal) y consulta de **docentes que no han accedido a sus cursos** (por días, default 15, o por semestre), con datos de programa y CAT |
 | `/usuarios/eliminar` | CsvUploader — eliminación masiva de usuarios |
 | `/categorias/crear` | CsvUploader — creación masiva de categorías |
-| `/categorias/consultar` | QueryTable — búsqueda de categorías por idnumber |
+| `/categorias/consultar` | TablaConsultaIsland (QueryTable) — búsqueda de categorías por idnumber |
 | `/categorias/eliminar` | CsvUploader — eliminación masiva de categorías |
-| `/operaciones/ejecuciones` | Tabs (Crear/Eliminar Cursos/Usuarios/Categorías) con ExecutionList + OperationList |
+| `/operaciones/ejecuciones` | Tabs (Crear/Eliminar Cursos/Usuarios/Categorías) con ListaEjecucionesIsland (ExecutionList) + ListaOperacionesIsland (OperationList) |
 | `/operaciones/historico` | Tabs con gráficos Chart.js theme-aware + tabla de datos |
-| `/jobs/{id}` | Detalle de ejecución con progreso en vivo, métricas, errores paginados |
+| `/ejecuciones/{id}` | Detalle de ejecución con progreso en vivo, métricas, errores paginados |
 | `/reportes?execution_id={id}` | Descarga de 16 CSVs + 5 gráficos |
+| `/ingreso` | Página de inicio de sesión (LoginForm) |
 
 ### Islas principales
 
 | Isla | Función |
-|---|---|---|
-| `ExecutionList` | Tabla de ejecuciones ETL con filtros, paginación, acciones (Procesar, Eliminar, ZIP, Reportes) |
-| `OperationList` | Tabla de lotes con filtros bloqueables por entidad/acción |
-| `DashboardIsland` | KPI cards, minigráfico, semáforo, ejecuciones recientes |
+|---|---|
+| `ListaEjecucionesIsland` | Tabla de ejecuciones ETL con filtros, paginación, acciones (Procesar, Eliminar, ZIP, Reportes) |
+| `ListaOperacionesIsland` | Tabla de lotes con filtros bloqueables por entidad/acción |
+| `PanelIsland` | KPI cards, minigráfico, semáforo, ejecuciones recientes |
 | `CsvUploader` | Formulario genérico de carga CSV con validación y polling de progreso |
-| `BulkVisibilityIsland` | Selector mostrar/ocultar + carga CSV + polling de progreso de visibilidad de cursos |
-| `QueryTable` | Búsqueda asíncrona con polling y descarga CSV |
+| `VisibilidadMasivaIsland` | Selector mostrar/ocultar + carga CSV + polling de progreso de visibilidad de cursos |
+| `TablaConsultaIsland` | Búsqueda asíncrona con polling y descarga CSV |
 | `NovedadesIsland` | Subir Excel de nueva carga académica, comparar con la ejecución anterior del mismo semestre, detectar cambios de profesores y aplicar acciones (ocultar/crear/rehabilitar cursos) |
-| `InactiveTeachersQuery` | Seleccionar corte (días de inactividad, default 15, o semestre) y consultar docentes editingteacher que no han accedido a sus cursos desde esa fecha, con resultados de programa y CAT |
-| `InactiveCoursesQuery` | Seleccionar corte (días/meses/años/semestre) y consultar cursos SIAUGESMAT sin uso (por `timemodified`), con datos del curso: programa, CAT, fechas y días sin uso |
+| `ConsultaDocentesSinAcceso` | Seleccionar corte (días de inactividad, default 15, o semestre) y consultar docentes editingteacher que no han accedido a sus cursos desde esa fecha, con resultados de programa y CAT |
+| `ConsultaCursosSinUso` | Seleccionar corte (días/meses/años/semestre) y consultar cursos SIAUGESMAT sin uso (por `timemodified`), con datos del curso: programa, CAT, fechas y días sin uso |
 | `CursosConsultas` | Tabs **Consulta normal**/**Cursos sin uso** para la página `/cursos/consultar` |
 | `Historico` | Evolución semestral y comparación con Chart.js |
 | `HistoricoOperaciones` | Gráfico Chart.js theme-aware con métricas adaptativas por operación |
-| `Sidebar` | Navegación con 4 tarjetas (Usuarios, Cursos, Categorías, Operaciones), avatar, ThemeToggle |
-| `JobDetailIsland` | Progreso en vivo con polling, métricas, errores paginados |
+| `Sidebar` | (→ `BarraLateral`) Navegación con 4 tarjetas (Usuarios, Cursos, Categorías, Operaciones), avatar, ThemeToggle |
+| `JobDetailIsland` | (→ `DetalleEjecucionIsland`) Progreso en vivo con polling, métricas, errores paginados |
 
 ### Componentes compartidos
 
@@ -199,10 +200,10 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 |---|---|
 | `HubCard` | 4 hub pages (usuarios, cursos, categorias, operaciones) — tarjeta con icono, título, descripción |
 | `ErrorBox` | 8+ islas — mensaje de error con icono |
-| `Pagination` | ExecutionList, OperationList — anterior/siguiente |
+| `Pagination` | ListaEjecucionesIsland, ListaOperacionesIsland — anterior/siguiente |
 | `LoadingSkeleton` | 6+ islas — variantes `table`, `chart`, `kpi` |
-| `KpiCard`, `MiniBarChart` | DashboardIsland |
-| `YearNav`, `SemesterPicker`, `SemesterMultiPicker` | HistoricoIsland, SemesterComparison |
+| `KpiCard`, `MiniBarChart` | PanelIsland |
+| `YearNav`, `SemesterPicker`, `SemesterMultiPicker` | Historico, ComparacionSemestre |
 | `Layout`, `ProgressBar`, `Card`, `Button`, `Input`, `Toast` | Varios |
 
 ---
@@ -252,17 +253,19 @@ SIAUGESMAT/
 │   │                           # SemesterMultiPicker, ReportsSection, ReportCard, HubCard, HubPage,
 │   │                           # TabbedPage, ConsultPage, CsvActionPage, PeriodButton,
 │   │                           # OperationHistorySection, ProcessInProgressBanner
-│   ├── islands/                # Sidebar, ThemeToggle, DashboardIsland, ExecutionList, OperationList,
-│   │                           # Historico, HistoricoOperaciones, FileUploader, CsvUploader, QueryTable,
-│   │                           # CrearUsuarios, JobDetailIsland, Reportes, Chart, MetricsChart,
-│   │   # SemesterComparison, LoginForm, LoginPageIsland, UploadIsland,
-│   │   # NovedadesIsland, InactiveTeachersQuery, BulkVisibilityIsland
-│   ├── routes/                 # _app.tsx, _middleware.ts, index.tsx, login.tsx, dashboard.tsx
+│   ├── islands/                # BarraLateral, AlternadorTema, PanelIsland, ListaEjecucionesIsland,
+│   │                           # ListaOperacionesIsland, Historico, HistoricoOperaciones,
+│   │                           # SubirArchivoIsland, CsvUploader, TablaConsultaIsland,
+│   │                           # CrearUsuarios, DetalleEjecucionIsland, Reportes, GraficoIsland,
+│   │   # GraficoMetricasIsland, ComparacionSemestre, FormularioLogin, PaginaLoginIsland, CargaIsland,
+│   │   # NovedadesIsland, ConsultaDocentesSinAcceso, ConsultaCursosSinUso, VisibilidadMasivaIsland,
+│   │   # DetalleLoteIsland, NotificacionIsland, BotonMenuMovil
+│   ├── routes/                 # _app.tsx, _middleware.ts, index.tsx, ingreso.tsx, panel.tsx
 │   │   ├── usuarios/           # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
 │   │   ├── cursos/             # index.tsx (hub), consultar.tsx, crear.tsx, novedades.tsx, eliminar.tsx, visibilidad.tsx
 │   │   ├── categorias/         # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
 │   │   ├── operaciones/        # index.tsx (hub), ejecuciones.tsx, historico.tsx
-│   │   ├── jobs/               # [id].tsx
+│   │   ├── ejecuciones/        # [id].tsx
 │   │   └── reportes.tsx
 │   ├── services/api.ts         # Barrel re-export → api/ (types, core, auth, trabajos, analytics, reportes, operaciones, consultas, mantenimiento, novedades)
 │   ├── hooks/                  # useBatchUpload.ts, useUploadGate.ts, useReports.ts

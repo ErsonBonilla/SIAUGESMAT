@@ -12,6 +12,7 @@ import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
 import ErrorBox from "../components/ErrorBox.tsx";
 import Pagination from "../components/Pagination.tsx";
 import SemesterPicker from "../components/SemesterPicker.tsx";
+import QueryHelp from "../components/QueryHelp.tsx";
 
 const PAGE_SIZE = 20;
 
@@ -145,6 +146,28 @@ export default function InactiveCoursesQuery() {
 
   return (
     <div class="space-y-4">
+      <QueryHelp
+        sections={[
+          {
+            title: "Qué consulta",
+            body:
+              "Lista los cursos SIAUGESMAT que no se han modificado desde una fecha de corte, usando el campo timemodified (última modificación) de Moodle.",
+          },
+          {
+            title: "Cómo elegir el corte",
+            body: [
+              "Por días (1-30), meses (1-12), años (≥ 1) o semestre (ej. 2026A).",
+              "El corte define la fecha límite: solo se muestran cursos cuya última modificación es anterior a esa fecha.",
+            ],
+          },
+          {
+            title: "Resultado",
+            body: [
+              "Cada fila muestra shortname, nombre, categoría, programa, CAT, fecha de creación, última modificación y días sin uso.",
+            ],
+          },
+        ]}
+      />
       <div class="flex flex-col sm:flex-row sm:items-end gap-4">
         <div class="flex flex-col gap-2">
           <div class="flex gap-1 bg-[var(--bg-tertiary)] rounded-lg p-1 w-fit flex-wrap">
