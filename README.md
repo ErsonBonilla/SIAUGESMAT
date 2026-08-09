@@ -86,6 +86,7 @@ Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y m
 - **Guard de delete masivo:** si el plan incluye >500 eliminaciones, la ejecución se pausa en `review_required` y requiere confirmación explícita vía `POST /api/v1/jobs/{id}/confirm`. Umbral configurable con `MAX_AUTO_DELETE_COURSES`.
 - **Creación de usuarios:** `createpassword=1` — Moodle genera la contraseña y la envía por email. No se almacena la cédula como password.
 - **Resolución paralela de docentes:** hasta 10 consultas simultáneas a `core_enrol_get_enrolled_users` con semáforo asyncio, en vez de N llamadas secuenciales.
+- **Consolidación de correos duplicados:** si un correo coincide con más de una cuenta en Moodle, la ejecución conserva la cuenta **más antigua**, usa su username tal cual (sin renombrar: **el username encontrado en Moodle nunca se renombra**, ni siquiera si difiere del prefijo del correo) y elimina automáticamente las cuentas **más recientes que no tengan cursos**. Salvaguarda: si el duplicado tiene cursos —o el webservice no expone `core_enrol_get_users_courses`— no se borra y queda en `pending_review` para revisión manual. Los usernames eliminados/pendientes se registran en el log `identity_by_email_duplicate` (criterio `oldest`).
 - **Compatibilidad Moodle 3.9:** adapter pattern para diferencias entre versiones (sin `enrolment_1`, `templatecourse` como `int`, `createpassword` en vez de `preferences[]`, `categoryid` con fallback multi-nivel).
 
 **Archivos clave:** `workers/tasks.py` (orquestador), `workers/utils.py` (runner async compartido `run_moodle_async`), `workers/phases/phase1_consult.py`, `phase2_analyze.py`, `phase3_structure.py`, `phase4_people.py`, `pipeline/` (núcleo puro), `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle_operations.py` (MoodleService), `services/moodle_adapter.py`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`, `services/metrics_service.py`, `services/orchestration.py` (puente API→Celery).
@@ -239,6 +240,7 @@ SIAUGESMAT/
 │   │   └── main.py
 │   ├── tools/                  # CLI de mantenimiento manual (fuera del paquete app/):
 │   │                           #   bulk_course_visibility.py, diagnostic_sibate.py,
+│   │                           #   fix_duplicate_email_usernames.py (+ Corregir username.csv),
 │   │                           #   fix_external_auth_users.py, reset_moodle_password.py,
 │   │                           #   restore_original_usernames.py (+ data/renamed_usernames.tsv)
 │   ├── tests/                  # ~556 tests (ETL, repos, phases, pipeline, analytics, API, workers)

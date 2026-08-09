@@ -92,6 +92,7 @@ class AnalyzePhase(BasePhase):
                 resolved_enrolments,
                 re_upload=ctx.re_upload,
                 courses_with_teacher=ctx.courses_with_teacher,
+                username_emails=ctx.username_emails,
                 max_age_seconds=settings.COURSE_MAX_AGE_SECONDS,
                 disappeared_age_seconds=settings.COURSE_DISAPPEARED_AGE_SECONDS,
             )

@@ -8,6 +8,10 @@ from app.services.roles import role_shortname_to_id
 
 logger = logging.getLogger(__name__)
 
+# Tamaño máximo de valores por consulta core_user_get_users_by_field.
+# Con cientos de valores Moodle trunca la respuesta silenciosamente.
+USERS_BATCH_SIZE = 100
+
 
 class MoodleService(MoodleClient):
     """
@@ -334,19 +338,44 @@ class MoodleService(MoodleClient):
         return await self._request("core_user_delete_users", params)
 
     async def get_users(self, field: str, values: list[str]) -> list[dict]:
+        """Busca usuarios por campo fragmentando en lotes.
+
+        ``core_user_get_users_by_field`` trunca silenciosamente la respuesta
+        cuando se le pasan cientos de valores (se perdió ~26 % de los usuarios
+        con ~1300 emails), así que se consulta por lotes de
+        ``USERS_BATCH_SIZE`` y se agregan los resultados.
+        """
         if not values:
             return []
-        params: dict[str, Any] = {"field": field}
-        for i, v in enumerate(values):
-            params[f"values[{i}]"] = v
-        try:
-            return await self._request(
-                "core_user_get_users_by_field", params, use_post=len(values) > 50
-            )
-        except MoodleAPIError as e:
-            if getattr(e, "error_code", None) == "invalidparameter":
-                return []
-            raise
+        results: list[dict] = []
+        for i in range(0, len(values), USERS_BATCH_SIZE):
+            chunk = values[i : i + USERS_BATCH_SIZE]
+            try:
+                params: dict[str, Any] = {"field": field}
+                for j, v in enumerate(chunk):
+                    params[f"values[{j}]"] = v
+                results.extend(
+                    await self._request(
+                        "core_user_get_users_by_field", params, use_post=len(chunk) > 50
+                    )
+                )
+            except MoodleAPIError as e:
+                if getattr(e, "error_code", None) != "invalidparameter":
+                    raise
+                # Un valor inválido invalida todo el lote: se reconsulta
+                # valor a valor para no perder los usuarios válidos.
+                logger.warning(
+                    f"get_users({field}): lote rechazado por invalidparameter, "
+                    f"reconsultando {len(chunk)} valores individuales"
+                )
+                for v in chunk:
+                    params: dict[str, Any] = {"field": field, "values[0]": v}
+                    try:
+                        results.extend(await self._request("core_user_get_users_by_field", params))
+                    except MoodleAPIError as inner:
+                        if getattr(inner, "error_code", None) != "invalidparameter":
+                            raise
+        return results
 
     async def get_user_by_username(self, username: str) -> dict | None:
         users = await self.get_users("username", [username])
@@ -459,10 +488,25 @@ class MoodleService(MoodleClient):
         for enrol in enrolments:
             user_id = user_map.get(enrol.get("username"))
             course_id = course_map.get(enrol.get("course_shortname"))
+            if not user_id and not course_id:
+                errors.append(
+                    f"Usuario y curso no encontrados: {enrol.get('username')} / {enrol.get('course_shortname')}"
+                )
+                logger.error(f"No se pudo matricular: {errors[-1]}")
+                continue
+            if not user_id and enrol.get("email"):
+                # Fallback: el username ETL puede no existir (usuario en Moodle
+                # bajo otro username). Se resuelve por email institucional.
+                by_email = await self.get_users("email", [enrol["email"]])
+                if by_email:
+                    user_id = int(by_email[0]["id"])
+                    user_map[enrol.get("username")] = user_id
+                    logger.info(
+                        f"Enrol {enrol.get('username')} resuelto por email a "
+                        f"{by_email[0].get('username')} ({user_id})"
+                    )
             if not user_id or not course_id:
-                if not user_id and not course_id:
-                    msg = f"Usuario y curso no encontrados: {enrol.get('username')} / {enrol.get('course_shortname')}"
-                elif not user_id:
+                if not user_id:
                     msg = f"Usuario no encontrado en Moodle: {enrol.get('username')}"
                 else:
                     msg = f"Curso no encontrado en Moodle: {enrol.get('course_shortname')}"

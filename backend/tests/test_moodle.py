@@ -308,6 +308,45 @@ async def test_get_users(moodle_service):
     assert params["values[0]"] == "a@b.com"
 
 
+@pytest.mark.asyncio
+async def test_get_users_chunks_large_values(moodle_service):
+    """Un lote grande se fragmenta (Moodle trunca respuestas grandes)."""
+    service, _ = moodle_service
+    calls = []
+
+    async def fake_request(wsfunction, params, use_post=False, timeout=None):
+        calls.append(params)
+        n = len(params) - 1
+        return [{"username": params[f"values[{i}]"], "id": i} for i in range(n)]
+
+    service._request = fake_request
+    values = [f"u{i}" for i in range(250)]
+    result = await service.get_users("username", values)
+    assert len(result) == 250
+    assert [len(c) - 1 for c in calls] == [100, 100, 50]
+    assert calls[0]["values[0]"] == "u0"
+    assert calls[2]["values[0]"] == "u200"
+
+
+@pytest.mark.asyncio
+async def test_get_users_invalid_chunk_falls_back_per_value(moodle_service):
+    """Un lote rechazado por invalidparameter se reconsulta valor a valor."""
+    service, _ = moodle_service
+    calls = []
+
+    async def fake_request(wsfunction, params, use_post=False, timeout=None):
+        calls.append(params)
+        n = len(params) - 1
+        if n > 1:
+            raise MoodleAPIError("invalid", "invalidparameter")
+        return [{"username": params.get("values[0]"), "id": 1}]
+
+    service._request = fake_request
+    result = await service.get_users("username", ["a", "b", "c"])
+    assert len(result) == 3
+    assert len(calls) == 4  # 1 lote fallido + 3 individuales
+
+
 # ---------------------------------------------------------------------------
 # Matriculación
 # ---------------------------------------------------------------------------
@@ -339,6 +378,43 @@ async def test_enrol_users(moodle_service):
     assert last_call_params["enrolments[0][userid]"] == 10
     assert last_call_params["enrolments[0][courseid]"] == 200
     assert last_call_params["enrolments[0][roleid]"] == 3  # editingteacher
+
+
+@pytest.mark.asyncio
+async def test_enrol_users_resolves_missing_username_by_email(moodle_service):
+    """Si el username ETL no existe, la matriculación resuelve por email."""
+    service, mock_adapter = moodle_service
+    mock_adapter.get_courses.return_value = [{"shortname": "CURSO1", "id": 200}]
+
+    async def mock_get(*args, **kwargs):
+        params = kwargs.get("params", {})
+        wsfunction = params.get("wsfunction")
+        if wsfunction == "core_user_get_users_by_field":
+            if params.get("field") == "email":
+                return MagicMock(
+                    json=lambda: [{"username": "realuser", "id": 10}],
+                    raise_for_status=lambda: None,
+                )
+            return MagicMock(json=lambda: [], raise_for_status=lambda: None)
+        if wsfunction == "enrol_manual_enrol_users":
+            return MagicMock(json=lambda: None, raise_for_status=lambda: None)
+        return MagicMock(json=dict, raise_for_status=lambda: None)
+
+    service._client.get.side_effect = mock_get
+
+    result = await service.enrol_users(
+        [
+            {
+                "username": "etluser",
+                "course_shortname": "CURSO1",
+                "role": "editingteacher",
+                "email": "etluser@ut.edu.co",
+            }
+        ]
+    )
+    assert result["success"] is True
+    params = service._client.get.call_args_list[-1][1]["params"]
+    assert params["enrolments[0][userid]"] == 10
 
 
 # ---------------------------------------------------------------------------

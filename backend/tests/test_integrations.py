@@ -70,12 +70,76 @@ class TestFindUserByEmail:
     @pytest.mark.asyncio
     async def test_multiple_found(self, integration):
         integration.service.get_users.return_value = [
-            {"username": "teacher1", "email": "a@ut.edu.co"},
-            {"username": "teacher2", "email": "a@ut.edu.co"},
+            {"id": "2", "username": "teacher2", "email": "a@ut.edu.co", "timecreated": "200"},
+            {"id": "1", "username": "teacher1", "email": "a@ut.edu.co", "timecreated": "100"},
         ]
+        integration.service._request.return_value = []
         user = await integration.find_user_by_email("a@ut.edu.co")
         assert user is not None
         assert user["username"] == "teacher1"
+
+
+# ---------------------------------------------------------------------------
+# Consolidación de duplicados por email (conservar antigua + eliminar modernas)
+# ---------------------------------------------------------------------------
+class TestConsolidateDuplicates:
+    @pytest.mark.asyncio
+    async def test_duplicate_sin_cursos_se_elimina(self, integration):
+        integration.service.get_users.return_value = [
+            {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
+            {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
+        ]
+        integration.service._request.return_value = []
+        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        assert result["a@ut.edu.co"]["username"] == "viejo"
+        integration.service.delete_users.assert_awaited_with(["nuevo"])
+        c = integration.last_email_conflicts[0]
+        assert c["deleted"] == ["nuevo"]
+        assert c["pending_review"] == []
+
+    @pytest.mark.asyncio
+    async def test_duplicate_con_cursos_no_se_elimina(self, integration):
+        integration.service.get_users.return_value = [
+            {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
+            {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
+        ]
+        integration.service._request.return_value = [{"id": 111}]
+        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        assert result["a@ut.edu.co"]["username"] == "viejo"
+        integration.service.delete_users.assert_not_awaited()
+        c = integration.last_email_conflicts[0]
+        assert c["deleted"] == []
+        assert c["pending_review"] == ["nuevo"]
+
+    @pytest.mark.asyncio
+    async def test_webservice_no_expone_cursos_no_se_elimina(self, integration):
+        integration.service.get_users.return_value = [
+            {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
+            {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
+        ]
+        integration.service._request.side_effect = Exception("acceso denegado")
+        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        assert result["a@ut.edu.co"]["username"] == "viejo"
+        integration.service.delete_users.assert_not_awaited()
+        c = integration.last_email_conflicts[0]
+        assert c["deleted"] == []
+        assert c["pending_review"] == ["nuevo"]
+
+    @pytest.mark.asyncio
+    async def test_mas_de_dos_elimina_todas_menos_la_antigua(self, integration):
+        integration.service.get_users.return_value = [
+            {"id": "3", "username": "nueva", "email": "a@ut.edu.co", "timecreated": "300"},
+            {"id": "2", "username": "media", "email": "a@ut.edu.co", "timecreated": "200"},
+            {"id": "1", "username": "vieja", "email": "a@ut.edu.co", "timecreated": "100"},
+        ]
+        integration.service._request.return_value = []
+        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        assert result["a@ut.edu.co"]["username"] == "vieja"
+        integration.service.delete_users.assert_awaited()
+        args = integration.service.delete_users.await_args.args[0]
+        assert set(args) == {"media", "nueva"}
+        c = integration.last_email_conflicts[0]
+        assert set(c["deleted"]) == {"media", "nueva"}
 
 
 # ---------------------------------------------------------------------------
