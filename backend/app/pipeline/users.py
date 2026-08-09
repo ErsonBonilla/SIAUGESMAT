@@ -39,6 +39,29 @@ def pick_oldest_user(users: list[dict]) -> dict | None:
     )
 
 
+def pick_newest_user(users: list[dict]) -> dict | None:
+    """Selecciona el usuario más reciente de una lista con el mismo identificador.
+
+    Contraparte de ``pick_oldest_user``: elige el de mayor ``timecreated``; por
+    desempate, el de mayor ``id``. Si ningún usuario trae ``timecreated`` se usa
+    el mayor ``id`` (los ids de Moodle son secuenciales y equivalen a antigüedad).
+
+    Pura, sin I/O.
+    """
+    if not users:
+        return None
+    with_time = [u for u in users if (u.get("timecreated") or 0)]
+    if with_time:
+        return max(
+            with_time,
+            key=lambda u: (int(u.get("timecreated") or 0), int(u.get("id") or 0)),
+        )
+    return max(
+        users,
+        key=lambda u: (int(u.get("id") or 0), int(u.get("timecreated") or 0)),
+    )
+
+
 def normalize_name(name: str) -> str:
     """Normaliza un nombre para comparación: minúsculas y sin tildes."""
     text = "".join(

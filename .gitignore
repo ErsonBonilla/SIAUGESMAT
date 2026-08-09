@@ -15,23 +15,29 @@ __pycache__/
 node_modules/
 
 # Archivos de subida de usuarios (cargas académicas)
-# ATENCIÓN: *.xlsx / *.xls / *.csv / *.zip bloquean TODOS los archivos
-# con esas extensiones en cualquier ruta del repo. Son artefactos generados.
-# Si se necesita commitear un CSV/ZIP/XLSX de configuración, añadir !excepción.
+# ATENCIÓN: *.xlsx / *.xls / *.csv / *.tsv / *.zip bloquean TODOS los archivos
+# con esas extensiones en cualquier ruta del repo. Son artefactos generados o
+# datos de prueba con información personal. No se commitean.
 uploads/
 *.xlsx
 *.xls
-!backend/e2e/fixtures/*.xlsx
 
 # Reportes generados por el backend (CSVs y ZIPs)
 reports/
 *.zip
 *.csv
+*.tsv
 
-# Certificados SSL para producción (no se comitean)
+# Datos de las herramientas del operador (backend/tools/): contienen
+# información personal real (usernames, cédulas, correos). Local únicamente.
+backend/tools/data/
+
+# Certificados y llaves (no se comitean)
 certs/*
 !certs/README.md
 !certs/generate-dev-certs.sh
+*.pem
+*.key
 
 # Archivos de configuración de IDE y sistema operativo
 .vscode/
@@ -57,6 +63,7 @@ build/
 
 # ---------------------------------------------------------------------------
 # e2e — pruebas de integración contra Moodle real
-# Los *.xlsx en fixtures contienen datos reales de docentes.
-# Los scripts .py y README.md se comitean.
+# Los fixtures (*.xlsx) contienen datos reales de docentes: son LOCALs,
+# cada integrador coloca los suyos en backend/e2e/fixtures/. Solo se
+# commitean scripts .py y documentación.
 # ---------------------------------------------------------------------------

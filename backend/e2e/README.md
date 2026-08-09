@@ -7,29 +7,34 @@ Scripts para probar el pipeline ETL completo contra la instancia real de Moodle 
 - Backend corriendo (`docker compose up -d backend worker`)
 - Python 3.12 con dependencias del backend instaladas
 
+## Fixtures (archivos Excel de carga académica)
+
+Los archivos de carga (`*.xlsx`) contienen **datos reales de docentes**, por lo que **no se comitean**.
+Cada integrador debe colocar los suyos en `backend/e2e/fixtures/` antes de ejecutar:
+
+```bash
+# Desde la raíz del backend
+mkdir -p e2e/fixtures
+# Coloca aquí tu(s) archivo(s) de carga académica real o de prueba
+```
+
+Solo se comitean los scripts (`run_test.py`, `jwt_helper.py`, `conftest.py`) y esta documentación.
+
 ## Uso
 
 ```bash
 # Modo seguro — solo usuarios (no toca cursos)
-python e2e/run_test.py e2e/fixtures/ibague.xlsx
+python e2e/run_test.py e2e/fixtures/MI_CARGA.xlsx
 
 # Modo users + courses — requiere confirmación de delete masivo
-python e2e/run_test.py e2e/fixtures/ibague.xlsx --mode both
+python e2e/run_test.py e2e/fixtures/MI_CARGA.xlsx --mode both
 
 # Con confirmación automática del delete masivo
-python e2e/run_test.py e2e/fixtures/ibague.xlsx --mode both --confirm
+python e2e/run_test.py e2e/fixtures/MI_CARGA.xlsx --mode both --confirm
 
 # Semestre personalizado
-python e2e/run_test.py e2e/fixtures/uraba.xlsx --semester 2026B --mode users
+python e2e/run_test.py e2e/fixtures/MI_CARGA.xlsx --semester 2026B --mode users
 ```
-
-## Fixtures disponibles
-
-| Archivo | Filas | Programa |
-|---------|-------|----------|
-| `bajocalima.xlsx` | 9 | Tecnología Forestal + Admin Financiera |
-| `ibague.xlsx` | 8 | Especialización Virtual (POSGRADO) |
-| `uraba.xlsx` | 10 | Admin Financiera Urabá |
 
 ## Funcionamiento
 
@@ -41,7 +46,7 @@ python e2e/run_test.py e2e/fixtures/uraba.xlsx --semester 2026B --mode users
 
 ```
 SIAUGESMAT — Prueba real
-  Archivo:   ibague.xlsx
+  Archivo:   MI_CARGA.xlsx
   Mode:      users
   Semestre:  2026B
 

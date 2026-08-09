@@ -5,6 +5,7 @@ from app.pipeline.users import (
     lookup_teacher_candidates,
     names_differ,
     normalize_name,
+    pick_newest_user,
     pick_oldest_user,
     resolve_users,
 )
@@ -184,6 +185,33 @@ class TestPickOldestUser:
 
     def test_empty_list_returns_none(self):
         assert pick_oldest_user([]) is None
+
+
+class TestPickNewestUser:
+    def test_picks_highest_timecreated(self):
+        users = [
+            {"id": "1", "username": "viejo", "timecreated": "100"},
+            {"id": "2", "username": "nuevo", "timecreated": "200"},
+        ]
+        assert pick_newest_user(users)["username"] == "nuevo"
+
+    def test_ties_break_by_highest_id(self):
+        users = [
+            {"id": "1", "username": "a", "timecreated": "100"},
+            {"id": "3", "username": "c", "timecreated": "100"},
+            {"id": "2", "username": "b", "timecreated": "100"},
+        ]
+        assert pick_newest_user(users)["username"] == "c"
+
+    def test_falls_back_to_highest_id_without_timecreated(self):
+        users = [
+            {"id": "2", "username": "viejo"},
+            {"id": "5", "username": "nuevo"},
+        ]
+        assert pick_newest_user(users)["username"] == "nuevo"
+
+    def test_empty_list_returns_none(self):
+        assert pick_newest_user([]) is None
 
 
 class TestIndexTeachers:

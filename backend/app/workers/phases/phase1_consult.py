@@ -72,8 +72,11 @@ class ConsultPhase(BasePhase):
                             "usernames": conflict.get("usernames", []),
                             "selected": conflict.get("selected", ""),
                             "selected_id": conflict.get("selected_id"),
+                            "renamed": conflict.get("renamed", ""),
                             "deleted": conflict.get("deleted", []),
                             "pending_review": conflict.get("pending_review", []),
+                            "auth_switched": conflict.get("auth_switched", False),
+                            "auth_reason": conflict.get("auth_reason", ""),
                             "criterion": "oldest",
                         },
                     )

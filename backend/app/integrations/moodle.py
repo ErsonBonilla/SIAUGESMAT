@@ -12,7 +12,7 @@ import logging
 from typing import Any
 
 from app.core.config import settings
-from app.pipeline.users import pick_oldest_user
+from app.pipeline.users import pick_newest_user, pick_oldest_user
 from app.services.moodle_error_handler import extract_error, handle_moodle_errors
 from app.services.moodle_errors import MoodleOverloadedError, is_moodle_overloaded
 from app.services.moodle_operations import MoodleService
@@ -224,20 +224,78 @@ class MoodleIntegration:
         except Exception:
             return None
 
+    TEMP_PREFIX = "zzdel_"
+    MAX_USERNAME_LEN = 100
+
+    def _temp_username(self, target: str) -> str:
+        """Username temporal que libera el deseado antes de eliminar el duplicado."""
+        return f"{self.TEMP_PREFIX}{target}"[: self.MAX_USERNAME_LEN]
+
+    async def _rename_user(self, user_id, username: str) -> bool:
+        """Renombra (username) una cuenta de Moodle por id."""
+        try:
+            await self.service.update_users([{"id": user_id, "username": username}])
+            return True
+        except Exception:
+            logger.exception(f"Fallo al renombrar id={user_id} -> {username}")
+            return False
+
+    async def _maybe_switch_to_external_auth(self, user: dict) -> tuple[bool, str]:
+        """Pasa la cuenta conservada de base manual a la base de datos externa.
+
+        Reglas:
+          - El correo debe ser institucional (termina en INSTITUTIONAL_EMAIL_DOMAIN).
+          - La cuenta NO debe estar en EXTERNAL_AUTH_EXCLUDED_USERS (admins).
+          - El auth actual debe ser ``manual``; si ya es externo se deja intacto.
+          - Si el auth actual no es conocido (nulo), no se fuerza el cambio.
+
+        Retorna (auth_switched: bool, motivo: str).
+        """
+        current_auth = (user.get("auth") or "").strip().lower()
+        email = (user.get("email") or "").strip().lower()
+        username = (user.get("username") or "").strip().lower()
+
+        if current_auth and current_auth != "manual":
+            return False, f"ya {current_auth}"
+        if not email.endswith(settings.INSTITUTIONAL_EMAIL_DOMAIN):
+            return False, "manual (correo no institucional)"
+        excluded = settings.external_auth_excluded_keys()
+        if email in excluded or username in excluded:
+            return False, "manual (admin excluido)"
+        if not current_auth:
+            return False, "manual (auth desconocido)"
+        try:
+            await self.service.update_users(
+                [{"id": user.get("id"), "auth": settings.MOODLE_EXTERNAL_AUTH}]
+            )
+            return True, f"manual->{settings.MOODLE_EXTERNAL_AUTH}"
+        except Exception:
+            logger.exception(
+                f"No se pudo cambiar auth de '{user.get('username', '')}' "
+                f"(id={user.get('id')}) a '{settings.MOODLE_EXTERNAL_AUTH}'"
+            )
+            return False, "manual (fallo al cambiar auth)"
+
     async def _consolidate_duplicates(self, email: str, matches: list[dict]) -> dict | None:
-        """Consolida cuentas que comparten email: conserva la más antigua y
-        elimina las más recientes que no tengan cursos matriculados.
+        """Consolida cuentas que comparten email conservando la más antigua.
 
-        El username de la cuenta conservada NO se renombra: se usa tal cual
-        existe en Moodle. Solo se escriben dos cosas: eliminar duplicados
-        recientes (si corresponde) y registrar el conflicto.
-
-        Salvaguarda: si la cuenta duplicada tiene cursos (o no se puede
-        verificar porque el webservice no expone ``core_enrol_get_users_courses``),
-        NO se elimina y queda en ``pending_review``.
+        1. Se conserva la cuenta MÁS ANTIGUA (la que tiene historial).
+        2. Si la cuenta MÁS RECIENTE no tiene cursos, se toma su username (el
+           deseado —el username real del usuario, que puede NO ser el prefijo
+           del correo—), se renombra la cuenta antigua conservada a ese
+           username (''la cuenta vieja queda renombrada'') y se elimina la
+           cuenta reciente.
+        3. Salvaguarda: si la reciente tiene cursos (o no se puede verificar
+           porque el webservice no expone ``core_enrol_get_users_courses``),
+           NO se elimina ni se renombra: queda en ``pending_review``.
+        4. Si la cuenta conservada está en base manual (auth=manual) con correo
+           institucional y no es admin, se pasa a la base de datos externa
+           (auth=``MOODLE_EXTERNAL_AUTH``). Las no institucionales y los admins
+           se dejan en base manual.
 
         Registra el resultado en ``last_email_conflicts`` y retorna la cuenta
-        conservada (la más antigua), o None si no hay matches válidos.
+        conservada (con su username actualizado si hubo rename), o None si no
+        hay matches válidos.
         """
         oldest = pick_oldest_user(matches)
         if oldest is None:
@@ -245,6 +303,8 @@ class MoodleIntegration:
         duplicated = [u for u in matches if u is not oldest]
         if not duplicated:
             return oldest
+
+        match_usernames = [u.get("username", "") for u in matches]
 
         deleted: list[str] = []
         pending_review: list[str] = []
@@ -255,6 +315,27 @@ class MoodleIntegration:
             else:
                 deleted.append(user.get("username", ""))
 
+        renamed = ""
+        newest = pick_newest_user(duplicated)
+        if (
+            newest
+            and newest.get("username") in deleted
+            and newest.get("username") != oldest.get("username")
+        ):
+            target = newest.get("username")
+            temp = self._temp_username(target)
+            newest_id = newest.get("id")
+            # 1. Libera el username deseado renombrando la reciente a temp.
+            if await self._rename_user(newest_id, temp):
+                # 2. Renombra la cuenta antigua al username deseado.
+                if await self._rename_user(oldest.get("id"), target):
+                    renamed = target
+                    oldest["username"] = target
+                    deleted = [temp if u == target else u for u in deleted]
+                else:
+                    # Rollback: devuelve el username a la cuenta reciente.
+                    await self._rename_user(newest_id, target)
+
         if deleted:
             try:
                 await self.service.delete_users(deleted)
@@ -263,19 +344,25 @@ class MoodleIntegration:
                 pending_review.extend(deleted)
                 deleted = []
 
+        auth_switched, auth_reason = await self._maybe_switch_to_external_auth(oldest)
+
         conflict = {
             "email": email,
-            "usernames": [u.get("username", "") for u in matches],
+            "usernames": match_usernames,
             "selected": oldest.get("username", ""),
             "selected_id": oldest.get("id"),
+            "renamed": renamed,
             "deleted": deleted,
             "pending_review": pending_review,
+            "auth_switched": auth_switched,
+            "auth_reason": auth_reason,
         }
         self.last_email_conflicts.append(conflict)
         logger.warning(
             f"Email duplicado en Moodle {email}: usernames={conflict['usernames']}; "
             f"conservando '{conflict['selected']}' (id={conflict['selected_id']}); "
-            f"eliminados={deleted}; pendientes de revisión={pending_review}"
+            f"renombrado='{renamed}'; eliminados={deleted}; "
+            f"pendientes de revisión={pending_review}; auth: {auth_reason}"
         )
         return oldest
 
