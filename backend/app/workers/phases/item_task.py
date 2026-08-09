@@ -9,7 +9,7 @@ from app.db.session import SessionLocal
 from app.integrations.moodle import MoodleIntegration
 from app.repositories.execution_repo import increment_metric, should_cancel, sync_errors_count
 from app.repositories.log_repo import save_error, save_log
-from app.repositories.operation_repo import claim_item, get_item, update_item
+from app.repositories.operation_repo import claim_item, get_item, resolve_orphan_items, update_item
 from app.services.error_messages import translate_error
 from app.services.moodle_errors import MoodleOverloadedError, is_moodle_overloaded
 from app.services.moodle_factory import get_moodle_service
@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 def _reset_stuck_items():
     try:
         db = SessionLocal()
+        # Primero resolver items huérfanos de ejecuciones ya finalizadas: si
+        # no, el reset global de abajo los devolvería a "pending" y nadie los
+        # reclamaría (el chord/sweeper solo operan sobre ejecuciones activas),
+        # dejando su lote "activo" y bloqueando subidas.
+        resolve_orphan_items(db)
         reset_stuck_items(db)
     except Exception:
         logger.exception("Error reseteando items stuck en etl_item_task")

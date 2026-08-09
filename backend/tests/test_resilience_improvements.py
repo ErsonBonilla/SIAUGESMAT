@@ -706,6 +706,98 @@ class TestSweeperResetsStaleItems:
 
 
 # ---------------------------------------------------------------------------
+# M3.3: limpieza de items huérfanos de ejecuciones finalizadas
+# ---------------------------------------------------------------------------
+class TestResolveOrphanItems:
+    def _make_execution(self, test_db, status="running"):
+        from app.db.models import Execution
+
+        ex = Execution(
+            filename="test.xlsx",
+            semester="2025A",
+            status=status,
+            modalidad="DISTANCIA",
+            created_at=datetime.now(UTC),
+        )
+        test_db.add(ex)
+        test_db.commit()
+        test_db.refresh(ex)
+        return ex
+
+    def _add_items(self, test_db, eid, batch, statuses):
+        from app.repositories.operation_repo import add_item
+
+        items = []
+        for i, status in enumerate(statuses):
+            item = add_item(
+                test_db,
+                batch,
+                f"id-{i}",
+                detail={"action": "create", "execution_id": eid},
+                status=status,
+            )
+            items.append(item)
+        test_db.commit()
+        for item in items:
+            test_db.refresh(item)
+        return items
+
+    def test_marks_orphans_of_completed_execution_as_failed(self, test_db):
+        from app.repositories.operation_repo import get_active_batch, resolve_orphan_items
+
+        ex = self._make_execution(test_db, status="completed")
+        batch = f"etl_3_create_{ex.id}"
+        from app.repositories.operation_repo import create_batch
+
+        create_batch(test_db, batch, "courses", "create", 2, "DISTANCIA")
+        pending, processing = self._add_items(test_db, ex.id, batch, ["pending", "processing"])
+        test_db.commit()
+
+        resolved = resolve_orphan_items(test_db)
+
+        assert len(resolved) == 2
+        test_db.refresh(pending)
+        test_db.refresh(processing)
+        assert pending.status == "failed"
+        assert processing.status == "failed"
+        assert pending.error_message == "Ejecución finalizada, item huérfano"
+        assert get_active_batch(test_db, "DISTANCIA") is None
+
+    def test_keeps_items_of_running_execution(self, test_db):
+        from app.repositories.operation_repo import get_active_batch, resolve_orphan_items
+
+        ex = self._make_execution(test_db, status="running")
+        batch = f"etl_3_create_{ex.id}"
+        from app.repositories.operation_repo import create_batch
+
+        create_batch(test_db, batch, "courses", "create", 1, "DISTANCIA")
+        (item,) = self._add_items(test_db, ex.id, batch, ["pending"])
+
+        resolved = resolve_orphan_items(test_db)
+
+        assert resolved == []
+        test_db.refresh(item)
+        assert item.status == "pending"
+        assert get_active_batch(test_db, "DISTANCIA") is not None
+
+    def test_ignores_items_without_execution_id(self, test_db):
+        from app.repositories.operation_repo import add_item, create_batch, resolve_orphan_items
+
+        create_batch(test_db, "csv-batch-1", "courses", "visibility", 1, "DISTANCIA")
+        item = add_item(
+            test_db, "csv-batch-1", "CSV1", detail={"visibility": "show"}, status="pending"
+        )
+        test_db.commit()
+        test_db.refresh(item)
+
+        resolved = resolve_orphan_items(test_db)
+
+        assert resolved == []
+        test_db.refresh(item)
+        assert item.status == "pending"
+
+
+# ---------------------------------------------------------------------------
 # M4.1: sync de contadores de lote ETL desde operation_items
 # ---------------------------------------------------------------------------
 class TestSyncBatchCounts:
