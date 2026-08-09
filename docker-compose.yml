@@ -140,6 +140,9 @@ services:
       # Plantilla de curso para ETL
       DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE}
 
+      # Cuentas externas excluidas de la consolidación de duplicados (admins)
+      EXTERNAL_AUTH_EXCLUDED_USERS: ${EXTERNAL_AUTH_EXCLUDED_USERS}
+
       # Directorio de reportes
       REPORT_DIR: /app/reports
 
@@ -208,6 +211,9 @@ services:
       COURSE_DISAPPEARED_AGE_SECONDS: ${COURSE_DISAPPEARED_AGE_SECONDS}
 
       DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE}
+
+      # Cuentas externas excluidas de la consolidación de duplicados (admins)
+      EXTERNAL_AUTH_EXCLUDED_USERS: ${EXTERNAL_AUTH_EXCLUDED_USERS}
 
       ALLOW_PRESENCIAL: ${ALLOW_PRESENCIAL}
       DEBUG: ${DEBUG}
