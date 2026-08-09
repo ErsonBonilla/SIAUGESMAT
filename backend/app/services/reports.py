@@ -418,6 +418,13 @@ class ReportService:
             val = src(counts) if callable(src) else counts.get(src, 0)
             if val > 0:
                 rows.append([label, str(val)])
+        examples = (
+            (execution.metrics or {}).get("templates_missing_examples") if execution else None
+        )
+        if examples:
+            rows.append(
+                ["Plantillas faltantes (ejemplos)", ", ".join(str(x) for x in examples[:10])]
+            )
         # Tasa de error
         total_ops = sum(v for k, v in counts.items() if k.startswith(("course_", "enrolment_")))
         total_errs = counts.get("enrolment_failed", 0)

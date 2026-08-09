@@ -60,6 +60,31 @@ class TestReportGeneration:
         assert data is not None
         assert len(data) > 1  # header + rows
 
+    def test_resumen_ejecutivo_incluye_ejemplos_de_plantillas(self):
+        fake = type(
+            "FakeExec",
+            (),
+            {
+                "semester": "2026B",
+                "filename": "carga.xlsx",
+                "duration_seconds": 10.0,
+                "moodle_version": "3.9",
+                "modalidad": "DISTANCIA",
+                "errors_count": 0,
+                "metrics": {
+                    "templates_missing": 2,
+                    "templates_missing_examples": [
+                        "PORTAFOLIO_0105_sI_101",
+                        "PORTAFOLIO_0105_sI_102",
+                    ],
+                },
+            },
+        )()
+        ReportService._write_resumen_ejecutivo(self.tmpdir, [], fake)
+        data = self._read_csv("01_resumen_ejecutivo.csv")
+        row = next(r for r in data if r[0] == "Plantillas faltantes (ejemplos)")
+        assert "PORTAFOLIO_0105_sI_101" in row[1]
+
     def test_inc_usuarios_inactivos(self):
         logs = [
             _make_log(

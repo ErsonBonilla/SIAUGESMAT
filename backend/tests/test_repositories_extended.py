@@ -184,3 +184,35 @@ class TestOperationRepo:
 
     def test_get_batch_nonexistent(self, test_db):
         assert get_batch(test_db, "no-such-batch") is None
+
+
+class TestExecutionErrorsCount:
+    def _execution(self, test_db, metrics=None):
+        from app.db.models import Execution
+
+        ex = Execution(
+            filename="test.xlsx",
+            semester="2025A",
+            status="running",
+            modalidad="DISTANCIA",
+            metrics=metrics,
+        )
+        test_db.add(ex)
+        test_db.commit()
+        return ex
+
+    def test_sync_errors_count_from_metrics(self, test_db):
+        from app.repositories.execution_repo import sync_errors_count
+
+        ex = self._execution(test_db, metrics={"total_errors": 3})
+        sync_errors_count(test_db, ex.id)
+        test_db.refresh(ex)
+        assert ex.errors_count == 3
+
+    def test_sync_errors_count_zero_when_no_metrics(self, test_db):
+        from app.repositories.execution_repo import sync_errors_count
+
+        ex = self._execution(test_db, metrics=None)
+        sync_errors_count(test_db, ex.id)
+        test_db.refresh(ex)
+        assert ex.errors_count == 0

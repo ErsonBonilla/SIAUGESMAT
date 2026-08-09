@@ -426,13 +426,16 @@ class TestRecoverStuckPhase:
         future = (datetime.now(UTC) + timedelta(minutes=30)).isoformat()
         self._make_execution(test_db, checkpoint={"chord_active": future})
         with (
-            patch("app.workers.phases.common._get_pending_items") as mock_get,
+            patch(
+                "app.workers.phases.common._get_pending_items", return_value=[MagicMock()]
+            ) as mock_get,
+            patch("app.workers.utils.reset_stuck_items", return_value=[]),
             patch("app.workers.phases.phase3_structure.on_delete_items_done") as mock_cb,
         ):
             from app.workers.cleanup_tasks import recover_stuck_phase
 
             recover_stuck_phase()
-        mock_get.assert_not_called()
+        mock_get.assert_called()
         mock_cb.delay.assert_not_called()
 
     def test_phase4_relaunch_refreshes_chord_active(self, test_db):
@@ -619,3 +622,113 @@ class TestChordActiveOrdering:
             mock_chord_fn.side_effect = lambda *a, **kw: calls.append("chord") or MagicMock()
             _launch_delete_chord(1, [item])
         assert calls == ["mark", "chord"]
+
+
+# ---------------------------------------------------------------------------
+# M2.5: reset de items 'failed' reintentables con tope de intentos
+# ---------------------------------------------------------------------------
+class TestResetFailedItems:
+    def test_resets_failed_below_attempt_cap(self, test_db):
+        from app.db.models import Execution, OperationItem
+        from app.workers.phases.common import _reset_failed_items
+
+        ex = Execution(
+            filename="test.xlsx", semester="2025A", status="running", modalidad="DISTANCIA"
+        )
+        test_db.add(ex)
+        test_db.commit()
+
+        retryable = OperationItem(
+            batch_id=f"etl_3_activate_{ex.id}",
+            identifier="A",
+            status="failed",
+            attempt=1,
+            detail={"action": "activate"},
+        )
+        exhausted = OperationItem(
+            batch_id=f"etl_3_activate_{ex.id}",
+            identifier="B",
+            status="failed",
+            attempt=3,
+            detail={"action": "activate"},
+        )
+        test_db.add_all([retryable, exhausted])
+        test_db.commit()
+
+        _reset_failed_items(test_db, ex.id, "3")
+
+        test_db.refresh(retryable)
+        test_db.refresh(exhausted)
+        assert retryable.status == "pending"
+        assert exhausted.status == "failed"
+
+
+# ---------------------------------------------------------------------------
+# M3.2: sweeper resetea items individuales atascados pese a actividad reciente
+# ---------------------------------------------------------------------------
+class TestSweeperResetsStaleItems:
+    def _stale_item(self, test_db, eid, batch, identifier, minutes_ago):
+        from app.db.models import OperationItem
+
+        item = OperationItem(
+            batch_id=batch,
+            identifier=identifier,
+            status="processing",
+            detail={"action": "create"},
+            updated_at=datetime.now(UTC) - timedelta(minutes=minutes_ago),
+        )
+        test_db.add(item)
+        return item
+
+    def test_resets_stale_item_even_with_recent_activity(self, test_db):
+        from app.db.models import Execution
+        from app.workers.cleanup_tasks import recover_stuck_phase
+
+        ex = Execution(
+            filename="test.xlsx", semester="2025A", status="running", modalidad="DISTANCIA"
+        )
+        test_db.add(ex)
+        test_db.commit()
+
+        stale = self._stale_item(test_db, ex.id, f"etl_3_hide_{ex.id}", "stale-1", minutes_ago=60)
+        recent = self._stale_item(
+            test_db, ex.id, f"etl_3_create_{ex.id}", "recent-1", minutes_ago=1
+        )
+        test_db.commit()
+
+        with patch("app.workers.phases.common._get_pending_items", return_value=[]):
+            recover_stuck_phase()
+
+        test_db.refresh(stale)
+        test_db.refresh(recent)
+        assert stale.status == "pending"
+        assert recent.status == "processing"
+
+
+# ---------------------------------------------------------------------------
+# M4.1: sync de contadores de lote ETL desde operation_items
+# ---------------------------------------------------------------------------
+class TestSyncBatchCounts:
+    def test_updates_batch_totals_from_items(self, test_db):
+        from app.db.models import Execution
+        from app.repositories.operation_repo import add_item, create_batch
+        from app.workers.phases.common import _sync_batch_counts
+
+        ex = Execution(
+            filename="test.xlsx", semester="2025A", status="running", modalidad="DISTANCIA"
+        )
+        test_db.add(ex)
+        test_db.commit()
+
+        batch_id = f"etl_3_activate_{ex.id}"
+        batch = create_batch(test_db, batch_id, "courses", "activate", 3, "DISTANCIA")
+        add_item(test_db, batch_id, "A", {"action": "activate"}, status="completed")
+        add_item(test_db, batch_id, "B", {"action": "activate"}, status="completed")
+        add_item(test_db, batch_id, "C", {"action": "activate"}, status="failed")
+        test_db.commit()
+
+        _sync_batch_counts(test_db, ex.id)
+
+        test_db.refresh(batch)
+        assert batch.completed == 2
+        assert batch.failed == 1

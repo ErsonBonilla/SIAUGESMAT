@@ -72,10 +72,13 @@ def _relaunch_phase4(db, eid: int) -> None:
     from app.workers.phases.common import (
         _get_pending_items,
         _mark_chord_active,
+        _reset_failed_items,
         on_phase_items_done,
         on_users_done,
     )
     from app.workers.phases.item_task import process_etl_item
+
+    _reset_failed_items(db, eid, "4")
 
     pending_users = _get_pending_items(db, eid, "4", sub_phase="create_user")
     if pending_users:
@@ -125,9 +128,18 @@ def recover_stuck_phase():
                 except ValueError:
                     chord_alive = False
 
-            if chord_alive:
-                continue
+            # 1) Siempre resetear items 'processing' viejos: pueden quedar
+            #    atascados aunque otros items de la fase sigan activos.
+            for phase in ("3", "4"):
+                reset_stuck_items(
+                    db,
+                    batch_id_prefix=f"etl_{phase}_%",
+                    execution_id=eid,
+                    increment_attempt=True,
+                )
 
+            # 2) Relanzar solo si hay pendientes, sin chord vivo y sin
+            #    procesamiento reciente en la fase.
             phase_relaunched = False
             for phase in ("3", "4"):
                 pending = _get_pending_items(db, eid, phase)
@@ -143,15 +155,9 @@ def recover_stuck_phase():
                     )
                     .count()
                 )
-                if recent_processing:
+                if recent_processing or chord_alive:
                     continue
 
-                reset_stuck_items(
-                    db,
-                    batch_id_prefix=f"etl_{phase}_%",
-                    execution_id=eid,
-                    increment_attempt=True,
-                )
                 logger.warning(
                     f"Sweeper: fase {phase} de ejecución {eid} con {len(pending)} "
                     f"pendientes sin chord activo ni items recientes, relanzando"

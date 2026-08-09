@@ -278,6 +278,19 @@ def increment_metric(db: Session, execution_id: int, metric_name: str, delta: in
         db.flush()
 
 
+def sync_errors_count(db: Session, execution_id: int) -> None:
+    """Sincroniza la columna ``errors_count`` con el total de errores en vivo.
+
+    Antes solo se escribía al completar la ejecución; durante ``running`` el
+    semáforo y las listas mostraban 0 aunque ya hubiera errores.
+    """
+    execution = db.query(Execution).filter(Execution.id == execution_id).first()
+    if execution:
+        metrics = execution.metrics or {}
+        execution.errors_count = metrics.get("total_errors", 0)
+        db.flush()
+
+
 def should_pause(db: Session, execution_id: int) -> bool:
     execution = db.query(Execution).filter(Execution.id == execution_id).first()
     return execution is not None and execution.status == "paused"

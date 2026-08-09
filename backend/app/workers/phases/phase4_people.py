@@ -177,6 +177,7 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> d
             if user_data:
                 detail["firstname"] = user_data.get("firstname", "")
                 detail["lastname"] = user_data.get("lastname", "")
+                detail["email"] = user_data.get("email", "")
             add_item(db, batch.batch_id, username, detail)
             count += 1
         counts["enrol"] = count
