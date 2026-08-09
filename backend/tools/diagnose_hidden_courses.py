@@ -118,10 +118,16 @@ def main():
     parser = argparse.ArgumentParser(description="Diagnóstico/activación de cursos ocultos")
     parser.add_argument("--execution-id", type=int, required=True)
     parser.add_argument("--csv", default="", help="Ruta CSV de salida (opcional)")
-    parser.add_argument("--activate-only-matching", action="store_true",
-                        help="Activa solo cursos cuyo profesor tiene usuario real")
-    parser.add_argument("--activate-all", action="store_true",
-                        help="Activa todos los cursos ocultos del diagnóstico")
+    parser.add_argument(
+        "--activate-only-matching",
+        action="store_true",
+        help="Activa solo cursos cuyo profesor tiene usuario real",
+    )
+    parser.add_argument(
+        "--activate-all",
+        action="store_true",
+        help="Activa todos los cursos ocultos del diagnóstico",
+    )
     parser.add_argument("--modalidad", default="DISTANCIA", help="Token de modalidad")
     args = parser.parse_args()
 
@@ -141,8 +147,15 @@ def main():
     if args.csv:
         with open(args.csv, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(
-                f, fieldnames=["sn", "etl_prof", "old_prof", "fullname", "real_username",
-                               "estado_user"]
+                f,
+                fieldnames=[
+                    "sn",
+                    "etl_prof",
+                    "old_prof",
+                    "fullname",
+                    "real_username",
+                    "estado_user",
+                ],
             )
             writer.writeheader()
             for r in rows:
