@@ -3,6 +3,7 @@ import logging
 from datetime import UTC, datetime
 
 from celery import chord
+from sqlalchemy import func
 from sqlalchemy import text as sql_text
 
 from app.celery_app import celery_app
@@ -77,6 +78,67 @@ def _get_pending_items(db, execution_id, phase, sub_phase=None):
     return query.all()
 
 
+RETRY_MAX_ATTEMPTS = 3
+
+
+def _reset_failed_items(db, execution_id, phase):
+    """Devuelve a 'pending' los items 'failed' con intentos restantes.
+
+    Permite reintentar errores transitorios (p. ej. 500 de Moodle) hasta
+    ``RETRY_MAX_ATTEMPTS``; los que superen el tope quedan como 'failed'.
+    """
+    from app.db.models import OperationItem
+
+    failed = (
+        db.query(OperationItem)
+        .filter(
+            OperationItem.batch_id.like(f"etl_{phase}_%_{execution_id}"),
+            OperationItem.status == "failed",
+            OperationItem.attempt < RETRY_MAX_ATTEMPTS,
+        )
+        .all()
+    )
+    if not failed:
+        return
+    for item in failed:
+        item.status = "pending"
+        item.error_message = None
+    db.commit()
+    logger.warning(f"FASE {phase}: {len(failed)} items failed reintentables reseteados a pending")
+
+
+def _sync_batch_counts(db, execution_id):
+    """Recomputa completed/failed de los lotes ETL de la ejecución.
+
+    El flujo ETL nunca usó ``update_batch_counts``; los contadores de
+    ``operation_batches`` quedaban en 0, rompiendo listados y analítica.
+    """
+    from app.db.models import OperationBatch, OperationItem
+
+    rows = (
+        db.query(OperationItem.batch_id, OperationItem.status, func.count(OperationItem.id))
+        .filter(OperationItem.batch_id.like(f"etl_%_{execution_id}"))
+        .group_by(OperationItem.batch_id, OperationItem.status)
+        .all()
+    )
+    totals: dict[str, dict[str, int]] = {}
+    for batch_id, status, count in rows:
+        bucket = totals.setdefault(batch_id, {"completed": 0, "failed": 0})
+        if status == "completed":
+            bucket["completed"] += count
+        elif status == "failed":
+            bucket["failed"] += count
+
+    if not totals:
+        return
+    for batch_id, counts in totals.items():
+        batch = db.query(OperationBatch).filter(OperationBatch.batch_id == batch_id).first()
+        if batch:
+            batch.completed = counts["completed"]
+            batch.failed = counts["failed"]
+    db.commit()
+
+
 def _mark_chord_active(execution_id):
     """Marca el chord recién lanzado como activo (para el sweeper)."""
     db = SessionLocal()
@@ -125,12 +187,14 @@ def on_phase_items_done(self, results, execution_id, phase):
             logger.warning(f"FASE {phase}: {len(stuck)} items stuck reseteados a pending")
 
         if phase == "3":
+            _reset_failed_items(db, execution_id, "3")
             pending = _get_pending_items(db, execution_id, "3")
             if pending:
                 logger.warning(f"FASE 3: {len(pending)} items pendientes tras chord, relanzando")
                 _launch_items_chord(execution_id, pending)
                 return
         elif phase == "4":
+            _reset_failed_items(db, execution_id, "4")
             pending = _get_pending_items(db, execution_id, "4")
             if pending:
                 logger.warning(f"FASE 4: {len(pending)} items pendientes tras chord, relanzando")
@@ -140,6 +204,7 @@ def on_phase_items_done(self, results, execution_id, phase):
                 return
 
         _sync_metrics_from_items(db, execution_id)
+        _sync_batch_counts(db, execution_id)
 
         if phase == "3":
             save_checkpoint(
@@ -212,7 +277,8 @@ def on_users_done(self, results, execution_id):
         failed_users = (
             db.query(OperationItem)
             .filter(
-                OperationItem.batch_id.like(f"etl_4_users_%_{execution_id}"),
+                OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
+                sql_text("detail->>'action' = 'create_user'"),
                 OperationItem.status == "failed",
             )
             .all()
@@ -226,7 +292,8 @@ def on_users_done(self, results, execution_id):
             enrol_to_fail = (
                 db.query(OperationItem)
                 .filter(
-                    OperationItem.batch_id.like(f"etl_4_enrol_%_{execution_id}"),
+                    OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
+                    sql_text("detail->>'action' = 'enrol'"),
                     OperationItem.status == "pending",
                     OperationItem.identifier.in_(failed_usernames),
                 )

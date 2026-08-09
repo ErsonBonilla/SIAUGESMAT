@@ -263,6 +263,7 @@ class TestProcessEtlItem:
                 username="IDENTIFIER_001",
                 course_shortname="CURSE_101",
                 course_map={"CURSE_101": 42},
+                email="",
             )
 
     def test_enrol_failure(self):
@@ -298,3 +299,173 @@ class TestProcessEtlItem:
             mock_sl.return_value = MagicMock()
             with contextlib.suppress(Exception):
                 process_etl_item(1)
+
+    def test_create_user_propagates_username_to_pending_enrols(self, test_db):
+        """Si create_user descubre un username distinto, se propaga a los enrols."""
+        import os
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from app.db.models import Execution, OperationItem
+        from app.repositories.operation_repo import add_item, create_batch
+
+        ex = Execution(
+            filename="test.xlsx", semester="2025A", status="running", modalidad="DISTANCIA"
+        )
+        test_db.add(ex)
+        test_db.commit()
+        ex_id = ex.id
+        create_batch(test_db, f"etl_4_enrol_{ex_id}", "enrolments", "enrol", 2, "DISTANCIA")
+        add_item(
+            test_db, f"etl_4_enrol_{ex_id}", "acgonzalezn", {"action": "enrol"}, status="pending"
+        )
+        add_item(
+            test_db, f"etl_4_enrol_{ex_id}", "otrousuario", {"action": "enrol"}, status="pending"
+        )
+        test_db.commit()
+
+        # Sesión propia para el worker (process_etl_item la cierra al finalizar).
+        engine = create_engine(
+            os.environ["DATABASE_URL"], connect_args={"check_same_thread": False}
+        )
+        Session = sessionmaker(bind=engine)
+        worker_db = Session()
+        try:
+            mock_integ = AsyncMock()
+            mock_integ.create_user_if_not_exists.return_value = ("acristinagonzalez", False)
+            with (
+                patch("app.workers.phases.item_task.SessionLocal", return_value=worker_db),
+                patch("app.workers.phases.item_task.get_item") as mock_get,
+                patch(
+                    "app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()
+                ),
+                patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls,
+                patch("app.workers.phases.item_task.claim_item", return_value=True),
+            ):
+                mock_integ_cls.return_value = mock_integ
+                item = _make_item(action="create_user", execution_id=ex_id)
+                item.identifier = "acgonzalezn"
+                mock_get.return_value = item
+                process_etl_item(1)
+        finally:
+            worker_db.close()
+
+        check = Session()
+        try:
+            identifiers = {
+                i.identifier
+                for i in check.query(OperationItem).filter(
+                    OperationItem.batch_id == f"etl_4_enrol_{ex_id}"
+                )
+            }
+        finally:
+            check.close()
+        assert "acristinagonzalez" in identifiers
+        assert "otrousuario" in identifiers
+        assert "acgonzalezn" not in identifiers
+
+    def test_create_user_reused_logs_user_reused_by_email(self, test_db):
+        """Cuando create_user reutiliza un usuario existente, se audita el evento."""
+        import os
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from app.db.models import Execution, ExecutionLog
+        from app.repositories.operation_repo import add_item, create_batch
+
+        ex = Execution(
+            filename="test.xlsx", semester="2025A", status="running", modalidad="DISTANCIA"
+        )
+        test_db.add(ex)
+        test_db.commit()
+        ex_id = ex.id
+        create_batch(test_db, f"etl_4_enrol_{ex_id}", "enrolments", "enrol", 1, "DISTANCIA")
+        add_item(
+            test_db, f"etl_4_enrol_{ex_id}", "eamateusr", {"action": "enrol"}, status="pending"
+        )
+        test_db.commit()
+
+        engine = create_engine(
+            os.environ["DATABASE_URL"], connect_args={"check_same_thread": False}
+        )
+        Session = sessionmaker(bind=engine)
+        worker_db = Session()
+        try:
+            mock_integ = AsyncMock()
+            mock_integ.create_user_if_not_exists.return_value = ("eamateusr_real", False)
+            with (
+                patch("app.workers.phases.item_task.SessionLocal", return_value=worker_db),
+                patch("app.workers.phases.item_task.get_item") as mock_get,
+                patch(
+                    "app.workers.phases.item_task.get_moodle_service", return_value=_make_moodle()
+                ),
+                patch("app.workers.phases.item_task.MoodleIntegration") as mock_integ_cls,
+                patch("app.workers.phases.item_task.claim_item", return_value=True),
+            ):
+                mock_integ_cls.return_value = mock_integ
+                item = _make_item(action="create_user", execution_id=ex_id)
+                item.identifier = "eamateusr"
+                mock_get.return_value = item
+                process_etl_item(1)
+        finally:
+            worker_db.close()
+
+        check = Session()
+        try:
+            log = (
+                check.query(ExecutionLog)
+                .filter(
+                    ExecutionLog.execution_id == ex_id,
+                    ExecutionLog.action == "user_reused_by_email",
+                )
+                .first()
+            )
+        finally:
+            check.close()
+        assert log is not None
+        assert log.identifier == "eamateusr_real"
+        assert log.detail["etl_username"] == "eamateusr"
+        assert log.detail["enrolments_propagated"] is True
+
+
+class TestRefreshPhaseProgress:
+    def _execution(self, test_db, progress_pct=None, updated_at=None):
+        from datetime import UTC, datetime
+
+        from app.db.models import Execution
+
+        ex = Execution(
+            filename="test.xlsx",
+            semester="2025A",
+            status="running",
+            modalidad="DISTANCIA",
+            progress_pct=progress_pct,
+            progress_updated_at=updated_at or datetime.now(UTC),
+        )
+        test_db.add(ex)
+        test_db.commit()
+        return ex
+
+    def test_skips_when_recently_updated(self, test_db):
+        from app.workers.phases.item_task import _refresh_phase_progress
+
+        ex = self._execution(test_db, progress_pct=50.0)
+        with patch("app.pipeline.progress.compute_phase_progress") as mock_cp:
+            _refresh_phase_progress(ex.id, test_db)
+        mock_cp.assert_not_called()
+
+    def test_updates_when_stale(self, test_db):
+        from datetime import timedelta
+
+        from app.workers.phases.item_task import _refresh_phase_progress
+
+        ex = self._execution(test_db, progress_pct=50.0)
+        ex.progress_updated_at = ex.progress_updated_at - timedelta(minutes=5)
+        test_db.commit()
+        with patch("app.pipeline.progress.compute_phase_progress", return_value=62.0) as mock_cp:
+            _refresh_phase_progress(ex.id, test_db)
+        mock_cp.assert_called_once()
+        test_db.refresh(ex)
+        assert ex.progress_pct == 62.0

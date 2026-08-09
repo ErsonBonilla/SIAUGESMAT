@@ -7,7 +7,7 @@ from app.celery_app import celery_app
 from app.core.logging_config import ExecutionContextFilter
 from app.db.session import SessionLocal
 from app.integrations.moodle import MoodleIntegration
-from app.repositories.execution_repo import increment_metric, should_cancel
+from app.repositories.execution_repo import increment_metric, should_cancel, sync_errors_count
 from app.repositories.log_repo import save_error, save_log
 from app.repositories.operation_repo import claim_item, get_item, update_item
 from app.services.error_messages import translate_error
@@ -116,6 +116,39 @@ def process_etl_item(self, item_id: int):
                     }
                 )
                 success = username is not None
+                if success and username != identifier and execution_id:
+                    # El usuario ya existía en Moodle bajo otro username. Se
+                    # propaga a los enrolments pendientes para que matrícula
+                    # con el username real en lugar del username ETL.
+                    from sqlalchemy import text as sql_text
+
+                    from app.db.models import OperationItem
+
+                    logger.warning(
+                        f"create_user: '{identifier}' existe en Moodle como '{username}', "
+                        f"actualizando enrolments pendientes"
+                    )
+                    db.query(OperationItem).filter(
+                        OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
+                        sql_text("detail->>'action' = 'enrol'"),
+                        OperationItem.status == "pending",
+                        OperationItem.identifier == identifier,
+                    ).update({"identifier": username}, synchronize_session=False)
+                    db.commit()
+                    if not created:
+                        save_log(
+                            db,
+                            execution_id,
+                            "4",
+                            "user_reused_by_email",
+                            username,
+                            {
+                                "etl_username": identifier,
+                                "email": detail.get("email", ""),
+                                "moodle_username": username,
+                                "enrolments_propagated": True,
+                            },
+                        )
                 if success and created and execution_id:
                     save_log(
                         db,
@@ -132,6 +165,7 @@ def process_etl_item(self, item_id: int):
                     username=identifier,
                     course_shortname=detail.get("course_shortname", ""),
                     course_map=course_map,
+                    email=detail.get("email", ""),
                 )
                 success = result["success"]
             else:
@@ -163,6 +197,9 @@ def process_etl_item(self, item_id: int):
             _handle_error(execution_id, action, identifier, translate_error(e), db=db)
             db.commit()
 
+        if execution_id:
+            _refresh_phase_progress(execution_id, db=db)
+
     except MoodleOverloadedError:
         if self.request.retries >= self.max_retries:
             error_msg = "Agotados reintentos por sobrecarga de Moodle"
@@ -193,11 +230,25 @@ def process_etl_item(self, item_id: int):
         db.close()
 
 
+PROGRESS_REFRESH_SECONDS = 5
+
+
 def _refresh_phase_progress(execution_id, db):
     from app.db.models import Execution, OperationItem
     from app.pipeline.progress import compute_phase_progress
 
     try:
+        ex = db.query(Execution).filter(Execution.id == execution_id).first()
+        if not ex:
+            return
+        now = datetime.now(UTC)
+        if ex.progress_updated_at:
+            last_update = ex.progress_updated_at
+            if last_update.tzinfo is None:
+                last_update = last_update.replace(tzinfo=UTC)
+            if (now - last_update).total_seconds() < PROGRESS_REFRESH_SECONDS:
+                return
+
         phase3_total = (
             db.query(func.count(OperationItem.id))
             .filter(OperationItem.batch_id.like(f"etl_3_%_{execution_id}"))
@@ -236,10 +287,9 @@ def _refresh_phase_progress(execution_id, db):
             phase4_total,
             phase4_done,
         )
-        ex = db.query(Execution).filter(Execution.id == execution_id).first()
-        if ex and (ex.progress_pct is None or pct > ex.progress_pct):
+        if ex.progress_pct is None or pct > ex.progress_pct:
             ex.progress_pct = pct
-            ex.progress_updated_at = datetime.now(UTC)
+            ex.progress_updated_at = now
             db.commit()
     except Exception as e:
         logger.exception(f"Error actualizando progreso para ejecución {execution_id}: {e}")
@@ -303,6 +353,7 @@ def _handle_error(execution_id, action, identifier, error_msg, db):
         increment_metric(db, execution_id, metric_key)
         if metric_key != "total_errors":
             increment_metric(db, execution_id, "total_errors")
+        sync_errors_count(db, execution_id)
     except Exception:
         logger.exception(f"Error manejando fallo ETL para {identifier}")
     # Nota: No cerramos db porque la sesión pertenece al caller

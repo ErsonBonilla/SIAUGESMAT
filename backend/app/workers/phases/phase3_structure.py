@@ -20,6 +20,8 @@ from app.workers.phases.common import (
     _get_pending_counts,
     _get_pending_items,
     _items_exist_for_execution,
+    _reset_failed_items,
+    _sync_batch_counts,
     on_phase_items_done,
 )
 from app.workers.phases.item_task import _refresh_phase_progress, process_etl_item
@@ -105,6 +107,7 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> d
     create_items = comparison.get("to_create", [])
     if create_items:
         _create_template_cache = {}
+        missing_templates: set[str] = set()
 
         async def _resolve_templates():
             ms = get_moodle_service(modalidad)
@@ -135,6 +138,7 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> d
                                 _create_template_cache[fallback] = None
                         template_id = _create_template_cache.get(fallback) if fallback else None
                         if template and template.startswith("PORTAFOLIO_"):
+                            missing_templates.add(template)
                             save_log(
                                 db,
                                 execution_id,
@@ -161,6 +165,22 @@ def _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad) -> d
                 (item["shortname"], courses.get(item["shortname"], {}), None, item)
                 for item in create_items
             ]
+
+        if missing_templates:
+            ex = get_execution(db, execution_id)
+            if ex:
+                metrics = ex.metrics or {}
+                metrics["templates_missing"] = len(missing_templates)
+                metrics["templates_missing_examples"] = sorted(missing_templates)[:20]
+                ex.metrics = metrics
+                from sqlalchemy.orm.attributes import flag_modified
+
+                flag_modified(ex, "metrics")
+                db.commit()
+            logger.warning(
+                f"Ejecución {execution_id}: {len(missing_templates)} plantillas "
+                f"PORTAFOLIO_ no encontradas en Moodle"
+            )
 
         batch = create_batch(
             db, _batch_id("create"), "courses", "create", len(create_items), modalidad
@@ -225,6 +245,8 @@ def on_delete_items_done(self, results, execution_id):
 
         clear_chord_active(db, execution_id)
 
+        _reset_failed_items(db, execution_id, "3")
+
         reset_stuck_items(
             db,
             batch_id_prefix="etl_3_%",
@@ -256,6 +278,7 @@ def on_delete_items_done(self, results, execution_id):
             return
 
         _refresh_phase_progress(execution_id, db=db)
+        _sync_batch_counts(db, execution_id)
         structure_items = _get_pending_items(db, execution_id, "3", "structure")
         if structure_items:
             from app.workers.phases.common import _launch_items_chord
