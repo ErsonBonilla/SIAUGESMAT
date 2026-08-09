@@ -1,9 +1,13 @@
+import logging
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
-from app.db.models import OperationBatch, OperationItem
+from app.db.models import Execution, OperationBatch, OperationItem
+from app.repositories.execution_repo import ACTIVE_EXECUTION_STATUSES
+
+logger = logging.getLogger(__name__)
 
 
 def get_batch(db: Session, batch_id: str) -> OperationBatch | None:
@@ -26,6 +30,55 @@ def get_active_batch(db: Session, modalidad: str) -> OperationBatch | None:
 
 def get_pending_items(db: Session, batch_id: str) -> list[OperationItem]:
     return db.query(OperationItem).filter_by(batch_id=batch_id, status="pending").all()
+
+
+def resolve_orphan_items(db: Session) -> list[OperationItem]:
+    """Marca como 'failed' los items pending/processing huérfanos.
+
+    Un item queda huérfano cuando su ejecución ya finalizó (completed, failed,
+    cancelled) pero el item sigue en pending/processing. El reset de arranque
+    del worker lo devuelve a 'pending' y, como el chord y el sweeper solo
+    operan sobre ejecuciones activas, nadie lo reclama: su lote queda
+    "activo" para siempre y bloquea subidas (get_active_batch). En lugar de
+    resucitarlo, esta limpieza lo resuelve como failed.
+
+    Returns:
+        Lista de items resueltos (marcados como failed).
+    """
+    items = (
+        db.query(OperationItem)
+        .filter(OperationItem.status.in_(["pending", "processing"]))
+        .all()
+    )
+    by_execution: dict[int, list[OperationItem]] = {}
+    for item in items:
+        eid = (item.detail or {}).get("execution_id")
+        if eid:
+            by_execution.setdefault(int(eid), []).append(item)
+
+    if not by_execution:
+        return []
+
+    executions = db.query(Execution).filter(Execution.id.in_(by_execution)).all()
+    active_ids = {ex.id for ex in executions if ex.status in ACTIVE_EXECUTION_STATUSES}
+
+    orphaned: list[OperationItem] = []
+    for eid, exec_items in by_execution.items():
+        if eid in active_ids:
+            continue
+        for item in exec_items:
+            item.status = "failed"
+            item.error_message = "Ejecución finalizada, item huérfano"
+            item.updated_at = datetime.now(UTC)
+            orphaned.append(item)
+
+    if orphaned:
+        db.commit()
+        logger.warning(
+            f"Resueltos {len(orphaned)} items huérfanos de ejecuciones finalizadas"
+        )
+
+    return orphaned
 
 
 def create_batch(

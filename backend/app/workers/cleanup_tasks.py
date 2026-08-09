@@ -109,6 +109,7 @@ def recover_stuck_phase():
       recientemente, relanza el chord de la fase.
     """
     from app.db.models import OperationItem
+    from app.repositories.operation_repo import resolve_orphan_items
     from app.workers.phases.common import _get_pending_items, _items_exist_for_execution
     from app.workers.phases.phase3_structure import on_delete_items_done
     from app.workers.utils import STUCK_ITEM_TIMEOUT_MINUTES, reset_stuck_items
@@ -116,6 +117,12 @@ def recover_stuck_phase():
     db = SessionLocal()
     try:
         now = datetime.now(UTC)
+
+        # Resolver items huérfanos de ejecuciones ya finalizadas antes de
+        # procesar las activas: evita que un lote terminado quede "activo"
+        # bloqueando subidas (get_active_batch).
+        resolve_orphan_items(db)
+
         executions = db.query(Execution).filter(Execution.status == "running").all()
         for ex in executions:
             eid = ex.id
