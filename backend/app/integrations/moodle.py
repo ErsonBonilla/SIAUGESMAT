@@ -211,13 +211,78 @@ class MoodleIntegration:
     # ------------------------------------------------------------------
     # Usuarios (FASE 3)
     # ------------------------------------------------------------------
+    async def _get_user_courses(self, user_id) -> list | None:
+        """Cursos matriculados del usuario; ``None`` si el webservice no permite
+        la consulta (en ese caso no se puede evaluar la salvaguarda)."""
+        try:
+            result = await self.service._request(
+                "core_enrol_get_users_courses",
+                {"userid": user_id},
+                timeout=30.0,
+            )
+            return result if isinstance(result, list) else []
+        except Exception:
+            return None
+
+    async def _consolidate_duplicates(self, email: str, matches: list[dict]) -> dict | None:
+        """Consolida cuentas que comparten email: conserva la más antigua y
+        elimina las más recientes que no tengan cursos matriculados.
+
+        El username de la cuenta conservada NO se renombra: se usa tal cual
+        existe en Moodle. Solo se escriben dos cosas: eliminar duplicados
+        recientes (si corresponde) y registrar el conflicto.
+
+        Salvaguarda: si la cuenta duplicada tiene cursos (o no se puede
+        verificar porque el webservice no expone ``core_enrol_get_users_courses``),
+        NO se elimina y queda en ``pending_review``.
+
+        Registra el resultado en ``last_email_conflicts`` y retorna la cuenta
+        conservada (la más antigua), o None si no hay matches válidos.
+        """
+        oldest = pick_oldest_user(matches)
+        if oldest is None:
+            return None
+        duplicated = [u for u in matches if u is not oldest]
+        if not duplicated:
+            return oldest
+
+        deleted: list[str] = []
+        pending_review: list[str] = []
+        for user in duplicated:
+            courses = await self._get_user_courses(user.get("id"))
+            if courses is None or courses:
+                pending_review.append(user.get("username", ""))
+            else:
+                deleted.append(user.get("username", ""))
+
+        if deleted:
+            try:
+                await self.service.delete_users(deleted)
+            except Exception:
+                logger.exception(f"Fallo al eliminar duplicados de {email}")
+                pending_review.extend(deleted)
+                deleted = []
+
+        conflict = {
+            "email": email,
+            "usernames": [u.get("username", "") for u in matches],
+            "selected": oldest.get("username", ""),
+            "selected_id": oldest.get("id"),
+            "deleted": deleted,
+            "pending_review": pending_review,
+        }
+        self.last_email_conflicts.append(conflict)
+        logger.warning(
+            f"Email duplicado en Moodle {email}: usernames={conflict['usernames']}; "
+            f"conservando '{conflict['selected']}' (id={conflict['selected_id']}); "
+            f"eliminados={deleted}; pendientes de revisión={pending_review}"
+        )
+        return oldest
+
     async def find_user_by_email(self, email: str) -> dict | None:
         users = await self.service.get_users("email", [email])
         if len(users) > 1:
-            logger.warning(
-                f"Múltiples usuarios con el mismo email {email}: "
-                f"{[u.get('username') for u in users]}"
-            )
+            return await self._consolidate_duplicates(email, users)
         return users[0] if users else None
 
     @handle_moodle_errors(
@@ -239,23 +304,10 @@ class MoodleIntegration:
 
         self.last_email_conflicts = []
         for email, matches in grouped.items():
-            oldest = pick_oldest_user(matches)
+            oldest = await self._consolidate_duplicates(email, matches)
             if oldest is None:
                 continue
             result[email] = oldest
-            if len(matches) > 1:
-                conflict = {
-                    "email": email,
-                    "usernames": [m.get("username", "") for m in matches],
-                    "selected": oldest.get("username", ""),
-                    "selected_id": oldest.get("id"),
-                }
-                self.last_email_conflicts.append(conflict)
-                logger.warning(
-                    f"Email duplicado en Moodle {email}: usernames="
-                    f"{conflict['usernames']}; eligiendo el más antiguo "
-                    f"'{conflict['selected']}' (id={conflict['selected_id']})"
-                )
         return result
 
     @handle_moodle_errors(
@@ -309,6 +361,11 @@ class MoodleIntegration:
     async def create_user_if_not_exists(self, user: dict) -> tuple[str | None, bool]:
         """
         Localiza o crea un usuario en Moodle.
+
+        Importante: el usuario encontrado por email se usa tal cual, el username
+        en Moodle NUNCA se renombra (ni siquiera cuando difiere del prefijo del
+        correo). Solo se crea un usuario nuevo —con el prefijo del email como
+        username— cuando no existe ninguno.
 
         Retorna (username, created):
           - (username: str, True)  → usuario creado exitosamente.
@@ -426,7 +483,7 @@ class MoodleIntegration:
         log_message="", default_return={"success": False, "reason": "Error del servidor Moodle"}
     )
     async def enrol_teacher(
-        self, username: str, course_shortname: str, course_map=None, courses=None
+        self, username: str, course_shortname: str, course_map=None, courses=None, email: str = ""
     ) -> dict[str, Any]:
         result = await self.service.enrol_users(
             [
@@ -434,6 +491,7 @@ class MoodleIntegration:
                     "username": username,
                     "course_shortname": course_shortname,
                     "role": "editingteacher",
+                    "email": email,
                 }
             ],
             course_map=course_map,

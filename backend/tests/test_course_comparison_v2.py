@@ -240,6 +240,112 @@ class TestComparison:
         assert any(c["reason"] == "teacher_change_recent" for c in result["to_create"])
 
     @pytest.mark.asyncio
+    async def test_case_3b_same_person_by_email_no_hide(self):
+        """Caso 3b: El profesor ETL difiere del de Moodle pero comparte email →
+        mismo profesor, no se oculta ni recrea."""
+        sn = "IDE_0105_sI_202_G-01"
+        recent_time = int(__import__("time").time()) - 1000
+        existing_courses = [
+            _make_moodle_course(
+                sn,
+                timecreated=recent_time,
+                customfields=[
+                    {"shortname": "professor", "value": "nbuenaventurac"},
+                ],
+            ),
+        ]
+
+        new_courses = [_make_new_course(sn)]
+        new_enrolments = [{"course_shortname": sn, "username": "nbuenaventurap"}]
+
+        result = await CourseComparisonService.compare(
+            existing_courses,
+            new_courses,
+            new_enrolments,
+            courses_with_teacher={sn: "nbuenaventurac"},
+            username_emails={
+                "nbuenaventurap": "nbuenaventurap@ut.edu.co",
+                "nbuenaventurac": "nbuenaventurap@ut.edu.co",
+            },
+        )
+
+        assert result["to_hide"] == []
+        assert result["to_create"] == []
+        assert len(result["logs"]) >= 1
+        assert any(entry["action"] == "course_unchanged" for entry in result["logs"])
+
+    @pytest.mark.asyncio
+    async def test_case_3c_same_person_by_email_hidden_activates(self):
+        """Caso 3c: Curso oculto, profesor ETL coincide por email con el de Moodle →
+        se activa (visible=1), no se oculta."""
+        sn = "IDE_0105_sI_202_G-01"
+        recent_time = int(__import__("time").time()) - 1000
+        existing_courses = [
+            _make_moodle_course(
+                sn,
+                visible=0,
+                timecreated=recent_time,
+                customfields=[
+                    {"shortname": "professor", "value": "eamateusr"},
+                ],
+            ),
+        ]
+
+        new_courses = [_make_new_course(sn)]
+        new_enrolments = [{"course_shortname": sn, "username": "eamateusr2"}]
+
+        result = await CourseComparisonService.compare(
+            existing_courses,
+            new_courses,
+            new_enrolments,
+            courses_with_teacher={sn: "eamateusr"},
+            username_emails={
+                "eamateusr": "eamateusr@ut.edu.co",
+                "eamateusr2": "eamateusr@ut.edu.co",
+            },
+        )
+
+        assert result["to_hide"] == []
+        assert result["to_create"] == []
+        assert any(
+            c["shortname"] == sn and c["reason"] == "same_professor_hidden"
+            for c in result["to_activate"]
+        )
+
+    @pytest.mark.asyncio
+    async def test_case_3d_same_username_email_no_match_hides(self):
+        """Caso 3d: Los usernames difieren y los emails NO coinciden →
+        se mantiene hide_and_create (comportamiento original)."""
+        sn = "IDE_0105_sI_202_G-01"
+        recent_time = int(__import__("time").time()) - 1000
+        existing_courses = [
+            _make_moodle_course(
+                sn,
+                timecreated=recent_time,
+                customfields=[
+                    {"shortname": "professor", "value": "prof_a"},
+                ],
+            ),
+        ]
+
+        new_courses = [_make_new_course(sn)]
+        new_enrolments = [{"course_shortname": sn, "username": "prof_b"}]
+
+        result = await CourseComparisonService.compare(
+            existing_courses,
+            new_courses,
+            new_enrolments,
+            courses_with_teacher={sn: "prof_a"},
+            username_emails={
+                "prof_a": "prof_a@ut.edu.co",
+                "prof_b": "prof_b@ut.edu.co",
+            },
+        )
+
+        assert len(result["to_hide"]) >= 1
+        assert result["to_hide"][0]["reason"] == "teacher_change_recent"
+
+    @pytest.mark.asyncio
     async def test_case_4_same_core_different_group_rename(self):
         """Caso 4: Mismo programa/curso, diferente grupo, mismo profesor.
         El grupo viejo ya no está en la nueva carga → renombrar el curso existente."""

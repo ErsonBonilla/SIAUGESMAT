@@ -30,6 +30,29 @@ from app.pipeline.shortnames import SIAUGESMAT_PATTERN, parse_shortname
 logger = logging.getLogger(__name__)
 
 
+def _norm_email(value: str) -> str:
+    return (value or "").strip().lower()
+
+
+def _same_person_by_email(
+    username_a: str | None,
+    username_b: str | None,
+    username_emails: dict[str, str] | None,
+) -> bool:
+    """Determina si dos usernames corresponden a la misma persona por email.
+
+    El comparador trabaja con usernames (ETL o resueltos), pero el ETL puede
+    diferir del username real de Moodle para la misma persona (p. ej. un email
+    ya asociado a otro username). Cuando los usernames difieren, se resuelve
+    cada uno a su email (si el mapa los conoce) y se comparan emails.
+    """
+    if not username_a or not username_b or not username_emails:
+        return False
+    email_a = _norm_email(username_emails.get(username_a, ""))
+    email_b = _norm_email(username_emails.get(username_b, ""))
+    return bool(email_a and email_b and email_a == email_b)
+
+
 class CourseComparisonService:
     @classmethod
     async def compare(
@@ -40,6 +63,7 @@ class CourseComparisonService:
         re_upload: bool = False,
         courses_with_teacher: dict[str, str] = None,
         *,
+        username_emails: dict[str, str] = None,
         max_age_seconds: int = DEFAULT_COURSE_MAX_AGE_SECONDS,
         disappeared_age_seconds: int = DEFAULT_COURSE_DISAPPEARED_AGE_SECONDS,
     ) -> dict[str, Any]:
@@ -99,6 +123,22 @@ class CourseComparisonService:
                 elif (existing_prof and existing_prof == professor) or courses_with_teacher.get(
                     sn
                 ) == professor:
+                    action, detail = handle_same_professor(
+                        existing,
+                        sn,
+                        professor,
+                        max_age_seconds=max_age_seconds,
+                    )
+                elif _same_person_by_email(
+                    courses_with_teacher.get(sn) or existing_prof,
+                    professor,
+                    username_emails,
+                ):
+                    logger.info(
+                        f"Curso {sn}: profesor ETL '{professor}' coincide por email "
+                        f"con el profesor de Moodle '{courses_with_teacher.get(sn)}'; "
+                        "se trata como mismo profesor"
+                    )
                     action, detail = handle_same_professor(
                         existing,
                         sn,

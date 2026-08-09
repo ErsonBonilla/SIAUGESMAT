@@ -72,6 +72,8 @@ class ConsultPhase(BasePhase):
                             "usernames": conflict.get("usernames", []),
                             "selected": conflict.get("selected", ""),
                             "selected_id": conflict.get("selected_id"),
+                            "deleted": conflict.get("deleted", []),
+                            "pending_review": conflict.get("pending_review", []),
                             "criterion": "oldest",
                         },
                     )
@@ -94,6 +96,18 @@ class ConsultPhase(BasePhase):
             idnumber_index = await integration.find_users_by_idnumbers(
                 [u.get("cedula", "") for u in etl_users if u.get("cedula")]
             )
+
+            username_emails: dict[str, str] = {}
+            for u in etl_users:
+                if u.get("username") and u.get("email"):
+                    username_emails[u["username"]] = u["email"]
+            for user_map in (institutional_map, personal_map, username_index, idnumber_index):
+                for user in user_map.values():
+                    uname = user.get("username", "")
+                    email = user.get("email", "")
+                    if uname and email:
+                        username_emails[uname] = email
+            ctx.username_emails = username_emails
 
             username_map, user_events = resolve_users(
                 etl_users,

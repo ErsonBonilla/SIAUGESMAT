@@ -33,6 +33,7 @@ class PhaseContext:
         self.all_categories_map: dict[str, dict] = {}
         self.existing_courses: list[dict] = []
         self.username_map: dict[str, str] = {}
+        self.username_emails: dict[str, str] = {}
         self.courses_with_teacher: dict[str, str] = {}
         self.course_teacher_map: dict[str, str] = {}
 
