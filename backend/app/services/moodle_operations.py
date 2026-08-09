@@ -400,6 +400,8 @@ class MoodleService(MoodleClient):
                 params[f"users[{idx}][email]"] = user["email"]
             if "username" in user:
                 params[f"users[{idx}][username]"] = user["username"]
+            if "auth" in user:
+                params[f"users[{idx}][auth]"] = user["auth"]
             if "firstname" in user:
                 params[f"users[{idx}][firstname]"] = user["firstname"]
             if "lastname" in user:

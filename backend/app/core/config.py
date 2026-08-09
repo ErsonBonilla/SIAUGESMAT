@@ -78,6 +78,22 @@ class Settings(BaseSettings):
     ROOT_CATEGORY_NAME: str = "IDEAD"
     DEFAULT_COURSE_FORMAT: str = "onetopic"
 
+    # Autenticación de cuentas consolidadas en FASE 1: cuando una cuenta
+    # creada en base manual (auth=manual) con correo institucional queda
+    # conservada al consolidar duplicados por email, se pasa a la base de
+    # datos externa (plugin auth de Moodle, p. ej. "db"). Los usuarios
+    # sin correo institucional y los administradores (lista de exclusión)
+    # se dejan en base manual.
+    MOODLE_EXTERNAL_AUTH: str = "db"
+
+    # Emails/username que SIEMPRE permanecen en base manual aunque tengan
+    # correo institucional (cuentas administradoras). Valores separados por
+    # coma; se iguala en minúsculas contra email o username.
+    #
+    # Dato sensible (identificadores de cuentas privilegiadas): NO se fija por
+    # defecto; se define en el .env de cada despliegue.
+    EXTERNAL_AUTH_EXCLUDED_USERS: str = ""
+
     # ------------------------------------------------------------------
     # Comparación de cursos (FASE 2)
     # ------------------------------------------------------------------
@@ -172,6 +188,24 @@ class Settings(BaseSettings):
             "token": _get("MOODLE_TOKEN", "MOODLE_ADMIN_TOKEN"),
             "version": _get("MOODLE_VERSION"),
         }
+
+    def external_auth_excluded_keys(self) -> set[str]:
+        """Claves de exclusión para el cambio manual→externo (FASE 1).
+
+        Incluye cada entrada de ``EXTERNAL_AUTH_EXCLUDED_USERS`` tal cual y su
+        variante sin el dominio institucional (para casar también por username
+        pelado, p. ej. ``ogt@ut.edu.co`` → ``ogt``). Todo en minúsculas.
+        """
+        domain = (self.INSTITUTIONAL_EMAIL_DOMAIN or "").strip().lower()
+        keys: set[str] = set()
+        for raw in (self.EXTERNAL_AUTH_EXCLUDED_USERS or "").split(","):
+            item = (raw or "").strip().lower()
+            if not item:
+                continue
+            keys.add(item)
+            if domain and item.endswith(domain) and len(item) > len(domain):
+                keys.add(item[: -len(domain)])
+        return keys
 
     def validate_critical(self):
         errors = []
