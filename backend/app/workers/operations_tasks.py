@@ -98,9 +98,20 @@ _DELETE_NOT_FOUND_MESSAGE = {
 }
 
 
+_DELETED_USER_ERROR_CODES = frozenset({"invaliduser", "invalidrecord"})
+
+
 async def _entity_exists(moodle, entity_type: str, identifier: str) -> bool:
     if entity_type == "users":
-        return await moodle.get_user_by_username(identifier) is not None
+        try:
+            return await moodle.get_user_by_username(identifier) is not None
+        except MoodleAPIError as e:
+            # Algunos Moodle (p. ej. tuaulavirtual) lanzan invaliduser en vez
+            # de devolver una lista vacía cuando el usuario ya fue eliminado.
+            # Se trata como "no existe": el borrado ya está consumado.
+            if getattr(e, "error_code", None) in _DELETED_USER_ERROR_CODES:
+                return False
+            raise
     if entity_type == "courses":
         return bool(await moodle.get_courses(shortname=identifier))
     if entity_type == "categories":
@@ -133,6 +144,13 @@ async def _delete_entity(moodle, entity_type: str, identifier: str) -> str:
             await moodle.delete_category(int(cats[0]["id"]))
             return "deleted"
         return "deleted"
+    except MoodleAPIError as e:
+        # core_user_delete_users (y su lookup previo) rechaza con invaliduser /
+        # invalidrecord a los usuarios ya eliminados en Moodle (deleted=1). Como
+        # el borrado ya está consumado, se omite en lugar de fallar.
+        if entity_type == "users" and getattr(e, "error_code", None) in _DELETED_USER_ERROR_CODES:
+            return "not_found"
+        raise
     except Exception:
         if await _entity_exists(moodle, entity_type, identifier):
             raise
