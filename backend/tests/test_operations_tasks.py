@@ -6,6 +6,7 @@ from app.services.error_messages import translate_error
 from app.services.moodle_errors import MoodleAPIError, MoodleOverloadedError
 from app.workers.operations_tasks import (
     _ensure_root_category,
+    _entity_exists,
     _format_moodle_error,
     process_operation_batch,
 )
@@ -208,6 +209,68 @@ class TestProcessOperationBatch:
 
     @patch("app.workers.operations_tasks.complete_batch")
     @patch("app.workers.operations_tasks.get_pending_items")
+    def test_delete_user_already_deleted_invaliduser(self, mock_pending, mock_complete):
+        """Cuenta ya eliminada en Moodle (invaliduser en delete_users) → se omite."""
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item") as mock_update,
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
+            batch = _make_batch(entity_type="users", action="delete")
+            mock_get_batch.return_value = batch
+            item = _make_item("user1")
+            mock_pending.return_value = [item]
+            moodle = _make_moodle()
+            moodle.delete_users = AsyncMock(
+                side_effect=MoodleAPIError("dml_missing_record_exception", "invaliduser")
+            )
+            moodle.get_user_by_username = AsyncMock(return_value={"id": 1})
+            mock_get_ms.return_value = moodle
+            db = MagicMock()
+            mock_sl.return_value = db
+            process_operation_batch("BATCH_001")
+            mock_update.assert_any_call(
+                db, 1, "completed", "Usuario no encontrado en Moodle. Se omite (ya no existía)."
+            )
+
+    @patch("app.workers.operations_tasks.complete_batch")
+    @patch("app.workers.operations_tasks.get_pending_items")
+    def test_delete_user_invaliduser_on_lookup_idempotent(self, mock_pending, mock_complete):
+        """invaliduser también en el lookup de existencia → se omite, no falla."""
+        with (
+            patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
+            patch("app.workers.operations_tasks.get_batch") as mock_get_batch,
+            patch(
+                "app.workers.operations_tasks.get_moodle_service", return_value=_make_moodle()
+            ) as mock_get_ms,
+            patch("app.workers.operations_tasks.update_item") as mock_update,
+            patch("app.workers.operations_tasks.update_batch_counts"),
+        ):
+            batch = _make_batch(entity_type="users", action="delete")
+            mock_get_batch.return_value = batch
+            item = _make_item("user1")
+            mock_pending.return_value = [item]
+            moodle = _make_moodle()
+            moodle.delete_users = AsyncMock(
+                side_effect=MoodleAPIError("dml_missing_record_exception", "invaliduser")
+            )
+            moodle.get_user_by_username = AsyncMock(
+                side_effect=MoodleAPIError("dml_missing_record_exception", "invaliduser")
+            )
+            mock_get_ms.return_value = moodle
+            db = MagicMock()
+            mock_sl.return_value = db
+            process_operation_batch("BATCH_001")
+            mock_update.assert_any_call(
+                db, 1, "completed", "Usuario no encontrado en Moodle. Se omite (ya no existía)."
+            )
+
+    @patch("app.workers.operations_tasks.complete_batch")
+    @patch("app.workers.operations_tasks.get_pending_items")
     def test_delete_categories(self, mock_pending, mock_complete):
         with (
             patch("app.workers.operations_tasks.SessionLocal") as mock_sl,
@@ -350,6 +413,37 @@ class TestProcessOperationBatch:
             mock_sl.return_value = db
             process_operation_batch("BATCH_001")
             mock_update.assert_any_call(db, 1, "failed", "[unknownerror] API error")
+
+
+class TestEntityExists:
+    @pytest.mark.asyncio
+    async def test_user_exists(self):
+        moodle = _make_moodle()
+        moodle.get_user_by_username = AsyncMock(return_value={"id": 5})
+        assert await _entity_exists(moodle, "users", "u1") is True
+
+    @pytest.mark.asyncio
+    async def test_user_missing(self):
+        moodle = _make_moodle()
+        moodle.get_user_by_username = AsyncMock(return_value=None)
+        assert await _entity_exists(moodle, "users", "u1") is False
+
+    @pytest.mark.asyncio
+    async def test_invaliduser_means_missing(self):
+        moodle = _make_moodle()
+        moodle.get_user_by_username = AsyncMock(
+            side_effect=MoodleAPIError("dml_missing_record_exception", "invaliduser")
+        )
+        assert await _entity_exists(moodle, "users", "u1") is False
+
+    @pytest.mark.asyncio
+    async def test_other_error_re_raises(self):
+        moodle = _make_moodle()
+        moodle.get_user_by_username = AsyncMock(
+            side_effect=MoodleAPIError("API error", "unknownerror")
+        )
+        with pytest.raises(MoodleAPIError):
+            await _entity_exists(moodle, "users", "u1")
 
 
 class TestEnsureRootCategory:
