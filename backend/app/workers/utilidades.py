@@ -4,14 +4,14 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.db.models import OperationItem
+from app.db.modelos import ItemOperacion
 
 logger = logging.getLogger(__name__)
 
 STUCK_ITEM_TIMEOUT_MINUTES = 30
 
 
-def _run_async(coro):
+def _ejecutar_async(coro):
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -19,25 +19,25 @@ def _run_async(coro):
     return loop.run_until_complete(coro)
 
 
-def run_moodle_async(moodle, coro):
+def ejecutar_moodle_async(moodle, coro):
     """Ejecuta un coroutine y garantiza el cierre del servicio Moodle."""
 
-    async def _run_and_close():
+    async def _ejecutar_y_cerrar():
         try:
             return await coro
         finally:
             await moodle.close()
 
-    return _run_async(_run_and_close())
+    return _ejecutar_async(_ejecutar_y_cerrar())
 
 
-def reset_stuck_items(
+def reiniciar_items_atascados(
     db: Session,
     batch_id_prefix: str | None = None,
     execution_id: str | None = None,
     increment_attempt: bool = False,
     cutoff_minutes: int = STUCK_ITEM_TIMEOUT_MINUTES,
-) -> list[OperationItem]:
+) -> list[ItemOperacion]:
     """Resetea items stuck en 'processing' más allá del timeout.
 
     Args:
@@ -50,22 +50,22 @@ def reset_stuck_items(
     Returns:
         Lista de items reseteados.
     """
-    query = db.query(OperationItem).filter(
-        OperationItem.status == "processing",
-        OperationItem.updated_at < datetime.now(UTC) - timedelta(minutes=cutoff_minutes),
+    query = db.query(ItemOperacion).filter(
+        ItemOperacion.estado == "processing",
+        ItemOperacion.actualizado_en < datetime.now(UTC) - timedelta(minutes=cutoff_minutes),
     )
     if batch_id_prefix:
         like_pattern = batch_id_prefix
         if execution_id:
             like_pattern = f"{like_pattern}%_{execution_id}"
-        query = query.filter(OperationItem.batch_id.like(like_pattern))
+        query = query.filter(ItemOperacion.id_lote.like(like_pattern))
 
-    stuck: list[OperationItem] = query.all()
+    stuck: list[ItemOperacion] = query.all()
     for item in stuck:
-        item.status = "pending"
-        item.error_message = "Reintentando tras timeout por crash"
+        item.estado = "pending"
+        item.mensaje_error = "Reintentando tras timeout por crash"
         if increment_attempt:
-            item.attempt = (item.attempt or 0) + 1
+            item.intento = (item.intento or 0) + 1
 
     if stuck:
         db.commit()

@@ -1,10 +1,10 @@
 // islands/PaginaLoginIsland.tsx
 import { useComputed, useSignal } from "@preact/signals";
-import LoginForm from "./FormularioLogin.tsx";
-import ThemeToggle from "./AlternadorTema.tsx";
-import { darkSignal } from "../utils/theme.ts";
+import FormularioLogin from "./FormularioLogin.tsx";
+import AlternadorTema from "./AlternadorTema.tsx";
+import { darkSignal } from "../utils/tema.ts";
 
-export default function LoginPageIsland() {
+export default function IslandPaginaLogin() {
   const outerBg = useComputed(() => darkSignal.value ? "#111827" : "#F3F4F6");
   const circleWhiteBg = useComputed(() =>
     darkSignal.value ? "#F9FAFB" : "#FFFFFF"
@@ -30,7 +30,7 @@ export default function LoginPageIsland() {
       }}
     >
       <div class="absolute top-4 right-4">
-        <ThemeToggle />
+        <AlternadorTema />
       </div>
 
       <div class="w-full max-w-md bg-[var(--bg-primary)] rounded-2xl shadow-lg border border-[var(--border-primary)] p-8">
@@ -78,7 +78,7 @@ export default function LoginPageIsland() {
         </div>
 
         <div class="mt-6">
-          <LoginForm
+          <FormularioLogin
             modalidad={modalidad.value}
             onModalidadChange={(m) => (modalidad.value = m)}
           />

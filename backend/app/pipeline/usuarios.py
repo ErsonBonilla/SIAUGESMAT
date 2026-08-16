@@ -7,14 +7,14 @@ logs directamente.
 
 import unicodedata
 
-from app.pipeline.course_index import build_base_key
-from app.pipeline.shortnames import parse_shortname
+from app.pipeline.indice_cursos import construir_clave_base
+from app.pipeline.nombres_cortos import parsear_shortname
 
 User = dict[str, object]
 Event = tuple[str, str, dict[str, object]]
 
 
-def pick_oldest_user(users: list[dict]) -> dict | None:
+def elegir_usuario_mas_antiguo(users: list[dict]) -> dict | None:
     """Selecciona el usuario más antiguo de una lista con el mismo identificador.
 
     Moodle puede devolver varios usuarios para un mismo email/username/cédula.
@@ -39,7 +39,7 @@ def pick_oldest_user(users: list[dict]) -> dict | None:
     )
 
 
-def pick_newest_user(users: list[dict]) -> dict | None:
+def elegir_usuario_mas_reciente(users: list[dict]) -> dict | None:
     """Selecciona el usuario más reciente de una lista con el mismo identificador.
 
     Contraparte de ``pick_oldest_user``: elige el de mayor ``timecreated``; por
@@ -62,7 +62,7 @@ def pick_newest_user(users: list[dict]) -> dict | None:
     )
 
 
-def normalize_name(name: str) -> str:
+def normalizar_nombre(name: str) -> str:
     """Normaliza un nombre para comparación: minúsculas y sin tildes."""
     text = "".join(
         c for c in unicodedata.normalize("NFD", name) if unicodedata.category(c) != "Mn"
@@ -70,10 +70,10 @@ def normalize_name(name: str) -> str:
     return " ".join(text.split())
 
 
-def names_differ(etl_name: str, moodle_name: str) -> bool:
+def nombres_difieren(etl_name: str, moodle_name: str) -> bool:
     """Detecta si dos nombres de persona difieren significativamente."""
-    a = normalize_name(etl_name)
-    b = normalize_name(moodle_name)
+    a = normalizar_nombre(etl_name)
+    b = normalizar_nombre(moodle_name)
     if not a or not b:
         return False
     if a == b:
@@ -86,7 +86,7 @@ def names_differ(etl_name: str, moodle_name: str) -> bool:
     return overlap < 0.5
 
 
-def resolve_users(
+def resolver_usuarios(
     etl_users: list[User],
     institutional_map: dict[str, User],
     personal_map: dict[str, User],
@@ -133,7 +133,7 @@ def resolve_users(
             moodle_name = (
                 f"{moodle_user.get('firstname') or ''} {moodle_user.get('lastname') or ''}"
             ).strip()
-            if names_differ(etl_name, moodle_name):
+            if nombres_difieren(etl_name, moodle_name):
                 events.append(
                     (
                         "user_identity_conflict",
@@ -164,7 +164,7 @@ def resolve_users(
     return username_map, events
 
 
-def index_teachers(
+def indexar_docentes(
     users: list[User],
     enrolments: list[dict[str, str]],
 ) -> dict[str, dict[str, dict[object, list[str]]]]:
@@ -192,9 +192,9 @@ def index_teachers(
         if cedula:
             by_course["idnumbers"].setdefault(sn, []).append(cedula)
 
-        parsed = parse_shortname(sn)
+        parsed = parsear_shortname(sn)
         if parsed:
-            bk = build_base_key(parsed)
+            bk = construir_clave_base(parsed)
             by_base_key["emails"].setdefault(bk, []).extend(emails)
             by_base_key["usernames"].setdefault(bk, []).append(enr["username"])
             if cedula:
@@ -203,7 +203,7 @@ def index_teachers(
     return {"by_course": by_course, "by_base_key": by_base_key}
 
 
-def lookup_teacher_candidates(
+def buscar_candidatos_docente(
     shortname: str,
     teacher_index: dict[str, dict[str, dict[object, list[str]]]],
 ) -> tuple[list[str], list[str], list[str]]:
@@ -219,9 +219,9 @@ def lookup_teacher_candidates(
     usernames = by_course["usernames"].get(shortname, [])
     idnumbers = by_course["idnumbers"].get(shortname, [])
     if not emails:
-        parsed = parse_shortname(shortname)
+        parsed = parsear_shortname(shortname)
         if parsed:
-            bk = build_base_key(parsed)
+            bk = construir_clave_base(parsed)
             emails = by_base_key["emails"].get(bk, [])
             usernames = by_base_key["usernames"].get(bk, [])
             idnumbers = by_base_key["idnumbers"].get(bk, [])

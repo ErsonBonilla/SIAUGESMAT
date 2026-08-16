@@ -9,29 +9,29 @@ import logging
 from celery.result import AsyncResult
 
 from app.celery_app import celery_app
-from app.workers.operations_tasks import process_operation_batch
-from app.workers.query_tasks import execute_query
-from app.workers.tasks import process_etl_file
+from app.workers.tareas import procesar_archivo_etl
+from app.workers.tareas_consultas import ejecutar_consulta
+from app.workers.tareas_operaciones import procesar_lote_operacion
 
 logger = logging.getLogger(__name__)
 
 
-def enqueue_etl(execution_id: int, file_path: str, semester: str) -> AsyncResult:
+def encolar_etl(execution_id: int, file_path: str, semester: str) -> AsyncResult:
     """Encola el procesamiento ETL de una ejecución."""
-    return process_etl_file.delay(execution_id, file_path, semester)
+    return procesar_archivo_etl.delay(execution_id, file_path, semester)
 
 
-def enqueue_async_query(task_id: str) -> None:
+def encolar_consulta_async(task_id: str) -> None:
     """Encola una consulta asíncrona ya registrada en BD."""
-    execute_query.delay(task_id)
+    ejecutar_consulta.delay(task_id)
 
 
-def enqueue_operation_batch(batch_id: str) -> None:
+def encolar_lote_operacion(batch_id: str) -> None:
     """Encola el procesamiento de un lote de operaciones (CSV masivo)."""
-    process_operation_batch.delay(batch_id)
+    procesar_lote_operacion.delay(batch_id)
 
 
-def revoke_task(task_id: str, terminate: bool = False) -> None:
+def revocar_tarea(task_id: str, terminate: bool = False) -> None:
     """Revoca una tarea Celery (pausa/cancelación)."""
     try:
         celery_app.control.revoke(task_id, terminate=terminate)

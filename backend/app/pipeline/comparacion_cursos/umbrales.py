@@ -5,5 +5,5 @@ app.core.config.Settings (COURSE_MAX_AGE_SECONDS / COURSE_DISAPPEARED_AGE_SECOND
 Estas constantes son el fallback para el uso del núcleo puro y los tests.
 """
 
-DEFAULT_COURSE_MAX_AGE_SECONDS: int = 24 * 30 * 24 * 3600  # 24 meses
-DEFAULT_COURSE_DISAPPEARED_AGE_SECONDS: int = 18 * 30 * 24 * 3600  # 18 meses
+EDAD_MAXIMA_CURSO_SEGUNDOS: int = 24 * 30 * 24 * 3600  # 24 meses
+EDAD_DESAPARICION_CURSO_SEGUNDOS: int = 18 * 30 * 24 * 3600  # 18 meses

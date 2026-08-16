@@ -1,17 +1,17 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import { compareNovedades, getCurrentSemester } from "../services/api.ts";
-import { useUploadGate } from "../hooks/useUploadGate.ts";
-import type { NovedadItem } from "../services/api.ts";
-import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
-import ErrorBox from "../components/ErrorBox.tsx";
-import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
-import QueryHelp from "../components/QueryHelp.tsx";
-import FilePicker from "../components/FilePicker.tsx";
+import { compararNovedades, obtenerSemestreActual } from "../services/api.ts";
+import { usePuertaSubida } from "../hooks/usePuertaSubida.ts";
+import type { ItemNovedad } from "../services/api.ts";
+import { IconoDescargar, IconoSpinner } from "../utils/iconos.tsx";
+import CajaError from "../components/CajaError.tsx";
+import BannerProcesoEnCurso from "../components/BannerProcesoEnCurso.tsx";
+import AyudaConsulta from "../components/AyudaConsulta.tsx";
+import SelectorArchivo from "../components/SelectorArchivo.tsx";
 
-type Step = "upload" | "results";
+type Paso = "upload" | "results";
 
-function _rowsToCsv(items: NovedadItem[]): string {
+function _rowsToCsv(items: ItemNovedad[]): string {
   const headers = [
     "tipo",
     "cat",
@@ -45,7 +45,7 @@ function _rowsToCsv(items: NovedadItem[]): string {
     rows.map((r) => r.join(",")).join("\n");
 }
 
-function downloadCsv(items: NovedadItem[], filename: string) {
+function downloadCsv(items: ItemNovedad[], filename: string) {
   if (items.length === 0) return;
   const csv = _rowsToCsv(items);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -60,7 +60,7 @@ function downloadCsv(items: NovedadItem[], filename: string) {
 }
 
 export default function NovedadesIsland() {
-  const step = useSignal<Step>("upload");
+  const step = useSignal<Paso>("upload");
   const file = useSignal<File | null>(null);
   const semester = useSignal("");
   const modalidad = useSignal("DISTANCIA");
@@ -70,14 +70,14 @@ export default function NovedadesIsland() {
 
   const previousFilename = useSignal("");
   const totalCompared = useSignal(0);
-  const novedades = useSignal<NovedadItem[]>([]);
+  const novedades = useSignal<ItemNovedad[]>([]);
 
-  const { allowed, status, error: gateError } = useUploadGate(() =>
+  const { allowed, status, error: gateError } = usePuertaSubida(() =>
     modalidad.value
   );
 
   useEffect(() => {
-    getCurrentSemester()
+    obtenerSemestreActual()
       .then((s) => {
         semester.value = s;
         semesterLoading.value = false;
@@ -87,7 +87,7 @@ export default function NovedadesIsland() {
       });
   }, []);
 
-  const handleFileChange = (e: Event) => {
+  const manejarCambioArchivo = (e: Event) => {
     const target = e.target as HTMLInputElement;
     const f = target.files?.[0];
     if (f) {
@@ -118,7 +118,7 @@ export default function NovedadesIsland() {
     }
     loading.value = true;
     try {
-      const result = await compareNovedades(
+      const result = await compararNovedades(
         file.value,
         semester.value.toUpperCase(),
         modalidad.value,
@@ -136,7 +136,7 @@ export default function NovedadesIsland() {
 
   return (
     <div class="max-w-5xl mx-auto space-y-6">
-      <QueryHelp
+      <AyudaConsulta
         sections={[
           {
             title: "Qué hace esta comparación",
@@ -169,12 +169,12 @@ export default function NovedadesIsland() {
           </h2>
           <form onSubmit={handleCompare} class="space-y-4">
             <div>
-              <FilePicker
+              <SelectorArchivo
                 id="file"
                 label="Archivo Excel (.xlsx o .xls)"
                 accept=".xlsx,.xls"
                 file={file}
-                onChange={handleFileChange}
+                onChange={manejarCambioArchivo}
                 disabled={loading.value || !allowed}
                 onClear={() => {
                   error.value = "";
@@ -199,9 +199,9 @@ export default function NovedadesIsland() {
                 )}
             </div>
 
-            {!allowed && <ProcessInProgressBanner status={status.value} />}
-            {gateError.value && <ErrorBox message={gateError.value} />}
-            {error.value && <ErrorBox message={error.value} />}
+            {!allowed && <BannerProcesoEnCurso status={status.value} />}
+            {gateError.value && <CajaError message={gateError.value} />}
+            {error.value && <CajaError message={error.value} />}
 
             <button
               type="submit"
@@ -211,7 +211,7 @@ export default function NovedadesIsland() {
               {loading.value
                 ? (
                   <>
-                    <SpinnerIcon class="animate-spin h-5 w-5 text-white" />
+                    <IconoSpinner class="animate-spin h-5 w-5 text-white" />
                     <span>Comparando...</span>
                   </>
                 )
@@ -315,7 +315,7 @@ export default function NovedadesIsland() {
 
           {error.value && (
             <div class="mt-4">
-              <ErrorBox message={error.value} />
+              <CajaError message={error.value} />
             </div>
           )}
 
@@ -340,7 +340,7 @@ export default function NovedadesIsland() {
                     )}
                   class="inline-flex items-center gap-2 py-2.5 px-4 rounded-lg border border-red-400 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-medium transition"
                 >
-                  <DownloadIcon class="w-4 h-4" />
+                  <IconoDescargar class="w-4 h-4" />
                   Solo eliminados ({novedades.value.filter((n) =>
                     n.action === "curso_eliminado"
                   ).length})
@@ -355,7 +355,7 @@ export default function NovedadesIsland() {
                   )}
                 class="inline-flex items-center gap-2 py-2.5 px-6 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white font-semibold hover:brightness-110 transition"
               >
-                <DownloadIcon class="w-4 h-4" />
+                <IconoDescargar class="w-4 h-4" />
                 Descargar CSV
               </button>
             </div>

@@ -1,8 +1,8 @@
-import { requireAuth } from "../../utils/auth-guard.ts";
-import ConsultPage from "../../components/ConsultPage.tsx";
+import { requerirAutenticacion } from "../../utils/guarda-autenticacion.ts";
+import PaginaConsulta from "../../components/PaginaConsulta.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
 export default function ConsultasCategoriasPage() {
-  return <ConsultPage entity="categories" />;
+  return <PaginaConsulta entity="categories" />;
 }

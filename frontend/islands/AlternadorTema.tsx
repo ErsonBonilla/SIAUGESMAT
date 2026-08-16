@@ -1,18 +1,18 @@
 // islands/AlternadorTema.tsx
 import {
-  applyThemeVars,
+  aplicarVariablesTema,
   DARK_THEME_VARS,
   darkSignal,
   LIGHT_THEME_VARS,
-} from "../utils/theme.ts";
+} from "../utils/tema.ts";
 
-export default function ThemeToggle() {
+export default function AlternadorTema() {
   const handleClick = (e: MouseEvent) => {
     e.stopPropagation();
     const newDark = !darkSignal.value;
     const root = document.documentElement;
     const vars = newDark ? DARK_THEME_VARS : LIGHT_THEME_VARS;
-    applyThemeVars(root, vars);
+    aplicarVariablesTema(root, vars);
     root.classList.toggle("dark", newDark);
     root.classList.toggle("light", !newDark);
     localStorage.setItem("theme", newDark ? "dark" : "light");

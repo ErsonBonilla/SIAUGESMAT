@@ -1,33 +1,33 @@
 // services/api/trabajos.ts
-import { authHeaders, BASE_URL, handleResponse } from "./core.ts";
-import type { ErrorLog, Execution } from "./types.ts";
+import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
+import type { Ejecucion, RegistroError } from "./tipos.ts";
 
-export async function getCurrentSemester(): Promise<string> {
+export async function obtenerSemestreActual(): Promise<string> {
   const response = await fetch(`${BASE_URL}/upload/current`, {
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  const data = await handleResponse<{ semester: string }>(response);
+  const data = await manejarRespuesta<{ semester: string }>(response);
   return data.semester;
 }
 
-export interface UploadStatus {
+export interface EstadoSubida {
   allowed: boolean;
   execution: { id: number; status: string; filename: string } | null;
   batch: { batch_id: string; entity_type: string; action: string } | null;
 }
 
-export async function getUploadStatus(
+export async function obtenerEstadoSubida(
   modalidad?: string,
-): Promise<UploadStatus> {
+): Promise<EstadoSubida> {
   const sp = new URLSearchParams();
   if (modalidad) sp.set("modalidad", modalidad);
   const response = await fetch(`${BASE_URL}/upload/status?${sp}`, {
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  return handleResponse<UploadStatus>(response);
+  return manejarRespuesta<EstadoSubida>(response);
 }
 
-export async function uploadFile(
+export async function subirArchivo(
   file: File,
   semester: string,
   modalidad: string,
@@ -38,10 +38,10 @@ export async function uploadFile(
   formData.append("modalidad", modalidad);
   const response = await fetch(`${BASE_URL}/upload`, {
     method: "POST",
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
     body: formData,
   });
-  return handleResponse<
+  return manejarRespuesta<
     {
       execution_id: number;
       filename: string;
@@ -53,31 +53,33 @@ export async function uploadFile(
   >(response);
 }
 
-export async function startProcess(executionId: number) {
+export async function iniciarProceso(executionId: number) {
   const response = await fetch(`${BASE_URL}/jobs/${executionId}/process`, {
     method: "POST",
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  return handleResponse<
+  return manejarRespuesta<
     { execution_id: number; job_id: string; status: string; message: string }
   >(response);
 }
 
-export async function getExecution(executionId: number): Promise<Execution> {
+export async function obtenerEjecucion(
+  executionId: number,
+): Promise<Ejecucion> {
   const response = await fetch(`${BASE_URL}/jobs/${executionId}`, {
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  return handleResponse<Execution>(response);
+  return manejarRespuesta<Ejecucion>(response);
 }
 
-export async function listExecutions(params: {
+export async function listarEjecuciones(params: {
   semester?: string;
   status?: string;
   mode?: string;
   modalidad?: string;
   limit?: number;
   offset?: number;
-} = {}): Promise<{ total: number; items: Execution[] }> {
+} = {}): Promise<{ total: number; items: Ejecucion[] }> {
   const sp = new URLSearchParams();
   if (params.semester) sp.set("semester", params.semester);
   if (params.status) sp.set("status", params.status);
@@ -86,61 +88,61 @@ export async function listExecutions(params: {
   if (params.limit) sp.set("limit", String(params.limit));
   if (params.offset) sp.set("offset", String(params.offset));
   const response = await fetch(`${BASE_URL}/jobs?${sp}`, {
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  return handleResponse<{ total: number; items: Execution[] }>(response);
+  return manejarRespuesta<{ total: number; items: Ejecucion[] }>(response);
 }
 
-export async function getExecutionErrors(
+export async function obtenerErroresEjecucion(
   executionId: number,
   limit = 100,
   offset = 0,
-): Promise<ErrorLog[]> {
+): Promise<RegistroError[]> {
   const response = await fetch(
     `${BASE_URL}/jobs/${executionId}/errors?limit=${limit}&offset=${offset}`,
-    { headers: { ...authHeaders() } },
+    { headers: { ...cabecerasAuth() } },
   );
-  return handleResponse<ErrorLog[]>(response);
+  return manejarRespuesta<RegistroError[]>(response);
 }
 
-export async function deleteExecution(executionId: number): Promise<void> {
-  await handleResponse(
+export async function eliminarEjecucion(executionId: number): Promise<void> {
+  await manejarRespuesta(
     await fetch(`${BASE_URL}/jobs/${executionId}`, {
       method: "DELETE",
-      headers: { ...authHeaders() },
+      headers: { ...cabecerasAuth() },
     }),
   );
 }
 
-export async function confirmExecution(executionId: number) {
+export async function confirmarEjecucion(executionId: number) {
   const response = await fetch(`${BASE_URL}/jobs/${executionId}/confirm`, {
     method: "POST",
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  return handleResponse<
+  return manejarRespuesta<
     { execution_id: number; job_id: string; status: string; message: string }
   >(response);
 }
 
 // Reusa /process porque el backend acepta status "paused" y reanuda desde checkpoint
-export const resumeExecution = startProcess;
+export const reanudarEjecucion = iniciarProceso;
 
-export async function pauseExecution(executionId: number) {
+export async function pausarEjecucion(executionId: number) {
   const response = await fetch(`${BASE_URL}/jobs/${executionId}/pause`, {
     method: "POST",
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  return handleResponse<
+  return manejarRespuesta<
     { execution_id: number; job_id: string; status: string; message: string }
   >(response);
 }
 
-export async function cancelExecution(executionId: number) {
+export async function cancelarEjecucion(executionId: number) {
   const response = await fetch(`${BASE_URL}/jobs/${executionId}/cancel`, {
     method: "POST",
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  return handleResponse<
+  return manejarRespuesta<
     { execution_id: number; job_id: string; status: string; message: string }
   >(response);
 }

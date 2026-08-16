@@ -16,13 +16,13 @@ from pythonjsonlogger import jsonlogger
 _context_vars: ContextVar[dict | None] = ContextVar("execution_context", default=None)
 
 
-class ExecutionContextFilter(logging.Filter):
+class FiltroContextoEjecucion(logging.Filter):
     """Filtro que agrega execution_id, item_id y action a cada LogRecord.
     Los valores se toman de un ContextVar que debe establecerse al inicio
     de cada tarea Celery. Thread-safe (contextvars)."""
 
     @staticmethod
-    def set_context(
+    def establecer_contexto(
         execution_id: int | None = None,
         item_id: int | None = None,
         action: str | None = None,
@@ -38,7 +38,7 @@ class ExecutionContextFilter(logging.Filter):
         )
 
     @staticmethod
-    def clear_context():
+    def limpiar_contexto():
         _context_vars.set({})
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -48,7 +48,7 @@ class ExecutionContextFilter(logging.Filter):
         return True
 
 
-class JSONFormatter(jsonlogger.JsonFormatter):
+class FormateadorJSON(jsonlogger.JsonFormatter):
     """Formateador JSON con campos estándar y orden definido."""
 
     def __init__(self):
@@ -57,15 +57,15 @@ class JSONFormatter(jsonlogger.JsonFormatter):
             timestamp=True,
         )
 
-    def add_fields(self, log_record, record, message_dict):
-        super().add_fields(log_record, record, message_dict)
+    def agregar_campos(self, log_record, record, message_dict):
+        super().agregar_campos(log_record, record, message_dict)
         log_record["level"] = record.levelname
         log_record["logger"] = record.name
         if not log_record.get("timestamp"):
             log_record["timestamp"] = self.formatTime(record, self.datefmt)
 
 
-def setup_logging(debug: bool = False):
+def configurar_logging(debug: bool = False):
     """Configura el logging global con formato JSON.
     En DEBUG usa formato texto plano para desarrollo."""
     root_logger = logging.getLogger()
@@ -83,8 +83,8 @@ def setup_logging(debug: bool = False):
     if debug or os.getenv("DEV_LOGGING"):
         formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     else:
-        formatter = JSONFormatter()
+        formatter = FormateadorJSON()
 
     handler.setFormatter(formatter)
-    handler.addFilter(ExecutionContextFilter())
+    handler.addFilter(FiltroContextoEjecucion())
     root_logger.addHandler(handler)

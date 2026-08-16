@@ -1,4 +1,5 @@
 import type { FreshContext } from "@fresh/core";
+import { tokenHaExpirado } from "./autenticacion.ts";
 
 function getCookie(name: string, headers: Headers | null): string | null {
   const cookie = headers?.get("cookie");
@@ -10,14 +11,16 @@ function getCookie(name: string, headers: Headers | null): string | null {
   return null;
 }
 
-function tokenPresent(headers: Headers | null): boolean {
-  return getCookie("auth_token", headers) !== null;
+function tokenValido(headers: Headers | null): boolean {
+  const token = getCookie("auth_token", headers);
+  if (!token) return false;
+  return !tokenHaExpirado(token);
 }
 
-export function requireAuth() {
+export function requerirAutenticacion() {
   return {
     GET(ctx: FreshContext) {
-      if (!tokenPresent(ctx.req.headers)) {
+      if (!tokenValido(ctx.req.headers)) {
         return ctx.redirect("/ingreso");
       }
       return { data: {} };
@@ -25,10 +28,10 @@ export function requireAuth() {
   };
 }
 
-export function redirectIfAuth() {
+export function redirigirSiAutenticado() {
   return {
     GET(ctx: FreshContext) {
-      if (tokenPresent(ctx.req.headers)) {
+      if (tokenValido(ctx.req.headers)) {
         return ctx.redirect("/panel");
       }
       return { data: {} };

@@ -8,20 +8,19 @@ import re
 import time
 from datetime import UTC, datetime
 
-from sqlalchemy import text
-
 from app.celery_app import celery_app
-from app.db.session import SessionLocal
-from app.pipeline.shortnames import SIAUGESMAT_PATTERN, parse_shortname
-from app.repositories.query_repo import (
-    get_query,
-    set_query_completed,
-    set_query_failed,
-    set_query_running,
+from app.db.modelos import RegistroEjecucion
+from app.db.sesion import SessionLocal
+from app.pipeline.nombres_cortos import SIAUGESMAT_PATTERN, parsear_shortname
+from app.repositories.repositorio_consultas import (
+    marcar_consulta_completada,
+    marcar_consulta_en_ejecucion,
+    marcar_consulta_fallida,
+    obtener_consulta,
 )
-from app.services.moodle_factory import get_moodle_service
-from app.services.moodle_operations import MoodleService
-from app.workers.utils import run_moodle_async
+from app.services.fabrica_moodle import obtener_servicio_moodle
+from app.services.operaciones_moodle import ServicioMoodle
+from app.workers.utilidades import ejecutar_moodle_async
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ MAX_INACTIVE_MONTHS = 12
 DEFAULT_INACTIVE_YEARS = 1
 
 
-def _semester_to_cutoff(semester: str) -> int:
+def _semestre_a_corte(semester: str) -> int:
     year = int(semester[:4])
     if semester[4] == "A":
         month, day = 1, 1
@@ -52,19 +51,19 @@ def _semester_to_cutoff(semester: str) -> int:
     return int(datetime(year, month, day, tzinfo=UTC).timestamp())
 
 
-def _days_to_cutoff(days: int) -> int:
+def _dias_hasta_corte(days: int) -> int:
     return int(time.time()) - days * 86400
 
 
-def _months_to_cutoff(months: int) -> int:
+def _meses_hasta_corte(months: int) -> int:
     return int(time.time()) - months * 30 * 86400
 
 
-def _years_to_cutoff(years: int) -> int:
+def _anios_hasta_corte(years: int) -> int:
     return int(time.time()) - years * 365 * 86400
 
 
-def _parse_cutoff(params: dict) -> int:
+def _parsear_corte(params: dict) -> int:
     """Valida que se provea exactamente un corte temporal y devuelve su timestamp.
 
     Acepta semestre ("2025A"/"2025B"), días (1-30), meses (1-12) o años (>=1).
@@ -86,7 +85,7 @@ def _parse_cutoff(params: dict) -> int:
             "Se requiere exactamente un corte: semestre (ej. 2026A), días, meses o años."
         )
     if semester:
-        return _semester_to_cutoff(semester)
+        return _semestre_a_corte(semester)
     if days is not None:
         try:
             days = int(days)
@@ -94,7 +93,7 @@ def _parse_cutoff(params: dict) -> int:
             raise ValueError("'days' debe ser un número entero.") from None
         if days < 1 or days > MAX_INACTIVE_DAYS:
             raise ValueError(f"'days' debe estar entre 1 y {MAX_INACTIVE_DAYS}.")
-        return _days_to_cutoff(days)
+        return _dias_hasta_corte(days)
     if months is not None:
         try:
             months = int(months)
@@ -102,21 +101,21 @@ def _parse_cutoff(params: dict) -> int:
             raise ValueError("'months' debe ser un número entero.") from None
         if months < 1 or months > MAX_INACTIVE_MONTHS:
             raise ValueError(f"'months' debe estar entre 1 y {MAX_INACTIVE_MONTHS}.")
-        return _months_to_cutoff(months)
+        return _meses_hasta_corte(months)
     try:
         years = int(years)
     except (TypeError, ValueError):
         raise ValueError("'years' debe ser un número entero.") from None
     if years < 1:
         raise ValueError("'years' debe ser al menos 1.")
-    return _years_to_cutoff(years)
+    return _anios_hasta_corte(years)
 
 
-def _build_inactive_rows(teachers: list[dict], course: dict, cutoff: int) -> list[dict]:
+def _construir_filas_inactivos(teachers: list[dict], course: dict, cutoff: int) -> list[dict]:
     """Filtra y arma las filas de docentes inactivos (pura, sin I/O)."""
     now = int(time.time())
     sn = course.get("shortname", "")
-    parsed = parse_shortname(sn)
+    parsed = parsear_shortname(sn)
     program = parsed["cod_prog"] if parsed else ""
     cat_prefix = parsed["cat_prefix"] if parsed else ""
     cat_name = CAT_NAMES.get(cat_prefix, cat_prefix)
@@ -144,16 +143,16 @@ def _build_inactive_rows(teachers: list[dict], course: dict, cutoff: int) -> lis
     return rows
 
 
-async def _filter_orphan_courses(moodle: MoodleService, courses: list[dict]) -> list[dict]:
+async def _filtrar_cursos_huerfanos(moodle: ServicioMoodle, courses: list[dict]) -> list[dict]:
     """Conserva solo cursos SIAUGESMAT sin docentes (editingteacher) matriculados."""
     siau_courses = [c for c in courses if SIAUGESMAT_RE.match(c.get("shortname", ""))]
     sem = asyncio.Semaphore(5)
     results = []
 
-    async def check_course(course):
+    async def verificar_curso(course):
         async with sem:
             try:
-                teachers = await moodle.get_enrolled_teachers_with_access(int(course["id"]))
+                teachers = await moodle.obtener_docentes_matriculados_con_acceso(int(course["id"]))
             except Exception as e:
                 logger.warning(
                     f"Error obteniendo docentes del curso {course.get('shortname')}: {e}"
@@ -165,44 +164,44 @@ async def _filter_orphan_courses(moodle: MoodleService, courses: list[dict]) -> 
     batch_size = 5
     for i in range(0, len(siau_courses), batch_size):
         batch = siau_courses[i : i + batch_size]
-        await asyncio.gather(*[check_course(c) for c in batch])
+        await asyncio.gather(*[verificar_curso(c) for c in batch])
 
     return results
 
 
-def _get_all_known_usernames() -> list:
-    """Usernames que la app ha creado o matriculado (execution_logs, sin límite de tiempo)."""
+def _obtener_todos_usuarios_conocidos() -> list:
+    """Usernames que la app ha creado o matriculado, sin límite de tiempo."""
     db = SessionLocal()
     try:
-        rows = db.execute(
-            text(
-                "SELECT DISTINCT identifier FROM execution_logs "
-                "WHERE action IN ('enrolment_ok', 'user_created_createpassword') "
-                "ORDER BY identifier"
-            )
-        ).fetchall()
+        rows = (
+            db.query(RegistroEjecucion.identificador)
+            .filter(RegistroEjecucion.accion.in_(["enrolment_ok", "user_created_createpassword"]))
+            .distinct()
+            .order_by(RegistroEjecucion.identificador)
+            .all()
+        )
         return [r[0] for r in rows]
     finally:
         db.close()
 
 
-def _normalize_email(email: str) -> str:
+def _normalizar_correo(email: str) -> str:
     """Normaliza un correo para agrupar: minúsculas y sin espacios."""
     return (email or "").strip().lower()
 
 
-def _group_users_by_email(users: list[dict]) -> dict[str, list[dict]]:
+def _agrupar_usuarios_por_correo(users: list[dict]) -> dict[str, list[dict]]:
     """Agrupa usuarios por correo normalizado, ignorando correos vacíos."""
     by_email: dict[str, list[dict]] = {}
     for u in users:
-        email = _normalize_email(u.get("email", ""))
+        email = _normalizar_correo(u.get("email", ""))
         if not email:
             continue
         by_email.setdefault(email, []).append(u)
     return by_email
 
 
-def _build_duplicate_email_rows(by_email: dict[str, list[dict]]) -> list[dict]:
+def _construir_filas_correos_duplicados(by_email: dict[str, list[dict]]) -> list[dict]:
     """Convierte los grupos en una fila por usuario (solo correos con más de una cuenta)."""
     rows = []
     for email, users in by_email.items():
@@ -227,7 +226,7 @@ def _build_duplicate_email_rows(by_email: dict[str, list[dict]]) -> list[dict]:
     return rows
 
 
-async def _query_duplicate_emails(moodle: MoodleService) -> list[dict]:
+async def _consultar_correos_duplicados(moodle: ServicioMoodle) -> list[dict]:
     """Correos con más de un usuario en Moodle.
 
     Moodle 3.9 no permite listar todos los usuarios por webservice, así que se
@@ -238,65 +237,65 @@ async def _query_duplicate_emails(moodle: MoodleService) -> list[dict]:
     """
     seed_emails: set[str] = set()
 
-    usernames = _get_all_known_usernames()
+    usernames = _obtener_todos_usuarios_conocidos()
     for i in range(0, len(usernames), 100):
         batch = usernames[i : i + 100]
         try:
-            users = await moodle.get_users("username", batch)
+            users = await moodle.obtener_usuarios("username", batch)
         except Exception as e:
             logger.warning(f"Error consultando usernames por lote: {e}")
             continue
         for u in users:
-            email = _normalize_email(u.get("email", ""))
+            email = _normalizar_correo(u.get("email", ""))
             if email:
                 seed_emails.add(email)
 
-    all_courses = await moodle.get_courses()
+    all_courses = await moodle.obtener_cursos()
     siau_courses = [c for c in all_courses if SIAUGESMAT_RE.match(c.get("shortname", ""))]
 
     sem = asyncio.Semaphore(5)
 
-    async def collect_enrolled(course):
+    async def recopilar_matriculados(course):
         async with sem:
             try:
-                users = await moodle.get_all_enrolled_users(int(course["id"]))
+                users = await moodle.obtener_todos_usuarios_matriculados(int(course["id"]))
             except Exception as e:
                 logger.warning(
                     f"Error obteniendo matriculados del curso {course.get('shortname')}: {e}"
                 )
                 return
             for u in users:
-                email = _normalize_email(u.get("email", ""))
+                email = _normalizar_correo(u.get("email", ""))
                 if email:
                     seed_emails.add(email)
 
     batch_size = 5
     for i in range(0, len(siau_courses), batch_size):
         batch = siau_courses[i : i + batch_size]
-        await asyncio.gather(*[collect_enrolled(c) for c in batch])
+        await asyncio.gather(*[recopilar_matriculados(c) for c in batch])
 
     all_users: list[dict] = []
     seed_list = sorted(seed_emails)
     for i in range(0, len(seed_list), 100):
         batch = seed_list[i : i + 100]
         try:
-            users = await moodle.get_users("email", batch)
+            users = await moodle.obtener_usuarios("email", batch)
         except Exception as e:
             logger.warning(f"Error consultando correos por lote: {e}")
             continue
         all_users.extend(users)
 
-    by_email = _group_users_by_email(all_users)
-    return _build_duplicate_email_rows(by_email)
+    by_email = _agrupar_usuarios_por_correo(all_users)
+    return _construir_filas_correos_duplicados(by_email)
 
 
-async def _do_query(moodle: MoodleService, qr):
-    params = qr.params or {}
+async def _ejecutar_consulta(moodle: ServicioMoodle, qr):
+    params = qr.parametros or {}
 
-    if qr.entity == "courses":
+    if qr.entidad == "courses":
         search = params.get("search")
         status_filter = params.get("status", "all")
-        raw = await moodle.get_courses()
+        raw = await moodle.obtener_cursos()
         if search:
             q = search.strip().lower()
             raw = [c for c in raw if q in (c.get("shortname") or "").lower()]
@@ -306,59 +305,59 @@ async def _do_query(moodle: MoodleService, qr):
         elif pattern == "5segments":
             raw = [c for c in raw if (c.get("shortname") or "").count("_") == 4]
         if status_filter == "orphan":
-            raw = await _filter_orphan_courses(moodle, raw)
+            raw = await _filtrar_cursos_huerfanos(moodle, raw)
         return raw
 
-    if qr.entity == "categories":
+    if qr.entidad == "categories":
         search = params.get("search")
-        return await moodle.get_categories(idnumber=search)
+        return await moodle.obtener_categorias(idnumber=search)
 
-    if qr.entity == "users":
+    if qr.entidad == "users":
         status_filter = params.get("status")
         search = params.get("search")
 
-        raw = await moodle.search_users(search) if search else []
+        raw = await moodle.buscar_usuarios(search) if search else []
 
         if status_filter == "never_logged_in":
             raw = [u for u in raw if u.get("lastlogin", 1) == 0]
         return raw
 
-    if qr.entity == "duplicate_emails":
-        return await _query_duplicate_emails(moodle)
+    if qr.entidad == "duplicate_emails":
+        return await _consultar_correos_duplicados(moodle)
 
-    if qr.entity == "inactive_teachers":
-        cutoff = _parse_cutoff(params)
+    if qr.entidad == "inactive_teachers":
+        cutoff = _parsear_corte(params)
 
-        all_courses = await moodle.get_courses()
+        all_courses = await moodle.obtener_cursos()
         siau_courses = [c for c in all_courses if SIAUGESMAT_RE.match(c.get("shortname", ""))]
 
         sem = asyncio.Semaphore(5)
         results = []
 
-        async def process_course(course):
+        async def procesar_curso(course):
             async with sem:
                 course_id = int(course["id"])
                 try:
-                    teachers = await moodle.get_enrolled_teachers_with_access(course_id)
+                    teachers = await moodle.obtener_docentes_matriculados_con_acceso(course_id)
                 except Exception as e:
                     logger.warning(
                         f"Error obteniendo profesores del curso {course.get('shortname')}: {e}"
                     )
                     return
-                results.extend(_build_inactive_rows(teachers, course, cutoff))
+                results.extend(_construir_filas_inactivos(teachers, course, cutoff))
 
         batch_size = 5
         for i in range(0, len(siau_courses), batch_size):
             batch = siau_courses[i : i + batch_size]
-            await asyncio.gather(*[process_course(c) for c in batch])
+            await asyncio.gather(*[procesar_curso(c) for c in batch])
 
         return results
 
-    if qr.entity == "inactive_courses":
-        cutoff = _parse_cutoff(params)
+    if qr.entidad == "inactive_courses":
+        cutoff = _parsear_corte(params)
         now = int(time.time())
 
-        all_courses = await moodle.get_courses()
+        all_courses = await moodle.obtener_cursos()
         siau_courses = [c for c in all_courses if SIAUGESMAT_RE.match(c.get("shortname", ""))]
 
         results = []
@@ -367,7 +366,7 @@ async def _do_query(moodle: MoodleService, qr):
             if not last_modified or last_modified >= cutoff:
                 continue
             sn = course.get("shortname", "")
-            parsed = parse_shortname(sn)
+            parsed = parsear_shortname(sn)
             program = parsed["cod_prog"] if parsed else ""
             cat_prefix = parsed["cat_prefix"] if parsed else ""
             days_since_modified = (now - last_modified) // 86400 if last_modified else 0
@@ -387,31 +386,36 @@ async def _do_query(moodle: MoodleService, qr):
             )
         return results
 
-    raise ValueError(f"Entidad desconocida: {qr.entity}")
+    raise ValueError(f"Entidad desconocida: {qr.entidad}")
 
 
 @celery_app.task(
-    bind=True, max_retries=2, default_retry_delay=30, time_limit=3600, soft_time_limit=3540
+    name="app.workers.query_tasks.execute_query",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=30,
+    time_limit=3600,
+    soft_time_limit=3540,
 )
-def execute_query(self, task_id: str):
+def ejecutar_consulta(self, task_id: str):
     db = SessionLocal()
     qr = None
     try:
-        set_query_running(db, task_id)
-        qr = get_query(db, task_id)
+        marcar_consulta_en_ejecucion(db, task_id)
+        qr = obtener_consulta(db, task_id)
         if not qr:
             logger.error(f"QueryResult {task_id} no encontrado")
             return
 
-        moodle = get_moodle_service(qr.modalidad)
+        moodle = obtener_servicio_moodle(qr.modalidad)
 
-        raw = run_moodle_async(moodle, _do_query(moodle, qr))
+        raw = ejecutar_moodle_async(moodle, _ejecutar_consulta(moodle, qr))
 
-        set_query_completed(db, task_id, raw, len(raw))
+        marcar_consulta_completada(db, task_id, raw, len(raw))
 
     except Exception as exc:
         logger.exception(f"Fallo en query {task_id}")
-        set_query_failed(db, task_id, str(exc))
+        marcar_consulta_fallida(db, task_id, str(exc))
         if self.request.retries < self.max_retries:
             raise self.retry(exc=exc, countdown=2**self.request.retries) from exc
 

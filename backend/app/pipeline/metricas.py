@@ -4,16 +4,16 @@ Los umbrales se reciben por parámetro (dict de floats), nunca se leen
 settings ni la base de datos aquí.
 """
 
-Thresholds = dict[str, float]
+Umbrales = dict[str, float]
 
-MESSAGES = {
+MENSAJES = {
     "red": "Se superaron umbrales críticos de error o duración.",
     "yellow": "Se superaron umbrales de advertencia.",
     "green": "Proceso exitoso.",
 }
 
 
-def calculate_error_rate(metrics: dict | None, errors_count: int | None) -> float:
+def calcular_tasa_error(metrics: dict | None, errors_count: int | None) -> float:
     """Porcentaje de error de una ejecución.
 
     Si `metrics` no trae ``total_operations`` se estima sumando cursos,
@@ -28,10 +28,10 @@ def calculate_error_rate(metrics: dict | None, errors_count: int | None) -> floa
     return (errors / total * 100.0) if total > 0 else 0.0
 
 
-def semaphore_color(
+def color_semaforo(
     error_rate: float,
     duration: float,
-    thresholds: Thresholds,
+    thresholds: Umbrales,
 ) -> str:
     """Color del semáforo según tasa de error y duración."""
     if error_rate >= thresholds["error_rate_red"] or duration >= thresholds["max_duration_red"]:
@@ -44,6 +44,6 @@ def semaphore_color(
     return "green"
 
 
-def semaphore_message(color: str) -> str:
+def mensaje_semaforo(color: str) -> str:
     """Mensaje descriptivo del color del semáforo."""
-    return MESSAGES[color]
+    return MENSAJES[color]

@@ -3,10 +3,10 @@ import logging
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from app.api.v1.helpers.upload_handler import handle_upload, handle_visibility_upload
-from app.core.dependencies import get_current_user, get_db
-from app.schemas.operations import CsvUploadResponse
-from app.schemas.user import UserInToken
+from app.api.v1.helpers.manejador_subida import manejar_subida, manejar_subida_visibilidad
+from app.core.dependencies import obtener_db, obtener_usuario_actual
+from app.schemas.operaciones import RespuestaSubidaCsv
+from app.schemas.usuario import UsuarioEnToken
 
 logger = logging.getLogger(__name__)
 
@@ -14,76 +14,85 @@ router = APIRouter()
 
 
 @router.post(
-    "/courses/upload-csv", response_model=CsvUploadResponse, summary="Eliminar cursos masivamente"
+    "/courses/upload-csv", response_model=RespuestaSubidaCsv, summary="Eliminar cursos masivamente"
 )
-async def delete_courses_csv(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def eliminar_cursos_csv(
+    archivo: UploadFile = File(..., alias="file"),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    return await handle_upload(file, db, current_user, entity_type="courses", action="delete")
+    return await manejar_subida(archivo, db, usuario_actual, entity_type="courses", action="delete")
 
 
 @router.post(
     "/categories/upload-csv",
-    response_model=CsvUploadResponse,
+    response_model=RespuestaSubidaCsv,
     summary="Eliminar categorías masivamente",
 )
-async def delete_categories_csv(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def eliminar_categorias_csv(
+    archivo: UploadFile = File(..., alias="file"),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    return await handle_upload(file, db, current_user, entity_type="categories", action="delete")
+    return await manejar_subida(
+        archivo, db, usuario_actual, entity_type="categories", action="delete"
+    )
 
 
 @router.post(
-    "/users/upload-csv", response_model=CsvUploadResponse, summary="Eliminar usuarios masivamente"
+    "/users/upload-csv", response_model=RespuestaSubidaCsv, summary="Eliminar usuarios masivamente"
 )
-async def delete_users_csv(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def eliminar_usuarios_csv(
+    archivo: UploadFile = File(..., alias="file"),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    return await handle_upload(file, db, current_user, entity_type="users", action="delete")
+    return await manejar_subida(archivo, db, usuario_actual, entity_type="users", action="delete")
 
 
 @router.post(
     "/courses/visibility",
-    response_model=CsvUploadResponse,
+    response_model=RespuestaSubidaCsv,
     summary="Cambiar visibilidad de cursos masivamente",
 )
-async def bulk_course_visibility(
-    file: UploadFile = File(...),
-    visibility: str = Query("show", regex="^(show|hide)$"),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def visibilidad_masiva_cursos(
+    archivo: UploadFile = File(..., alias="file"),
+    visibilidad: str = Query("show", alias="visibility", regex="^(show|hide)$"),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    return await handle_visibility_upload(file, db, current_user, visibility)
+    return await manejar_subida_visibilidad(archivo, db, usuario_actual, visibilidad)
 
 
 @router.post(
-    "/users/create-csv", response_model=CsvUploadResponse, summary="Crear usuarios masivamente"
+    "/users/create-csv", response_model=RespuestaSubidaCsv, summary="Crear usuarios masivamente"
 )
-async def create_users_csv(
-    file: UploadFile = File(...),
-    default_role: str | None = Query(None),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def crear_usuarios_csv(
+    archivo: UploadFile = File(..., alias="file"),
+    rol_por_defecto: str | None = Query(None, alias="default_role"),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    return await handle_upload(
-        file, db, current_user, entity_type="users", action="create", default_role=default_role
+    return await manejar_subida(
+        archivo,
+        db,
+        usuario_actual,
+        entity_type="users",
+        action="create",
+        default_role=rol_por_defecto,
     )
 
 
 @router.post(
     "/categories/create-csv",
-    response_model=CsvUploadResponse,
+    response_model=RespuestaSubidaCsv,
     summary="Crear categorías masivamente",
 )
-async def create_categories_csv(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def crear_categorias_csv(
+    archivo: UploadFile = File(..., alias="file"),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    return await handle_upload(file, db, current_user, entity_type="categories", action="create")
+    return await manejar_subida(
+        archivo, db, usuario_actual, entity_type="categories", action="create"
+    )

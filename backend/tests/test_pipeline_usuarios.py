@@ -1,13 +1,13 @@
 """Pruebas del núcleo puro de resolución de usuarios (pipeline/users.py)."""
 
-from app.pipeline.users import (
-    index_teachers,
-    lookup_teacher_candidates,
-    names_differ,
-    normalize_name,
-    pick_newest_user,
-    pick_oldest_user,
-    resolve_users,
+from app.pipeline.usuarios import (
+    buscar_candidatos_docente,
+    elegir_usuario_mas_antiguo,
+    elegir_usuario_mas_reciente,
+    indexar_docentes,
+    nombres_difieren,
+    normalizar_nombre,
+    resolver_usuarios,
 )
 
 
@@ -31,25 +31,25 @@ def _user(
 
 class TestNormalizeName:
     def test_normalize_removes_accents_and_case(self):
-        assert normalize_name("  MARÍA  José  ") == "maria jose"
+        assert normalizar_nombre("  MARÍA  José  ") == "maria jose"
 
     def test_same_name_not_different(self):
-        assert names_differ("María José Suárez", "MARIA JOSE SUAREZ") is False
+        assert nombres_difieren("María José Suárez", "MARIA JOSE SUAREZ") is False
 
     def test_different_name_is_different(self):
-        assert names_differ("María José Suárez", "Carlos Andrés López") is True
+        assert nombres_difieren("María José Suárez", "Carlos Andrés López") is True
 
     def test_minor_token_overlap_not_different(self):
-        assert names_differ("Ana María Pérez", "Ana Pérez") is False
+        assert nombres_difieren("Ana María Pérez", "Ana Pérez") is False
 
     def test_empty_names_not_different(self):
-        assert names_differ("", "") is False
+        assert nombres_difieren("", "") is False
 
 
 class TestResolveUsers:
     def test_resolves_by_email(self):
         user = _user()
-        username_map, events = resolve_users(
+        username_map, events = resolver_usuarios(
             [user],
             {"doc1@ut.edu.co": {"username": "m_doc1"}},
             {},
@@ -61,7 +61,7 @@ class TestResolveUsers:
 
     def test_resolves_by_personal_email(self):
         user = _user(email="", personal="doc1@gmail.com")
-        username_map, _ = resolve_users(
+        username_map, _ = resolver_usuarios(
             [user],
             {},
             {"doc1@gmail.com": {"username": "m_doc1"}},
@@ -72,7 +72,7 @@ class TestResolveUsers:
 
     def test_resolves_by_username(self):
         user = _user()
-        username_map, _ = resolve_users(
+        username_map, _ = resolver_usuarios(
             [user],
             {},
             {},
@@ -83,7 +83,7 @@ class TestResolveUsers:
 
     def test_resolves_by_cedula(self):
         user = _user()
-        username_map, _ = resolve_users(
+        username_map, _ = resolver_usuarios(
             [user],
             {},
             {},
@@ -94,13 +94,13 @@ class TestResolveUsers:
 
     def test_unmatched_user_skipped(self):
         user = _user()
-        username_map, events = resolve_users([user], {}, {}, {}, {})
+        username_map, events = resolver_usuarios([user], {}, {}, {}, {})
         assert username_map == {}
         assert events == []
 
     def test_username_match_with_conflicting_name_is_not_mapped(self):
         user = _user()
-        username_map, events = resolve_users(
+        username_map, events = resolver_usuarios(
             [user],
             {},
             {},
@@ -114,7 +114,7 @@ class TestResolveUsers:
 
     def test_cedula_match_with_same_name_is_mapped(self):
         user = _user()
-        username_map, _ = resolve_users(
+        username_map, _ = resolver_usuarios(
             [user],
             {},
             {},
@@ -126,7 +126,7 @@ class TestResolveUsers:
     def test_email_match_never_checks_names(self):
         # Un match por email no debe emitir conflicto aunque el nombre difiera.
         user = _user()
-        username_map, events = resolve_users(
+        username_map, events = resolver_usuarios(
             [user],
             {"doc1@ut.edu.co": {"username": "m_doc1", "firstname": "Carlos", "lastname": "Andres"}},
             {},
@@ -138,7 +138,7 @@ class TestResolveUsers:
 
     def test_precedence_institutional_over_username(self):
         user = _user()
-        username_map, _ = resolve_users(
+        username_map, _ = resolver_usuarios(
             [user],
             {"doc1@ut.edu.co": {"username": "por_email"}},
             {},
@@ -154,7 +154,7 @@ class TestPickOldestUser:
             {"id": "2", "username": "nuevo", "timecreated": "200"},
             {"id": "1", "username": "viejo", "timecreated": "100"},
         ]
-        assert pick_oldest_user(users)["username"] == "viejo"
+        assert elegir_usuario_mas_antiguo(users)["username"] == "viejo"
 
     def test_ties_break_by_lowest_id(self):
         users = [
@@ -162,7 +162,7 @@ class TestPickOldestUser:
             {"id": "1", "username": "a", "timecreated": "100"},
             {"id": "2", "username": "b", "timecreated": "100"},
         ]
-        assert pick_oldest_user(users)["username"] == "a"
+        assert elegir_usuario_mas_antiguo(users)["username"] == "a"
 
     def test_falls_back_to_lowest_id_without_timecreated(self):
         # core_user_get_users_by_field puede no exponer timecreated.
@@ -170,21 +170,21 @@ class TestPickOldestUser:
             {"id": "5", "username": "nuevo"},
             {"id": "2", "username": "viejo"},
         ]
-        assert pick_oldest_user(users)["username"] == "viejo"
+        assert elegir_usuario_mas_antiguo(users)["username"] == "viejo"
 
     def test_prefers_users_with_timecreated(self):
         users = [
             {"id": "1", "username": "sin_tc"},
             {"id": "2", "username": "con_tc", "timecreated": "50"},
         ]
-        assert pick_oldest_user(users)["username"] == "con_tc"
+        assert elegir_usuario_mas_antiguo(users)["username"] == "con_tc"
 
     def test_single_user(self):
         users = [{"id": "1", "username": "unico", "timecreated": "0"}]
-        assert pick_oldest_user(users)["username"] == "unico"
+        assert elegir_usuario_mas_antiguo(users)["username"] == "unico"
 
     def test_empty_list_returns_none(self):
-        assert pick_oldest_user([]) is None
+        assert elegir_usuario_mas_antiguo([]) is None
 
 
 class TestPickNewestUser:
@@ -193,7 +193,7 @@ class TestPickNewestUser:
             {"id": "1", "username": "viejo", "timecreated": "100"},
             {"id": "2", "username": "nuevo", "timecreated": "200"},
         ]
-        assert pick_newest_user(users)["username"] == "nuevo"
+        assert elegir_usuario_mas_reciente(users)["username"] == "nuevo"
 
     def test_ties_break_by_highest_id(self):
         users = [
@@ -201,17 +201,17 @@ class TestPickNewestUser:
             {"id": "3", "username": "c", "timecreated": "100"},
             {"id": "2", "username": "b", "timecreated": "100"},
         ]
-        assert pick_newest_user(users)["username"] == "c"
+        assert elegir_usuario_mas_reciente(users)["username"] == "c"
 
     def test_falls_back_to_highest_id_without_timecreated(self):
         users = [
             {"id": "2", "username": "viejo"},
             {"id": "5", "username": "nuevo"},
         ]
-        assert pick_newest_user(users)["username"] == "nuevo"
+        assert elegir_usuario_mas_reciente(users)["username"] == "nuevo"
 
     def test_empty_list_returns_none(self):
-        assert pick_newest_user([]) is None
+        assert elegir_usuario_mas_reciente([]) is None
 
 
 class TestIndexTeachers:
@@ -226,7 +226,7 @@ class TestIndexTeachers:
             _user(username="doc1", email="a@ut.edu.co", personal="p1@gmail.com", cedula="1"),
             _user(username="doc2", email="b@ut.edu.co", personal="", cedula="2"),
         ]
-        idx = index_teachers(users, self._enrolments())
+        idx = indexar_docentes(users, self._enrolments())
         sn = "IDE_0001_sI_101_G-01"
         assert sorted(idx["by_course"]["usernames"][sn]) == ["doc1", "doc2"]
         assert sorted(idx["by_course"]["emails"][sn]) == [
@@ -245,7 +245,7 @@ class TestIndexTeachers:
             {"username": "doc1", "course_shortname": "IDE_0001_sI_101_G-01"},
             {"username": "fantasma", "course_shortname": "IDE_0001_sI_101_G-01"},
         ]
-        idx = index_teachers(users, enrolments)
+        idx = indexar_docentes(users, enrolments)
         sn = "IDE_0001_sI_101_G-01"
         assert idx["by_course"]["usernames"][sn] == ["doc1"]
 
@@ -258,9 +258,9 @@ class TestLookupTeacherCandidates:
         enrolments = [
             {"username": "doc1", "course_shortname": "IDE_0001_sI_101_G-01"},
         ]
-        idx = index_teachers(self._single_user(), enrolments)
+        idx = indexar_docentes(self._single_user(), enrolments)
 
-        emails, usernames, idnumbers = lookup_teacher_candidates(
+        emails, usernames, idnumbers = buscar_candidatos_docente(
             "IDE_0001_sI_101_G-01",
             idx,
         )
@@ -272,10 +272,10 @@ class TestLookupTeacherCandidates:
         enrolments = [
             {"username": "doc1", "course_shortname": "IDE_0001_sI_101_G-01"},
         ]
-        idx = index_teachers(self._single_user(), enrolments)
+        idx = indexar_docentes(self._single_user(), enrolments)
 
         # Mismo base_key (grupo 01) pero con sufijo de profesor distinto.
-        emails, usernames, _ = lookup_teacher_candidates(
+        emails, usernames, _ = buscar_candidatos_docente(
             "IDE_0001_sI_101_G-01_99999",
             idx,
         )
@@ -283,8 +283,8 @@ class TestLookupTeacherCandidates:
         assert usernames == ["doc1"]
 
     def test_empty_when_no_candidates(self):
-        idx = index_teachers([], [])
-        emails, usernames, idnumbers = lookup_teacher_candidates(
+        idx = indexar_docentes([], [])
+        emails, usernames, idnumbers = buscar_candidatos_docente(
             "IDE_0001_sI_101_G-99",
             idx,
         )

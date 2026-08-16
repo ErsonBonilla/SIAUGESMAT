@@ -8,6 +8,7 @@ que vuelvan a mezclar I/O con las transformaciones puras.
 """
 
 import ast
+import importlib
 from pathlib import Path
 
 import pytest
@@ -25,14 +26,14 @@ FORBIDDEN_IMPORT_PREFIXES = (
     "app.api",
     "app.schemas",
     "app.main",
-    "app.services.etl",
-    "app.services.moodle_factory",
-    "app.services.moodle_errors",
-    "app.services.error_messages",
-    "app.services.novedades_service",
-    "app.services.metrics_service",
-    "app.services.reports",
-    "app.services.charts",
+    "app.services.proceso_etl",
+    "app.services.fabrica_moodle",
+    "app.services.errores_moodle",
+    "app.services.mensajes_error",
+    "app.services.servicio_novedades",
+    "app.services.servicio_metricas",
+    "app.services.reportes",
+    "app.services.graficos",
     "sqlalchemy",
     "httpx",
     "pandas",
@@ -48,10 +49,10 @@ FORBIDDEN_NAMES = {
     "settings",
     "Session",
     "SessionLocal",
-    "get_moodle_service",
-    "save_log",
-    "save_error",
-    "ETLService",
+    "obtener_servicio_moodle",
+    "guardar_log",
+    "guardar_error",
+    "ServicioETL",
 }
 
 
@@ -81,7 +82,7 @@ def _forbidden_names(tree: ast.Module) -> list:
         elif (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
-            and node.func.attr in {"save_log", "save_error"}
+            and node.func.attr in {"guardar_log", "guardar_error"}
         ):
             found.append(node.func.attr)
     return found
@@ -118,3 +119,24 @@ def test_pipeline_module_is_pure(path):
 
 def test_pipeline_has_modules():
     assert len(_pipeline_modules()) >= 6, "El paquete pipeline perdió módulos"
+
+
+def test_prefijos_prohibidos_resuelven_a_modulos_reales():
+    """Evita prefijos obsoletos que dejen la guardia ciega.
+
+    El bug histórico: `app.services.mensaje_errors` no existía, así que la
+    guardia no vigilaba el módulo real. Cada prefijo prohibido debe importar.
+    """
+    for prefix in FORBIDDEN_IMPORT_PREFIXES:
+        if prefix in {
+            "sqlalchemy",
+            "httpx",
+            "pandas",
+            "openpyxl",
+            "celery",
+            "fastapi",
+            "requests",
+            "aiohttp",
+        }:
+            continue  # bibliotecas de terceros (no apuntan a un módulo de app)
+        assert importlib.import_module(prefix), f"prefijo prohibido obsoleto: {prefix}"

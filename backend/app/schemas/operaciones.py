@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
-class CsvUploadResponse(BaseModel):
+class RespuestaSubidaCsv(BaseModel):
     batch_id: str
     entity_type: str
     action: str
@@ -11,16 +11,16 @@ class CsvUploadResponse(BaseModel):
     message: str
 
 
-class OperationItemOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class ItemOperacionSalida(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    identifier: str
-    status: str
-    error_message: str | None = None
-    attempt: int
+    identificador: str = Field(alias="identifier")
+    estado: str = Field(alias="status")
+    mensaje_error: str | None = Field(default=None, alias="error_message")
+    intento: int = Field(alias="attempt")
 
 
-class BatchStatusResponse(BaseModel):
+class RespuestaEstadoLote(BaseModel):
     batch_id: str
     entity_type: str
     action: str
@@ -36,30 +36,30 @@ class BatchStatusResponse(BaseModel):
     completed_at: datetime | None = None
     offset: int = 0
     limit: int = 100
-    details: list[OperationItemOut]
+    details: list[ItemOperacionSalida]
 
 
-class BatchListOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class LoteSalidaLista(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    batch_id: str
-    entity_type: str
-    action: str
+    id_lote: str = Field(alias="batch_id")
+    tipo_entidad: str = Field(alias="entity_type")
+    accion: str = Field(alias="action")
+    total: int = Field(alias="total")
+    completados: int = Field(alias="completed")
+    fallidos: int = Field(alias="failed")
+    pausados: int = Field(default=0, alias="paused")
+    modalidad: str = Field(alias="modalidad")
+    creado_en: datetime = Field(alias="created_at")
+    completado_en: datetime | None = Field(default=None, alias="completed_at")
+
+
+class RespuestaListaLotes(BaseModel):
     total: int
-    completed: int
-    failed: int
-    paused: int = 0
-    modalidad: str
-    created_at: datetime
-    completed_at: datetime | None = None
+    items: list[LoteSalidaLista]
 
 
-class BatchListResponse(BaseModel):
-    total: int
-    items: list[BatchListOut]
-
-
-class OperationMonthlyMetrics(BaseModel):
+class MetricasMensualesOperacion(BaseModel):
     month: str
     users_created: int = 0
     users_deleted: int = 0
@@ -69,10 +69,10 @@ class OperationMonthlyMetrics(BaseModel):
     total_errors: int = 0
 
 
-class OperationsAnalyticsResponse(BaseModel):
-    history: list[OperationMonthlyMetrics]
+class RespuestaAnaliticaOperaciones(BaseModel):
+    history: list[MetricasMensualesOperacion]
 
 
-class DeleteOldBatchesResponse(BaseModel):
+class RespuestaEliminarLotesAntiguos(BaseModel):
     deleted_batches: int
     older_than_days: int

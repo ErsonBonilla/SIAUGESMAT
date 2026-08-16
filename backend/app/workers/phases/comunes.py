@@ -7,30 +7,32 @@ from sqlalchemy import func
 from sqlalchemy import text as sql_text
 
 from app.celery_app import celery_app
-from app.db.models import OperationItem
-from app.db.session import SessionLocal
-from app.repositories.execution_repo import (
-    clear_checkpoint,
-    clear_chord_active,
-    get_execution,
-    mark_completed,
-    mark_failed,
-    save_checkpoint,
-    set_chord_active,
-    set_report_dir,
-    update_progress,
+from app.db.modelos import ItemOperacion
+from app.db.sesion import SessionLocal
+from app.repositories.repositorio_ejecuciones import (
+    actualizar_progreso,
+    establecer_directorio_reportes,
+    guardar_checkpoint,
+    limpiar_checkpoint,
+    limpiar_chord_activo,
+    marcar_chord_activo,
+    marcar_completado,
+    marcar_fallido,
+    obtener_ejecucion,
 )
-from app.repositories.log_repo import save_error
-from app.services.error_messages import translate_error
-from app.services.reports import ReportService
-from app.workers.phases.base import MoodleOverloadedError
-from app.workers.phases.item_task import process_etl_item
-from app.workers.utils import reset_stuck_items
+from app.repositories.repositorio_registros import guardar_error
+from app.services.mensajes_error import traducir_error
+from app.services.reportes import ServicioReportes
+from app.workers.phases.base import ErrorMoodleSobrecargado
+from app.workers.phases.tarea_item import procesar_item_etl
+from app.workers.utilidades import reiniciar_items_atascados
 
 logger = logging.getLogger(__name__)
 
 
-def _acquire_advisory_lock(db, execution_id: int, phase: str) -> bool:
+def _adquirir_bloqueo_asesor(db, execution_id: int, phase: str) -> bool:
+    if db.get_bind().dialect.name != "postgresql":
+        return True
     key = f"etl_lock_{execution_id}_{phase}".encode()
     lock_id = int(hashlib.sha256(key).hexdigest(), 16) % (2**63)
     result = db.execute(
@@ -40,85 +42,85 @@ def _acquire_advisory_lock(db, execution_id: int, phase: str) -> bool:
     return bool(result)
 
 
-def _items_exist_for_execution(db, execution_id, phase):
+def _existen_items_para_ejecucion(db, execution_id, phase):
     return (
-        db.query(OperationItem)
-        .filter(OperationItem.batch_id.like(f"etl_{phase}_%_{execution_id}"))
+        db.query(ItemOperacion)
+        .filter(ItemOperacion.id_lote.like(f"etl_{phase}_%_{execution_id}"))
         .first()
         is not None
     )
 
 
-def _get_pending_counts(db, execution_id: int, phase: str) -> dict[str, int]:
+def _obtener_conteos_pendientes(db, execution_id: int, phase: str) -> dict[str, int]:
     items = (
-        db.query(OperationItem)
+        db.query(ItemOperacion)
         .filter(
-            OperationItem.batch_id.like(f"etl_{phase}_%_{execution_id}"),
-            OperationItem.status == "pending",
+            ItemOperacion.id_lote.like(f"etl_{phase}_%_{execution_id}"),
+            ItemOperacion.estado == "pending",
         )
         .all()
     )
     counts: dict[str, int] = {}
     for item in items:
-        action = (item.detail or {}).get("action", "unknown")
+        action = (item.detalle or {}).get("action", "unknown")
         counts[action] = counts.get(action, 0) + 1
     return counts
 
 
-def _get_pending_items(db, execution_id, phase, sub_phase=None):
-    query = db.query(OperationItem).filter(
-        OperationItem.batch_id.like(f"etl_{phase}_%_{execution_id}"),
-        OperationItem.status == "pending",
+def _obtener_items_pendientes(db, execution_id, phase, sub_phase=None):
+    query = db.query(ItemOperacion).filter(
+        ItemOperacion.id_lote.like(f"etl_{phase}_%_{execution_id}"),
+        ItemOperacion.estado == "pending",
     )
     if sub_phase:
         if sub_phase == "structure":
-            query = query.filter(sql_text("detail->>'action' != 'delete'"))
+            query = query.filter(sql_text("detalle->>'action' != 'delete'"))
         else:
-            query = query.filter(sql_text("detail->>'action' = :action")).params(action=sub_phase)
+            query = query.filter(sql_text("detalle->>'action' = :action")).params(action=sub_phase)
     return query.all()
 
 
 RETRY_MAX_ATTEMPTS = 3
 
 
-def _reset_failed_items(db, execution_id, phase):
+def _reiniciar_items_fallidos(db, execution_id, phase):
     """Devuelve a 'pending' los items 'failed' con intentos restantes.
 
     Permite reintentar errores transitorios (p. ej. 500 de Moodle) hasta
     ``RETRY_MAX_ATTEMPTS``; los que superen el tope quedan como 'failed'.
     """
-    from app.db.models import OperationItem
+    from app.db.modelos import ItemOperacion
 
     failed = (
-        db.query(OperationItem)
+        db.query(ItemOperacion)
         .filter(
-            OperationItem.batch_id.like(f"etl_{phase}_%_{execution_id}"),
-            OperationItem.status == "failed",
-            OperationItem.attempt < RETRY_MAX_ATTEMPTS,
+            ItemOperacion.id_lote.like(f"etl_{phase}_%_{execution_id}"),
+            ItemOperacion.estado == "failed",
+            ItemOperacion.intento < RETRY_MAX_ATTEMPTS,
         )
         .all()
     )
     if not failed:
         return
     for item in failed:
-        item.status = "pending"
-        item.error_message = None
+        item.estado = "pending"
+        item.mensaje_error = None
     db.commit()
     logger.warning(f"FASE {phase}: {len(failed)} items failed reintentables reseteados a pending")
 
 
-def _sync_batch_counts(db, execution_id):
+def _sincronizar_conteos_lote(db, execution_id):
     """Recomputa completed/failed de los lotes ETL de la ejecución.
 
     El flujo ETL nunca usó ``update_batch_counts``; los contadores de
     ``operation_batches`` quedaban en 0, rompiendo listados y analítica.
     """
-    from app.db.models import OperationBatch, OperationItem
+    from app.db.modelos import ItemOperacion, LoteOperacion
 
     rows = (
-        db.query(OperationItem.batch_id, OperationItem.status, func.count(OperationItem.id))
-        .filter(OperationItem.batch_id.like(f"etl_%_{execution_id}"))
-        .group_by(OperationItem.batch_id, OperationItem.status)
+        db.query(ItemOperacion.id_lote, ItemOperacion.estado, func.count(ItemOperacion.id))
+        .filter(ItemOperacion.id_lote.like(f"etl_%_{execution_id}"))
+        .group_by(ItemOperacion.id_lote, ItemOperacion.estado)
         .all()
     )
     totals: dict[str, dict[str, int]] = {}
@@ -132,52 +134,53 @@ def _sync_batch_counts(db, execution_id):
     if not totals:
         return
     for batch_id, counts in totals.items():
-        batch = db.query(OperationBatch).filter(OperationBatch.batch_id == batch_id).first()
+        batch = db.query(LoteOperacion).filter(LoteOperacion.id_lote == batch_id).first()
         if batch:
-            batch.completed = counts["completed"]
-            batch.failed = counts["failed"]
+            batch.completados = counts["completed"]
+            batch.fallidos = counts["failed"]
     db.commit()
 
 
-def _mark_chord_active(execution_id):
+def _marcar_chord_activo(execution_id):
     """Marca el chord recién lanzado como activo (para el sweeper)."""
     db = SessionLocal()
     try:
-        set_chord_active(db, execution_id)
+        marcar_chord_activo(db, execution_id)
     except Exception:
         logger.exception(f"No se pudo marcar chord activo para ejecución {execution_id}")
     finally:
         db.close()
 
 
-def _launch_items_chord(execution_id, structure_items):
+def _lanzar_chord_items(execution_id, structure_items):
     if not structure_items:
-        on_phase_items_done.delay([], execution_id, "3")
+        al_terminar_items_fase.delay([], execution_id, "3")
         return
-    task_ids = [process_etl_item.si(item.id) for item in structure_items]
-    _mark_chord_active(execution_id)
-    chord(task_ids)(on_phase_items_done.s(execution_id=execution_id, phase="3"))
+    task_ids = [procesar_item_etl.si(item.id) for item in structure_items]
+    _marcar_chord_activo(execution_id)
+    chord(task_ids)(al_terminar_items_fase.s(execution_id=execution_id, phase="3"))
 
 
 @celery_app.task(
+    name="app.workers.phases.common.on_phase_items_done",
     bind=True,
-    autoretry_for=(MoodleOverloadedError,),
+    autoretry_for=(ErrorMoodleSobrecargado,),
     max_retries=3,
     default_retry_delay=10,
     retry_backoff=True,
     retry_backoff_max=60,
 )
-def on_phase_items_done(self, results, execution_id, phase):
+def al_terminar_items_fase(self, results, execution_id, phase):
     _cb_entered = datetime.now(UTC)
     db = SessionLocal()
     try:
-        execution = get_execution(db, execution_id)
-        if not execution or execution.status in ("paused", "cancelled"):
+        execution = obtener_ejecucion(db, execution_id)
+        if not execution or execution.estado in ("paused", "cancelled"):
             return
 
-        clear_chord_active(db, execution_id)
+        limpiar_chord_activo(db, execution_id)
 
-        stuck = reset_stuck_items(
+        stuck = reiniciar_items_atascados(
             db,
             batch_id_prefix=f"etl_{phase}_%",
             execution_id=execution_id,
@@ -187,65 +190,65 @@ def on_phase_items_done(self, results, execution_id, phase):
             logger.warning(f"FASE {phase}: {len(stuck)} items stuck reseteados a pending")
 
         if phase == "3":
-            _reset_failed_items(db, execution_id, "3")
-            pending = _get_pending_items(db, execution_id, "3")
+            _reiniciar_items_fallidos(db, execution_id, "3")
+            pending = _obtener_items_pendientes(db, execution_id, "3")
             if pending:
                 logger.warning(f"FASE 3: {len(pending)} items pendientes tras chord, relanzando")
-                _launch_items_chord(execution_id, pending)
+                _lanzar_chord_items(execution_id, pending)
                 return
         elif phase == "4":
-            _reset_failed_items(db, execution_id, "4")
-            pending = _get_pending_items(db, execution_id, "4")
+            _reiniciar_items_fallidos(db, execution_id, "4")
+            pending = _obtener_items_pendientes(db, execution_id, "4")
             if pending:
                 logger.warning(f"FASE 4: {len(pending)} items pendientes tras chord, relanzando")
-                task_ids = [process_etl_item.si(item.id) for item in pending]
-                chord(task_ids)(on_phase_items_done.s(execution_id=execution_id, phase="4"))
-                _mark_chord_active(execution_id)
+                task_ids = [procesar_item_etl.si(item.id) for item in pending]
+                chord(task_ids)(al_terminar_items_fase.s(execution_id=execution_id, phase="4"))
+                _marcar_chord_activo(execution_id)
                 return
 
-        _sync_metrics_from_items(db, execution_id)
-        _sync_batch_counts(db, execution_id)
+        _sincronizar_metricas_desde_items(db, execution_id)
+        _sincronizar_conteos_lote(db, execution_id)
 
         if phase == "3":
-            save_checkpoint(
+            guardar_checkpoint(
                 db, execution_id, "3", {"completed": True, "at": datetime.now(UTC).isoformat()}
             )
-            update_progress(db, execution_id, 62, "FASE 3 completada, lanzando FASE 4", step=3)
+            actualizar_progreso(db, execution_id, 62, "FASE 3 completada, lanzando FASE 4", paso=3)
             logger.info(f"FASE 3 completada para ejecución {execution_id}")
             celery_app.send_task(
                 "app.workers.phases.orchestrator.process_etl_phase", args=[execution_id, "4"]
             )
 
         elif phase == "4":
-            save_checkpoint(
+            guardar_checkpoint(
                 db, execution_id, "4", {"completed": True, "at": datetime.now(UTC).isoformat()}
             )
-            update_progress(db, execution_id, 85, "Generando reportes…", step=5)
+            actualizar_progreso(db, execution_id, 85, "Generando reportes…", paso=5)
             report_ok = True
             try:
-                report_dir = ReportService.generate_all(execution_id, db)
-                set_report_dir(db, execution_id, report_dir)
+                report_dir = ServicioReportes.generar_todos(execution_id, db)
+                establecer_directorio_reportes(db, execution_id, report_dir)
                 logger.info(f"Reportes generados en: {report_dir}")
             except Exception as e:
                 logger.exception(f"Error generando reportes: {e}")
-                save_error(db, execution_id, "critical", None, translate_error(e))
+                guardar_error(db, execution_id, "critical", None, traducir_error(e))
                 report_ok = False
 
-            update_progress(db, execution_id, 95, "Finalizando…")
+            actualizar_progreso(db, execution_id, 95, "Finalizando…")
             _cb_done = datetime.now(UTC)
-            metrics = execution.metrics or {}
-            mark_completed(
+            metrics = execution.metricas or {}
+            marcar_completado(
                 db,
                 execution_id,
                 metrics,
-                errors_count=metrics.get("total_errors", 0),
-                duration_seconds=(
-                    execution.started_at and (_cb_done - execution.started_at).total_seconds()
+                conteo_errores=metrics.get("total_errors", 0),
+                duracion_segundos=(
+                    execution.iniciado_en and (_cb_done - execution.iniciado_en).total_seconds()
                 )
                 or 0,
             )
-            clear_checkpoint(db, execution_id)
-            update_progress(db, execution_id, 100, "Ejecución completada")
+            limpiar_checkpoint(db, execution_id)
+            actualizar_progreso(db, execution_id, 100, "Ejecución completada")
             logger.info(
                 f"Ejecución {execution_id} completada {'' if report_ok else '(sin reportes)'}"
             )
@@ -254,11 +257,11 @@ def on_phase_items_done(self, results, execution_id, phase):
         logger.exception(f"Error en on_phase_items_done (fase {phase}): {e}")
         try:
             db.rollback()
-            save_error(db, execution_id, "critical", None, translate_error(e))
-            mark_failed(
+            guardar_error(db, execution_id, "critical", None, traducir_error(e))
+            marcar_fallido(
                 db,
                 execution_id,
-                (datetime.now(UTC) - _cb_entered).total_seconds() if execution.started_at else 0,
+                (datetime.now(UTC) - _cb_entered).total_seconds() if execution.iniciado_en else 0,
             )
         except Exception:
             logger.exception(f"Error marcando fallido on_phase_items_done (fase {phase})")
@@ -266,69 +269,69 @@ def on_phase_items_done(self, results, execution_id, phase):
         db.close()
 
 
-@celery_app.task(bind=True)
-def on_users_done(self, results, execution_id):
+@celery_app.task(name="app.workers.phases.common.on_users_done", bind=True)
+def al_terminar_usuarios(self, results, execution_id):
     db = SessionLocal()
     try:
-        execution = get_execution(db, execution_id)
-        if execution and execution.status not in ("paused", "cancelled"):
-            clear_chord_active(db, execution_id)
+        execution = obtener_ejecucion(db, execution_id)
+        if execution and execution.estado not in ("paused", "cancelled"):
+            limpiar_chord_activo(db, execution_id)
 
         failed_users = (
-            db.query(OperationItem)
+            db.query(ItemOperacion)
             .filter(
-                OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
-                sql_text("detail->>'action' = 'create_user'"),
-                OperationItem.status == "failed",
+                ItemOperacion.id_lote.like(f"etl_4_%_{execution_id}"),
+                sql_text("detalle->>'action' = 'create_user'"),
+                ItemOperacion.estado == "failed",
             )
             .all()
         )
         if failed_users:
-            failed_usernames = {item.identifier for item in failed_users}
+            failed_usernames = {item.identificador for item in failed_users}
             logger.warning(
                 f"on_users_done: {len(failed_usernames)} usuario(s) no creados, "
                 f"marcando enrolments correspondientes como fallidos"
             )
             enrol_to_fail = (
-                db.query(OperationItem)
+                db.query(ItemOperacion)
                 .filter(
-                    OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
-                    sql_text("detail->>'action' = 'enrol'"),
-                    OperationItem.status == "pending",
-                    OperationItem.identifier.in_(failed_usernames),
+                    ItemOperacion.id_lote.like(f"etl_4_%_{execution_id}"),
+                    sql_text("detalle->>'action' = 'enrol'"),
+                    ItemOperacion.estado == "pending",
+                    ItemOperacion.identificador.in_(failed_usernames),
                 )
                 .all()
             )
             for item in enrol_to_fail:
-                item.status = "failed"
-                item.error_message = "Usuario no pudo crearse en Moodle"
+                item.estado = "failed"
+                item.mensaje_error = "Usuario no pudo crearse en Moodle"
             if enrol_to_fail:
                 db.commit()
                 logger.info(
                     f"Marcados {len(enrol_to_fail)} enrolments como failed por usuario no creado"
                 )
 
-        enrol_items = _get_pending_items(db, execution_id, "4", sub_phase="enrol")
+        enrol_items = _obtener_items_pendientes(db, execution_id, "4", sub_phase="enrol")
         if enrol_items:
             logger.info(f"on_users_done: enrolando {len(enrol_items)} profesor(es)")
-            task_ids = [process_etl_item.si(item.id) for item in enrol_items]
-            chord(task_ids)(on_phase_items_done.s(execution_id=execution_id, phase="4"))
-            _mark_chord_active(execution_id)
+            task_ids = [procesar_item_etl.si(item.id) for item in enrol_items]
+            chord(task_ids)(al_terminar_items_fase.s(execution_id=execution_id, phase="4"))
+            _marcar_chord_activo(execution_id)
         else:
             logger.info("on_users_done: sin enrolamientos pendientes")
-            on_phase_items_done.delay([], execution_id, "4")
+            al_terminar_items_fase.delay([], execution_id, "4")
     except Exception as e:
         logger.exception(f"Error en on_users_done: {e}")
-        on_phase_items_done.delay([], execution_id, "4")
+        al_terminar_items_fase.delay([], execution_id, "4")
     finally:
         db.close()
 
 
-def _sync_metrics_from_items(db, execution_id):
-    from app.db.models import OperationItem
+def _sincronizar_metricas_desde_items(db, execution_id):
+    from app.db.modelos import ItemOperacion
 
     items = (
-        db.query(OperationItem).filter(OperationItem.batch_id.like(f"etl_%_{execution_id}")).all()
+        db.query(ItemOperacion).filter(ItemOperacion.id_lote.like(f"etl_%_{execution_id}")).all()
     )
 
     metrics = {
@@ -344,8 +347,8 @@ def _sync_metrics_from_items(db, execution_id):
     }
 
     for item in items:
-        action = (item.detail or {}).get("action", "")
-        if item.status == "completed":
+        action = (item.detalle or {}).get("action", "")
+        if item.estado == "completed":
             key = {
                 "delete": "courses_deleted",
                 "activate": "courses_activated",
@@ -357,14 +360,14 @@ def _sync_metrics_from_items(db, execution_id):
             }.get(action)
             if key:
                 metrics[key] = metrics.get(key, 0) + 1
-        elif item.status == "failed":
+        elif item.estado == "failed":
             if action == "enrol":
                 metrics["enrolment_errors"] = metrics.get("enrolment_errors", 0) + 1
             metrics["total_errors"] = metrics.get("total_errors", 0) + 1
 
-    ex = get_execution(db, execution_id)
+    ex = obtener_ejecucion(db, execution_id)
     if ex:
-        existing = ex.metrics or {}
+        existing = ex.metricas or {}
         for key in metrics:
             existing[key] = metrics[key]
         existing["total_operations"] = sum(
@@ -380,8 +383,8 @@ def _sync_metrics_from_items(db, execution_id):
             )
         )
         existing["alerts"] = existing.get("alerts", 0)
-        ex.metrics = existing
+        ex.metricas = existing
         from sqlalchemy.orm.attributes import flag_modified
 
-        flag_modified(ex, "metrics")
+        flag_modified(ex, "metricas")
         db.commit()

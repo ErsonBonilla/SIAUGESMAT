@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import httpx
 
 from app.core.config import settings
-from app.services.moodle_factory import get_moodle_service
+from app.services.fabrica_moodle import obtener_servicio_moodle
 
 _LOGINTOKEN_RE = re.compile(r'<input\s+type="hidden"\s+name="logintoken"\s+value="([^"]+)"')
 
@@ -30,14 +30,15 @@ _LOGINTOKEN_RE = re.compile(r'<input\s+type="hidden"\s+name="logintoken"\s+value
 def _print_safe_error(msg: str, password: str) -> str:
     return msg.replace(password, "********")
 
+    # ---------------------------------------------------------------------------
+    # Moodle API helpers (read + update)
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Moodle API helpers (read + update)
-# ---------------------------------------------------------------------------
+
 async def _get_user(ms, username: str) -> dict | None:
     """Consulta usuario por username y muestra estado relevante."""
     try:
-        users = await ms.get_users("username", [username])
+        users = await ms.obtener_usuarios("username", [username])
     except Exception as e:
         print(f"  [ERROR] Buscando usuario '{username}': {e}")
         return None
@@ -95,10 +96,11 @@ async def _reset_password(ms, user_id: int, password: str) -> bool:
         print(f"  [ERROR] Reset de contraseña: {msg}")
         return False
 
+        # ---------------------------------------------------------------------------
+        # Login verification (POST real a /login/index.php)
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Login verification (POST real a /login/index.php)
-# ---------------------------------------------------------------------------
+
 async def _verify_login(base_url: str, username: str, password: str) -> bool:
     """
     Realiza un POST de login interactivo contra Moodle.
@@ -140,7 +142,7 @@ async def _verify_login(base_url: str, username: str, password: str) -> bool:
             print(f"  [ERROR] POST login: {e}")
             return False
 
-        # 3. Pipeline: accumulate cookies, follow redirect chain
+            # 3. Pipeline: accumulate cookies, follow redirect chain
         jar.update(r2.cookies)
         location = r2.headers.get("location", "")
         max_hops = 8
@@ -155,7 +157,7 @@ async def _verify_login(base_url: str, username: str, password: str) -> bool:
                 if is_home:
                     print(f"  Login OK: redirect → {location}")
                     return True
-                # testsession or other login-page redirect
+                    # testsession or other login-page redirect
                 try:
                     r_next = await client.get(location, cookies=jar)
                 except Exception as e:
@@ -171,13 +173,13 @@ async def _verify_login(base_url: str, username: str, password: str) -> bool:
                 last_body = r2.text
                 break
 
-        # 4. Final page inspection
+                # 4. Final page inspection
         body_lower = last_body.lower()
         if "/login/" not in final_url or "siteadmin" in body_lower or "dashboard" in body_lower:
             print(f"  Login OK (no login page at final URL: {final_url})")
             return True
 
-        # 5. Parse error message
+            # 5. Parse error message
         error = re.search(
             r'(?:loginerrormessage|alert-danger|class="error"[^>]*>)\s*([^<]{10,200})',
             body_lower,
@@ -190,10 +192,11 @@ async def _verify_login(base_url: str, username: str, password: str) -> bool:
             print(f"  Login fallido. status={last_status} url={final_url}")
         return False
 
+        # ---------------------------------------------------------------------------
+        # Main
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+
 async def _main():
     p = argparse.ArgumentParser(description="Restablece contraseña de usuario Moodle.")
     p.add_argument("--modalidad", required=True, help="PRESENCIAL o DISTANCIA")
@@ -206,7 +209,7 @@ async def _main():
 
     password = args.password
     username = args.username
-    config = settings.get_moodle_config(args.modalidad)
+    config = settings.obtener_config_moodle(args.modalidad)
     base_url = config["url"]
     version = config.get("version", "3.9")
 
@@ -215,7 +218,7 @@ async def _main():
         f"| version={version} | base={base_url} ===\n"
     )
 
-    ms = get_moodle_service(args.modalidad)
+    ms = obtener_servicio_moodle(args.modalidad)
 
     # 1. Leer estado previo
     print("--- Estado previo ---")
@@ -232,7 +235,7 @@ async def _main():
     elif not current_auth:
         print("\n  [WARN] auth no reportado por la API. Se intentará reset sin fix.")
 
-    # 2. Reset password
+        # 2. Reset password
     print("\n--- Reset de contraseña ---")
     if await _reset_password(ms, user_id, password):
         print("  Contraseña restablecida exitosamente.")
@@ -240,7 +243,7 @@ async def _main():
         print("  El reset falló. Revisa la política de contraseñas del sitio.")
         raise SystemExit(1)
 
-    # 3. Releer y mostrar estado
+        # 3. Releer y mostrar estado
     print("\n--- Estado posterior ---")
     user = await _get_user(ms, username)
 

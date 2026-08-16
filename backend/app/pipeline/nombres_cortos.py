@@ -18,7 +18,7 @@ SHORTNAME_PATTERN = re.compile(
 )
 
 
-def parse_shortname(shortname: str) -> dict[str, str] | None:
+def parsear_shortname(shortname: str) -> dict[str, str] | None:
     m = SHORTNAME_PATTERN.match(shortname)
     if not m:
         return None

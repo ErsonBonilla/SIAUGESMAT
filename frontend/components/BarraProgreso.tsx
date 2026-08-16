@@ -1,6 +1,6 @@
-// components/ProgressBar.tsx
+// components/BarraProgreso.tsx
 
-import { formatEta } from "../utils/date.ts";
+import { formatearEta } from "../utils/fechas.ts";
 
 const PHASE_ICONS = ["🔄", "📊", "⚡", "📋"];
 const PHASE_LABELS = [
@@ -10,22 +10,22 @@ const PHASE_LABELS = [
   "Generar reportes",
 ];
 
-interface ProgressBarProps {
-  currentPhase: string | null;
-  currentStep: number | null;
-  progressPct: number;
+interface PropsBarraProgreso {
+  faseActual: string | null;
+  pasoActual: number | null;
+  porcentajeProgreso: number;
   status?: string;
-  etaSeconds?: number;
+  segundosRestantes?: number;
 }
 
-export default function ProgressBar(
-  { currentPhase, currentStep, progressPct, status, etaSeconds }:
-    ProgressBarProps,
+export default function BarraProgreso(
+  { faseActual, pasoActual, porcentajeProgreso, status, segundosRestantes }:
+    PropsBarraProgreso,
 ) {
-  const step = currentStep ?? 1;
+  const step = pasoActual ?? 1;
   const icon = PHASE_ICONS[step - 1] ?? "⏳";
   const phaseLabel = PHASE_LABELS[step - 1] ?? "Procesando";
-  const pct = Math.round(progressPct);
+  const pct = Math.round(porcentajeProgreso);
   const running = pct < 100;
   const progressColor = `hsl(${pct * 1.2}, 85%, 42%)`;
 
@@ -40,7 +40,7 @@ export default function ProgressBar(
           </span>
           <div>
             <p class="text-sm font-semibold text-[var(--text-primary)]">
-              {currentPhase ?? "Procesando…"}
+              {faseActual ?? "Procesando…"}
             </p>
             <p class="text-xs text-[var(--text-secondary)]">
               {phaseLabel} · Fase {step} de 4
@@ -51,9 +51,10 @@ export default function ProgressBar(
           <span class="text-2xl font-bold" style={{ color: progressColor }}>
             {pct}%
           </span>
-          {status === "running" && etaSeconds != null && etaSeconds > 0 && (
+          {status === "running" && segundosRestantes != null &&
+            segundosRestantes > 0 && (
             <span class="text-xs text-[var(--text-secondary)] whitespace-nowrap">
-              {formatEta(etaSeconds)}
+              {formatearEta(segundosRestantes)}
             </span>
           )}
         </div>

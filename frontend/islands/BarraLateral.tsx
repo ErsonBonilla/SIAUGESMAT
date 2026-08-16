@@ -1,36 +1,41 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { JSX } from "preact";
-import { logout } from "../services/api.ts";
-import { removeToken } from "../utils/auth.ts";
-import { getMyProfile } from "../services/api.ts";
-import { ensureProfile, profileSignal } from "../utils/profile.ts";
-import { mobileOpenSignal } from "../utils/layout.ts";
+import { cerrarSesion } from "../services/api.ts";
+import { eliminarToken } from "../utils/autenticacion.ts";
+import { obtenerMiPerfil } from "../services/api.ts";
+import { garantizarPerfil, profileSignal } from "../utils/perfil.ts";
+import { mobileOpenSignal } from "../utils/disposicion.ts";
 import {
-  BookOpenIcon,
-  CogIcon,
-  FolderIcon,
-  UserGroupIcon,
-} from "../utils/icons.tsx";
-import ThemeToggle from "./AlternadorTema.tsx";
+  IconoCarpeta,
+  IconoEngranaje,
+  IconoGrupoUsuarios,
+  IconoLibroAbierto,
+} from "../utils/iconos.tsx";
+import AlternadorTema from "./AlternadorTema.tsx";
 
 const NAV_ITEMS = [
   {
     href: "/usuarios",
-    icon: UserGroupIcon,
+    icon: IconoGrupoUsuarios,
     label: "Usuarios",
     match: "/usuarios",
   },
-  { href: "/cursos", icon: BookOpenIcon, label: "Cursos", match: "/cursos" },
+  {
+    href: "/cursos",
+    icon: IconoLibroAbierto,
+    label: "Cursos",
+    match: "/cursos",
+  },
   {
     href: "/categorias",
-    icon: FolderIcon,
+    icon: IconoCarpeta,
     label: "Categorías",
     match: "/categorias",
   },
   {
     href: "/operaciones",
-    icon: CogIcon,
+    icon: IconoEngranaje,
     label: "Operaciones",
     match: "/operaciones",
   },
@@ -43,7 +48,7 @@ const navIdle =
 const navActive =
   "font-semibold border border-brand-red-200 bg-brand-red-100 dark:bg-[var(--bg-tertiary)] dark:border-[var(--border-secondary)] text-brand-red-900 dark:text-[var(--text-primary)]";
 
-export default function Sidebar() {
+export default function BarraLateral() {
   const currentPath = useSignal("");
 
   useEffect(() => {
@@ -51,7 +56,7 @@ export default function Sidebar() {
   }, []);
 
   useEffect(() => {
-    ensureProfile(getMyProfile);
+    garantizarPerfil(obtenerMiPerfil);
   }, []);
 
   const displayName = profileSignal.value?.firstname || "Usuario";
@@ -59,8 +64,8 @@ export default function Sidebar() {
   const initial = displayName.charAt(0).toUpperCase();
 
   const handleLogout = () => {
-    removeToken();
-    logout();
+    eliminarToken();
+    cerrarSesion();
     if (typeof window !== "undefined") {
       window.location.href = "/ingreso";
     }
@@ -143,7 +148,7 @@ export default function Sidebar() {
             <span class="text-[0.8125rem] font-medium truncate">
               {displayName}
             </span>
-            <ThemeToggle />
+            <AlternadorTema />
           </div>
           <button
             type="button"

@@ -2,8 +2,8 @@ import { render } from "preact-render-to-string";
 import { assert, assertStringIncludes } from "@std/assert";
 
 import SubirArchivoIsland from "../../islands/SubirArchivoIsland.tsx";
-import ProcessInProgressBanner from "../../components/ProcessInProgressBanner.tsx";
-import { darkSignal } from "../../utils/theme.ts";
+import BannerProcesoEnCurso from "../../components/BannerProcesoEnCurso.tsx";
+import { darkSignal } from "../../utils/tema.ts";
 
 Deno.test("SubirArchivoIsland - muestra el formulario de subida con todos los elementos", () => {
   darkSignal.value = false;
@@ -22,7 +22,7 @@ Deno.test("SubirArchivoIsland - muestra el formulario de subida con todos los el
 Deno.test("ProcessInProgressBanner - muestra aviso cuando hay proceso en curso", () => {
   darkSignal.value = false;
   const html = render(
-    <ProcessInProgressBanner
+    <BannerProcesoEnCurso
       status={{
         allowed: false,
         execution: { id: 3, status: "running", filename: "carga.xlsx" },
@@ -38,7 +38,7 @@ Deno.test("ProcessInProgressBanner - muestra aviso cuando hay proceso en curso",
 Deno.test("ProcessInProgressBanner - no muestra nada si no hay proceso", () => {
   darkSignal.value = false;
   const html = render(
-    <ProcessInProgressBanner
+    <BannerProcesoEnCurso
       status={{ allowed: true, execution: null, batch: null }}
     />,
   );

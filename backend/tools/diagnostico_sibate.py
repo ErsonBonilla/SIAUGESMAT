@@ -6,18 +6,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
-from app.services.moodle_operations import MoodleService
+from app.services.operaciones_moodle import ServicioMoodle
 
 CAT = "SIB"
 
 
 async def check():
-    config = settings.get_moodle_config("DISTANCIA")
-    ms = MoodleService(token=config["token"], base_url=config["url"], version=config["version"])
+    config = settings.obtener_config_moodle("DISTANCIA")
+    ms = ServicioMoodle(token=config["token"], base_url=config["url"], version=config["version"])
 
     # 1. Get ALL SIB courses from Moodle
     print("=== CURSOS SIBATE EN MOODLE ===")
-    all_courses = await ms.get_courses()
+    all_courses = await ms.obtener_cursos()
     sib_moodle = [c for c in all_courses if c.get("shortname", "").startswith(CAT)]
     print(f"Total SIB en Moodle: {len(sib_moodle)}")
     for c in sib_moodle[:10]:

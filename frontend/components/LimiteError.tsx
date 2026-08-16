@@ -1,20 +1,20 @@
 import { Component, type ComponentChildren } from "preact";
 
-interface ErrorBoundaryProps {
+interface PropsLimiteError {
   children: ComponentChildren;
   fallback?: ComponentChildren;
 }
 
-interface ErrorBoundaryState {
+interface EstadoLimiteError {
   hasError: boolean;
   error: Error | null;
 }
 
-export default class ErrorBoundary
-  extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  override state: ErrorBoundaryState = { hasError: false, error: null };
+export default class LimiteError
+  extends Component<PropsLimiteError, EstadoLimiteError> {
+  override state: EstadoLimiteError = { hasError: false, error: null };
 
-  static override getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static override getDerivedStateFromError(error: Error): EstadoLimiteError {
     return { hasError: true, error };
   }
 

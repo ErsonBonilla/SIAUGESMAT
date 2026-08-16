@@ -1,31 +1,31 @@
 import logging
 from typing import Any
 
-from app.pipeline.course_comparison.action_handler import (
-    handle_different_professor,
-    handle_same_core_different_group,
-    handle_same_professor,
+from app.pipeline.comparacion_cursos.aplicar_accion import aplicar_accion
+from app.pipeline.comparacion_cursos.constructor_indice import (
+    construir_indice_claves_base,
+    construir_indice_nucleo,
+    construir_indice_shortnames,
 )
-from app.pipeline.course_comparison.apply_action import apply_action
-from app.pipeline.course_comparison.disappeared import find_disappeared_courses
-from app.pipeline.course_comparison.index_builder import (
-    build_base_key_index,
-    build_core_index,
-    build_shortname_index,
+from app.pipeline.comparacion_cursos.desaparecidos import encontrar_cursos_desaparecidos
+from app.pipeline.comparacion_cursos.manejador_acciones import (
+    manejar_docente_diferente,
+    manejar_mismo_docente,
+    manejar_mismo_nucleo_grupo_diferente,
 )
-from app.pipeline.course_comparison.thresholds import (
-    DEFAULT_COURSE_DISAPPEARED_AGE_SECONDS,
-    DEFAULT_COURSE_MAX_AGE_SECONDS,
+from app.pipeline.comparacion_cursos.umbrales import (
+    EDAD_DESAPARICION_CURSO_SEGUNDOS,
+    EDAD_MAXIMA_CURSO_SEGUNDOS,
 )
-from app.pipeline.course_comparison.utils import (
-    build_base_key,
-    build_enrolment_map,
-    first_visible,
-    get_course_professor,
-    get_suffix,
-    is_course_hidden,
+from app.pipeline.comparacion_cursos.utilidades import (
+    construir_clave_base,
+    construir_mapa_matriculaciones,
+    es_curso_oculto,
+    obtener_profesor_curso,
+    obtener_sufijo,
+    primer_visible,
 )
-from app.pipeline.shortnames import SIAUGESMAT_PATTERN, parse_shortname
+from app.pipeline.nombres_cortos import SIAUGESMAT_PATTERN, parsear_shortname
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def _norm_email(value: str) -> str:
     return (value or "").strip().lower()
 
 
-def _same_person_by_email(
+def _misma_persona_por_correo(
     username_a: str | None,
     username_b: str | None,
     username_emails: dict[str, str] | None,
@@ -53,9 +53,9 @@ def _same_person_by_email(
     return bool(email_a and email_b and email_a == email_b)
 
 
-class CourseComparisonService:
+class ServicioComparacionCursos:
     @classmethod
-    async def compare(
+    async def comparar(
         cls,
         existing_courses: list[dict],
         new_courses: list[dict],
@@ -64,8 +64,8 @@ class CourseComparisonService:
         courses_with_teacher: dict[str, str] = None,
         *,
         username_emails: dict[str, str] = None,
-        max_age_seconds: int = DEFAULT_COURSE_MAX_AGE_SECONDS,
-        disappeared_age_seconds: int = DEFAULT_COURSE_DISAPPEARED_AGE_SECONDS,
+        max_age_seconds: int = EDAD_MAXIMA_CURSO_SEGUNDOS,
+        disappeared_age_seconds: int = EDAD_DESAPARICION_CURSO_SEGUNDOS,
     ) -> dict[str, Any]:
         if courses_with_teacher is None:
             courses_with_teacher = {}
@@ -73,11 +73,11 @@ class CourseComparisonService:
             c for c in existing_courses if SIAUGESMAT_PATTERN.match(c.get("shortname", ""))
         ]
 
-        existing_by_shortname = build_shortname_index(siaugesmat_courses)
-        existing_by_base_key = build_base_key_index(siaugesmat_courses)
-        existing_by_core = build_core_index(siaugesmat_courses)
+        existing_by_shortname = construir_indice_shortnames(siaugesmat_courses)
+        existing_by_base_key = construir_indice_claves_base(siaugesmat_courses)
+        existing_by_core = construir_indice_nucleo(siaugesmat_courses)
 
-        enrolment_index = build_enrolment_map(new_enrolments)
+        enrolment_index = construir_mapa_matriculaciones(new_enrolments)
 
         to_create: list[dict] = []
         to_delete: list[str] = []
@@ -93,7 +93,7 @@ class CourseComparisonService:
         new_groups_by_core: dict[tuple[str, ...], set] = {}
         new_program_codes: set[str] = set()
         for course in new_courses:
-            parsed = parse_shortname(course["shortname"])
+            parsed = parsear_shortname(course["shortname"])
             if parsed:
                 core_key = (parsed["cod_prog"], parsed["cod_curso"], parsed["semestre"])
                 new_groups_by_core.setdefault(core_key, set()).add(parsed["grupo"])
@@ -102,13 +102,13 @@ class CourseComparisonService:
         for course in new_courses:
             sn = course["shortname"]
             new_shortnames.add(sn)
-            parsed_new = parse_shortname(sn)
+            parsed_new = parsear_shortname(sn)
             professor = enrolment_index.get(sn, "")
             new_suffix = parsed_new.get("suffix", "") if parsed_new else ""
 
             if sn in existing_by_shortname:
                 existing = existing_by_shortname[sn]
-                existing_prof = get_course_professor(existing)
+                existing_prof = obtener_profesor_curso(existing)
 
                 if sn not in courses_with_teacher:
                     action, detail = (
@@ -123,13 +123,13 @@ class CourseComparisonService:
                 elif (existing_prof and existing_prof == professor) or courses_with_teacher.get(
                     sn
                 ) == professor:
-                    action, detail = handle_same_professor(
+                    action, detail = manejar_mismo_docente(
                         existing,
                         sn,
                         professor,
                         max_age_seconds=max_age_seconds,
                     )
-                elif _same_person_by_email(
+                elif _misma_persona_por_correo(
                     courses_with_teacher.get(sn) or existing_prof,
                     professor,
                     username_emails,
@@ -139,14 +139,14 @@ class CourseComparisonService:
                         f"con el profesor de Moodle '{courses_with_teacher.get(sn)}'; "
                         "se trata como mismo profesor"
                     )
-                    action, detail = handle_same_professor(
+                    action, detail = manejar_mismo_docente(
                         existing,
                         sn,
                         professor,
                         max_age_seconds=max_age_seconds,
                     )
                 else:
-                    action, detail = handle_different_professor(
+                    action, detail = manejar_docente_diferente(
                         existing,
                         sn,
                         professor,
@@ -157,26 +157,30 @@ class CourseComparisonService:
                     )
 
             elif parsed_new:
-                base_key = build_base_key(parsed_new)
+                base_key = construir_clave_base(parsed_new)
                 new_base_keys.add(base_key)
                 candidates = existing_by_base_key.get(base_key, [])
 
                 if candidates:
                     match = next(
-                        (c for c in candidates if get_suffix(c.get("shortname", "")) == new_suffix),
+                        (
+                            c
+                            for c in candidates
+                            if obtener_sufijo(c.get("shortname", "")) == new_suffix
+                        ),
                         None,
                     )
                     if match:
-                        existing_prof = get_course_professor(match)
+                        existing_prof = obtener_profesor_curso(match)
                         if existing_prof and existing_prof == professor:
-                            action, detail = handle_same_professor(
+                            action, detail = manejar_mismo_docente(
                                 match,
                                 sn,
                                 professor,
                                 max_age_seconds=max_age_seconds,
                             )
                         else:
-                            action, detail = handle_different_professor(
+                            action, detail = manejar_docente_diferente(
                                 match,
                                 sn,
                                 professor,
@@ -189,7 +193,7 @@ class CourseComparisonService:
                             (
                                 c
                                 for c in candidates
-                                if get_course_professor(c) == professor
+                                if obtener_profesor_curso(c) == professor
                                 or (
                                     c.get("shortname", "") in courses_with_teacher
                                     and courses_with_teacher[c.get("shortname", "")] == professor
@@ -198,22 +202,22 @@ class CourseComparisonService:
                             None,
                         )
                         if match:
-                            old_hidden = is_course_hidden(match)
+                            old_hidden = es_curso_oculto(match)
                             action, detail = (
                                 "rename_group",
                                 {
                                     "reason": "suffix_update",
                                     "professor": professor,
                                     "old_shortname": match["shortname"],
-                                    "old_suffix": get_suffix(match["shortname"]),
+                                    "old_suffix": obtener_sufijo(match["shortname"]),
                                     "new_suffix": new_suffix,
                                     "reactivate": old_hidden,
                                 },
                             )
                         else:
-                            target = first_visible(candidates)
-                            existing_prof = get_course_professor(target)
-                            action, detail = handle_different_professor(
+                            target = primer_visible(candidates)
+                            existing_prof = obtener_profesor_curso(target)
+                            action, detail = manejar_docente_diferente(
                                 target,
                                 sn,
                                 professor,
@@ -223,9 +227,9 @@ class CourseComparisonService:
                                 max_age_seconds=max_age_seconds,
                             )
                     else:
-                        target = first_visible(candidates)
-                        existing_prof = get_course_professor(target)
-                        action, detail = handle_different_professor(
+                        target = primer_visible(candidates)
+                        existing_prof = obtener_profesor_curso(target)
+                        action, detail = manejar_docente_diferente(
                             target,
                             sn,
                             professor,
@@ -243,7 +247,7 @@ class CourseComparisonService:
                     same_core_courses = existing_by_core.get(core_key, [])
 
                     if same_core_courses:
-                        action, detail = handle_same_core_different_group(
+                        action, detail = manejar_mismo_nucleo_grupo_diferente(
                             same_core_courses, parsed_new, sn, professor, new_groups_by_core
                         )
                     else:
@@ -251,7 +255,7 @@ class CourseComparisonService:
             else:
                 action, detail = "create", {"reason": "new", "professor": professor}
 
-            apply_action(
+            aplicar_accion(
                 action,
                 detail,
                 sn,
@@ -266,7 +270,7 @@ class CourseComparisonService:
                 logs,
             )
 
-        find_disappeared_courses(
+        encontrar_cursos_desaparecidos(
             existing_by_shortname,
             existing_by_base_key,
             new_shortnames,

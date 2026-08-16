@@ -1,16 +1,16 @@
 // services/api/mantenimiento.ts
-import { authHeaders, BASE_URL, handleResponse } from "./core.ts";
-import type { CsvUploadResponse } from "./types.ts";
+import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
+import type { RespuestaSubidaCsv } from "./tipos.ts";
 
-export async function uploadVisibilityCsv(
+export async function subirCsvVisibilidad(
   file: File,
   visibility: "show" | "hide",
-): Promise<CsvUploadResponse> {
+): Promise<RespuestaSubidaCsv> {
   const formData = new FormData();
   formData.append("file", file);
   const response = await fetch(
     `${BASE_URL}/operations/courses/visibility?visibility=${visibility}`,
-    { method: "POST", headers: { ...authHeaders() }, body: formData },
+    { method: "POST", headers: { ...cabecerasAuth() }, body: formData },
   );
-  return handleResponse<CsvUploadResponse>(response);
+  return manejarRespuesta<RespuestaSubidaCsv>(response);
 }

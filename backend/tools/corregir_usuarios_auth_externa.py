@@ -29,8 +29,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import text
 
 from app.core.config import settings
-from app.db.session import SessionLocal
-from app.services.moodle_factory import get_moodle_service
+from app.db.sesion import SessionLocal
+from app.services.fabrica_moodle import obtener_servicio_moodle
 
 logger = logging.getLogger(__name__)
 
@@ -108,19 +108,20 @@ async def _fix_users_batch(ms, users: list) -> tuple:
                 fail += 1
         return ok, fail
 
+        # ---------------------------------------------------------------------------
+        # App DB helpers
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# App DB helpers
-# ---------------------------------------------------------------------------
-def _get_all_known_usernames() -> list:
+
+def _obtener_todos_usuarios_conocidos() -> list:
     """Todos los usernames procesados por el app (enrol+create, sin limite de tiempo)."""
     db = SessionLocal()
     try:
         rows = db.execute(
             text(
-                "SELECT DISTINCT identifier FROM execution_logs "
-                "WHERE action IN ('enrolment_ok', 'user_created_createpassword') "
-                "ORDER BY identifier"
+                "SELECT DISTINCT identificador FROM registros_ejecucion "
+                "WHERE accion IN ('enrolment_ok', 'user_created_createpassword') "
+                "ORDER BY identificador"
             )
         ).fetchall()
         return [r[0] for r in rows]
@@ -135,10 +136,10 @@ def _get_recent_enrolled_usernames(days: int) -> list:
     try:
         rows = db.execute(
             text(
-                "SELECT DISTINCT identifier FROM execution_logs "
-                "WHERE action IN ('enrolment_ok', 'user_created_createpassword') "
-                "AND created_at >= :since "
-                "ORDER BY identifier"
+                "SELECT DISTINCT identificador FROM registros_ejecucion "
+                "WHERE accion IN ('enrolment_ok', 'user_created_createpassword') "
+                "AND creado_en >= :since "
+                "ORDER BY identificador"
             ),
             {"since": since},
         ).fetchall()
@@ -146,10 +147,11 @@ def _get_recent_enrolled_usernames(days: int) -> list:
     finally:
         db.close()
 
+        # ---------------------------------------------------------------------------
+        # Output helpers
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Output helpers
-# ---------------------------------------------------------------------------
+
 def _print_user(user: dict, idx: int = 0):
     username = user.get("username", "?")
     email = (user.get("email") or "sin email").strip().lower()
@@ -158,10 +160,11 @@ def _print_user(user: dict, idx: int = 0):
     prefix = f"   #{idx:<3}" if idx else "   "
     print(f"{prefix}{username:<20} {email:<35} auth={auth:<8} {fullname}")
 
+    # ---------------------------------------------------------------------------
+    # Audit + fix-all flow
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Audit + fix-all flow
-# ---------------------------------------------------------------------------
+
 async def _audit_and_fix(ms, usernames: list, fix_all: bool, days: int):
     if not usernames:
         print("   No hay usernames recientes en los logs del app.\n")
@@ -192,7 +195,7 @@ async def _audit_and_fix(ms, usernames: list, fix_all: bool, days: int):
         print("   OK - Todos los usuarios recientes tienen auth=manual.\n")
         return
 
-    # Agrupar por email para detectar duplicados
+        # Agrupar por email para detectar duplicados
     by_email: dict = {}
     for u in affected:
         email = (u.get("email") or "").strip().lower()
@@ -227,11 +230,12 @@ async def _audit_and_fix(ms, usernames: list, fix_all: bool, days: int):
     print(f"\n  Reparados: {ok}")
     print(f"  Fallidos:  {fail}\n")
 
+    # ---------------------------------------------------------------------------
+    # Dedup flow (Fase 3)
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Dedup flow (Fase 3)
-# ---------------------------------------------------------------------------
-async def _get_user_courses(ms, user_id: int) -> list:
+
+async def _obtener_cursos_usuario(ms, user_id: int) -> list:
     """Cursos en los que el usuario esta enrolado."""
     try:
         result = await ms._request(
@@ -281,7 +285,7 @@ async def _find_users_by_email(ms, email: str) -> list:
 
 
 async def _dedup_flow(ms, fix: bool, days: int):
-    usernames = _get_all_known_usernames()
+    usernames = _obtener_todos_usuarios_conocidos()
     if not usernames:
         print("   No hay usernames en los logs del app.\n")
         return
@@ -309,14 +313,14 @@ async def _dedup_flow(ms, fix: bool, days: int):
         print("   OK - No se encontraron usuarios.\n")
         return
 
-    # Agrupar por email
+        # Agrupar por email
     by_email: dict = {}
     for u in all_users:
         email = (u.get("email") or "").strip().lower()
         by_email.setdefault(email, []).append(u)
 
-    # Para cada email, buscar en Moodle TODOS los usuarios (incluyendo los
-    # que el app nunca toco, como el usuario original que fue duplicado por error).
+        # Para cada email, buscar en Moodle TODOS los usuarios (incluyendo los
+        # que el app nunca toco, como el usuario original que fue duplicado por error).
     print(f"   Verificando duplicados por email en Moodle ({len(by_email)} emails)...\n")
     i = 0
     for email in list(by_email.keys()):
@@ -346,7 +350,7 @@ async def _dedup_flow(ms, fix: bool, days: int):
         without_courses = []
 
         for u in users:
-            courses = await _get_user_courses(ms, u["id"])
+            courses = await _obtener_cursos_usuario(ms, u["id"])
             u["_courses"] = len(courses)
             label = f"{u['username']} (id={u['id']}, cursos={u['_courses']}, firstaccess={u.get('firstaccess', '?')})"
             print(f"      {label}")
@@ -451,7 +455,7 @@ async def main():
 
     print(f"\n=== fix_external_auth_users | modalidad={args.modalidad} ===\n")
 
-    ms = get_moodle_service(args.modalidad)
+    ms = obtener_servicio_moodle(args.modalidad)
 
     try:
         # --- Modo usuario individual ---
@@ -480,13 +484,13 @@ async def main():
                 print(f"   [ERROR] No se pudo reparar {username}.\n")
             return
 
-        # --- Modo auditoria masiva ---
+            # --- Modo auditoria masiva ---
         if args.audit:
             usernames = _get_recent_enrolled_usernames(args.days)
             await _audit_and_fix(ms, usernames, args.fix_all, args.days)
             return
 
-        # --- Modo dedup ---
+            # --- Modo dedup ---
         if args.dedup:
             await _dedup_flow(ms, args.fix, args.days)
             return

@@ -1,209 +1,216 @@
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import bindparam
-from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.config import settings
-from app.db.models import ErrorLog, Execution
+from app.db.modelos import Ejecucion, RegistroError
 
 
-def get_execution(db: Session, execution_id: int) -> Execution | None:
-    return db.query(Execution).filter(Execution.id == execution_id).first()
+def obtener_ejecucion(db: Session, ejecucion_id: int) -> Ejecucion | None:
+    return db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
 
 
 ACTIVE_EXECUTION_STATUSES = ("queued", "running", "paused", "review_required")
 
 
-def get_active_execution(
+def obtener_ejecucion_activa(
     db: Session, modalidad: str, exclude_id: int | None = None
-) -> Execution | None:
+) -> Ejecucion | None:
     """Devuelve la ejecución en curso (no terminada) de una modalidad.
 
     Estados considerados activos: queued, running, paused, review_required.
     ``exclude_id`` permite ignorar una ejecución concreta (p. ej. la propia
     al reanudar/confirmar una ejecución).
     """
-    query = db.query(Execution).filter(
-        Execution.status.in_(ACTIVE_EXECUTION_STATUSES),
+    query = db.query(Ejecucion).filter(
+        Ejecucion.estado.in_(ACTIVE_EXECUTION_STATUSES),
     )
     if modalidad:
-        query = query.filter(Execution.modalidad == modalidad)
+        query = query.filter(Ejecucion.modalidad == modalidad)
     if exclude_id is not None:
-        query = query.filter(Execution.id != exclude_id)
-    return query.order_by(Execution.created_at.desc()).first()
+        query = query.filter(Ejecucion.id != exclude_id)
+    return query.order_by(Ejecucion.creado_en.desc()).first()
 
 
-def create_execution(
-    db: Session, filename: str, semester: str, mode: str, modalidad: str, moodle_version: str
-) -> Execution:
-    execution = Execution(
-        filename=filename,
-        semester=semester,
-        mode=mode,
-        status="pending",
-        moodle_version=moodle_version,
-        modalidad=modalidad,
-        created_at=datetime.now(UTC),
-    )
-    db.add(execution)
-    db.commit()
-    db.refresh(execution)
-    return execution
-
-
-def atomic_mark_queued(
-    db: Session, execution_id: int, task_id: str, allowed_statuses: tuple
-) -> bool:
-    result = db.execute(
-        sql_text(
-            "UPDATE executions SET status = 'queued', started_at = :now, celery_task_id = :task_id "
-            "WHERE id = :id AND status IN :allowed_statuses"
-        ).bindparams(
-            bindparam("allowed_statuses", expanding=True),
-        ),
-        {
-            "now": datetime.now(UTC),
-            "task_id": task_id,
-            "id": execution_id,
-            "allowed_statuses": allowed_statuses,
-        },
-    )
-    db.commit()
-    return result.rowcount > 0
-
-
-def update_progress(
-    db: Session, execution_id: int, pct: float, phase: str = None, step: int = None
-) -> None:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        if phase is not None:
-            execution.current_phase = phase
-        execution.progress_pct = pct
-        execution.progress_updated_at = datetime.now(UTC)
-        if step is not None:
-            execution.current_step = step
-        db.commit()
-
-
-def touch_heartbeat(db: Session, execution_id: int) -> None:
-    """Actualiza solo progress_updated_at sin cambiar porcentaje ni mensaje."""
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        execution.progress_updated_at = datetime.now(UTC)
-        db.commit()
-
-
-def mark_running(db: Session, execution_id: int) -> Execution | None:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        execution.status = "running"
-        execution.started_at = datetime.now(UTC)
-        execution.progress_pct = 0
-        db.commit()
-    return execution
-
-
-def mark_completed(
-    db: Session, execution_id: int, metrics: dict, errors_count: int, duration_seconds: float
-) -> Execution | None:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        execution.status = "completed"
-        execution.metrics = metrics
-        execution.errors_count = errors_count
-        execution.completed_at = datetime.now(UTC)
-        execution.duration_seconds = round(duration_seconds, 2)
-        execution.current_phase = "Procesamiento completado"
-        execution.progress_pct = 100
-        db.commit()
-    return execution
-
-
-def mark_failed(db: Session, execution_id: int, duration_seconds: float) -> Execution | None:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        execution.status = "failed"
-        execution.completed_at = datetime.now(UTC)
-        execution.duration_seconds = round(duration_seconds, 2)
-        db.commit()
-    return execution
-
-
-def delete_execution(db: Session, execution_id: int) -> None:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        db.delete(execution)
-        db.commit()
-
-
-def list_executions(
+def crear_ejecucion(
     db: Session,
-    semester: str = None,
-    status: str = None,
-    mode: str = None,
-    moodle_version: str = None,
+    nombre_archivo: str,
+    semestre: str,
+    modo: str,
+    modalidad: str,
+    version_moodle: str,
+) -> Ejecucion:
+    ejecucion = Ejecucion(
+        nombre_archivo=nombre_archivo,
+        semestre=semestre,
+        modo=modo,
+        estado="pending",
+        version_moodle=version_moodle,
+        modalidad=modalidad,
+        creado_en=datetime.now(UTC),
+    )
+    db.add(ejecucion)
+    db.commit()
+    db.refresh(ejecucion)
+    return ejecucion
+
+
+def marcar_en_cola_atomicamente(
+    db: Session, ejecucion_id: int, task_id: str, allowed_statuses: tuple
+) -> bool:
+    result = (
+        db.query(Ejecucion)
+        .filter(Ejecucion.id == ejecucion_id, Ejecucion.estado.in_(allowed_statuses))
+        .update(
+            {
+                Ejecucion.estado: "queued",
+                Ejecucion.iniciado_en: datetime.now(UTC),
+                Ejecucion.id_tarea_celery: task_id,
+            },
+            synchronize_session=False,
+        )
+    )
+    db.commit()
+    return result > 0
+
+
+def actualizar_progreso(
+    db: Session, ejecucion_id: int, pct: float, fase: str = None, paso: int = None
+) -> None:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if ejecucion:
+        if fase is not None:
+            ejecucion.fase_actual = fase
+        ejecucion.porcentaje_progreso = pct
+        ejecucion.progreso_actualizado_en = datetime.now(UTC)
+        if paso is not None:
+            ejecucion.paso_actual = paso
+        db.commit()
+
+
+def actualizar_heartbeat(db: Session, ejecucion_id: int) -> None:
+    """Actualiza solo progreso_actualizado_en sin cambiar porcentaje ni mensaje."""
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if ejecucion:
+        ejecucion.progreso_actualizado_en = datetime.now(UTC)
+        db.commit()
+
+
+def marcar_en_ejecucion(db: Session, ejecucion_id: int) -> Ejecucion | None:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if ejecucion:
+        ejecucion.estado = "running"
+        ejecucion.iniciado_en = datetime.now(UTC)
+        ejecucion.porcentaje_progreso = 0
+        db.commit()
+    return ejecucion
+
+
+def marcar_completado(
+    db: Session,
+    ejecucion_id: int,
+    metricas: dict,
+    conteo_errores: int,
+    duracion_segundos: float,
+) -> Ejecucion | None:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if ejecucion:
+        ejecucion.estado = "completed"
+        ejecucion.metricas = metricas
+        ejecucion.conteo_errores = conteo_errores
+        ejecucion.completado_en = datetime.now(UTC)
+        ejecucion.duracion_segundos = round(duracion_segundos, 2)
+        ejecucion.fase_actual = "Procesamiento completado"
+        ejecucion.porcentaje_progreso = 100
+        db.commit()
+    return ejecucion
+
+
+def marcar_fallido(db: Session, ejecucion_id: int, duracion_segundos: float) -> Ejecucion | None:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if ejecucion:
+        ejecucion.estado = "failed"
+        ejecucion.completado_en = datetime.now(UTC)
+        ejecucion.duracion_segundos = round(duracion_segundos, 2)
+        db.commit()
+    return ejecucion
+
+
+def eliminar_ejecucion(db: Session, ejecucion_id: int) -> None:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if ejecucion:
+        db.delete(ejecucion)
+        db.commit()
+
+
+def listar_ejecuciones(
+    db: Session,
+    semestre: str = None,
+    estado: str = None,
+    modo: str = None,
+    version_moodle: str = None,
     modalidad: str = None,
     limit: int = 20,
     offset: int = 0,
-) -> tuple[int, list[Execution]]:
-    query = db.query(Execution)
-    if semester:
-        query = query.filter(Execution.semester == semester)
-    if status:
-        query = query.filter(Execution.status == status)
-    if mode:
-        query = query.filter(Execution.mode == mode)
-    if moodle_version:
-        query = query.filter(Execution.moodle_version == moodle_version)
+) -> tuple[int, list[Ejecucion]]:
+    query = db.query(Ejecucion)
+    if semestre:
+        query = query.filter(Ejecucion.semestre == semestre)
+    if estado:
+        query = query.filter(Ejecucion.estado == estado)
+    if modo:
+        query = query.filter(Ejecucion.modo == modo)
+    if version_moodle:
+        query = query.filter(Ejecucion.version_moodle == version_moodle)
     if modalidad:
-        query = query.filter(Execution.modalidad == modalidad.upper())
+        query = query.filter(Ejecucion.modalidad == modalidad.upper())
     total = query.count()
-    executions = query.order_by(Execution.created_at.desc()).offset(offset).limit(limit).all()
-    return total, executions
+    ejecuciones = query.order_by(Ejecucion.creado_en.desc()).offset(offset).limit(limit).all()
+    return total, ejecuciones
 
 
-def get_execution_errors(db: Session, execution_id: int, limit: int, offset: int) -> list[ErrorLog]:
+def obtener_errores_ejecucion(
+    db: Session, ejecucion_id: int, limit: int, offset: int
+) -> list[RegistroError]:
     return (
-        db.query(ErrorLog)
-        .filter(ErrorLog.execution_id == execution_id)
-        .order_by(ErrorLog.created_at.desc())
+        db.query(RegistroError)
+        .filter(RegistroError.ejecucion_id == ejecucion_id)
+        .order_by(RegistroError.creado_en.desc())
         .offset(offset)
         .limit(limit)
         .all()
     )
 
 
-def set_report_dir(db: Session, execution_id: int, report_dir: str) -> None:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        execution.report_dir = report_dir
+def establecer_directorio_reportes(db: Session, ejecucion_id: int, directorio_reporte: str) -> None:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if ejecucion:
+        ejecucion.directorio_reporte = directorio_reporte
         db.commit()
 
 
-def is_reupload(db: Session, semester: str, modalidad: str, exclude_id: int) -> bool:
+def es_re_subida(db: Session, semestre: str, modalidad: str, exclude_id: int) -> bool:
     return (
-        db.query(Execution)
+        db.query(Ejecucion)
         .filter(
-            Execution.semester == semester,
-            Execution.modalidad == modalidad,
-            Execution.status == "completed",
-            Execution.id != exclude_id,
+            Ejecucion.semestre == semestre,
+            Ejecucion.modalidad == modalidad,
+            Ejecucion.estado == "completed",
+            Ejecucion.id != exclude_id,
         )
         .first()
         is not None
     )
 
 
-def delete_old_pending_executions(db: Session, hours: int = 24) -> int:
+def eliminar_ejecuciones_pendientes_antiguas(db: Session, hours: int = 24) -> int:
     cutoff = datetime.now(UTC) - timedelta(hours=hours)
     old = (
-        db.query(Execution)
+        db.query(Ejecucion)
         .filter(
-            Execution.status == "pending",
-            Execution.created_at < cutoff,
+            Ejecucion.estado == "pending",
+            Ejecucion.creado_en < cutoff,
         )
         .all()
     )
@@ -215,24 +222,24 @@ def delete_old_pending_executions(db: Session, hours: int = 24) -> int:
     return len(old)
 
 
-def save_checkpoint(db: Session, execution_id: int, phase: str, data: dict) -> None:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        if execution.phase_checkpoint is None:
-            execution.phase_checkpoint = {}
-        execution.phase_checkpoint[phase] = data
-        flag_modified(execution, "phase_checkpoint")
+def guardar_checkpoint(db: Session, ejecucion_id: int, fase: str, data: dict) -> None:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if ejecucion:
+        if ejecucion.checkpoint_fase is None:
+            ejecucion.checkpoint_fase = {}
+        ejecucion.checkpoint_fase[fase] = data
+        flag_modified(ejecucion, "checkpoint_fase")
         db.commit()
 
 
-def get_checkpoint(db: Session, execution_id: int) -> dict | None:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if not execution or not execution.phase_checkpoint:
+def obtener_checkpoint(db: Session, ejecucion_id: int) -> dict | None:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if not ejecucion or not ejecucion.checkpoint_fase:
         return None
-    return dict(execution.phase_checkpoint)
+    return dict(ejecucion.checkpoint_fase)
 
 
-def set_chord_active(db: Session, execution_id: int, minutes: int = None) -> None:
+def marcar_chord_activo(db: Session, ejecucion_id: int, minutes: int = None) -> None:
     """Marca un chord de fase como activo hasta una fecha de expiración.
 
     El sweeper ``recover_stuck_phase`` usa esta marca para relanzar una fase
@@ -240,79 +247,81 @@ def set_chord_active(db: Session, execution_id: int, minutes: int = None) -> Non
     """
     minutes = settings.CHORD_ACTIVE_MINUTES if minutes is None else minutes
     expires = datetime.now(UTC) + timedelta(minutes=minutes)
-    save_checkpoint(db, execution_id, "chord_active", expires.isoformat())
+    guardar_checkpoint(db, ejecucion_id, "chord_active", expires.isoformat())
 
 
-def clear_chord_active(db: Session, execution_id: int) -> None:
+def limpiar_chord_activo(db: Session, ejecucion_id: int) -> None:
     """Limpia la marca de chord activo (al iniciar el callback de la fase)."""
-    save_checkpoint(db, execution_id, "chord_active", None)
+    guardar_checkpoint(db, ejecucion_id, "chord_active", None)
 
 
-def clear_checkpoint(db: Session, execution_id: int) -> None:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        execution.phase_checkpoint = None
-        flag_modified(execution, "phase_checkpoint")
+def limpiar_checkpoint(db: Session, ejecucion_id: int) -> None:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if ejecucion:
+        ejecucion.checkpoint_fase = None
+        flag_modified(ejecucion, "checkpoint_fase")
         db.commit()
 
 
-def pause_execution(db: Session, execution_id: int) -> tuple[bool, str]:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if not execution or execution.status != "running":
+def pausar_ejecucion(db: Session, ejecucion_id: int) -> tuple[bool, str]:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if not ejecucion or ejecucion.estado != "running":
         return False, ""
-    task_id = execution.celery_task_id or ""
-    execution.status = "paused"
-    if " (pausado)" not in (execution.current_phase or ""):
-        execution.current_phase = f"{execution.current_phase or ''} (pausado)"
+    task_id = ejecucion.id_tarea_celery or ""
+    ejecucion.estado = "paused"
+    if " (pausado)" not in (ejecucion.fase_actual or ""):
+        ejecucion.fase_actual = f"{ejecucion.fase_actual or ''} (pausado)"
     db.commit()
     return True, task_id
 
 
-def increment_metric(db: Session, execution_id: int, metric_name: str, delta: int = 1) -> None:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        metrics = execution.metrics or {}
-        metrics[metric_name] = metrics.get(metric_name, 0) + delta
-        execution.metrics = metrics
-        flag_modified(execution, "metrics")
+def incrementar_metrica(
+    db: Session, ejecucion_id: int, nombre_metrica: str, delta: int = 1
+) -> None:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if ejecucion:
+        metricas = ejecucion.metricas or {}
+        metricas[nombre_metrica] = metricas.get(nombre_metrica, 0) + delta
+        ejecucion.metricas = metricas
+        flag_modified(ejecucion, "metricas")
         db.flush()
 
 
-def sync_errors_count(db: Session, execution_id: int) -> None:
-    """Sincroniza la columna ``errors_count`` con el total de errores en vivo.
+def sincronizar_conteo_errores(db: Session, ejecucion_id: int) -> None:
+    """Sincroniza la columna ``conteo_errores`` con el total de errores en vivo.
 
     Antes solo se escribía al completar la ejecución; durante ``running`` el
     semáforo y las listas mostraban 0 aunque ya hubiera errores.
     """
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if execution:
-        metrics = execution.metrics or {}
-        execution.errors_count = metrics.get("total_errors", 0)
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if ejecucion:
+        metricas = ejecucion.metricas or {}
+        ejecucion.conteo_errores = metricas.get("total_errors", 0)
         db.flush()
 
 
-def should_pause(db: Session, execution_id: int) -> bool:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    return execution is not None and execution.status == "paused"
+def debe_pausarse(db: Session, ejecucion_id: int) -> bool:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    return ejecucion is not None and ejecucion.estado == "paused"
 
 
-def cancel_execution(db: Session, execution_id: int) -> tuple[bool, str]:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    if not execution or execution.status not in ("running", "paused", "queued"):
+def cancelar_ejecucion(db: Session, ejecucion_id: int) -> tuple[bool, str]:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    if not ejecucion or ejecucion.estado not in ("running", "paused", "queued"):
         return False, ""
-    task_id = execution.celery_task_id or ""
-    execution.status = "cancelled"
-    execution.current_phase = f"{execution.current_phase or ''} (cancelado)"
-    execution.completed_at = datetime.now(UTC)
-    execution.duration_seconds = (
-        round((datetime.now(UTC) - execution.started_at).total_seconds())
-        if execution.started_at
+    task_id = ejecucion.id_tarea_celery or ""
+    ejecucion.estado = "cancelled"
+    ejecucion.fase_actual = f"{ejecucion.fase_actual or ''} (cancelado)"
+    ejecucion.completado_en = datetime.now(UTC)
+    ejecucion.duracion_segundos = (
+        round((datetime.now(UTC) - ejecucion.iniciado_en).total_seconds())
+        if ejecucion.iniciado_en
         else 0
     )
     db.commit()
     return True, task_id
 
 
-def should_cancel(db: Session, execution_id: int) -> bool:
-    execution = db.query(Execution).filter(Execution.id == execution_id).first()
-    return execution is not None and execution.status == "cancelled"
+def debe_cancelarse(db: Session, ejecucion_id: int) -> bool:
+    ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
+    return ejecucion is not None and ejecucion.estado == "cancelled"

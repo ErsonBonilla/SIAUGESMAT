@@ -23,7 +23,7 @@ import uuid
 import pytest
 
 from app.core.config import settings
-from app.services.moodle_operations import MoodleService
+from app.services.operaciones_moodle import ServicioMoodle
 
 pytestmark = pytest.mark.integration
 logger = logging.getLogger(__name__)
@@ -32,10 +32,10 @@ logger = logging.getLogger(__name__)
 def _get_service():
     """Obtiene una instancia de MoodleService para DISTANCIA."""
     try:
-        cfg = settings.get_moodle_config("DISTANCIA")
+        cfg = settings.obtener_config_moodle("DISTANCIA")
     except ValueError:
         pytest.skip("MOODLE_URL__DISTANCIA no configurada en .env")
-    return MoodleService(
+    return ServicioMoodle(
         token=cfg["token"],
         base_url=cfg["url"],
         version=cfg["version"],
@@ -52,7 +52,7 @@ class TestRealMoodleCategoria:
 
         try:
             # Crear
-            await ms.create_categories(
+            await ms.crear_categorias(
                 [
                     {
                         "name": f"CAT INTEGRACION {uid}",
@@ -61,12 +61,12 @@ class TestRealMoodleCategoria:
                     }
                 ]
             )
-            cats = await ms.get_categories(idnumber=cat_idn)
+            cats = await ms.obtener_categorias(idnumber=cat_idn)
             assert cats, "La categoría no se encontró después de crearla"
 
             # Eliminar
-            await ms.delete_category(int(cats[0]["id"]), recursive=True)
-            cats2 = await ms.get_categories(idnumber=cat_idn)
+            await ms.eliminar_categoria(int(cats[0]["id"]), recursive=True)
+            cats2 = await ms.obtener_categorias(idnumber=cat_idn)
             assert not cats2, "La categoría no se eliminó correctamente"
         finally:
             await ms.close()
@@ -83,7 +83,7 @@ class TestRealMoodleCurso:
 
         try:
             # Crear categoría padre primero
-            await ms.create_categories(
+            await ms.crear_categorias(
                 [
                     {
                         "name": f"CAT INT {uid}",
@@ -94,7 +94,7 @@ class TestRealMoodleCurso:
             )
 
             # Crear curso
-            r = await ms.create_courses(
+            r = await ms.crear_cursos(
                 [
                     {
                         "shortname": sn,
@@ -109,19 +109,19 @@ class TestRealMoodleCurso:
             assert r[0].get("id"), "El curso creado no tiene ID"
 
             # Verificar que existe via get_courses(shortname=...)
-            courses = await ms.get_courses(shortname=sn)
+            courses = await ms.obtener_cursos(shortname=sn)
             assert courses, "get_courses(shortname) no encontró el curso"
             assert courses[0]["id"] == r[0]["id"]
 
             # Eliminar
-            await ms.delete_courses([sn])
-            courses2 = await ms.get_courses(shortname=sn)
+            await ms.eliminar_cursos([sn])
+            courses2 = await ms.obtener_cursos(shortname=sn)
             assert not courses2, "El curso no se eliminó"
 
             # Limpiar categoría
-            cats = await ms.get_categories(idnumber=cat_idn)
+            cats = await ms.obtener_categorias(idnumber=cat_idn)
             if cats:
-                await ms.delete_category(int(cats[0]["id"]), recursive=True)
+                await ms.eliminar_categoria(int(cats[0]["id"]), recursive=True)
         finally:
             await ms.close()
 
@@ -136,7 +136,7 @@ class TestRealMoodleUsuario:
 
         try:
             # Crear
-            await ms.create_users(
+            await ms.crear_usuarios(
                 [
                     {
                         "username": username,
@@ -147,13 +147,13 @@ class TestRealMoodleUsuario:
                     }
                 ]
             )
-            users = await ms.get_users("username", [username])
+            users = await ms.obtener_usuarios("username", [username])
             assert users, "El usuario no se encontró después de crearlo"
             assert users[0]["username"] == username
 
             # Eliminar
-            await ms.delete_users([username])
-            users2 = await ms.get_users("username", [username])
+            await ms.eliminar_usuarios([username])
+            users2 = await ms.obtener_usuarios("username", [username])
             assert not users2, "El usuario no se eliminó"
         finally:
             await ms.close()
@@ -171,7 +171,7 @@ class TestRealMoodleFlujoCompleto:
 
         try:
             # 1. Crear categoría
-            await ms.create_categories(
+            await ms.crear_categorias(
                 [
                     {
                         "name": f"FLOW CAT {uid}",
@@ -180,11 +180,11 @@ class TestRealMoodleFlujoCompleto:
                     }
                 ]
             )
-            cats = await ms.get_categories(idnumber=cat_idn)
+            cats = await ms.obtener_categorias(idnumber=cat_idn)
             assert cats, "1. Crear categoría falló"
 
             # 2. Crear curso
-            r = await ms.create_courses(
+            r = await ms.crear_cursos(
                 [
                     {
                         "shortname": sn,
@@ -198,7 +198,7 @@ class TestRealMoodleFlujoCompleto:
             assert r and r[0].get("id"), "2. Crear curso falló"
 
             # 3. Crear usuario
-            await ms.create_users(
+            await ms.crear_usuarios(
                 [
                     {
                         "username": username,
@@ -209,24 +209,24 @@ class TestRealMoodleFlujoCompleto:
                     }
                 ]
             )
-            users = await ms.get_users("username", [username])
+            users = await ms.obtener_usuarios("username", [username])
             assert users, "3. Crear usuario falló"
 
             # 4. Eliminar usuario
-            await ms.delete_users([username])
-            users2 = await ms.get_users("username", [username])
+            await ms.eliminar_usuarios([username])
+            users2 = await ms.obtener_usuarios("username", [username])
             assert not users2, "4. Eliminar usuario falló"
 
             # 5. Eliminar curso
-            await ms.delete_courses([sn])
-            courses = await ms.get_courses(shortname=sn)
+            await ms.eliminar_cursos([sn])
+            courses = await ms.obtener_cursos(shortname=sn)
             assert not courses, "5. Eliminar curso falló"
 
             # 6. Eliminar categoría
-            cats = await ms.get_categories(idnumber=cat_idn)
+            cats = await ms.obtener_categorias(idnumber=cat_idn)
             if cats:
-                await ms.delete_category(int(cats[0]["id"]), recursive=True)
-                cats2 = await ms.get_categories(idnumber=cat_idn)
+                await ms.eliminar_categoria(int(cats[0]["id"]), recursive=True)
+                cats2 = await ms.obtener_categorias(idnumber=cat_idn)
                 assert not cats2, "6. Eliminar categoría falló"
         finally:
             await ms.close()
@@ -242,7 +242,7 @@ class TestRealMoodleCursoConTemplate:
         sn = f"TEST_INT_NTPL_{uid}"
 
         try:
-            await ms.create_categories(
+            await ms.crear_categorias(
                 [
                     {
                         "name": f"CAT NTPL {uid}",
@@ -252,7 +252,7 @@ class TestRealMoodleCursoConTemplate:
                 ]
             )
 
-            r = await ms.create_courses(
+            r = await ms.crear_cursos(
                 [
                     {
                         "shortname": sn,
@@ -265,16 +265,16 @@ class TestRealMoodleCursoConTemplate:
             )
             assert r and r[0].get("id"), "create_courses sin template falló"
 
-            courses = await ms.get_courses(shortname=sn)
+            courses = await ms.obtener_cursos(shortname=sn)
             assert courses, "get_courses(shortname) no encontró el curso"
 
-            await ms.delete_courses([sn])
-            courses2 = await ms.get_courses(shortname=sn)
+            await ms.eliminar_cursos([sn])
+            courses2 = await ms.obtener_cursos(shortname=sn)
             assert not courses2, "El curso no se eliminó"
 
-            cats = await ms.get_categories(idnumber=cat_idn)
+            cats = await ms.obtener_categorias(idnumber=cat_idn)
             if cats:
-                await ms.delete_category(int(cats[0]["id"]), recursive=True)
+                await ms.eliminar_categoria(int(cats[0]["id"]), recursive=True)
         finally:
             await ms.close()
 
@@ -287,7 +287,7 @@ class TestRealMoodleCursoConTemplate:
         sn = f"TEST_INT_IMP_{uid}"
 
         try:
-            await ms.create_categories(
+            await ms.crear_categorias(
                 [
                     {
                         "name": f"CAT IMP {uid}",
@@ -297,12 +297,12 @@ class TestRealMoodleCursoConTemplate:
                 ]
             )
 
-            templates = await ms.get_courses(shortname=settings.DEFAULT_COURSE_TEMPLATE)
+            templates = await ms.obtener_cursos(shortname=settings.DEFAULT_COURSE_TEMPLATE)
             assert templates, f"Template '{settings.DEFAULT_COURSE_TEMPLATE}' no existe"
             template_id = int(templates[0]["id"])
 
             # Paso 1: crear curso vacío (activa instancia enrol manual)
-            r = await ms.create_courses(
+            r = await ms.crear_cursos(
                 [
                     {
                         "shortname": sn,
@@ -317,16 +317,16 @@ class TestRealMoodleCursoConTemplate:
             course_id = int(r[0]["id"])
 
             # Paso 2: importar contenido de la plantilla
-            await ms.import_course_content(from_id=template_id, to_id=course_id)
+            await ms.importar_contenido_curso(from_id=template_id, to_id=course_id)
             logger.info(f"Plantilla {template_id} importada a curso {course_id}")
 
-            await ms.delete_courses([sn])
-            courses2 = await ms.get_courses(shortname=sn)
+            await ms.eliminar_cursos([sn])
+            courses2 = await ms.obtener_cursos(shortname=sn)
             assert not courses2, "El curso no se eliminó"
 
-            cats = await ms.get_categories(idnumber=cat_idn)
+            cats = await ms.obtener_categorias(idnumber=cat_idn)
             if cats:
-                await ms.delete_category(int(cats[0]["id"]), recursive=True)
+                await ms.eliminar_categoria(int(cats[0]["id"]), recursive=True)
         finally:
             await ms.close()
 
@@ -339,7 +339,7 @@ class TestRealMoodleCursoConTemplate:
         sn = f"TEST_INT_DUP_{uid}"
 
         try:
-            await ms.create_categories(
+            await ms.crear_categorias(
                 [
                     {
                         "name": f"CAT DUP {uid}",
@@ -348,13 +348,13 @@ class TestRealMoodleCursoConTemplate:
                     }
                 ]
             )
-            cats = await ms.get_categories(idnumber=cat_idn)
+            cats = await ms.obtener_categorias(idnumber=cat_idn)
             cat_id = int(cats[0]["id"])
 
-            templates = await ms.get_courses(shortname=settings.DEFAULT_COURSE_TEMPLATE)
+            templates = await ms.obtener_cursos(shortname=settings.DEFAULT_COURSE_TEMPLATE)
             template_id = int(templates[0]["id"])
 
-            r = await ms.duplicate_course(
+            r = await ms.duplicar_curso(
                 from_id=template_id,
                 fullname=f"CURSO DUP {uid}",
                 shortname=sn,
@@ -363,9 +363,9 @@ class TestRealMoodleCursoConTemplate:
             )
             assert r and r.get("id"), "duplicate_course falló"
 
-            await ms.delete_courses([sn])
-            cats = await ms.get_categories(idnumber=cat_idn)
+            await ms.eliminar_cursos([sn])
+            cats = await ms.obtener_categorias(idnumber=cat_idn)
             if cats:
-                await ms.delete_category(int(cats[0]["id"]), recursive=True)
+                await ms.eliminar_categoria(int(cats[0]["id"]), recursive=True)
         finally:
             await ms.close()

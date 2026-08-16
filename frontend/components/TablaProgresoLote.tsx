@@ -1,35 +1,35 @@
-import { CheckIcon, SpinnerIcon, XMarkIcon } from "../utils/icons.tsx";
-import type { OperationBatchStatus } from "../services/api.ts";
-import BatchReportsSection from "./BatchReportsSection.tsx";
-import Pagination from "./Pagination.tsx";
-import ProgressBar from "./ProgressBar.tsx";
+import { IconoCheck, IconoSpinner, IconoX } from "../utils/iconos.tsx";
+import type { EstadoLoteOperacion } from "../services/api.ts";
+import SeccionReportesLote from "./SeccionReportesLote.tsx";
+import Paginacion from "./Paginacion.tsx";
+import BarraProgreso from "./BarraProgreso.tsx";
 
-interface BatchProgressTableProps {
-  batchStatus: OperationBatchStatus;
+interface PropsTablaProgresoLote {
+  estadoLote: EstadoLoteOperacion;
   batchId: string;
-  labelSingular: string;
-  labelPlural: string;
-  onPause?: () => void;
-  onResume?: () => void;
-  onCancel?: () => void;
+  etiquetaSingular: string;
+  etiquetaPlural: string;
+  alPausar?: () => void;
+  alReanudar?: () => void;
+  alCancelar?: () => void;
   pagination?: {
     offset: number;
-    pageSize: number;
-    onPageChange: (offset: number) => void;
+    tamanoPagina: number;
+    alCambiarPagina: (offset: number) => void;
   };
 }
 
-export default function BatchProgressTable(
+export default function TablaProgresoLote(
   {
-    batchStatus,
+    estadoLote,
     batchId,
-    labelSingular,
-    labelPlural,
-    onPause,
-    onResume,
-    onCancel,
+    etiquetaSingular,
+    etiquetaPlural,
+    alPausar,
+    alReanudar,
+    alCancelar,
     pagination,
-  }: BatchProgressTableProps,
+  }: PropsTablaProgresoLote,
 ) {
   return (
     <div class="mt-6 bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6">
@@ -40,48 +40,48 @@ export default function BatchProgressTable(
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-5 mb-6">
         <div class="p-3 rounded-lg bg-[var(--bg-tertiary)] text-center">
           <div class="text-2xl font-bold text-[var(--text-primary)]">
-            {batchStatus.total}
+            {estadoLote.total}
           </div>
           <div class="text-xs text-[var(--text-secondary)]">Total</div>
         </div>
         <div class="p-3 rounded-lg bg-[var(--bg-tertiary)] text-center">
           <div class="text-2xl font-bold text-[var(--brand-green)]">
-            {batchStatus.completed}
+            {estadoLote.completed}
           </div>
           <div class="text-xs text-[var(--text-secondary)]">Completados</div>
         </div>
         <div class="p-3 rounded-lg bg-[var(--bg-tertiary)] text-center">
           <div class="text-2xl font-bold text-[var(--brand-red)]">
-            {batchStatus.failed}
+            {estadoLote.failed}
           </div>
           <div class="text-xs text-[var(--text-secondary)]">Fallidos</div>
         </div>
         <div class="p-3 rounded-lg bg-[var(--bg-tertiary)] text-center">
           <div class="text-2xl font-bold text-yellow-600">
-            {batchStatus.processing + batchStatus.pending}
+            {estadoLote.processing + estadoLote.pending}
           </div>
           <div class="text-xs text-[var(--text-secondary)]">Pendientes</div>
         </div>
       </div>
 
       {(() => {
-        const total = batchStatus.total || 1;
-        const done = batchStatus.completed + batchStatus.failed;
+        const total = estadoLote.total || 1;
+        const done = estadoLote.completed + estadoLote.failed;
         const pct = Math.round(done / total * 100);
-        const running = batchStatus.pending > 0 || batchStatus.processing > 0;
+        const running = estadoLote.pending > 0 || estadoLote.processing > 0;
         return (
           <>
-            <ProgressBar
-              currentPhase={running
-                ? `Procesando ${labelPlural}...`
-                : `${labelSingular} procesados`}
-              currentStep={running ? 1 : 4}
-              progressPct={running ? pct : 100}
+            <BarraProgreso
+              faseActual={running
+                ? `Procesando ${etiquetaPlural}...`
+                : `${etiquetaSingular} procesados`}
+              pasoActual={running ? 1 : 4}
+              porcentajeProgreso={running ? pct : 100}
               status={running ? "running" : "completed"}
             />
             {!running && (
               <div class="mt-4">
-                <BatchReportsSection batchId={batchId} />
+                <SeccionReportesLote batchId={batchId} />
                 <a
                   href={`/operaciones/lotes/${batchId}`}
                   class="mt-3 inline-block text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] no-underline"
@@ -94,32 +94,32 @@ export default function BatchProgressTable(
         );
       })()}
 
-      {(batchStatus.pending > 0 || batchStatus.processing > 0 ||
-        batchStatus.paused > 0) && (
+      {(estadoLote.pending > 0 || estadoLote.processing > 0 ||
+        estadoLote.paused > 0) && (
         <div class="flex justify-end gap-2 mt-3">
-          {(batchStatus.pending > 0 || batchStatus.processing > 0) && onPause &&
+          {(estadoLote.pending > 0 || estadoLote.processing > 0) && alPausar &&
             (
               <button
                 type="button"
-                onClick={onPause}
+                onClick={alPausar}
                 class="px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-400 hover:bg-amber-500 text-white transition"
               >
                 ⏸ Pausa
               </button>
             )}
-          {batchStatus.paused > 0 && onResume && (
+          {estadoLote.paused > 0 && alReanudar && (
             <button
               type="button"
-              onClick={onResume}
+              onClick={alReanudar}
               class="px-3 py-1.5 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition"
             >
               ▶ Reanudar
             </button>
           )}
-          {onCancel && (
+          {alCancelar && (
             <button
               type="button"
-              onClick={onCancel}
+              onClick={alCancelar}
               class="px-3 py-1.5 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-700 text-white transition"
             >
               ✖ Cancelar
@@ -133,7 +133,7 @@ export default function BatchProgressTable(
           <thead>
             <tr class="border-b border-[var(--border-primary)]">
               <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">
-                {labelSingular}
+                {etiquetaSingular}
               </th>
               <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">
                 Estado
@@ -144,7 +144,7 @@ export default function BatchProgressTable(
             </tr>
           </thead>
           <tbody>
-            {batchStatus.details.map((d) => (
+            {estadoLote.details.map((d) => (
               <tr
                 key={d.identifier}
                 class="border-b border-[var(--border-primary)]"
@@ -155,17 +155,17 @@ export default function BatchProgressTable(
                 <td class="py-2 px-2">
                   {d.status === "completed" && (
                     <span class="flex items-center gap-1 text-[var(--brand-green)]">
-                      <CheckIcon class="w-3 h-3" />Completado
+                      <IconoCheck class="w-3 h-3" />Completado
                     </span>
                   )}
                   {d.status === "failed" && (
                     <span class="flex items-center gap-1 text-[var(--brand-red)]">
-                      <XMarkIcon class="w-3 h-3" />Fallido
+                      <IconoX class="w-3 h-3" />Fallido
                     </span>
                   )}
                   {d.status === "processing" && (
                     <span class="flex items-center gap-1 text-yellow-600">
-                      <SpinnerIcon class="animate-spin w-3 h-3" />Procesando
+                      <IconoSpinner class="animate-spin w-3 h-3" />Procesando
                     </span>
                   )}
                   {d.status === "pending" && (
@@ -182,12 +182,12 @@ export default function BatchProgressTable(
       </div>
 
       {pagination && (
-        <Pagination
+        <Paginacion
           offset={pagination.offset}
-          pageSize={pagination.pageSize}
-          total={batchStatus.total}
+          tamanoPagina={pagination.tamanoPagina}
+          total={estadoLote.total}
           label="registros"
-          onPageChange={pagination.onPageChange}
+          alCambiarPagina={pagination.alCambiarPagina}
         />
       )}
     </div>

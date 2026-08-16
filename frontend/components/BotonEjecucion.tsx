@@ -1,13 +1,13 @@
-// components/ExecutionButton.tsx
-import type { TabKey } from "../utils/operations-tabs.ts";
+// components/BotonEjecucion.tsx
+import type { ClavePestana } from "../utils/pestanas-operaciones.ts";
 
-interface ExecutionButtonProps {
-  tab: TabKey;
+interface PropsBotonEjecucion {
+  tab: ClavePestana;
   label?: string;
 }
 
-export default function ExecutionButton(
-  { tab, label = "Ejecución" }: ExecutionButtonProps,
+export default function BotonEjecucion(
+  { tab, label = "Ejecución" }: PropsBotonEjecucion,
 ) {
   const goToExecution = () => {
     window.location.href = `/operaciones/ejecuciones?tab=${tab}`;

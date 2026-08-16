@@ -1,15 +1,15 @@
-from app.pipeline.course_comparison.thresholds import (
-    DEFAULT_COURSE_DISAPPEARED_AGE_SECONDS,
+from app.pipeline.comparacion_cursos.umbrales import (
+    EDAD_DESAPARICION_CURSO_SEGUNDOS,
 )
-from app.pipeline.course_comparison.utils import (
-    build_base_key,
-    get_course_age_seconds,
-    is_course_hidden,
+from app.pipeline.comparacion_cursos.utilidades import (
+    construir_clave_base,
+    es_curso_oculto,
+    obtener_edad_curso_segundos,
 )
-from app.pipeline.shortnames import parse_shortname
+from app.pipeline.nombres_cortos import parsear_shortname
 
 
-def find_disappeared_courses(
+def encontrar_cursos_desaparecidos(
     existing_by_shortname: dict[str, dict],
     existing_by_base_key: dict[tuple[str, ...], list[dict]],
     new_shortnames: set,
@@ -20,21 +20,21 @@ def find_disappeared_courses(
     alerts: list[dict],
     logs: list[dict],
     *,
-    disappeared_age_seconds: int = DEFAULT_COURSE_DISAPPEARED_AGE_SECONDS,
+    disappeared_age_seconds: int = EDAD_DESAPARICION_CURSO_SEGUNDOS,
 ):
     for sn, existing in existing_by_shortname.items():
         if sn in new_shortnames:
             continue
 
-        parsed = parse_shortname(sn)
+        parsed = parsear_shortname(sn)
         if parsed:
             if parsed["cod_prog"] not in new_program_codes:
                 continue
-            base_key = build_base_key(parsed)
+            base_key = construir_clave_base(parsed)
             if base_key in new_base_keys:
                 continue
 
-        age = get_course_age_seconds(existing)
+        age = obtener_edad_curso_segundos(existing)
         if age >= disappeared_age_seconds:
             to_delete.append(
                 {
@@ -59,7 +59,7 @@ def find_disappeared_courses(
                     "detail": {"reason": "disappeared", "age_seconds": age},
                 }
             )
-        elif not is_course_hidden(existing):
+        elif not es_curso_oculto(existing):
             to_hide.append(
                 {
                     "shortname": sn,

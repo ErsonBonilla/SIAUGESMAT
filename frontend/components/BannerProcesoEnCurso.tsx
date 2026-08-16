@@ -1,15 +1,15 @@
-// components/ProcessInProgressBanner.tsx
-import type { UploadStatus } from "../services/api.ts";
+// components/BannerProcesoEnCurso.tsx
+import type { EstadoSubida } from "../services/api.ts";
 
 interface Props {
-  status: UploadStatus | null;
+  status: EstadoSubida | null;
 }
 
 /**
  * Aviso mostrado cuando hay un proceso en ejecución que impide subir
  * nuevos archivos hasta que finalice.
  */
-export default function ProcessInProgressBanner({ status }: Props) {
+export default function BannerProcesoEnCurso({ status }: Props) {
   if (!status || status.allowed) return null;
 
   const what = status.execution

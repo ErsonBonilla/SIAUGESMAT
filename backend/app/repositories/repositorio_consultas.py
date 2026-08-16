@@ -2,21 +2,21 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from app.db.models import QueryResult
+from app.db.modelos import ResultadoConsulta
 
 
-def get_query(db: Session, task_id: str) -> QueryResult | None:
-    return db.query(QueryResult).filter_by(task_id=task_id).first()
+def obtener_consulta(db: Session, id_tarea: str) -> ResultadoConsulta | None:
+    return db.query(ResultadoConsulta).filter_by(id_tarea=id_tarea).first()
 
 
-def create_query(
-    db: Session, task_id: str, entity: str, params: dict, modalidad: str
-) -> QueryResult:
-    qr = QueryResult(
-        task_id=task_id,
-        entity=entity,
-        params=params,
-        status="pending",
+def crear_consulta(
+    db: Session, id_tarea: str, entidad: str, parametros: dict, modalidad: str
+) -> ResultadoConsulta:
+    qr = ResultadoConsulta(
+        id_tarea=id_tarea,
+        entidad=entidad,
+        parametros=parametros,
+        estado="pending",
         modalidad=modalidad,
     )
     db.add(qr)
@@ -24,45 +24,47 @@ def create_query(
     return qr
 
 
-def set_query_running(db: Session, task_id: str) -> QueryResult | None:
-    qr = db.query(QueryResult).filter_by(task_id=task_id).first()
+def marcar_consulta_en_ejecucion(db: Session, id_tarea: str) -> ResultadoConsulta | None:
+    qr = db.query(ResultadoConsulta).filter_by(id_tarea=id_tarea).first()
     if qr:
-        qr.status = "running"
-        qr.error_message = None
-        qr.result_json = None
-        qr.completed_at = None
+        qr.estado = "running"
+        qr.mensaje_error = None
+        qr.resultado_json = None
+        qr.completado_en = None
         db.commit()
     return qr
 
 
-def set_query_completed(
-    db: Session, task_id: str, result_json, total_count: int
-) -> QueryResult | None:
-    qr = db.query(QueryResult).filter_by(task_id=task_id).first()
+def marcar_consulta_completada(
+    db: Session, id_tarea: str, resultado_json, conteo_total: int
+) -> ResultadoConsulta | None:
+    qr = db.query(ResultadoConsulta).filter_by(id_tarea=id_tarea).first()
     if qr:
-        qr.result_json = result_json
-        qr.total_count = total_count
-        qr.status = "completed"
-        qr.completed_at = datetime.now(UTC)
+        qr.resultado_json = resultado_json
+        qr.conteo_total = conteo_total
+        qr.estado = "completed"
+        qr.completado_en = datetime.now(UTC)
         db.commit()
     return qr
 
 
-def set_query_failed(db: Session, task_id: str, error_message: str) -> QueryResult | None:
-    qr = db.query(QueryResult).filter_by(task_id=task_id).first()
+def marcar_consulta_fallida(
+    db: Session, id_tarea: str, mensaje_error: str
+) -> ResultadoConsulta | None:
+    qr = db.query(ResultadoConsulta).filter_by(id_tarea=id_tarea).first()
     if qr:
-        qr.status = "failed"
-        qr.error_message = error_message[:500]
-        qr.completed_at = datetime.now(UTC)
+        qr.estado = "failed"
+        qr.mensaje_error = mensaje_error[:500]
+        qr.completado_en = datetime.now(UTC)
         db.commit()
     return qr
 
 
-def delete_old_queries(db: Session, days: int) -> int:
+def eliminar_consultas_antiguas(db: Session, days: int) -> int:
     cutoff = datetime.now(UTC) - timedelta(days=days)
     deleted = (
-        db.query(QueryResult)
-        .filter(QueryResult.created_at < cutoff)
+        db.query(ResultadoConsulta)
+        .filter(ResultadoConsulta.creado_en < cutoff)
         .delete(synchronize_session=False)
     )
     db.commit()

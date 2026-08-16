@@ -1,7 +1,7 @@
 import {
-  downloadReport,
-  getBatchReportFileUrl,
-  getBatchReportUrl,
+  descargarReporte,
+  obtenerUrlArchivoReporteLote,
+  obtenerUrlDescargaReporteLote,
 } from "../services/api.ts";
 
 const BATCH_REPORT_LABELS: Record<string, string> = {
@@ -20,12 +20,12 @@ const BATCH_REPORT_NAMES = [
   "resumen",
 ] as const;
 
-interface BatchReportsSectionProps {
+interface PropsSeccionReportesLote {
   batchId: string;
 }
 
-export default function BatchReportsSection(
-  { batchId }: BatchReportsSectionProps,
+export default function SeccionReportesLote(
+  { batchId }: PropsSeccionReportesLote,
 ) {
   const shortId = batchId.slice(0, 8);
 
@@ -43,8 +43,8 @@ export default function BatchReportsSection(
         <button
           type="button"
           onClick={() =>
-            downloadReport(
-              getBatchReportUrl(batchId),
+            descargarReporte(
+              obtenerUrlDescargaReporteLote(batchId),
               `reportes_${shortId}.zip`,
             )}
           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-[var(--brand-red)] to-[var(--brand-green)] text-white text-xs font-medium hover:brightness-110 transition cursor-pointer"
@@ -71,8 +71,8 @@ export default function BatchReportsSection(
             key={name}
             type="button"
             onClick={() =>
-              downloadReport(
-                getBatchReportFileUrl(batchId, name),
+              descargarReporte(
+                obtenerUrlArchivoReporteLote(batchId, name),
                 `${name}.csv`,
               )}
             class="px-2.5 py-1 rounded border border-[var(--border-secondary)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] transition cursor-pointer bg-[var(--bg-primary)]"

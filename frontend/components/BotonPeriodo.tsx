@@ -1,4 +1,4 @@
-import { MONTH_LABELS } from "../utils/constants.ts";
+import { ETIQUETAS_MESES } from "../utils/constantes.ts";
 
 interface Props {
   period: "A" | "B";
@@ -7,7 +7,7 @@ interface Props {
   onClick: () => void;
 }
 
-export default function PeriodButton(
+export default function BotonPeriodo(
   { period, selected, disabled, onClick }: Props,
 ) {
   return (
@@ -23,7 +23,7 @@ export default function PeriodButton(
     >
       <div class="leading-tight">{period}</div>
       <div class="text-[10px] opacity-80 leading-tight">
-        {MONTH_LABELS[period]}
+        {ETIQUETAS_MESES[period]}
       </div>
     </button>
   );

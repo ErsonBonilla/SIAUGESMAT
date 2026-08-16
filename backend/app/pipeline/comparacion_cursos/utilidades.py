@@ -1,34 +1,34 @@
 from datetime import UTC, datetime
 
-from app.pipeline.course_index import (
-    build_base_key,
-    build_base_key_str,
-    build_enrolment_map,
-    index_courses,
+from app.pipeline.indice_cursos import (
+    construir_cadena_clave_base,
+    construir_clave_base,
+    construir_mapa_matriculaciones,
+    indexar_cursos,
 )
-from app.pipeline.shortnames import parse_shortname
+from app.pipeline.nombres_cortos import parsear_shortname
 
 __all__ = [
-    "build_base_key",
-    "build_base_key_str",
-    "build_enrolment_map",
-    "first_visible",
-    "get_course_age_seconds",
-    "get_course_professor",
-    "get_suffix",
-    "index_courses",
-    "is_course_hidden",
+    "construir_cadena_clave_base",
+    "construir_clave_base",
+    "construir_mapa_matriculaciones",
+    "es_curso_oculto",
+    "indexar_cursos",
+    "obtener_edad_curso_segundos",
+    "obtener_profesor_curso",
+    "obtener_sufijo",
+    "primer_visible",
 ]
 
 
-def get_suffix(shortname: str) -> str:
-    parsed = parse_shortname(shortname)
+def obtener_sufijo(shortname: str) -> str:
+    parsed = parsear_shortname(shortname)
     if not parsed:
         return ""
     return parsed["suffix"] or ""
 
 
-def get_course_professor(course: dict) -> str | None:
+def obtener_profesor_curso(course: dict) -> str | None:
     custom = course.get("customfields", [])
     for field in custom:
         if field.get("shortname") == "professor":
@@ -36,18 +36,18 @@ def get_course_professor(course: dict) -> str | None:
     return None
 
 
-def get_course_age_seconds(course: dict) -> int:
+def obtener_edad_curso_segundos(course: dict) -> int:
     created = course.get("timecreated", 0)
     if not created:
         created = course.get("startdate", 0)
     return int(datetime.now(UTC).timestamp()) - created
 
 
-def is_course_hidden(course: dict) -> bool:
+def es_curso_oculto(course: dict) -> bool:
     return course.get("visible", 1) == 0
 
 
-def first_visible(candidates: list[dict]) -> dict:
+def primer_visible(candidates: list[dict]) -> dict:
     for c in candidates:
         if c.get("visible", 1) == 1:
             return c

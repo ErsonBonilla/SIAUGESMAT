@@ -3,7 +3,7 @@
 Category = dict[str, object]
 
 
-def classify_categories(
+def clasificar_categorias(
     etl_categories: list[Category],
     existing_idnumbers: set,
     all_categories_map: dict[str, Category],

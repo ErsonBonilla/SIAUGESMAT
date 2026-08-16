@@ -7,13 +7,13 @@ class TestCeleryAppConfig:
 
     def test_imports(self):
         expected = [
-            "app.workers.tasks",
-            "app.workers.phases.item_task",
-            "app.workers.phases.common",
-            "app.workers.phases.orchestrator",
-            "app.workers.cleanup_tasks",
-            "app.workers.operations_tasks",
-            "app.workers.query_tasks",
+            "app.workers.tareas",
+            "app.workers.phases.tarea_item",
+            "app.workers.phases.comunes",
+            "app.workers.phases.orquestador",
+            "app.workers.tareas_limpieza",
+            "app.workers.tareas_operaciones",
+            "app.workers.tareas_consultas",
         ]
         imports = celery_app.conf.get("imports")
         for mod in expected:

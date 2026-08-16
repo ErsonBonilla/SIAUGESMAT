@@ -1,8 +1,8 @@
 // routes/_app.tsx
 import type { PageProps } from "@fresh/core";
-import ErrorBoundary from "../components/ErrorBoundary.tsx";
-import ToastContainer from "../islands/NotificacionIsland.tsx";
-import { DARK_THEME_VARS, LIGHT_THEME_VARS } from "../utils/theme.ts";
+import LimiteError from "../components/LimiteError.tsx";
+import ContenedorToast from "../islands/NotificacionIsland.tsx";
+import { DARK_THEME_VARS, LIGHT_THEME_VARS } from "../utils/tema.ts";
 
 interface AppState {
   theme?: string;
@@ -49,10 +49,10 @@ export default function App({ Component, state }: PageProps<AppState>) {
       </head>
       <body class="min-h-screen bg-[var(--bg-primary)]">
         <div class="page-enter">
-          <ErrorBoundary>
+          <LimiteError>
             <Component />
-          </ErrorBoundary>
-          <ToastContainer />
+          </LimiteError>
+          <ContenedorToast />
         </div>
       </body>
     </html>

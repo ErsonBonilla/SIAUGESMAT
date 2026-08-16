@@ -12,7 +12,7 @@ from io import BytesIO
 _OLE2_CFB_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
 
-def is_excel_content(data: bytes) -> bool:
+def es_contenido_excel(data: bytes) -> bool:
     """Devuelve True si los bytes parecen un archivo Excel legible.
 
     Replica la detección automática del motor calamine: acepta libros

@@ -1,9 +1,9 @@
 import { useSignal } from "@preact/signals";
-import { useReports } from "../hooks/useReports.ts";
-import type { ReportInfo } from "../services/api.ts";
-import Button from "./Button.tsx";
-import LoadingSkeleton from "./LoadingSkeleton.tsx";
-import { formatSize, REPORT_LABELS } from "../utils/reports.ts";
+import { useReportes } from "../hooks/useReportes.ts";
+import type { InfoReporte } from "../services/api.ts";
+import Boton from "./Boton.tsx";
+import EsqueletoCarga from "./EsqueletoCarga.tsx";
+import { ETIQUETAS_REPORTES, formatearTamano } from "../utils/reportes.ts";
 
 const REPORT_GROUPS = [
   {
@@ -41,17 +41,17 @@ const REPORT_GROUPS = [
   },
 ];
 
-interface ReportsSectionProps {
+interface PropsSeccionReportes {
   executionId: number;
 }
 
-export default function ReportsSection({ executionId }: ReportsSectionProps) {
+export default function SeccionReportes({ executionId }: PropsSeccionReportes) {
   const open = useSignal(false);
-  const { reports, loading, error, download, downloadAll } = useReports({
+  const { reports, loading, error, download, descargarTodos } = useReportes({
     executionId,
   });
 
-  if (loading.value) return <LoadingSkeleton />;
+  if (loading.value) return <EsqueletoCarga />;
   if (error.value || reports.value.length === 0) return null;
 
   const reportsMap = new Map(reports.value.map((r) => [r.name, r]));
@@ -61,7 +61,7 @@ export default function ReportsSection({ executionId }: ReportsSectionProps) {
   };
 
   const handleDownloadAll = () => {
-    downloadAll();
+    descargarTodos();
   };
 
   return (
@@ -87,7 +87,7 @@ export default function ReportsSection({ executionId }: ReportsSectionProps) {
 
       {open.value && (
         <div class="mt-4 space-y-4 animate-scaleIn">
-          <Button
+          <Boton
             variant="primary"
             onClick={handleDownloadAll}
             style={{
@@ -98,12 +98,12 @@ export default function ReportsSection({ executionId }: ReportsSectionProps) {
           >
             <span>📦</span>
             <span>Descargar todo (ZIP)</span>
-          </Button>
+          </Boton>
 
           {REPORT_GROUPS.map((group) => {
             const groupReports = group.keys
               .map((k) => reportsMap.get(k))
-              .filter((r): r is ReportInfo =>
+              .filter((r): r is InfoReporte =>
                 r !== undefined
               );
             if (groupReports.length === 0) return null;
@@ -123,11 +123,11 @@ export default function ReportsSection({ executionId }: ReportsSectionProps) {
                       class="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-sm transition cursor-pointer border-none report-row"
                     >
                       <span class="truncate">
-                        {REPORT_LABELS[r.name] ?? r.name}
+                        {ETIQUETAS_REPORTES[r.name] ?? r.name}
                       </span>
                       <span class="shrink-0 flex items-center gap-2">
                         <span class="text-xs text-[var(--text-muted)]">
-                          {formatSize(r.size)}
+                          {formatearTamano(r.size)}
                         </span>
                         <span>📥</span>
                       </span>

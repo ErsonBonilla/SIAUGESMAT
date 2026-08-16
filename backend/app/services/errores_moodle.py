@@ -6,11 +6,11 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
-class MoodleOverloadedError(Exception):
+class ErrorMoodleSobrecargado(Exception):
     """El servidor de Moodle está sobrecargado. Celery reintentará la tarea."""
 
 
-def is_moodle_overloaded(e: BaseException) -> bool:
+def es_moodle_sobrecargado(e: BaseException) -> bool:
     """Retorna True si el error es transitorio (servidor sobrecargado, timeout, o errores DB de Moodle)."""
     if isinstance(e, httpx.HTTPStatusError):
         return e.response.status_code in (502, 503, 504)
@@ -24,7 +24,7 @@ def is_moodle_overloaded(e: BaseException) -> bool:
             inner = e.last_attempt.exception() or inner
         except Exception:
             logger.debug("No se pudo obtener last_attempt.exception()")
-    if isinstance(inner, MoodleAPIError) and inner.error_code in (
+    if isinstance(inner, ErrorApiMoodle) and inner.codigo_error in (
         "invalidrecord",
         "storedfilenotcreated",
         "invalidcoursemodule",
@@ -37,21 +37,21 @@ def is_moodle_overloaded(e: BaseException) -> bool:
     )
 
 
-def _is_retryable_error(exception: BaseException) -> bool:
+def _es_error_reintentable(exception: BaseException) -> bool:
     """Solo reintenta errores HTTP 5xx (servidor), errores de Moodle retryables
     y la sobrecarga transitoria de Moodle."""
-    if isinstance(exception, MoodleOverloadedError):
+    if isinstance(exception, ErrorMoodleSobrecargado):
         return True
     if isinstance(exception, httpx.HTTPStatusError):
         return exception.response.status_code >= 500
     if isinstance(exception, httpx.HTTPError):
         return True
-    if isinstance(exception, MoodleAPIError):
-        return exception.is_retryable
+    if isinstance(exception, ErrorApiMoodle):
+        return exception.es_reintentable
     return False
 
 
-class MoodleAPIError(Exception):
+class ErrorApiMoodle(Exception):
     """Excepción lanzada cuando la API de Moodle devuelve un error."""
 
     NON_RETRYABLE_CODES = frozenset(
@@ -104,21 +104,21 @@ class MoodleAPIError(Exception):
 
     def __init__(self, message: str, error_code: str | None = None):
         super().__init__(message)
-        self.error_code = error_code
+        self.codigo_error = error_code
 
     @property
-    def is_retryable(self) -> bool:
-        return self.error_code not in self.NON_RETRYABLE_CODES
+    def es_reintentable(self) -> bool:
+        return self.codigo_error not in self.NON_RETRYABLE_CODES
 
     @property
-    def spanish_message(self) -> str:
-        if self.error_code and self.error_code in self.ERROR_CODES:
-            msg = self.ERROR_CODES[self.error_code]
+    def mensaje_espanol(self) -> str:
+        if self.codigo_error and self.codigo_error in self.ERROR_CODES:
+            msg = self.ERROR_CODES[self.codigo_error]
         else:
             msg = str(self.args[0]) if self.args else "Error desconocido de Moodle."
-        if self.error_code:
-            return f"[{self.error_code}] {msg}"
+        if self.codigo_error:
+            return f"[{self.codigo_error}] {msg}"
         return msg
 
     def __str__(self):
-        return self.spanish_message
+        return self.mensaje_espanol

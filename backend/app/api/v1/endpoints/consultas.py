@@ -12,14 +12,14 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_db
-from app.repositories.query_repo import (
-    create_query,
-    get_query,
+from app.core.dependencies import obtener_db, obtener_usuario_actual
+from app.repositories.repositorio_consultas import (
+    crear_consulta,
+    obtener_consulta,
 )
-from app.schemas.api import QueryEnqueuedResponse
-from app.schemas.user import UserInToken
-from app.services.orchestration import enqueue_async_query
+from app.schemas.respuestas import RespuestaConsultaEncolada
+from app.schemas.usuario import UsuarioEnToken
+from app.services.orquestacion import encolar_consulta_async
 
 logger = logging.getLogger(__name__)
 
@@ -122,86 +122,91 @@ ENTITY_CSV_EXTRACT = {
 }
 
 
-def _csv_download(qr):
-    entity = qr.entity
-    headers = ENTITY_CSV_HEADERS.get(entity, ["data"])
-    extract = ENTITY_CSV_EXTRACT.get(entity, lambda x: [str(x)])
-    data = qr.result_json or []
+def _descargar_csv(qr):
+    entidad = qr.entidad
+    headers = ENTITY_CSV_HEADERS.get(entidad, ["data"])
+    extract = ENTITY_CSV_EXTRACT.get(entidad, lambda x: [str(x)])
+    data = qr.resultado_json or []
 
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(headers)
-    for row in data:
-        writer.writerow(extract(row))
-    output.seek(0)
+    def _generar():
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(headers)
+        yield buffer.getvalue().encode("utf-8-sig")
+        for row in data:
+            buffer.seek(0)
+            buffer.truncate()
+            writer.writerow(extract(row))
+            yield buffer.getvalue().encode("utf-8")
+
     return StreamingResponse(
-        iter([output.getvalue().encode("utf-8-sig")]),
+        _generar(),
         media_type="text/csv",
         headers={
-            "Content-Disposition": f"attachment; filename={entity}_consulta_{qr.task_id[:8]}.csv"
+            "Content-Disposition": f"attachment; filename={entidad}_consulta_{qr.id_tarea[:8]}.csv"
         },
     )
 
 
 @router.post(
-    "/{entity}", response_model=QueryEnqueuedResponse, summary="Encolar consulta asíncrona"
+    "/{entidad}", response_model=RespuestaConsultaEncolada, summary="Encolar consulta asíncrona"
 )
-async def enqueue_query(
-    entity: str,
+async def encolar_consulta(
+    entidad: str,
     body: dict = Body(default={}),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    if entity not in ENTITY_LABELS:
-        raise HTTPException(400, f"Entidad desconocida: {entity}")
+    if entidad not in ENTITY_LABELS:
+        raise HTTPException(400, f"Entidad desconocida: {entidad}")
 
-    task_id = str(uuid.uuid4())
-    create_query(db, task_id, entity, body, current_user.modalidad)
-    enqueue_async_query(task_id)
+    id_tarea = str(uuid.uuid4())
+    crear_consulta(db, id_tarea, entidad, body, usuario_actual.modalidad)
+    encolar_consulta_async(id_tarea)
 
-    label = ENTITY_LABELS[entity].lower()
-    logger.info(f"Consulta de {label} encolada (task={task_id[:8]}) por {current_user.username}")
+    label = ENTITY_LABELS[entidad].lower()
+    logger.info(f"Consulta de {label} encolada (task={id_tarea[:8]}) por {usuario_actual.username}")
 
     return {
-        "task_id": task_id,
-        "entity": entity,
+        "task_id": id_tarea,
+        "entity": entidad,
         "status": "pending",
         "message": f"Consulta de {label} encolada. Esperando resultado...",
     }
 
 
-@router.get("/tasks/{task_id}", summary="Consultar estado de una consulta")
-def get_task_status(
-    task_id: str,
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+@router.get("/tasks/{id_tarea}", summary="Consultar estado de una consulta")
+def obtener_estado_tarea(
+    id_tarea: str,
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    qr = get_query(db, task_id)
+    qr = obtener_consulta(db, id_tarea)
     if not qr:
         raise HTTPException(404, "Tarea de consulta no encontrada")
 
     response = {
-        "task_id": qr.task_id,
-        "entity": qr.entity,
-        "status": qr.status,
-        "total_count": qr.total_count,
+        "task_id": qr.id_tarea,
+        "entity": qr.entidad,
+        "status": qr.estado,
+        "total_count": qr.conteo_total,
     }
-    if qr.status == "completed":
-        response["result"] = qr.result_json
-    elif qr.status == "failed":
-        response["error"] = qr.error_message
+    if qr.estado == "completed":
+        response["result"] = qr.resultado_json
+    elif qr.estado == "failed":
+        response["error"] = qr.mensaje_error
     return response
 
 
-@router.get("/tasks/{task_id}/download", summary="Descargar resultado como CSV")
-def download_task_csv(
-    task_id: str,
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+@router.get("/tasks/{id_tarea}/download", summary="Descargar resultado como CSV")
+def descargar_csv_tarea(
+    id_tarea: str,
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    qr = get_query(db, task_id)
+    qr = obtener_consulta(db, id_tarea)
     if not qr:
         raise HTTPException(404, "Tarea de consulta no encontrada")
-    if qr.status != "completed":
+    if qr.estado != "completed":
         raise HTTPException(409, "La consulta aún no ha finalizado")
-    return _csv_download(qr)
+    return _descargar_csv(qr)

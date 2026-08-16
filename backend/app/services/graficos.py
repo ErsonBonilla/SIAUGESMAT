@@ -5,8 +5,8 @@ from typing import Any, ClassVar
 
 import plotly.graph_objects as go
 
-from app.db.models import Execution, ExecutionLog
-from app.pipeline.shortnames import SHORTNAME_PATTERN
+from app.db.modelos import Ejecucion, RegistroEjecucion
+from app.pipeline.nombres_cortos import SHORTNAME_PATTERN
 
 logger = logging.getLogger(__name__)
 
@@ -49,21 +49,21 @@ PALETTE_CATEGORICAL_DARK = [
 ]
 
 
-def _get_palette(theme: str = "light") -> dict:
+def _obtener_paleta(theme: str = "light") -> dict:
     return PALETTE_DARK if theme == "dark" else PALETTE_LIGHT
 
 
-def _get_categorical(theme: str = "light") -> list:
+def _obtener_categorico(theme: str = "light") -> list:
     return PALETTE_CATEGORICAL_DARK if theme == "dark" else PALETTE_CATEGORICAL_LIGHT
 
 
-def _cat_prefix_from_shortname(shortname: str) -> str | None:
+def _prefijo_cat_desde_shortname(shortname: str) -> str | None:
     m = SHORTNAME_PATTERN.match(shortname)
     return m.group("cat_prefix") if m else None
 
 
-def _default_fig(title: str, theme: str = "light") -> go.Figure:
-    palette = _get_palette(theme)
+def _figura_por_defecto(title: str, theme: str = "light") -> go.Figure:
+    palette = _obtener_paleta(theme)
     fig = go.Figure()
     fig.update_layout(
         title={"text": title, "font": {"size": 16, "color": palette["negro"]}},
@@ -78,7 +78,7 @@ def _default_fig(title: str, theme: str = "light") -> go.Figure:
     return fig
 
 
-class ChartService:
+class ServicioGraficos:
     CHART_NAMES: ClassVar[dict[str, str]] = {
         "resumen_ejecutivo": "1_resumen_ejecutivo",
         "tasa_exito": "2_tasa_exito",
@@ -88,7 +88,7 @@ class ChartService:
     }
 
     @classmethod
-    def generate_all(cls, execution: Execution, logs: list[ExecutionLog], report_dir: str):
+    def generar_todos(cls, execution: Ejecucion, logs: list[RegistroEjecucion], report_dir: str):
         for key, prefix in cls.CHART_NAMES.items():
             method = getattr(cls, key, None)
             if not method:
@@ -109,21 +109,22 @@ class ChartService:
                 logger.exception(f"Error generando gráfico {key}: {e}")
 
     @classmethod
-    def _figure_to_dict(cls, fig: go.Figure) -> dict[str, Any]:
+    def _figura_a_dict(cls, fig: go.Figure) -> dict[str, Any]:
         return {
             "traces": [t.to_plotly_json() for t in fig.data],
             "layout": fig.layout.to_plotly_json(),
         }
 
-    # ------------------------------------------------------------------
-    # 1. Resumen ejecutivo — 4 KPIs en barras horizontales
-    # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # 1. Resumen ejecutivo — 4 KPIs en barras horizontales
+        # ------------------------------------------------------------------
+
     @classmethod
     def resumen_ejecutivo(
-        cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light"
+        cls, execution: Ejecucion, logs: list[RegistroEjecucion], theme: str = "light"
     ) -> go.Figure:
-        palette = _get_palette(theme)
-        m = execution.metrics or {}
+        palette = _obtener_paleta(theme)
+        m = execution.metricas or {}
         labels = ["Cursos creados", "Usuarios nuevos", "Matrículas exitosas", "Errores totales"]
         values = [
             m.get("courses_created", 0),
@@ -132,7 +133,7 @@ class ChartService:
             m.get("total_errors", 0),
         ]
         colors = [palette["verde"], palette["verde"], palette["verde"], palette["rojo"]]
-        fig = _default_fig("", theme)
+        fig = _figura_por_defecto("", theme)
         fig.add_trace(
             go.Bar(
                 y=labels,
@@ -155,24 +156,25 @@ class ChartService:
 
     @classmethod
     def resumen_ejecutivo_json(cls, execution, logs, theme="light"):
-        return cls._figure_to_dict(cls.resumen_ejecutivo(execution, logs, theme))
+        return cls._figura_a_dict(cls.resumen_ejecutivo(execution, logs, theme))
 
-    # ------------------------------------------------------------------
-    # 2. Tasa de éxito de matrícula — donut con % grande al centro
-    # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # 2. Tasa de éxito de matrícula — donut con % grande al centro
+        # ------------------------------------------------------------------
+
     @classmethod
     def tasa_exito(
-        cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light"
+        cls, execution: Ejecucion, logs: list[RegistroEjecucion], theme: str = "light"
     ) -> go.Figure:
-        palette = _get_palette(theme)
-        m = execution.metrics or {}
+        palette = _obtener_paleta(theme)
+        m = execution.metricas or {}
         ok = m.get("enrolments", 0)
         fail = m.get("enrolment_errors", 0)
         total = ok + fail
         rate = round(ok / total * 100, 1) if total > 0 else 0
         color = palette["verde"] if rate >= 95 else ("#F59E0B" if rate >= 85 else palette["rojo"])
 
-        fig = _default_fig("", theme)
+        fig = _figura_por_defecto("", theme)
         fig.add_trace(
             go.Pie(
                 labels=["Exitosas", "Fallidas"],
@@ -205,21 +207,22 @@ class ChartService:
 
     @classmethod
     def tasa_exito_json(cls, execution, logs, theme="light"):
-        return cls._figure_to_dict(cls.tasa_exito(execution, logs, theme))
+        return cls._figura_a_dict(cls.tasa_exito(execution, logs, theme))
 
-    # ------------------------------------------------------------------
-    # 3. Top 10 programas — barras horizontales por cantidad de cursos
-    # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # 3. Top 10 programas — barras horizontales por cantidad de cursos
+        # ------------------------------------------------------------------
+
     @classmethod
     def top_programas(
-        cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light"
+        cls, execution: Ejecucion, logs: list[RegistroEjecucion], theme: str = "light"
     ) -> go.Figure:
-        palette = _get_palette(theme)
+        palette = _obtener_paleta(theme)
         counts: dict[str, int] = defaultdict(int)
         for log_entry in logs:
-            sn = log_entry.identifier or ""
-            prefix = _cat_prefix_from_shortname(sn)
-            if prefix and log_entry.action in (
+            sn = log_entry.identificador or ""
+            prefix = _prefijo_cat_desde_shortname(sn)
+            if prefix and log_entry.accion in (
                 "course_created",
                 "course_created_with_template",
                 "course_recreated",
@@ -229,7 +232,7 @@ class ChartService:
         sorted_items = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:10]
         labels = [program_names.get(k, k) for k, _ in sorted_items]
         values = [v for _, v in sorted_items]
-        fig = _default_fig("", theme)
+        fig = _figura_por_defecto("", theme)
         fig.add_trace(
             go.Bar(
                 y=labels,
@@ -253,27 +256,28 @@ class ChartService:
 
     @classmethod
     def top_programas_json(cls, execution, logs, theme="light"):
-        return cls._figure_to_dict(cls.top_programas(execution, logs, theme))
+        return cls._figura_a_dict(cls.top_programas(execution, logs, theme))
 
-    # ------------------------------------------------------------------
-    # 4. Distribución de usuarios — donut nuevos vs existentes
-    # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # 4. Distribución de usuarios — donut nuevos vs existentes
+        # ------------------------------------------------------------------
+
     @classmethod
     def distribucion_usuarios(
-        cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light"
+        cls, execution: Ejecucion, logs: list[RegistroEjecucion], theme: str = "light"
     ) -> go.Figure:
-        palette = _get_palette(theme)
-        nuevos = sum(1 for log in logs if log.action == "user_created_createpassword")
-        resueltos = sum(1 for log in logs if log.action == "user_resolved")
+        palette = _obtener_paleta(theme)
+        nuevos = sum(1 for log in logs if log.accion == "user_created_createpassword")
+        resueltos = sum(1 for log in logs if log.accion == "user_resolved")
         total = nuevos + resueltos
         if total == 0:
-            fig = _default_fig("", theme)
+            fig = _figura_por_defecto("", theme)
             fig.update_layout(
                 title={"text": "Usuarios", "font": {"size": 16, "color": palette["negro"]}}
             )
             fig.add_annotation(text="Sin datos", showarrow=False, font={"color": palette["negro"]})
             return fig
-        fig = _default_fig("", theme)
+        fig = _figura_por_defecto("", theme)
         pct_nuevos = round(nuevos / total * 100)
         fig.add_trace(
             go.Pie(
@@ -306,16 +310,17 @@ class ChartService:
 
     @classmethod
     def distribucion_usuarios_json(cls, execution, logs, theme="light"):
-        return cls._figure_to_dict(cls.distribucion_usuarios(execution, logs, theme))
+        return cls._figura_a_dict(cls.distribucion_usuarios(execution, logs, theme))
 
-    # ------------------------------------------------------------------
-    # 5. Top 5 incidencias — barras horizontales por frecuencia
-    # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # 5. Top 5 incidencias — barras horizontales por frecuencia
+        # ------------------------------------------------------------------
+
     @classmethod
     def top_incidencias(
-        cls, execution: Execution, logs: list[ExecutionLog], theme: str = "light"
+        cls, execution: Ejecucion, logs: list[RegistroEjecucion], theme: str = "light"
     ) -> go.Figure:
-        palette = _get_palette(theme)
+        palette = _obtener_paleta(theme)
         incidencia_labels = {
             "enrolment_failed": "Matrícula fallida",
             "alert_disappeared_recent": "Curso desaparecido reciente",
@@ -325,11 +330,11 @@ class ChartService:
         }
         counts: dict[str, int] = defaultdict(int)
         for log_entry in logs:
-            label = incidencia_labels.get(log_entry.action)
+            label = incidencia_labels.get(log_entry.accion)
             if label:
                 counts[label] += 1
         if not counts:
-            fig = _default_fig("", theme)
+            fig = _figura_por_defecto("", theme)
             fig.update_layout(
                 title={"text": "Incidencias", "font": {"size": 16, "color": palette["negro"]}}
             )
@@ -342,7 +347,7 @@ class ChartService:
         sorted_items = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:5]
         labels = [k for k, _ in sorted_items]
         values = [v for _, v in sorted_items]
-        fig = _default_fig("", theme)
+        fig = _figura_por_defecto("", theme)
         fig.add_trace(
             go.Bar(
                 y=labels,
@@ -366,4 +371,4 @@ class ChartService:
 
     @classmethod
     def top_incidencias_json(cls, execution, logs, theme="light"):
-        return cls._figure_to_dict(cls.top_incidencias(execution, logs, theme))
+        return cls._figura_a_dict(cls.top_incidencias(execution, logs, theme))

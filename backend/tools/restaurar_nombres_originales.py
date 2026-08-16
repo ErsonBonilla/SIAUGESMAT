@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.core.config import settings
-from app.services.moodle_factory import get_moodle_service
+from app.services.fabrica_moodle import obtener_servicio_moodle
 
 logger = logging.getLogger(__name__)
 
@@ -194,10 +194,11 @@ async def _delete_user_by_id(ms, user_id: int) -> bool:
         logger.exception(f"  Fallo al eliminar userid={user_id}: {e}")
         return False
 
+        # ---------------------------------------------------------------------------
+        # Load data
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Load data
-# ---------------------------------------------------------------------------
+
 def load_pairs() -> list:
     if not DATA_FILE.exists():
         print(f"ERROR: No se encontro {DATA_FILE}")
@@ -225,10 +226,11 @@ def load_pairs() -> list:
             )
     return pairs
 
+    # ---------------------------------------------------------------------------
+    # Classification
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Classification
-# ---------------------------------------------------------------------------
+
 async def classify_all(ms, pairs: list) -> list:
     """Consulta Moodle para cada par y clasifica: SAFE, AUTH_FIX, CONFLICT, GONE, ALREADY_OK."""
     all_news = [p["new"] for p in pairs]
@@ -267,10 +269,11 @@ async def classify_all(ms, pairs: list) -> list:
             results.append({"pair": p, "status": "GONE"})
     return results
 
+    # ---------------------------------------------------------------------------
+    # Audit / Read-only
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Audit / Read-only
-# ---------------------------------------------------------------------------
+
 async def run_audit(ms, pairs: list):
     print(f"\n  Clasificando {len(pairs)} pares contra Moodle...\n")
     classified = await classify_all(ms, pairs)
@@ -308,10 +311,11 @@ async def run_audit(ms, pairs: list):
     print(f"  >>> {len(counts.get('GONE', []))} requieren --recreate-gone")
     print(f"  >>> {len(counts.get('CONFLICT', []))} requieren --conflicts-fix\n")
 
+    # ---------------------------------------------------------------------------
+    # Fix: rename back SAFE + AUTH_FIX pairs
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Fix: rename back SAFE + AUTH_FIX pairs
-# ---------------------------------------------------------------------------
+
 async def run_fix(ms, pairs: list):
     print("\n  Renombrando usuarios de vuelta a su username original...\n")
     classified = await classify_all(ms, pairs)
@@ -322,7 +326,7 @@ async def run_fix(ms, pairs: list):
         print("  No hay casos por restaurar.\n")
         return
 
-    # Step 1: fix auth for AUTH_FIX_RENAME cases
+        # Step 1: fix auth for AUTH_FIX_RENAME cases
     auth_fix = [c for c in to_fix if c["status"] == "AUTH_FIX_RENAME"]
     if auth_fix:
         print(f"  Paso 1: Fijando auth=manual en {len(auth_fix)} usuarios (auth=db)...")
@@ -330,7 +334,7 @@ async def run_fix(ms, pairs: list):
         ok, fail = await _update_batch_auth(ms, users)
         print(f"  [OK] auth=manual: {ok} | [FAIL]: {fail}\n")
 
-    # Step 2: rename
+        # Step 2: rename
     print(f"  Paso 2: Renombrando {len(to_fix)} usuarios...")
     ok = fail = 0
     restored = []
@@ -364,10 +368,11 @@ async def run_fix(ms, pairs: list):
                 print(f"  [WARN] {p['old']}: no se pudo verificar o auth != manual")
         print(f"  Verificados: {verified}/{ok}\n")
 
+        # ---------------------------------------------------------------------------
+        # Recreate GONE accounts + re-enrol
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Recreate GONE accounts + re-enrol
-# ---------------------------------------------------------------------------
+
 async def run_recreate_gone(ms, pairs: list):
     classified = await classify_all(ms, pairs)
     gone = [c for c in classified if c["status"] == "GONE"]
@@ -408,10 +413,11 @@ async def run_recreate_gone(ms, pairs: list):
 
     print("  Recreacion completada.\n")
 
+    # ---------------------------------------------------------------------------
+    # Conflicts fix: keep original username account, auth manual + re-enrol
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Conflicts fix: keep original username account, auth manual + re-enrol
-# ---------------------------------------------------------------------------
+
 async def run_conflicts_fix(ms, pairs: list):
     classified = await classify_all(ms, pairs)
     conflicts = [c for c in classified if c["status"] == "CONFLICT"]
@@ -442,7 +448,7 @@ async def run_conflicts_fix(ms, pairs: list):
                 print("    [FAIL] No se pudo fijar auth")
                 continue
 
-        # Re-enrol original account from courses data
+                # Re-enrol original account from courses data
         courses = p["courses"]
         if courses and old_user.get("id"):
             print(f"    Re-matriculando en {len(courses)} cursos...")
@@ -458,10 +464,11 @@ async def run_conflicts_fix(ms, pairs: list):
 
     print("  Conflictos resueltos.\n")
 
+    # ---------------------------------------------------------------------------
+    # CSV notification
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# CSV notification
-# ---------------------------------------------------------------------------
+
 def generate_csv(pairs: list, output_path: str):
     rows = []
     for p in pairs:
@@ -489,10 +496,11 @@ def generate_csv(pairs: list, output_path: str):
         writer.writerows(rows)
     print(f"  CSV generado: {output_path} ({len(rows)} docentes)\n")
 
+    # ---------------------------------------------------------------------------
+    # Main
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+
 async def main():
     parser = argparse.ArgumentParser(
         description="Restaura usernames originales de Moodle renombrados por el bug del ETL"
@@ -527,7 +535,7 @@ async def main():
     pairs = load_pairs()
     print(f"  {len(pairs)} pares cargados desde {DATA_FILE}")
 
-    ms = get_moodle_service(args.modalidad)
+    ms = obtener_servicio_moodle(args.modalidad)
 
     try:
         if args.audit:

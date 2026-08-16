@@ -86,7 +86,7 @@ export const LIGHT_THEME_VARS: Record<string, string> = {
   "--brand-orange": "#f97316",
 };
 
-export function applyThemeVars(
+export function aplicarVariablesTema(
   root: HTMLElement,
   vars: Record<string, string>,
 ) {

@@ -4,40 +4,40 @@ from celery import chord
 
 from app.celery_app import celery_app
 from app.core.config import settings
-from app.db.session import SessionLocal
-from app.integrations.moodle import MoodleIntegration
-from app.repositories.execution_repo import (
-    get_checkpoint,
-    get_execution,
-    increment_metric,
-    mark_failed,
-    save_checkpoint,
-    set_chord_active,
-    update_progress,
+from app.db.sesion import SessionLocal
+from app.integrations.integracion_moodle import IntegracionMoodle
+from app.repositories.repositorio_ejecuciones import (
+    actualizar_progreso,
+    guardar_checkpoint,
+    incrementar_metrica,
+    marcar_chord_activo,
+    marcar_fallido,
+    obtener_checkpoint,
+    obtener_ejecucion,
 )
-from app.repositories.log_repo import save_error, save_log
-from app.services.error_messages import translate_error
-from app.services.moodle_factory import get_moodle_service
-from app.workers.phases.base import PhaseContext
-from app.workers.phases.common import (
-    _get_pending_items,
-    _launch_items_chord,
-    on_phase_items_done,
-    on_users_done,
+from app.repositories.repositorio_registros import guardar_error, guardar_log
+from app.services.fabrica_moodle import obtener_servicio_moodle
+from app.services.mensajes_error import traducir_error
+from app.workers.phases.base import ContextoFase
+from app.workers.phases.comunes import (
+    _lanzar_chord_items,
+    _obtener_items_pendientes,
+    al_terminar_items_fase,
+    al_terminar_usuarios,
 )
-from app.workers.phases.item_task import process_etl_item
-from app.workers.phases.phase3_structure import (
-    _create_phase3_items,
-    _launch_delete_chord,
+from app.workers.phases.fase3_estructura import (
+    _crear_items_fase3,
+    _lanzar_chord_eliminacion,
 )
-from app.workers.phases.phase4_people import _create_phase4_items
-from app.workers.utils import _run_async
+from app.workers.phases.fase4_personas import _create_phase4_items
+from app.workers.phases.tarea_item import procesar_item_etl
+from app.workers.utilidades import _ejecutar_async
 
 logger = logging.getLogger(__name__)
 
 
-def _save_phase_2_data_to_checkpoint(db, eid, etl_data, metrics, phase2_data, modalidad, mode):
-    save_checkpoint(
+def _guardar_datos_fase2_en_checkpoint(db, eid, etl_data, metrics, phase2_data, modalidad, mode):
+    guardar_checkpoint(
         db,
         eid,
         "phase3_ctx",
@@ -58,45 +58,50 @@ def _save_phase_2_data_to_checkpoint(db, eid, etl_data, metrics, phase2_data, mo
     )
 
 
-@celery_app.task(bind=True, soft_time_limit=3600, time_limit=7200)
-def process_etl_phase(self, execution_id: int, phase: str):
+@celery_app.task(
+    name="app.workers.phases.orchestrator.process_etl_phase",
+    bind=True,
+    soft_time_limit=3600,
+    time_limit=7200,
+)
+def procesar_fase_etl(self, execution_id: int, phase: str):
     db = SessionLocal()
     try:
-        execution = get_execution(db, execution_id)
+        execution = obtener_ejecucion(db, execution_id)
         if not execution:
             logger.error(f"Ejecución {execution_id} no encontrada para FASE {phase}")
             return
-        if execution.status in ("paused", "cancelled"):
-            logger.info(f"FASE {phase}: ejecución {execution.status}, no se lanzan subtareas")
+        if execution.estado in ("paused", "cancelled"):
+            logger.info(f"FASE {phase}: ejecución {execution.estado}, no se lanzan subtareas")
             return
 
-        phase3_ctx = get_checkpoint(db, execution_id) or {}
+        phase3_ctx = obtener_checkpoint(db, execution_id) or {}
         ctx_data = phase3_ctx.get("phase3_ctx", {})
         comparison = ctx_data.get("comparison", {})
         modalidad = ctx_data.get("modalidad", execution.modalidad or "DISTANCIA")
-        mode = ctx_data.get("mode", execution.mode or "both")
+        mode = ctx_data.get("mode", execution.modo or "both")
 
-        def _do_courses():
+        def _procesar_cursos():
             return mode in ("courses", "both")
 
-        def _do_users():
+        def _procesar_usuarios():
             return mode in ("users", "both")
 
         if phase == "3":
-            update_progress(db, execution_id, 34, "Preparando items de estructura…", step=3)
+            actualizar_progreso(db, execution_id, 34, "Preparando items de estructura…", paso=3)
 
-            if _do_courses() and ctx_data.get("missing_categories"):
+            if _procesar_cursos() and ctx_data.get("missing_categories"):
 
-                async def _create_cats():
-                    ms = get_moodle_service(modalidad)
+                async def _crear_categorias():
+                    ms = obtener_servicio_moodle(modalidad)
                     try:
                         for cat in ctx_data["missing_categories"]:
-                            existing = await ms.get_categories(idnumber=cat["idnumber"])
+                            existing = await ms.obtener_categorias(idnumber=cat["idnumber"])
                             if existing:
                                 logger.info(f"Categoría {cat['idnumber']} ya existe, omitiendo")
                                 continue
-                            await ms.create_categories([cat])
-                            save_log(
+                            await ms.crear_categorias([cat])
+                            guardar_log(
                                 db,
                                 execution_id,
                                 "3",
@@ -107,25 +112,25 @@ def process_etl_phase(self, execution_id: int, phase: str):
                                     "parent": cat.get("parent", ""),
                                 },
                             )
-                            increment_metric(db, execution_id, "categories_created")
+                            incrementar_metrica(db, execution_id, "categories_created")
                     finally:
                         await ms.close()
 
                 try:
-                    _run_async(_create_cats())
+                    _ejecutar_async(_crear_categorias())
                 except Exception as e:
                     logger.exception(f"Error creando categorías: {e}")
-                    save_error(db, execution_id, "3", None, translate_error(e))
+                    guardar_error(db, execution_id, "3", None, traducir_error(e))
 
             cats_to_relocate = ctx_data.get("categories_to_relocate", [])
-            if _do_courses() and cats_to_relocate:
+            if _procesar_cursos() and cats_to_relocate:
 
-                async def _relocate_cats():
-                    ms = get_moodle_service(modalidad)
-                    integ = MoodleIntegration(ms)
+                async def _reubicar_categorias():
+                    ms = obtener_servicio_moodle(modalidad)
+                    integ = IntegracionMoodle(ms)
                     try:
                         for cat in cats_to_relocate:
-                            ok = await integ.relocate_category(
+                            ok = await integ.reubicar_categoria(
                                 idnumber=cat["idnumber"],
                                 moodle_id=cat["moodle_id"],
                                 target_parent_idn=cat["expected_parent_idn"],
@@ -136,128 +141,130 @@ def process_etl_phase(self, execution_id: int, phase: str):
                         await ms.close()
 
                 try:
-                    _run_async(_relocate_cats())
+                    _ejecutar_async(_reubicar_categorias())
                 except Exception as e:
                     logger.exception(f"Error reubicando categorías: {e}")
-                    save_error(db, execution_id, "3", None, translate_error(e))
+                    guardar_error(db, execution_id, "3", None, traducir_error(e))
 
             if not comparison:
                 logger.info("FASE 3: sin datos de comparación, saltando")
-                on_phase_items_done.delay([], execution_id, "3")
+                al_terminar_items_fase.delay([], execution_id, "3")
                 return
 
-            update_progress(db, execution_id, 34, "Resolviendo templates y creando items…", step=3)
-            item_counts = _create_phase3_items(db, execution_id, ctx_data, comparison, modalidad)
+            actualizar_progreso(
+                db, execution_id, 34, "Resolviendo templates y creando items…", paso=3
+            )
+            item_counts = _crear_items_fase3(db, execution_id, ctx_data, comparison, modalidad)
             total = sum(item_counts.values())
             if total == 0:
                 logger.info("FASE 3: sin items que procesar")
-                on_phase_items_done.delay([], execution_id, "3")
+                al_terminar_items_fase.delay([], execution_id, "3")
                 return
 
-            delete_items = _get_pending_items(db, execution_id, "3", "delete")
-            structure_items = _get_pending_items(db, execution_id, "3", "structure")
+            delete_items = _obtener_items_pendientes(db, execution_id, "3", "delete")
+            structure_items = _obtener_items_pendientes(db, execution_id, "3", "structure")
 
             if delete_items:
                 logger.info(
                     f"FASE 3: lanzando {len(delete_items)} delete(s) + {len(structure_items)} estructura(s)"
                 )
-                _launch_delete_chord(execution_id, delete_items)
+                _lanzar_chord_eliminacion(execution_id, delete_items)
             elif structure_items:
-                _launch_items_chord(execution_id, structure_items)
+                _lanzar_chord_items(execution_id, structure_items)
             else:
-                on_phase_items_done.delay([], execution_id, "3")
+                al_terminar_items_fase.delay([], execution_id, "3")
 
         elif phase == "4":
-            update_progress(db, execution_id, 65, "Creando items de personas…", step=4)
+            actualizar_progreso(db, execution_id, 65, "Creando items de personas…", paso=4)
             item_counts = _create_phase4_items(db, execution_id, ctx_data, modalidad)
             total = sum(item_counts.values())
             if total == 0:
                 logger.info("FASE 4: sin items que procesar")
-                on_phase_items_done.delay([], execution_id, "4")
+                al_terminar_items_fase.delay([], execution_id, "4")
                 return
 
-            user_items = _get_pending_items(db, execution_id, "4", sub_phase="create_user")
-            enrol_items = _get_pending_items(db, execution_id, "4", sub_phase="enrol")
+            user_items = _obtener_items_pendientes(db, execution_id, "4", sub_phase="create_user")
+            enrol_items = _obtener_items_pendientes(db, execution_id, "4", sub_phase="enrol")
 
             if user_items:
                 logger.info(f"FASE 4: creando {len(user_items)} usuario(s)")
-                set_chord_active(db, execution_id)
-                task_ids = [process_etl_item.si(item.id) for item in user_items]
+                marcar_chord_activo(db, execution_id)
+                task_ids = [procesar_item_etl.si(item.id) for item in user_items]
                 chord(task_ids)(
-                    on_users_done.s(
+                    al_terminar_usuarios.s(
                         execution_id=execution_id,
                     )
                 )
             elif enrol_items:
                 logger.info(f"FASE 4: enrolando {len(enrol_items)} profesor(es)")
-                set_chord_active(db, execution_id)
-                task_ids = [process_etl_item.si(item.id) for item in enrol_items]
-                chord(task_ids)(on_phase_items_done.s(execution_id=execution_id, phase="4"))
+                marcar_chord_activo(db, execution_id)
+                task_ids = [procesar_item_etl.si(item.id) for item in enrol_items]
+                chord(task_ids)(al_terminar_items_fase.s(execution_id=execution_id, phase="4"))
             else:
-                on_phase_items_done.delay([], execution_id, "4")
+                al_terminar_items_fase.delay([], execution_id, "4")
 
     except Exception as e:
         logger.exception(f"Error en FASE {phase}: {e}")
         try:
             db.rollback()
-            save_error(db, execution_id, "critical", None, translate_error(e))
-            mark_failed(db, execution_id, 0)
+            guardar_error(db, execution_id, "critical", None, traducir_error(e))
+            marcar_fallido(db, execution_id, 0)
         except Exception:
             logger.exception("Error en rollback/error handling post-fallo de FASE {phase}")
     finally:
         db.close()
 
 
-def _save_phase_checkpoint(db, eid, ctx: PhaseContext, phase_name: str):
+def _guardar_checkpoint_fase(db, eid, ctx: ContextoFase, phase_name: str):
     if phase_name == "1":
-        save_checkpoint(
+        guardar_checkpoint(
             db,
             eid,
             "1",
             {
-                "cat_idnumbers": list(ctx.existing_cat_idnumbers),
-                "courses": ctx.existing_courses,
-                "username_map": ctx.username_map,
-                "courses_with_teacher": dict(ctx.courses_with_teacher),
+                "cat_idnumbers": list(ctx.idnumeros_categorias_existentes),
+                "courses": ctx.cursos_existentes,
+                "username_map": ctx.mapa_usuarios,
+                "courses_with_teacher": dict(ctx.cursos_con_docente),
             },
         )
     elif phase_name == "2":
-        save_checkpoint(
+        guardar_checkpoint(
             db,
             eid,
             "2",
             {
-                "comparison": _serialize_comparison(ctx.comparison),
-                "missing_categories": ctx.missing_categories,
-                "categories_to_relocate": ctx.categories_to_relocate,
-                "users_to_create": ctx.users_to_create,
-                "resolved_enrolments": ctx.resolved_enrolments,
-                "re_upload": ctx.re_upload,
+                "comparison": _serializar_comparacion(ctx.comparacion),
+                "missing_categories": ctx.categorias_faltantes,
+                "categories_to_relocate": ctx.categorias_a_reubicar,
+                "users_to_create": ctx.usuarios_a_crear,
+                "resolved_enrolments": ctx.matriculas_resueltas,
+                "re_upload": ctx.nueva_subida,
             },
         )
 
 
-def _restore_checkpoint(ctx: PhaseContext, data: dict, phase_name: str):
+def _restaurar_checkpoint(ctx: ContextoFase, data: dict, phase_name: str):
     if phase_name == "1":
-        ctx.existing_cat_idnumbers = set(data.get("cat_idnumbers", []))
-        ctx.existing_courses = data.get("courses", [])
-        ctx.username_map = data.get("username_map", {})
-        ctx.courses_with_teacher = dict(data.get("courses_with_teacher", {}))
+        ctx.idnumeros_categorias_existentes = set(data.get("cat_idnumbers", []))
+        ctx.cursos_existentes = data.get("courses", [])
+        ctx.mapa_usuarios = data.get("username_map", {})
+        ctx.cursos_con_docente = dict(data.get("courses_with_teacher", {}))
     elif phase_name == "2":
-        ctx.comparison = data.get("comparison", {})
-        ctx.missing_categories = data.get("missing_categories", [])
-        ctx.categories_to_relocate = data.get("categories_to_relocate", [])
-        ctx.users_to_create = data.get("users_to_create", [])
-        ctx.resolved_enrolments = data.get("resolved_enrolments", [])
-        ctx.re_upload = data.get("re_upload", False)
+        ctx.comparacion = data.get("comparison", {})
+        ctx.categorias_faltantes = data.get("missing_categories", [])
+        ctx.categorias_a_reubicar = data.get("categories_to_relocate", [])
+        ctx.usuarios_a_crear = data.get("users_to_create", [])
+        ctx.matriculas_resueltas = data.get("resolved_enrolments", [])
+        ctx.nueva_subida = data.get("re_upload", False)
 
 
-def _restore_progress_checkpoint(ctx: PhaseContext, data: dict, phase_name: str):
-    ctx.metrics.update(data.get("metrics", {}))
-    ctx.username_map.update(data.get("username_map", {}))
+def _restaurar_checkpoint_progreso(ctx: ContextoFase, data: dict, phase_name: str):
+    ctx.metricas.update(data.get("metrics", {}))
+    ctx.mapa_usuarios.update(data.get("username_map", {}))
 
 
-def _serialize_comparison(comparison: dict) -> dict:
+def _serializar_comparacion(comparison: dict) -> dict:
     result = {}
     for k, v in comparison.items():
         if k == "logs":
@@ -271,53 +278,53 @@ def _serialize_comparison(comparison: dict) -> dict:
     return result
 
 
-def _is_delete_confirmed(db, execution_id: int) -> bool:
-    from app.db.models import Execution
+def _es_eliminacion_confirmada(db, execution_id: int) -> bool:
+    from app.db.modelos import Ejecucion
 
-    ex = db.query(Execution).filter(Execution.id == execution_id).first()
-    if not ex or not ex.phase_checkpoint:
+    ex = db.query(Ejecucion).filter(Ejecucion.id == execution_id).first()
+    if not ex or not ex.checkpoint_fase:
         return False
-    return ex.phase_checkpoint.get("delete_confirmed", False)
+    return ex.checkpoint_fase.get("delete_confirmed", False)
 
 
-def _require_review(db, execution_id: int, ctx):
+def _requerir_revision(db, execution_id: int, ctx):
     from sqlalchemy.orm.attributes import flag_modified
 
-    from app.db.models import Execution
+    from app.db.modelos import Ejecucion
 
-    ex = db.query(Execution).filter(Execution.id == execution_id).first()
+    ex = db.query(Ejecucion).filter(Ejecucion.id == execution_id).first()
     if ex:
-        to_delete_count = len(ctx.comparison.get("to_delete", []))
-        ex.status = "review_required"
-        ex.current_phase = f"Revisión requerida: {to_delete_count} cursos a eliminar"
-        ex.progress_pct = 30
-        ex.metrics = {
-            **(ex.metrics or {}),
+        to_delete_count = len(ctx.comparacion.get("to_delete", []))
+        ex.estado = "review_required"
+        ex.fase_actual = f"Revisión requerida: {to_delete_count} cursos a eliminar"
+        ex.porcentaje_progreso = 30
+        ex.metricas = {
+            **(ex.metricas or {}),
             "pending_delete_count": to_delete_count,
         }
-        if ex.phase_checkpoint is None:
-            ex.phase_checkpoint = {}
-        ex.phase_checkpoint["delete_review"] = {
+        if ex.checkpoint_fase is None:
+            ex.checkpoint_fase = {}
+        ex.checkpoint_fase["delete_review"] = {
             "to_delete_count": to_delete_count,
-            "to_create_count": len(ctx.comparison.get("to_create", [])),
+            "to_create_count": len(ctx.comparacion.get("to_create", [])),
             "threshold": settings.MAX_AUTO_DELETE_COURSES,
         }
-        flag_modified(ex, "phase_checkpoint")
+        flag_modified(ex, "checkpoint_fase")
         db.commit()
 
 
-def _inc_retry_count(db, execution_id: int) -> int:
+def _incrementar_conteo_reintentos(db, execution_id: int) -> int:
     from sqlalchemy.orm.attributes import flag_modified
 
-    from app.db.models import Execution
+    from app.db.modelos import Ejecucion
 
-    ex = db.query(Execution).filter(Execution.id == execution_id).first()
+    ex = db.query(Ejecucion).filter(Ejecucion.id == execution_id).first()
     if not ex:
         return 0
-    if ex.phase_checkpoint is None:
-        ex.phase_checkpoint = {}
-    count = ex.phase_checkpoint.get("_retry_count", 0) + 1
-    ex.phase_checkpoint["_retry_count"] = count
-    flag_modified(ex, "phase_checkpoint")
+    if ex.checkpoint_fase is None:
+        ex.checkpoint_fase = {}
+    count = ex.checkpoint_fase.get("_retry_count", 0) + 1
+    ex.checkpoint_fase["_retry_count"] = count
+    flag_modified(ex, "checkpoint_fase")
     db.commit()
     return count

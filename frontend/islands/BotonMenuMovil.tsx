@@ -1,7 +1,7 @@
-import { mobileOpenSignal } from "../utils/layout.ts";
-import { Bars3Icon, XMarkIcon } from "../utils/icons.tsx";
+import { mobileOpenSignal } from "../utils/disposicion.ts";
+import { IconoBarras, IconoX } from "../utils/iconos.tsx";
 
-export default function MobileMenuButton() {
+export default function BotonMenuMovil() {
   return (
     <button
       type="button"
@@ -10,8 +10,8 @@ export default function MobileMenuButton() {
       aria-label={mobileOpenSignal.value ? "Cerrar menú" : "Abrir menú"}
     >
       {mobileOpenSignal.value
-        ? <XMarkIcon class="w-6 h-6" />
-        : <Bars3Icon class="w-6 h-6" />}
+        ? <IconoX class="w-6 h-6" />
+        : <IconoBarras class="w-6 h-6" />}
     </button>
   );
 }

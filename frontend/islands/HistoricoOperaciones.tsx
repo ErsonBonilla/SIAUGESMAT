@@ -1,12 +1,12 @@
 import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import {
-  getOperationsAnalytics,
-  type OperationsHistoryItem,
+  type ItemHistorialOperaciones,
+  obtenerAnaliticaOperaciones,
 } from "../services/api.ts";
-import { useChart } from "../utils/chart.ts";
-import ErrorBox from "../components/ErrorBox.tsx";
-import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
+import { useChart } from "../utils/grafico.ts";
+import CajaError from "../components/CajaError.tsx";
+import EsqueletoCarga from "../components/EsqueletoCarga.tsx";
 
 const METRICS = [
   { key: "users_created", name: "Usuarios creados", color: "#00A859" },
@@ -36,7 +36,7 @@ interface Props {
 }
 
 export default function HistoricoOperaciones({ entityType, action }: Props) {
-  const data = useSignal<OperationsHistoryItem[]>([]);
+  const data = useSignal<ItemHistorialOperaciones[]>([]);
   const loading = useSignal(true);
   const error = useSignal("");
   const view = useSignal<"history" | "table">("history");
@@ -46,7 +46,7 @@ export default function HistoricoOperaciones({ entityType, action }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        data.value = await getOperationsAnalytics(
+        data.value = await obtenerAnaliticaOperaciones(
           undefined,
           12,
           entityType,
@@ -124,9 +124,9 @@ export default function HistoricoOperaciones({ entityType, action }: Props) {
 
       <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6">
         {loading.value
-          ? <LoadingSkeleton variant="chart" />
+          ? <EsqueletoCarga variant="chart" />
           : error.value
-          ? <ErrorBox message={error.value} />
+          ? <CajaError message={error.value} />
           : data.value.length === 0
           ? (
             <div class="text-center py-12 text-[var(--text-secondary)]">

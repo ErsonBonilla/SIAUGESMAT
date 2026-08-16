@@ -11,7 +11,7 @@ const TOKEN_KEY = "auth_token";
 // ---------------------------------------------------------------------------
 
 /** Estructura esperada del payload del JWT (claims). */
-export interface TokenPayload {
+export interface PayloadToken {
   exp?: number;
   username?: string;
   [key: string]: unknown;
@@ -26,7 +26,7 @@ export interface TokenPayload {
  * Retorna null si localStorage no está disponible (entorno de servidor)
  * o si el token no existe.
  */
-export function getToken(): string | null {
+export function obtenerToken(): string | null {
   if (typeof localStorage === "undefined") return null;
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -36,7 +36,7 @@ export function getToken(): string | null {
  * En entornos donde localStorage no existe (servidor), la función
  * simplemente no hace nada.
  */
-export function setToken(token: string): void {
+export function guardarToken(token: string): void {
   if (typeof localStorage !== "undefined") {
     localStorage.setItem(TOKEN_KEY, token);
   }
@@ -45,7 +45,7 @@ export function setToken(token: string): void {
 /**
  * Elimina el token JWT de localStorage.
  */
-export function removeToken(): void {
+export function eliminarToken(): void {
   if (typeof localStorage !== "undefined") {
     localStorage.removeItem(TOKEN_KEY);
   }
@@ -71,6 +71,25 @@ function base64UrlDecode(segment: string): string {
 }
 
 /**
+ * Comprueba si un token JWT (string crudo) ha expirado.
+ *
+ * Decodifica el payload sin verificar la firma (la firma ya fue validada por
+ * el backend). Si el token no contiene el campo `exp` se considera no expirado.
+ * Un token malformado se considera expirado.
+ */
+export function tokenHaExpirado(token: string): boolean {
+  try {
+    const payload: PayloadToken = JSON.parse(
+      base64UrlDecode(token.split(".")[1]),
+    );
+    if (!payload.exp) return false;
+    return Date.now() >= payload.exp * 1000;
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Comprueba si el token almacenado en localStorage es válido (no ha expirado).
  *
  * Realiza una decodificación básica del payload sin verificar la firma
@@ -79,19 +98,10 @@ function base64UrlDecode(segment: string): string {
  *
  * @returns `true` si el token existe y no ha expirado, `false` en caso contrario.
  */
-export function isTokenValid(): boolean {
-  const token = getToken();
+export function esTokenValido(): boolean {
+  const token = obtenerToken();
   if (!token) return false;
-
-  try {
-    const payload: TokenPayload = JSON.parse(
-      base64UrlDecode(token.split(".")[1]),
-    );
-    if (!payload.exp) return true; // sin expiración se asume válido
-    return Date.now() < payload.exp * 1000;
-  } catch {
-    return false;
-  }
+  return !tokenHaExpirado(token);
 }
 
 /**
@@ -100,8 +110,8 @@ export function isTokenValid(): boolean {
  * @returns Un objeto con los claims del token, o `null` si el token
  *          no existe o no se puede decodificar.
  */
-export function getTokenPayload(): TokenPayload | null {
-  const token = getToken();
+export function obtenerPayloadToken(): PayloadToken | null {
+  const token = obtenerToken();
   if (!token) return null;
 
   try {
@@ -116,7 +126,7 @@ export function getTokenPayload(): TokenPayload | null {
  *
  * @returns El valor del claim `username`, o `null` si no está disponible.
  */
-export function getUsername(): string | null {
-  const payload = getTokenPayload();
+export function obtenerNombreUsuario(): string | null {
+  const payload = obtenerPayloadToken();
   return payload?.username ?? null;
 }

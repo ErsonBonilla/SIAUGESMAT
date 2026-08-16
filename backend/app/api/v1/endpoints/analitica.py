@@ -11,17 +11,17 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_db
-from app.schemas.analytics import (
-    LatestExecution,
-    SemaphoreStatus,
-    SemesterMetrics,
+from app.core.dependencies import obtener_db, obtener_usuario_actual
+from app.schemas.analitica import (
+    EjecucionReciente,
+    EstadoSemaforo,
+    MetricasSemestre,
 )
-from app.schemas.user import UserInToken
-from app.services.metrics_service import (
-    get_history_metrics,
-    get_latest_execution_data,
-    get_semaphore_status,
+from app.schemas.usuario import UsuarioEnToken
+from app.services.servicio_metricas import (
+    obtener_datos_ejecucion_reciente,
+    obtener_estado_semaforo,
+    obtener_metricas_historial,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,22 +31,23 @@ router = APIRouter()
 
 @router.get(
     "/history",
-    response_model=list[SemesterMetrics],
+    response_model=list[MetricasSemestre],
     summary="Obtener métricas históricas por semestre",
 )
-async def get_history(
-    limit: int = Query(
+async def obtener_historial(
+    limite: int = Query(
         10,
         ge=1,
         le=50,
+        alias="limit",
         description="Número máximo de semestres a devolver",
     ),
     modalidad: str | None = Query(
         None,
         description="Filtrar por modalidad (PRESENCIAL, DISTANCIA)",
     ),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
     """
     Devuelve una lista con las métricas agregadas de todos los procesos ETL
@@ -55,7 +56,7 @@ async def get_history(
     matriculaciones, errores y duración promedio.
     """
     try:
-        return get_history_metrics(db, limit=limit, modalidad=modalidad)
+        return obtener_metricas_historial(db, limit=limite, modalidad=modalidad)
     except Exception:
         logger.exception("Error al obtener histórico de métricas")
         raise HTTPException(
@@ -66,20 +67,21 @@ async def get_history(
 
 @router.get(
     "/semaphore",
-    response_model=SemaphoreStatus,
+    response_model=EstadoSemaforo,
     summary="Obtener el estado del semáforo de la última ejecución",
 )
-async def get_semaphore(
-    semester: str | None = Query(
+async def obtener_semaforo(
+    semestre: str | None = Query(
         None,
+        alias="semester",
         description="Semestre a evaluar; si se omite se usa el último registrado.",
     ),
     modalidad: str | None = Query(
         None,
         description="Filtrar por modalidad (PRESENCIAL, DISTANCIA)",
     ),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
     """
     Devuelve el estado del semáforo (verde, amarillo, rojo) basado en las
@@ -90,7 +92,7 @@ async def get_semaphore(
     ANALYTICS_MAX_DURATION_*).
     """
     try:
-        return get_semaphore_status(db, semester=semester, modalidad=modalidad)
+        return obtener_estado_semaforo(db, semester=semestre, modalidad=modalidad)
     except Exception:
         logger.exception("Error al calcular el semáforo")
         raise HTTPException(
@@ -101,23 +103,23 @@ async def get_semaphore(
 
 @router.get(
     "/latest",
-    response_model=LatestExecution,
+    response_model=EjecucionReciente,
     summary="Obtener un resumen de la ejecución más reciente",
 )
-async def get_latest_execution(
+async def obtener_ejecucion_reciente(
     modalidad: str | None = Query(
         None,
         description="Filtrar por modalidad (PRESENCIAL, DISTANCIA)",
     ),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
     """
     Devuelve los detalles de la última ejecución registrada,
     incluyendo métricas, errores y semáforo derivado.
     """
     try:
-        return get_latest_execution_data(db, modalidad=modalidad)
+        return obtener_datos_ejecucion_reciente(db, modalidad=modalidad)
     except ValueError as e:
         # No hay ejecuciones registradas
         raise HTTPException(

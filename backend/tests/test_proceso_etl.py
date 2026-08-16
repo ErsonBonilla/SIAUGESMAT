@@ -9,8 +9,8 @@ reglas de la Universidad del Tolima.
 import pandas as pd
 import pytest
 
-from app.services.parsers.base import BaseExcelParser
-from app.services.parsers.distancia import DistanciaParser
+from app.services.parsers.base import AnalizadorExcelBase
+from app.services.parsers.distancia import AnalizadorDistancia
 
 
 # ---------------------------------------------------------------------------
@@ -26,15 +26,16 @@ def _base_dataframe(rows: list[dict]) -> pd.DataFrame:
 
 def test_excel_engine_selection():
     """El motor de lectura se elige según la extensión del archivo."""
-    assert DistanciaParser._excel_engine("carga.xls") == "calamine"
-    assert DistanciaParser._excel_engine("carga.XLS") == "calamine"
-    assert DistanciaParser._excel_engine("carga.xlsx") is None
-    assert DistanciaParser._excel_engine("carga.csv") is None
+    assert AnalizadorDistancia._excel_engine("carga.xls") == "calamine"
+    assert AnalizadorDistancia._excel_engine("carga.XLS") == "calamine"
+    assert AnalizadorDistancia._excel_engine("carga.xlsx") is None
+    assert AnalizadorDistancia._excel_engine("carga.csv") is None
+
+    # ---------------------------------------------------------------------------
+    # Escenario 1: curso y docente básicos
+    # ---------------------------------------------------------------------------
 
 
-# ---------------------------------------------------------------------------
-# Escenario 1: curso y docente básicos
-# ---------------------------------------------------------------------------
 def test_transform_basic():
     """Un curso con docente debe generar las estructuras esperadas."""
     df = _base_dataframe(
@@ -52,7 +53,7 @@ def test_transform_basic():
         ]
     )
 
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
 
     # Categorías: deben existir los tres niveles sin duplicados
     cats = result["categories"]
@@ -89,10 +90,11 @@ def test_transform_basic():
     assert enrols[0]["course_shortname"] == "IDE_0105_sI_202_G-01"
     assert enrols[0]["role"] == "editingteacher"
 
+    # ---------------------------------------------------------------------------
+    # Escenario 2: prefijo para "APARTADO"
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 2: prefijo para "APARTADO"
-# ---------------------------------------------------------------------------
+
 def test_apartado_maps_to_uraba_prefix():
     """La categoría APARTADO debe usar el prefijo URA."""
     df = _base_dataframe(
@@ -110,7 +112,7 @@ def test_apartado_maps_to_uraba_prefix():
         ]
     )
 
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     course = result["courses"][0]
     assert course["shortname"] == "URA_0305_sII_101_G-02"
     assert course["category_idnumber"] == "URA_0305_sII"
@@ -124,10 +126,11 @@ def test_apartado_maps_to_uraba_prefix():
     assert len(ural) == 1
     assert ural[0]["parent"] == "DISTANCIA"
 
+    # ---------------------------------------------------------------------------
+    # Escenario 3: relleno de cero inicial en código de programa
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 3: relleno de cero inicial en código de programa
-# ---------------------------------------------------------------------------
+
 def test_code_padding():
     """Un código de programa sin cero inicial se debe completar a 3 dígitos."""
     df = _base_dataframe(
@@ -145,15 +148,16 @@ def test_code_padding():
         ]
     )
 
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     course = result["courses"][0]
     assert course["shortname"] == "IDE_0005_sI_10_G-1"
     assert course["category_idnumber"] == "IDE_0005_sI"
 
+    # ---------------------------------------------------------------------------
+    # Escenario 4: docente sin email válido (@ut.edu.co) no se incluye
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 4: docente sin email válido (@ut.edu.co) no se incluye
-# ---------------------------------------------------------------------------
+
 def test_invalid_email_ignored():
     """Un docente sin email @ut.edu.co no debe aparecer en usuarios ni matrículas."""
     df = _base_dataframe(
@@ -171,14 +175,15 @@ def test_invalid_email_ignored():
         ]
     )
 
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     assert len(result["users"]) == 0
     assert len(result["enrolments"]) == 0
 
+    # ---------------------------------------------------------------------------
+    # Escenario 5: división de nombre completo
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 5: división de nombre completo
-# ---------------------------------------------------------------------------
+
 def test_name_splitting():
     """Divide el nombre completo usando el diccionario de nombres propios."""
     df = _base_dataframe(
@@ -196,15 +201,16 @@ def test_name_splitting():
         ]
     )
 
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     user = result["users"][0]
     assert user["firstname"] == "Pedro Luis"
     assert user["lastname"] == "García López"
 
+    # ---------------------------------------------------------------------------
+    # Escenario 6: nombre con una sola palabra
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 6: nombre con una sola palabra
-# ---------------------------------------------------------------------------
+
 def test_single_word_name():
     """Si el nombre solo tiene una palabra, se toma como firstname."""
     df = _base_dataframe(
@@ -221,15 +227,16 @@ def test_single_word_name():
             }
         ]
     )
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     user = result["users"][0]
     assert user["firstname"] == "Sol"
     assert user["lastname"] == "Sol"
 
+    # ---------------------------------------------------------------------------
+    # Escenario 7: jerarquía de categorías ordenada
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 7: jerarquía de categorías ordenada
-# ---------------------------------------------------------------------------
+
 def test_category_hierarchy_order():
     """Las categorías deben aparecer en orden de padre antes que hijos."""
     df = _base_dataframe(
@@ -246,17 +253,18 @@ def test_category_hierarchy_order():
             }
         ]
     )
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     cats = result["categories"]
     # El primer elemento debe ser el raíz (parent=0)
     assert cats[0]["parent"] == 0
     # Los últimos deben ser los niveles más profundos
     assert cats[-1]["parent"] != 0
 
+    # ---------------------------------------------------------------------------
+    # Escenario 8: múltiples cursos y usuarios sin duplicados
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 8: múltiples cursos y usuarios sin duplicados
-# ---------------------------------------------------------------------------
+
 def test_multiple_courses_same_program():
     """Varios cursos en el mismo programa comparten las categorías superiores."""
     df = _base_dataframe(
@@ -284,7 +292,7 @@ def test_multiple_courses_same_program():
         ]
     )
 
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     cats = result["categories"]
     roots = [c for c in cats if c["parent"] == 0]
     assert len(roots) == 1
@@ -308,10 +316,11 @@ def test_multiple_courses_same_program():
     # Matriculaciones
     assert len(result["enrolments"]) == 2
 
+    # ---------------------------------------------------------------------------
+    # Escenario 9: marcas de eliminación (manejadas desde la app, no del Excel)
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 9: marcas de eliminación (manejadas desde la app, no del Excel)
-# ---------------------------------------------------------------------------
+
 def test_delete_flags():
     """Las marcas de eliminación son siempre False desde el ETL."""
     df = _base_dataframe(
@@ -328,14 +337,15 @@ def test_delete_flags():
             }
         ]
     )
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     assert result["courses"][0]["delete"] is False
     assert result["users"][0]["delete"] is False
 
+    # ---------------------------------------------------------------------------
+    # Escenario 10: visibilidad del curso (manejada desde la app, no del Excel)
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 10: visibilidad del curso (manejada desde la app, no del Excel)
-# ---------------------------------------------------------------------------
+
 def test_course_visibility():
     """El curso siempre se crea visible (1) desde el ETL."""
     df = _base_dataframe(
@@ -352,13 +362,14 @@ def test_course_visibility():
             }
         ]
     )
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     assert result["courses"][0]["visible"] == 1
 
+    # ---------------------------------------------------------------------------
+    # Escenario 11: nuevo formato con código de programa en columna Programa
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 11: nuevo formato con código de programa en columna Programa
-# ---------------------------------------------------------------------------
+
 def test_new_format_with_program_parse():
     """El nuevo formato con Programa='cod - nombre' extrae cod_programa."""
     df = _base_dataframe(
@@ -376,7 +387,7 @@ def test_new_format_with_program_parse():
         ]
     )
 
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
 
     cats = result["categories"]
     cat_ids = [c["idnumber"] for c in cats]
@@ -397,10 +408,11 @@ def test_new_format_with_program_parse():
     assert len(result["enrolments"]) == 1
     assert result["enrolments"][0]["username"] == "juan.perez"
 
+    # ---------------------------------------------------------------------------
+    # Escenario 12: nuevo formato sin código de programa (solo nombre)
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 12: nuevo formato sin código de programa (solo nombre)
-# ---------------------------------------------------------------------------
+
 def test_new_format_without_program_code():
     """Cuando Programa no tiene formato 'cod - nombre', cod_programa queda vacío."""
     df = _base_dataframe(
@@ -418,7 +430,7 @@ def test_new_format_without_program_code():
         ]
     )
 
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
 
     # Sin código de programa → cod_programa vacío → fallback al código
     course = result["courses"][0]
@@ -429,10 +441,11 @@ def test_new_format_without_program_code():
     cat_level2 = [c for c in cats if "LICENCIATURA EN MATEMATICAS" in c["name"]]
     assert len(cat_level2) == 1
 
+    # ---------------------------------------------------------------------------
+    # Escenario 13: columnas ruidosas deben ser ignoradas
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 13: columnas ruidosas deben ser ignoradas
-# ---------------------------------------------------------------------------
+
 def test_noise_columns_ignored():
     """Columnas como Categoría, Perfil, Total, Tipo deben ser ignoradas."""
     df = _base_dataframe(
@@ -455,39 +468,41 @@ def test_noise_columns_ignored():
         ]
     )
 
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     course = result["courses"][0]
     assert course["shortname"] == "IDE_0105_sI_202_G-01"
     assert len(result["users"]) == 1
 
+    # ---------------------------------------------------------------------------
+    # Escenario 14: conversión a número romano
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Escenario 14: conversión a número romano
-# ---------------------------------------------------------------------------
+
 class TestRomanNumeral:
     """Pruebas unitarias para _to_roman_numeral."""
 
     def test_arabic_to_roman(self):
-        assert BaseExcelParser._to_roman_numeral("1") == "I"
-        assert BaseExcelParser._to_roman_numeral("6") == "VI"
-        assert BaseExcelParser._to_roman_numeral("12") == "XII"
+        assert AnalizadorExcelBase._a_numeral_romano("1") == "I"
+        assert AnalizadorExcelBase._a_numeral_romano("6") == "VI"
+        assert AnalizadorExcelBase._a_numeral_romano("12") == "XII"
 
     def test_roman_passthrough(self):
-        assert BaseExcelParser._to_roman_numeral("I") == "I"
-        assert BaseExcelParser._to_roman_numeral("VI") == "VI"
-        assert BaseExcelParser._to_roman_numeral("iii") == "III"
+        assert AnalizadorExcelBase._a_numeral_romano("I") == "I"
+        assert AnalizadorExcelBase._a_numeral_romano("VI") == "VI"
+        assert AnalizadorExcelBase._a_numeral_romano("iii") == "III"
 
     def test_out_of_range_fallback(self):
-        assert BaseExcelParser._to_roman_numeral("2025") == "MMXXV"
-        assert BaseExcelParser._to_roman_numeral("0") == "0"
+        assert AnalizadorExcelBase._a_numeral_romano("2025") == "MMXXV"
+        assert AnalizadorExcelBase._a_numeral_romano("0") == "0"
 
     def test_non_numeric_fallback(self):
-        assert BaseExcelParser._to_roman_numeral("custom") == "CUSTOM"
+        assert AnalizadorExcelBase._a_numeral_romano("custom") == "CUSTOM"
+
+        # ---------------------------------------------------------------------------
+        # Escenario 16: filas con "virtual" en Observaciones se ignoran
+        # ---------------------------------------------------------------------------
 
 
-# ---------------------------------------------------------------------------
-# Escenario 16: filas con "virtual" en Observaciones se ignoran
-# ---------------------------------------------------------------------------
 def test_virtual_rows_ignored():
     """Filas cuya columna Observaciones mencione virtualidad se ignoran."""
     df = _base_dataframe(
@@ -506,7 +521,7 @@ def test_virtual_rows_ignored():
         ]
     )
 
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     assert result["courses"] == []
     assert result["users"] == []
     assert result["enrolments"] == []
@@ -543,7 +558,7 @@ def test_virtuality_conjugations_ignored():
                 }
             ]
         )
-        result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+        result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
         assert result["courses"] == [], f"Debería ignorarse la fila con: {obs!r}"
 
 
@@ -565,7 +580,7 @@ def test_non_virtual_rows_kept():
         ]
     )
 
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     assert len(result["courses"]) == 1
     assert len(result["users"]) == 1
     assert len(result["enrolments"]) == 1
@@ -590,12 +605,13 @@ def test_missing_observaciones_column_raises():
     df = df.drop(columns=["Observaciones"])
 
     with pytest.raises(ValueError, match="Observaciones"):
-        DistanciaParser.parse(df, modalidad="DISTANCIA")
+        AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
+
+        # ---------------------------------------------------------------------------
+        # Escenario 15: estructura mínima de curso
+        # ---------------------------------------------------------------------------
 
 
-# ---------------------------------------------------------------------------
-# Escenario 15: estructura mínima de curso
-# ---------------------------------------------------------------------------
 def test_course_minimal_fields():
     """Todo curso debe incluir los campos obligatorios para Moodle 3.9."""
     df = _base_dataframe(
@@ -612,7 +628,7 @@ def test_course_minimal_fields():
             }
         ]
     )
-    result = DistanciaParser.parse(df, modalidad="DISTANCIA")
+    result = AnalizadorDistancia.parsear(df, modalidad="DISTANCIA")
     for course in result["courses"]:
         assert "shortname" in course
         assert "fullname" in course

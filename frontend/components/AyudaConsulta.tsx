@@ -1,16 +1,16 @@
-// components/QueryHelp.tsx
+// components/AyudaConsulta.tsx
 import { useSignal } from "@preact/signals";
 
-export interface QueryHelpSection {
+export interface SeccionAyudaConsulta {
   title: string;
   body: string | string[];
 }
 
-interface QueryHelpProps {
-  sections: QueryHelpSection[];
+interface PropsAyudaConsulta {
+  sections: SeccionAyudaConsulta[];
 }
 
-export default function QueryHelp({ sections }: QueryHelpProps) {
+export default function AyudaConsulta({ sections }: PropsAyudaConsulta) {
   const open = useSignal(false);
 
   return (

@@ -1,73 +1,75 @@
 // services/api/analytics.ts
-import { authHeaders, BASE_URL, handleResponse } from "./core.ts";
+import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
 import type {
-  ChartsListResponse,
-  ChartTracesLayout,
-  LatestExecution,
-  SemaphoreStatus,
-  SemesterMetrics,
-} from "./types.ts";
+  DisposicionTrazasGrafico,
+  EjecucionReciente,
+  EstadoSemaforo,
+  MetricasSemestre,
+  RespuestaListaGraficos,
+} from "./tipos.ts";
 
-export async function getHistory(
+export async function obtenerHistorial(
   limit = 10,
   modalidad?: string,
-): Promise<SemesterMetrics[]> {
+): Promise<MetricasSemestre[]> {
   const params = new URLSearchParams({ limit: String(limit) });
   if (modalidad) params.set("modalidad", modalidad);
   const response = await fetch(`${BASE_URL}/analytics/history?${params}`, {
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  return handleResponse<SemesterMetrics[]>(response);
+  return manejarRespuesta<MetricasSemestre[]>(response);
 }
 
-export async function getSemaphore(
+export async function obtenerSemaforo(
   semester?: string,
   modalidad?: string,
-): Promise<SemaphoreStatus> {
+): Promise<EstadoSemaforo> {
   const params = new URLSearchParams();
   if (semester) params.set("semester", semester);
   if (modalidad) params.set("modalidad", modalidad);
   const url = `${BASE_URL}/analytics/semaphore${
     params.toString() ? "?" + params.toString() : ""
   }`;
-  const response = await fetch(url, { headers: { ...authHeaders() } });
-  return handleResponse<SemaphoreStatus>(response);
+  const response = await fetch(url, { headers: { ...cabecerasAuth() } });
+  return manejarRespuesta<EstadoSemaforo>(response);
 }
 
-export async function getLatest(modalidad?: string): Promise<LatestExecution> {
+export async function obtenerReciente(
+  modalidad?: string,
+): Promise<EjecucionReciente> {
   const url = modalidad
     ? `${BASE_URL}/analytics/latest?modalidad=${modalidad}`
     : `${BASE_URL}/analytics/latest`;
-  const response = await fetch(url, { headers: { ...authHeaders() } });
-  return handleResponse<LatestExecution>(response);
+  const response = await fetch(url, { headers: { ...cabecerasAuth() } });
+  return manejarRespuesta<EjecucionReciente>(response);
 }
 
-export async function listCharts(
+export async function listarGraficos(
   executionId: number,
-): Promise<ChartsListResponse> {
+): Promise<RespuestaListaGraficos> {
   const response = await fetch(
     `${BASE_URL}/analytics/executions/${executionId}/charts`,
-    { headers: { ...authHeaders() } },
+    { headers: { ...cabecerasAuth() } },
   );
-  return handleResponse<ChartsListResponse>(response);
+  return manejarRespuesta<RespuestaListaGraficos>(response);
 }
 
-const CHART_CACHE = new Map<string, ChartTracesLayout>();
+const CHART_CACHE = new Map<string, DisposicionTrazasGrafico>();
 const CACHE_MAX = 20;
 
-export async function getChartData(
+export async function obtenerDatosGrafico(
   executionId: number,
   chartName: string,
   theme?: string,
   force = false,
-): Promise<ChartTracesLayout> {
-  const key = `${executionId}/${chartName}`;
+): Promise<DisposicionTrazasGrafico> {
+  const key = `${executionId}/${chartName}/${theme ?? "default"}`;
   if (!force && CHART_CACHE.has(key)) return CHART_CACHE.get(key)!;
   const url = theme
     ? `${BASE_URL}/analytics/executions/${executionId}/charts/${chartName}?theme=${theme}`
     : `${BASE_URL}/analytics/executions/${executionId}/charts/${chartName}`;
-  const response = await fetch(url, { headers: { ...authHeaders() } });
-  const data = await handleResponse<ChartTracesLayout>(response);
+  const response = await fetch(url, { headers: { ...cabecerasAuth() } });
+  const data = await manejarRespuesta<DisposicionTrazasGrafico>(response);
   if (CHART_CACHE.size >= CACHE_MAX) {
     const firstKey = CHART_CACHE.keys().next().value;
     if (firstKey) CHART_CACHE.delete(firstKey);

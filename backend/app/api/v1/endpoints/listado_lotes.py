@@ -3,73 +3,77 @@ import logging
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_db
-from app.repositories.operation_repo import (
-    get_batch_paused_counts,
-    get_operations_analytics,
-    list_batches,
+from app.core.dependencies import obtener_db, obtener_usuario_actual
+from app.repositories.repositorio_operaciones import (
+    listar_lotes,
+    obtener_analitica_operaciones,
+    obtener_conteos_pausados_lote,
 )
-from app.schemas.operations import (
-    BatchListOut,
-    BatchListResponse,
-    OperationMonthlyMetrics,
-    OperationsAnalyticsResponse,
+from app.schemas.operaciones import (
+    LoteSalidaLista,
+    MetricasMensualesOperacion,
+    RespuestaAnaliticaOperaciones,
+    RespuestaListaLotes,
 )
-from app.schemas.user import UserInToken
+from app.schemas.usuario import UsuarioEnToken
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-@router.get("/batches", response_model=BatchListResponse, summary="Listar lotes de operaciones")
-def list_operation_batches(
-    entity_type: str | None = Query(None, description="courses, categories, users"),
-    action: str | None = Query(None, description="create, delete"),
+@router.get("/batches", response_model=RespuestaListaLotes, summary="Listar lotes de operaciones")
+def listar_lotes_operacion(
+    tipo_entidad: str | None = Query(
+        None, alias="entity_type", description="courses, categories, users"
+    ),
+    accion: str | None = Query(None, alias="action", description="create, delete"),
     modalidad: str | None = Query(None),
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+    limite: int = Query(20, ge=1, le=100, alias="limit"),
+    desplazamiento: int = Query(0, ge=0, alias="offset"),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    total, batches = list_batches(
+    total, batches = listar_lotes(
         db,
-        entity_type=entity_type,
-        action=action,
+        tipo_entidad=tipo_entidad,
+        accion=accion,
         modalidad=modalidad,
-        limit=limit,
-        offset=offset,
+        limit=limite,
+        offset=desplazamiento,
     )
-    batch_ids = [b.batch_id for b in batches]
-    paused_counts = get_batch_paused_counts(db, batch_ids)
+    batch_ids = [b.id_lote for b in batches]
+    paused_counts = obtener_conteos_pausados_lote(db, batch_ids)
     items = []
     for b in batches:
-        item = BatchListOut.model_validate(b)
-        item.paused = paused_counts.get(b.batch_id, 0)
+        item = LoteSalidaLista.model_validate(b)
+        item.pausados = paused_counts.get(b.id_lote, 0)
         items.append(item)
-    return BatchListResponse(total=total, items=items)
+    return RespuestaListaLotes(total=total, items=items)
 
 
 @router.get(
     "/analytics",
-    response_model=OperationsAnalyticsResponse,
+    response_model=RespuestaAnaliticaOperaciones,
     summary="Analítica histórica de operaciones masivas",
 )
-def get_operations_history(
+def obtener_historial_operaciones(
     modalidad: str | None = Query(None),
-    months: int = Query(12, ge=1, le=60),
-    entity_type: str | None = Query(None, description="courses, categories, users"),
-    action: str | None = Query(None, description="create, delete"),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+    meses: int = Query(12, ge=1, le=60, alias="months"),
+    tipo_entidad: str | None = Query(
+        None, alias="entity_type", description="courses, categories, users"
+    ),
+    accion: str | None = Query(None, alias="action", description="create, delete"),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    history = get_operations_analytics(
+    history = obtener_analitica_operaciones(
         db,
         modalidad=modalidad,
-        months=months,
-        entity_type=entity_type,
-        action=action,
+        months=meses,
+        tipo_entidad=tipo_entidad,
+        accion=accion,
     )
-    return OperationsAnalyticsResponse(
-        history=[OperationMonthlyMetrics(**m) for m in history],
+    return RespuestaAnaliticaOperaciones(
+        history=[MetricasMensualesOperacion(**m) for m in history],
     )

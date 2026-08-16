@@ -2,6 +2,6 @@
 Paquete de workers para tareas asíncronas (Celery).
 """
 
-from app.workers.tasks import process_etl_file
+from app.workers.tareas import procesar_archivo_etl
 
-__all__ = ["process_etl_file"]
+__all__ = ["procesar_archivo_etl"]

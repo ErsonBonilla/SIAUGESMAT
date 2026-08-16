@@ -1,17 +1,17 @@
-// components/Pagination.tsx
+// components/Paginacion.tsx
 interface Props {
   offset: number;
-  pageSize: number;
+  tamanoPagina: number;
   total: number;
   label: string;
-  onPageChange: (offset: number) => void;
+  alCambiarPagina: (offset: number) => void;
 }
 
-export default function Pagination(
-  { offset, pageSize, total, label, onPageChange }: Props,
+export default function Paginacion(
+  { offset, tamanoPagina, total, label, alCambiarPagina }: Props,
 ) {
-  const totalPages = Math.ceil(total / pageSize);
-  const currentPage = Math.floor(offset / pageSize) + 1;
+  const totalPages = Math.ceil(total / tamanoPagina);
+  const currentPage = Math.floor(offset / tamanoPagina) + 1;
 
   if (totalPages <= 1) return null;
 
@@ -22,15 +22,15 @@ export default function Pagination(
         <button
           type="button"
           disabled={offset === 0}
-          onClick={() => onPageChange(Math.max(0, offset - pageSize))}
+          onClick={() => alCambiarPagina(Math.max(0, offset - tamanoPagina))}
           class="px-3 py-1 border border-[var(--border-secondary)] rounded disabled:opacity-40 hover:bg-[var(--bg-tertiary)] bg-[var(--bg-primary)] text-[var(--text-primary)]"
         >
           Anterior
         </button>
         <button
           type="button"
-          disabled={offset + pageSize >= total}
-          onClick={() => onPageChange(offset + pageSize)}
+          disabled={offset + tamanoPagina >= total}
+          onClick={() => alCambiarPagina(offset + tamanoPagina)}
           class="px-3 py-1 border border-[var(--border-secondary)] rounded disabled:opacity-40 hover:bg-[var(--bg-tertiary)] bg-[var(--bg-primary)] text-[var(--text-primary)]"
         >
           Siguiente

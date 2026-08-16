@@ -9,7 +9,7 @@ import {
 
 Chart.register(...registerables);
 
-export const METRIC_LABELS: Record<string, string> = {
+export const ETIQUETAS_METRICAS: Record<string, string> = {
   total_executions: "Ejecuciones",
   total_courses_created: "Cursos creados",
   total_users_created: "Usuarios creados",
@@ -18,8 +18,8 @@ export const METRIC_LABELS: Record<string, string> = {
   avg_duration_seconds: "Duración media (s)",
 };
 
-type ColorPair = { base: string; light: string };
-export const METRIC_COLORS: Record<string, ColorPair> = {
+type ParColores = { base: string; light: string };
+export const COLORES_METRICAS: Record<string, ParColores> = {
   total_executions: { base: "#1E40AF", light: "#93C5FD" },
   total_courses_created: { base: "#00A859", light: "#79d1a8" },
   total_users_created: { base: "#4B5563", light: "#9CA3AF" },
@@ -28,7 +28,7 @@ export const METRIC_COLORS: Record<string, ColorPair> = {
   avg_duration_seconds: { base: "#6B7280", light: "#D1D5DB" },
 };
 
-export const METRIC_KEYS = [
+export const CLAVES_METRICAS = [
   "total_executions",
   "total_courses_created",
   "total_users_created",
@@ -37,9 +37,9 @@ export const METRIC_KEYS = [
   "avg_duration_seconds",
 ] as const;
 
-export function createGradient(
+export function crearGradiente(
   ctx: CanvasRenderingContext2D,
-  color: ColorPair,
+  color: ParColores,
   dark: boolean,
   height: number,
 ): CanvasGradient {

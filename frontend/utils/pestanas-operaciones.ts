@@ -1,11 +1,11 @@
 // utils/operations-tabs.ts
-type TabComponent = "etl" | "batch";
+type ComponentePestana = "etl" | "batch";
 
-export const OPERATIONS_TABS = [
+export const PESTANAS_OPERACIONES = [
   {
     key: "crear_cursos",
     label: "Crear Cursos",
-    component: "etl" as TabComponent,
+    component: "etl" as ComponentePestana,
     entity: null,
     action: null,
   },
@@ -53,4 +53,4 @@ export const OPERATIONS_TABS = [
   },
 ] as const;
 
-export type TabKey = (typeof OPERATIONS_TABS)[number]["key"];
+export type ClavePestana = (typeof PESTANAS_OPERACIONES)[number]["key"];

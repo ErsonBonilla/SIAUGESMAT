@@ -11,7 +11,7 @@ import logging
 import os
 
 from celery import Celery
-from celery.signals import after_setup_logger, task_failure, worker_process_init
+from celery.signals import after_setup_logger, task_failure, worker_process_init, worker_ready
 
 from app.core.config import settings
 
@@ -26,13 +26,13 @@ celery_app = Celery(
 celery_app.conf.update(
     # Auto-descubrimiento de tareas (strings → evita imports eager)
     imports=(
-        "app.workers.tasks",
-        "app.workers.phases.item_task",
-        "app.workers.phases.common",
-        "app.workers.phases.orchestrator",
-        "app.workers.cleanup_tasks",
-        "app.workers.operations_tasks",
-        "app.workers.query_tasks",
+        "app.workers.tareas",
+        "app.workers.phases.tarea_item",
+        "app.workers.phases.comunes",
+        "app.workers.phases.orquestador",
+        "app.workers.tareas_limpieza",
+        "app.workers.tareas_operaciones",
+        "app.workers.tareas_consultas",
     ),
     # Seguimiento
     task_track_started=True,
@@ -86,10 +86,24 @@ celery_app.conf.update(
 def init_worker(**kwargs):
     """Descarta el pool de conexiones DB heredado del proceso padre (fork).
     Cada worker hijo crea su propio pool al abrir su primer SessionLocal()."""
-    from app.db.session import engine
+    from app.db.sesion import engine
 
     engine.dispose()
     logger.debug("Engine DB disposed after fork")
+
+
+@worker_ready.connect
+def validar_configuracion_worker(**kwargs):
+    """Valida la configuración crítica al arrancar el worker (fail-fast).
+
+    La API valida en su lifespan, pero los workers se lanzan por separado y
+    podrían arrancar con una configuración inválida sin avisar.
+    """
+    try:
+        settings.validar_critico()
+    except ValueError as e:
+        logger.critical("Configuración inválida al arrancar el worker: %s", e)
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +124,7 @@ def setup_dlq_handler(logger, **kwargs):
 
 
 @task_failure.connect
-def on_task_failure(sender, task_id, exception, args, kwargs, **kw):
+def al_fallar_tarea(sender, task_id, exception, args, kwargs, **kw):
     """Callback global cuando una tarea agota todos sus reintentos.
     Registra la tarea, sus argumentos y el error final en el logger DLQ."""
     dlq_logger = logging.getLogger("celery.dlq")

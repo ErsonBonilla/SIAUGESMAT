@@ -2,17 +2,17 @@
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import {
-  getCurrentSemester,
-  startProcess,
-  uploadFile,
+  iniciarProceso,
+  obtenerSemestreActual,
+  subirArchivo,
 } from "../services/api.ts";
-import { useUploadGate } from "../hooks/useUploadGate.ts";
-import { SpinnerIcon } from "../utils/icons.tsx";
-import ErrorBox from "../components/ErrorBox.tsx";
-import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
-import FilePicker from "../components/FilePicker.tsx";
+import { usePuertaSubida } from "../hooks/usePuertaSubida.ts";
+import { IconoSpinner } from "../utils/iconos.tsx";
+import CajaError from "../components/CajaError.tsx";
+import BannerProcesoEnCurso from "../components/BannerProcesoEnCurso.tsx";
+import SelectorArchivo from "../components/SelectorArchivo.tsx";
 
-export default function FileUploader() {
+export default function SubidorArchivo() {
   const file = useSignal<File | null>(null);
   const semester = useSignal("");
   const modalidad = useSignal("DISTANCIA");
@@ -22,12 +22,12 @@ export default function FileUploader() {
   const successExecutionId = useSignal<number | null>(null);
   const semesterLoading = useSignal(true);
 
-  const { allowed, status, error: gateError } = useUploadGate(() =>
+  const { allowed, status, error: gateError } = usePuertaSubida(() =>
     modalidad.value
   );
 
   useEffect(() => {
-    getCurrentSemester()
+    obtenerSemestreActual()
       .then((s) => {
         semester.value = s;
         semesterLoading.value = false;
@@ -37,7 +37,7 @@ export default function FileUploader() {
       });
   }, []);
 
-  const handleFileChange = (e: Event) => {
+  const manejarCambioArchivo = (e: Event) => {
     const target = e.target as HTMLInputElement;
     const f = target.files?.[0];
     if (f) {
@@ -54,7 +54,7 @@ export default function FileUploader() {
     }
   };
 
-  const handleSubmit = async (e: Event) => {
+  const manejarEnviar = async (e: Event) => {
     e.preventDefault();
     error.value = "";
 
@@ -71,13 +71,13 @@ export default function FileUploader() {
 
     uploading.value = true;
     try {
-      const uploadResult = await uploadFile(
+      const uploadResult = await subirArchivo(
         file.value,
         semester.value.toUpperCase(),
         modalidad.value,
       );
       const executionId = uploadResult.execution_id;
-      await startProcess(executionId);
+      await iniciarProceso(executionId);
       successExecutionId.value = executionId;
     } catch (err) {
       error.value = err instanceof Error
@@ -98,17 +98,17 @@ export default function FileUploader() {
 
   return (
     <form
-      onSubmit={handleSubmit}
+      onSubmit={manejarEnviar}
       class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 space-y-6"
     >
       {/* Archivo */}
       <div>
-        <FilePicker
+        <SelectorArchivo
           id="file"
           label="Archivo Excel"
           accept=".xlsx,.xls"
           file={file}
-          onChange={handleFileChange}
+          onChange={manejarCambioArchivo}
           disabled={uploading.value || !allowed}
           onClear={() => {
             error.value = "";
@@ -133,11 +133,11 @@ export default function FileUploader() {
       <input type="hidden" name="modalidad" value={modalidad.value} />
 
       {/* Proceso en curso: no se pueden subir archivos */}
-      {!allowed && <ProcessInProgressBanner status={status.value} />}
-      {gateError.value && <ErrorBox message={gateError.value} />}
+      {!allowed && <BannerProcesoEnCurso status={status.value} />}
+      {gateError.value && <CajaError message={gateError.value} />}
 
       {/* Error */}
-      {error.value && <ErrorBox message={error.value} />}
+      {error.value && <CajaError message={error.value} />}
 
       {/* Botón de envío */}
       <button
@@ -148,7 +148,7 @@ export default function FileUploader() {
         {uploading.value
           ? (
             <>
-              <SpinnerIcon class="animate-spin h-5 w-5 text-white" />
+              <IconoSpinner class="animate-spin h-5 w-5 text-white" />
               <span>Subiendo y encolando...</span>
             </>
           )

@@ -9,8 +9,9 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Asegurar que la raíz del proyecto esté en el path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -20,13 +21,13 @@ from app.db.base import Base
 
 # Importar todos los modelos para que se registren en Base.metadata
 # (no eliminar estos imports aunque parezcan no usados)
-from app.db.models import (  # noqa: F401
-    ErrorLog,
-    Execution,
-    ExecutionLog,
-    OperationBatch,
-    OperationItem,
-    QueryResult,
+from app.db.modelos import (  # noqa: F401
+    Ejecucion,
+    ItemOperacion,
+    LoteOperacion,
+    RegistroEjecucion,
+    RegistroError,
+    ResultadoConsulta,
 )
 
 # Obtener la configuración de Alembic
@@ -39,7 +40,7 @@ config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Metadatos compartidos de todos los modelos
+    # Metadatos compartidos de todos los modelos
 target_metadata = Base.metadata
 
 

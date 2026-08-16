@@ -12,10 +12,10 @@ import time
 
 import pytest
 
-from app.pipeline.course_comparison import CourseComparisonService
-from app.pipeline.course_comparison.index_builder import build_shortname_index
-from app.pipeline.course_comparison.utils import get_course_age_seconds, is_course_hidden
-from app.pipeline.shortnames import parse_shortname
+from app.pipeline.comparacion_cursos import ServicioComparacionCursos
+from app.pipeline.comparacion_cursos.constructor_indice import construir_indice_shortnames
+from app.pipeline.comparacion_cursos.utilidades import es_curso_oculto, obtener_edad_curso_segundos
+from app.pipeline.nombres_cortos import parsear_shortname
 
 
 def _make_moodle_course(
@@ -51,7 +51,7 @@ def _nc(sn):
 
 class TestParseShortname:
     def test_valid_shortname(self):
-        result = parse_shortname("IDE_0105_sI_202_G-01")
+        result = parsear_shortname("IDE_0105_sI_202_G-01")
         assert result == {
             "cat_prefix": "IDE",
             "cod_prog": "0105",
@@ -62,13 +62,13 @@ class TestParseShortname:
         }
 
     def test_valid_with_uraba(self):
-        result = parse_shortname("URA_0305_sII_101_G-A")
+        result = parsear_shortname("URA_0305_sII_101_G-A")
         assert result["cat_prefix"] == "URA"
         assert result["grupo"] == "A"
 
     def test_invalid_format(self):
-        assert parse_shortname("invalid") is None
-        assert parse_shortname("") is None
+        assert parsear_shortname("invalid") is None
+        assert parsear_shortname("") is None
 
 
 class TestBuildIndex:
@@ -77,7 +77,7 @@ class TestBuildIndex:
             _make_moodle_course("IDE_0105_sI_202_G-01"),
             _make_moodle_course("IDE_0105_203_sI_G-01"),
         ]
-        index = build_shortname_index(courses)
+        index = construir_indice_shortnames(courses)
         assert "IDE_0105_sI_202_G-01" in index
         assert "IDE_0105_203_sI_G-01" in index
         assert len(index) == 2
@@ -86,18 +86,18 @@ class TestBuildIndex:
 class TestCourseAge:
     def test_age_from_timecreated(self):
         course = _make_moodle_course("TEST", timecreated=100000)
-        age = get_course_age_seconds(course)
+        age = obtener_edad_curso_segundos(course)
         assert age > 0
 
 
 class TestIsCourseHidden:
     def test_hidden_course(self):
         course = _make_moodle_course("TEST", visible=0)
-        assert is_course_hidden(course) is True
+        assert es_curso_oculto(course) is True
 
     def test_visible_course(self):
         course = _make_moodle_course("TEST", visible=1)
-        assert is_course_hidden(course) is False
+        assert es_curso_oculto(course) is False
 
 
 class TestComparison:
@@ -111,7 +111,7 @@ class TestComparison:
         new_courses = [_make_new_course("IDE_0105_sI_202_G-01")]
         new_enrolments = [{"course_shortname": "IDE_0105_sI_202_G-01", "username": "prof1"}]
 
-        result = await CourseComparisonService.compare(
+        result = await ServicioComparacionCursos.comparar(
             existing_courses, new_courses, new_enrolments
         )
 
@@ -139,7 +139,7 @@ class TestComparison:
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "prof1"}]
 
-        result = await CourseComparisonService.compare(
+        result = await ServicioComparacionCursos.comparar(
             existing_courses,
             new_courses,
             new_enrolments,
@@ -168,7 +168,7 @@ class TestComparison:
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "prof1"}]
 
-        result = await CourseComparisonService.compare(
+        result = await ServicioComparacionCursos.comparar(
             existing_courses,
             new_courses,
             new_enrolments,
@@ -199,7 +199,7 @@ class TestComparison:
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "prof1"}]
 
-        result = await CourseComparisonService.compare(
+        result = await ServicioComparacionCursos.comparar(
             existing_courses,
             new_courses,
             new_enrolments,
@@ -227,7 +227,7 @@ class TestComparison:
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "new_prof"}]
 
-        result = await CourseComparisonService.compare(
+        result = await ServicioComparacionCursos.comparar(
             existing_courses,
             new_courses,
             new_enrolments,
@@ -258,7 +258,7 @@ class TestComparison:
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "nbuenaventurap"}]
 
-        result = await CourseComparisonService.compare(
+        result = await ServicioComparacionCursos.comparar(
             existing_courses,
             new_courses,
             new_enrolments,
@@ -294,7 +294,7 @@ class TestComparison:
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "eamateusr2"}]
 
-        result = await CourseComparisonService.compare(
+        result = await ServicioComparacionCursos.comparar(
             existing_courses,
             new_courses,
             new_enrolments,
@@ -331,7 +331,7 @@ class TestComparison:
         new_courses = [_make_new_course(sn)]
         new_enrolments = [{"course_shortname": sn, "username": "prof_b"}]
 
-        result = await CourseComparisonService.compare(
+        result = await ServicioComparacionCursos.comparar(
             existing_courses,
             new_courses,
             new_enrolments,
@@ -364,7 +364,7 @@ class TestComparison:
         new_courses = [_make_new_course(new_sn)]
         new_enrolments = [{"course_shortname": new_sn, "username": "prof1"}]
 
-        result = await CourseComparisonService.compare(
+        result = await ServicioComparacionCursos.comparar(
             existing_courses, new_courses, new_enrolments
         )
 
@@ -396,7 +396,7 @@ class TestComparison:
             {"course_shortname": new_sn_2, "username": "prof1"},
         ]
 
-        result = await CourseComparisonService.compare(
+        result = await ServicioComparacionCursos.comparar(
             existing_courses, new_courses, new_enrolments
         )
 
@@ -422,7 +422,7 @@ class TestComparison:
         new_courses = [_make_new_course(new_sn)]
         new_enrolments = [{"course_shortname": new_sn, "username": "prof2"}]
 
-        result = await CourseComparisonService.compare(
+        result = await ServicioComparacionCursos.comparar(
             existing_courses, new_courses, new_enrolments
         )
 
@@ -440,7 +440,7 @@ class TestComparison:
         ]
 
         # Excel vacío → no se elimina nada (sin programas en scope)
-        result = await CourseComparisonService.compare(existing_courses, [], [])
+        result = await ServicioComparacionCursos.comparar(existing_courses, [], [])
         assert not any(d.get("shortname") == sn for d in result["to_delete"]), (
             "Excel vacío no debe eliminar cursos"
         )
@@ -448,7 +448,7 @@ class TestComparison:
 
         # Excel con un curso de OTRO programa → el curso 0105 no se toca
         other_sn = "IDE_9999_sI_999_G-01"
-        result2 = await CourseComparisonService.compare(
+        result2 = await ServicioComparacionCursos.comparar(
             existing_courses,
             [_make_new_course(other_sn)],
             [],
@@ -459,7 +459,7 @@ class TestComparison:
 
         # Excel con cursos del MISMO programa → si desapareció, se elimina
         same_prog_sn = "IDE_0105_sI_303_G-01"
-        result3 = await CourseComparisonService.compare(
+        result3 = await ServicioComparacionCursos.comparar(
             existing_courses,
             [_make_new_course(same_prog_sn)],
             [{"course_shortname": same_prog_sn, "username": "prof1"}],
@@ -475,7 +475,7 @@ class TestComplete:
 
     @pytest.mark.asyncio
     async def test_1_new(self):
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [],
             [_nc("IDE_0105_sI_202_G-01")],
             [{"course_shortname": "IDE_0105_sI_202_G-01", "username": "p1"}],
@@ -485,7 +485,7 @@ class TestComplete:
     @pytest.mark.asyncio
     async def test_2_same_prof(self):
         sn = "IDE_0105_sI_202_G-01"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(sn, customfields=[{"shortname": "professor", "value": "p1"}])],
             [_nc(sn)],
             [{"course_shortname": sn, "username": "p1"}],
@@ -496,7 +496,7 @@ class TestComplete:
     @pytest.mark.asyncio
     async def test_3_diff_prof_dict(self):
         sn = "BAJ_0838_sI_1102188_G-1_123456"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(sn)],
             [_nc(sn)],
             [{"course_shortname": sn, "username": "new_prof"}],
@@ -508,7 +508,7 @@ class TestComplete:
     @pytest.mark.asyncio
     async def test_4_orphan(self):
         sn = "IDE_0105_sI_202_G-01"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(sn)],
             [_nc(sn)],
             [{"course_shortname": sn, "username": "p1"}],
@@ -521,7 +521,7 @@ class TestComplete:
     async def test_5_suffix_migration(self):
         old = "IBA_0854_sIV_2022481_G-1"
         new = "IBA_0854_sIV_2022481_G-1_14398493"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(old, customfields=[{"shortname": "professor", "value": "fandrade"}])],
             [_nc(new)],
             [{"course_shortname": new, "username": "fandrade"}],
@@ -534,7 +534,7 @@ class TestComplete:
     async def test_6_suffix_diff_prof(self):
         old = "IBA_0854_sIV_2022481_G-1"
         new = "IBA_0854_sIV_2022481_G-1_14398493"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(old, customfields=[{"shortname": "professor", "value": "old_p"}])],
             [_nc(new)],
             [{"course_shortname": new, "username": "new_p"}],
@@ -550,7 +550,7 @@ class TestComplete:
         # disparándose al coincidir con el editingteacher del curso.
         old = "IBA_0854_sIV_2022481_G-1"
         new = "IBA_0854_sIV_2022481_G-1_14398493"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(old, customfields=[{"shortname": "professor", "value": "fandrade_pes"}])],
             [_nc(new)],
             [{"course_shortname": new, "username": "fandrade_pes"}],
@@ -562,7 +562,7 @@ class TestComplete:
     @pytest.mark.asyncio
     async def test_7_disappeared_old(self):
         sn = "IDE_0105_sI_202_G-01"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(sn, timecreated=100000)],
             [_nc("IDE_0105_sI_303_G-01")],
             [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}],
@@ -572,7 +572,7 @@ class TestComplete:
     @pytest.mark.asyncio
     async def test_8_disappeared_recent(self):
         sn = "IDE_0105_sI_202_G-01"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(sn, timecreated=int(time.time()) - 3600)],
             [_nc("IDE_0105_sI_303_G-01")],
             [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}],
@@ -582,7 +582,7 @@ class TestComplete:
     @pytest.mark.asyncio
     async def test_9_disappeared_hidden(self):
         sn = "IDE_0105_sI_202_G-01"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(sn, visible=0, timecreated=int(time.time()) - 3600)],
             [_nc("IDE_0105_sI_303_G-01")],
             [{"course_shortname": "IDE_0105_sI_303_G-01", "username": "p1"}],
@@ -593,7 +593,7 @@ class TestComplete:
     async def test_10_cedula_update(self):
         old = "TUN_0838_sI_1102188_G-1"
         new = "TUN_0838_sI_1102188_G-1_12345678"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(old, customfields=[{"shortname": "professor", "value": "p1"}])],
             [_nc(new)],
             [{"course_shortname": new, "username": "p1"}],
@@ -606,7 +606,7 @@ class TestComplete:
     async def test_11_core_rename(self):
         old = "IDE_0105_sI_202_G-01"
         new = "IDE_0105_sI_202_G-02"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(old, customfields=[{"shortname": "professor", "value": "p1"}])],
             [_nc(new)],
             [{"course_shortname": new, "username": "p1"}],
@@ -618,7 +618,7 @@ class TestComplete:
     async def test_12_core_create_with_template(self):
         old = "IDE_0105_sI_202_G-01"
         new2 = "IDE_0105_sI_202_G-02"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc(old, customfields=[{"shortname": "professor", "value": "p1"}])],
             [_nc(old), _nc(new2)],
             [
@@ -632,7 +632,7 @@ class TestComplete:
     @pytest.mark.asyncio
     async def test_13_core_diff_prof_create(self):
         new = "IDE_0105_sI_202_G-02"
-        r = await CourseComparisonService.compare(
+        r = await ServicioComparacionCursos.comparar(
             [_mc("IDE_0105_sI_202_G-01", customfields=[{"shortname": "professor", "value": "p1"}])],
             [_nc(new)],
             [{"course_shortname": new, "username": "p2"}],

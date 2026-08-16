@@ -8,14 +8,14 @@ siguiendo las reglas definidas por la Universidad del Tolima.
 
 from typing import Any
 
-from app.services.parsers.factory import ParserFactory
+from app.services.parsers.fabrica import FabricaAnalizadores
 
 
-class ETLService:
+class ServicioETL:
     """Fachada que orquesta la lectura y parseo del Excel según la modalidad."""
 
     @staticmethod
-    def process(file_path: str, modalidad: str) -> dict[str, Any]:
-        parser_cls = ParserFactory.get_parser(modalidad)
-        df = parser_cls.read_excel(file_path)
-        return parser_cls.parse(df, modalidad)
+    def procesar(file_path: str, modalidad: str) -> dict[str, Any]:
+        parser_cls = FabricaAnalizadores.obtener_analizador(modalidad)
+        df = parser_cls.leer_excel(file_path)
+        return parser_cls.parsear(df, modalidad)

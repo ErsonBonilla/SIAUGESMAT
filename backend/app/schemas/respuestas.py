@@ -8,77 +8,81 @@ from pydantic import BaseModel
 
 
 # --- Queries (consulta asíncrona) ---
-class QueryEnqueuedResponse(BaseModel):
+class RespuestaConsultaEncolada(BaseModel):
     task_id: str
     entity: str
     status: str
     message: str
 
+    # --- Reports (ejecución ETL) ---
 
-# --- Reports (ejecución ETL) ---
-class ReportInfo(BaseModel):
+
+class InfoReporte(BaseModel):
     name: str
     filename: str
     size: int
 
 
-class ReportsListResponse(BaseModel):
+class RespuestaListaReportes(BaseModel):
     execution_id: int
     report_dir: str
-    reports: list[ReportInfo]
+    reports: list[InfoReporte]
+
+    # --- Charts (analytics de ejecución) ---
 
 
-# --- Charts (analytics de ejecución) ---
-class ChartInfo(BaseModel):
+class InfoGrafico(BaseModel):
     id: str
     title: str
     endpoint: str
 
 
-class ChartsListResponse(BaseModel):
+class RespuestaListaGraficos(BaseModel):
     execution_id: int
     moodle_version: str | None = None
     modalidad: str | None = None
-    charts: list[ChartInfo]
+    charts: list[InfoGrafico]
+
+    # --- Upload status ---
 
 
-# --- Upload status ---
-class UploadStatusExecution(BaseModel):
+class EstadoSubidaEjecucion(BaseModel):
     id: int
     status: str
     filename: str
 
 
-class UploadStatusBatch(BaseModel):
+class EstadoSubidaLote(BaseModel):
     batch_id: str
     entity_type: str
     action: str
 
 
-class UploadStatusResponse(BaseModel):
+class RespuestaEstadoSubida(BaseModel):
     allowed: bool
-    execution: UploadStatusExecution | None = None
-    batch: UploadStatusBatch | None = None
+    execution: EstadoSubidaEjecucion | None = None
+    batch: EstadoSubidaLote | None = None
+
+    # --- Batch control (acciones sobre lotes) ---
 
 
-# --- Batch control (acciones sobre lotes) ---
-class BatchActionResponse(BaseModel):
+class RespuestaAccionLote(BaseModel):
     batch_id: str
     message: str
 
 
-class BatchPauseResponse(BatchActionResponse):
+class RespuestaPausaLote(RespuestaAccionLote):
     paused: int
 
 
-class BatchResumeResponse(BatchActionResponse):
+class RespuestaReanudacionLote(RespuestaAccionLote):
     resumed: int
 
 
-class BatchCancelResponse(BatchActionResponse):
+class RespuestaCancelacionLote(RespuestaAccionLote):
     cancelled: int
 
 
-class BatchReportsListResponse(BaseModel):
+class RespuestaListaReportesLote(BaseModel):
     batch_id: str
     reports: list[dict]

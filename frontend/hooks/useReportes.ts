@@ -1,26 +1,26 @@
-// hooks/useReports.ts
+// hooks/useReportes.ts
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import {
-  downloadReport,
-  getReportDownloadUrl,
-  getReportFileUrl,
-  listReports,
-  type ReportInfo,
+  descargarReporte,
+  type InfoReporte,
+  listarReportes,
+  obtenerUrlArchivoReporte,
+  obtenerUrlDescargaReporte,
 } from "../services/api.ts";
 
-interface UseReportsOptions {
+interface OpcionesUsarReportes {
   executionId: number;
 }
 
-export function useReports({ executionId }: UseReportsOptions) {
-  const reports = useSignal<ReportInfo[]>([]);
+export function useReportes({ executionId }: OpcionesUsarReportes) {
+  const reports = useSignal<InfoReporte[]>([]);
   const loading = useSignal(true);
   const error = useSignal("");
 
   useEffect(() => {
     loading.value = true;
-    listReports(executionId)
+    listarReportes(executionId)
       .then((data) => {
         reports.value = data.reports;
       })
@@ -34,16 +34,19 @@ export function useReports({ executionId }: UseReportsOptions) {
       });
   }, [executionId]);
 
-  function download(report: ReportInfo) {
-    downloadReport(getReportFileUrl(executionId, report.name), report.filename);
+  function download(report: InfoReporte) {
+    descargarReporte(
+      obtenerUrlArchivoReporte(executionId, report.name),
+      report.filename,
+    );
   }
 
-  function downloadAll() {
-    downloadReport(
-      getReportDownloadUrl(executionId),
+  function descargarTodos() {
+    descargarReporte(
+      obtenerUrlDescargaReporte(executionId),
       `reportes_ejecucion_${executionId}.zip`,
     );
   }
 
-  return { reports, loading, error, download, downloadAll };
+  return { reports, loading, error, download, descargarTodos };
 }

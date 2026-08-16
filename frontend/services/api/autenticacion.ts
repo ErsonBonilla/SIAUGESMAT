@@ -1,8 +1,8 @@
 // services/api/auth.ts
-import { authHeaders, BASE_URL, handleResponse } from "./core.ts";
-import type { UserProfile } from "./types.ts";
+import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
+import type { PerfilUsuario } from "./tipos.ts";
 
-export async function login(
+export async function iniciarSesion(
   username: string,
   password: string,
   modalidad: string,
@@ -26,17 +26,17 @@ export async function login(
   >;
 }
 
-export async function getMyProfile(): Promise<UserProfile> {
+export async function obtenerMiPerfil(): Promise<PerfilUsuario> {
   const response = await fetch(`${BASE_URL}/auth/me`, {
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  return handleResponse<UserProfile>(response);
+  return manejarRespuesta<PerfilUsuario>(response);
 }
 
-export async function logout(): Promise<void> {
+export async function cerrarSesion(): Promise<void> {
   try {
     await fetch(`${BASE_URL}/auth/logout`, { method: "POST" });
   } catch {
-    // El logout es best-effort; si falla, el cliente limpia el estado local.
+    // El cerrarSesion es best-effort; si falla, el cliente limpia el estado local.
   }
 }

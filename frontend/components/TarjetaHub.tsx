@@ -1,14 +1,14 @@
 import type { JSX } from "preact";
 
-interface HubCardProps {
+interface PropsTarjetaHub {
   icon: (props: { class?: string }) => JSX.Element;
   title: string;
   description: string;
   href: string;
 }
 
-export default function HubCard(
-  { icon: Icon, title, description, href }: HubCardProps,
+export default function TarjetaHub(
+  { icon: Icon, title, description, href }: PropsTarjetaHub,
 ) {
   return (
     <a

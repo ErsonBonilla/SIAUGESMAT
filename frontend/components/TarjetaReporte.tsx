@@ -1,21 +1,21 @@
-// components/ReportCard.tsx
-import type { ReportInfo } from "../services/api.ts";
-import { formatSize, REPORT_LABELS } from "../utils/reports.ts";
+// components/TarjetaReporte.tsx
+import type { InfoReporte } from "../services/api.ts";
+import { ETIQUETAS_REPORTES, formatearTamano } from "../utils/reportes.ts";
 
-interface ReportCardProps {
-  report: ReportInfo;
+interface PropsTarjetaReporte {
+  report: InfoReporte;
   downloading: boolean;
   disabled?: boolean;
-  onClick: (report: ReportInfo) => void;
+  onClick: (report: InfoReporte) => void;
 }
 
-export default function ReportCard({
+export default function TarjetaReporte({
   report,
   downloading,
   disabled,
   onClick,
-}: ReportCardProps) {
-  const label = REPORT_LABELS[report.name] ?? report.name;
+}: PropsTarjetaReporte) {
+  const label = ETIQUETAS_REPORTES[report.name] ?? report.name;
   return (
     <button
       type="button"
@@ -34,7 +34,7 @@ export default function ReportCard({
           )
           : (
             <span class="text-xs text-[var(--text-secondary)] shrink-0">
-              {formatSize(report.size)}
+              {formatearTamano(report.size)}
             </span>
           )}
       </div>

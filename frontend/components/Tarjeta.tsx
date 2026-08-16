@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 
-type CardProps = {
+type PropsTarjeta = {
   variant?: "default" | "glass";
   hover?: boolean;
   padding?: "sm" | "md" | "lg";
@@ -9,7 +9,7 @@ type CardProps = {
   children: ComponentChildren;
 } & ({ as?: "div"; href?: never } | { as: "a"; href: string });
 
-export default function Card(
+export default function Tarjeta(
   {
     variant = "default",
     hover,
@@ -19,7 +19,7 @@ export default function Card(
     children,
     as = "div",
     href,
-  }: CardProps,
+  }: PropsTarjeta,
 ) {
   const base = "rounded-xl border p-6";
   const defaultStyle =

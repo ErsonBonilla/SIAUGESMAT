@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
-import { SpinnerIcon } from "../utils/icons.tsx";
+import { IconoSpinner } from "../utils/iconos.tsx";
 
-interface ButtonProps {
+interface PropsBoton {
   variant?: "primary" | "secondary" | "ghost" | "green" | "gradient";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
@@ -31,7 +31,7 @@ const sizeClasses: Record<string, string> = {
   lg: "px-6 py-3 text-base",
 };
 
-export default function Button(
+export default function Boton(
   {
     variant = "primary",
     size = "md",
@@ -42,7 +42,7 @@ export default function Button(
     type = "button",
     onClick,
     style,
-  }: ButtonProps,
+  }: PropsBoton,
 ) {
   const cls = [
     "inline-flex items-center justify-center gap-2 border-0 cursor-pointer font-inherit transition-all duration-200 font-medium no-underline leading-5 disabled:opacity-60 disabled:cursor-not-allowed disabled:pointer-events-none",
@@ -60,7 +60,7 @@ export default function Button(
       style={style}
     >
       {loading && (
-        <SpinnerIcon
+        <IconoSpinner
           style={{ width: "1.25rem", height: "1.25rem" }}
           class="animate-spin shrink-0"
         />

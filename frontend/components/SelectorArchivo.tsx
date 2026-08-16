@@ -1,8 +1,8 @@
 import { useRef } from "preact/hooks";
 import type { Signal } from "@preact/signals";
-import { XMarkIcon } from "../utils/icons.tsx";
+import { IconoX } from "../utils/iconos.tsx";
 
-interface FilePickerProps {
+interface PropsSelectorArchivo {
   id: string;
   label: string;
   accept: string;
@@ -12,8 +12,9 @@ interface FilePickerProps {
   disabled?: boolean;
 }
 
-export default function FilePicker(
-  { id, label, accept, file, onChange, onClear, disabled }: FilePickerProps,
+export default function SelectorArchivo(
+  { id, label, accept, file, onChange, onClear, disabled }:
+    PropsSelectorArchivo,
 ) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -56,7 +57,7 @@ export default function FilePicker(
             aria-label="Quitar archivo seleccionado"
             class="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-full border border-[var(--border-secondary)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--brand-red)] hover:text-white hover:border-[var(--brand-red)] transition cursor-pointer"
           >
-            <XMarkIcon class="w-4 h-4" />
+            <IconoX class="w-4 h-4" />
           </button>
         )}
       </div>

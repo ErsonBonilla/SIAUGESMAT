@@ -16,13 +16,13 @@ from typing import ClassVar
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import Execution, ExecutionLog
-from app.services.report_utils import create_zip, write_csv
+from app.db.modelos import Ejecucion, RegistroEjecucion
+from app.services.utilidades_reportes import crear_zip, escribir_csv
 
 logger = logging.getLogger(__name__)
 
 
-class ReportService:
+class ServicioReportes:
     REPORT_NAMES: ClassVar[dict[str, str]] = {
         "resumen_ejecutivo": "01_resumen_ejecutivo.csv",
         "inc_usuarios_inactivos": "02_inc_usuarios_inactivos.csv",
@@ -44,7 +44,7 @@ class ReportService:
     }
 
     @classmethod
-    def generate_all(cls, execution_id: int, db: Session) -> str:
+    def generar_todos(cls, execution_id: int, db: Session) -> str:
         """
         Genera todos los reportes (CSV + gráficos Plotly) para una ejecución.
 
@@ -55,8 +55,10 @@ class ReportService:
         report_dir = os.path.join(settings.REPORT_DIR, f"exec_{execution_id}_{timestamp}")
         os.makedirs(report_dir, exist_ok=True)
 
-        execution = db.query(Execution).filter(Execution.id == execution_id).first()
-        logs = db.query(ExecutionLog).filter(ExecutionLog.execution_id == execution_id).all()
+        execution = db.query(Ejecucion).filter(Ejecucion.id == execution_id).first()
+        logs = (
+            db.query(RegistroEjecucion).filter(RegistroEjecucion.ejecucion_id == execution_id).all()
+        )
 
         for cfg in cls.REPORT_CONFIGS:
             rows = []
@@ -69,7 +71,7 @@ class ReportService:
                         f"Error extrayendo log para reporte {cfg.get('key', '?')}, log_id={log.id}"
                     )
             if rows:
-                write_csv(
+                escribir_csv(
                     os.path.join(report_dir, cls.REPORT_NAMES[cfg["key"]]),
                     cfg["headers"],
                     rows,
@@ -77,22 +79,22 @@ class ReportService:
                 logger.info(f"Reporte {cfg['key']}: {len(rows)} filas")
             else:
                 logger.info(f"Reporte {cfg['key']}: sin datos, se omite")
-        cls._write_audit_errores(report_dir, db, execution_id)
-        cls._write_resumen_ejecutivo(report_dir, logs, execution)
+        cls._escribir_auditoria_errores(report_dir, db, execution_id)
+        cls._escribir_resumen_ejecutivo(report_dir, logs, execution)
 
         if execution:
-            from app.services.charts import ChartService
+            from app.services.graficos import ServicioGraficos
 
-            ChartService.generate_all(execution, logs, report_dir)
+            ServicioGraficos.generar_todos(execution, logs, report_dir)
 
-        create_zip(report_dir, report_dir + ".zip", extensions=(".csv", ".png", ".html"))
-        cls._cleanup_old_reports(report_dir)
+        crear_zip(report_dir, report_dir + ".zip", extensions=(".csv", ".png", ".html"))
+        cls._limpiar_reportes_antiguos(report_dir)
 
         logger.info(f"Reportes generados en: {report_dir}")
         return report_dir
 
     @classmethod
-    def get_report_path(cls, report_dir: str, report_name: str) -> str | None:
+    def obtener_ruta_reporte(cls, report_dir: str, report_name: str) -> str | None:
         filename = cls.REPORT_NAMES.get(report_name)
         if not filename:
             return None
@@ -100,12 +102,12 @@ class ReportService:
         return path if os.path.exists(path) else None
 
     @classmethod
-    def get_zip_path(cls, report_dir: str) -> str | None:
+    def obtener_ruta_zip(cls, report_dir: str) -> str | None:
         zip_path = report_dir + ".zip"
         return zip_path if os.path.exists(zip_path) else None
 
     @classmethod
-    def list_reports(cls, report_dir: str) -> list[dict[str, str]]:
+    def listar_reportes(cls, report_dir: str) -> list[dict[str, str]]:
         reports = []
         for name, filename in cls.REPORT_NAMES.items():
             path = os.path.join(report_dir, filename)
@@ -119,40 +121,41 @@ class ReportService:
                 )
         return reports
 
-    # ------------------------------------------------------------------
-    # Configuración de reportes (data-driven)
-    # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # Configuración de reportes (data-driven)
+        # ------------------------------------------------------------------
+
     REPORT_CONFIGS: ClassVar[list[dict]] = [
         # INICIENCIAS —— 4 reportes
         {
             "key": "inc_usuarios_inactivos",
             "headers": ["Correo", "Curso (shortname)", "Curso (nombre)", "Motivo"],
             "match": lambda log: (
-                log.action == "enrolment_failed"
-                and log.detail
-                and log.detail.get("reason") in ("user_not_found", "user_inactive")
+                log.accion == "enrolment_failed"
+                and log.detalle
+                and log.detalle.get("reason") in ("user_not_found", "user_inactive")
             ),
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("course", ""),
-                log.detail.get("fullname", ""),
-                log.detail.get("reason", ""),
+                log.identificador or "",
+                log.detalle.get("course", ""),
+                log.detalle.get("fullname", ""),
+                log.detalle.get("reason", ""),
             ],
         },
         {
             "key": "inc_cursos_recientes",
             "headers": ["Shortname", "Curso", "Motivo", "Antigüedad (días)", "Profesor"],
             "match": lambda log: (
-                log.action in ("alert_disappeared_recent", "alert_teacher_change_recent")
-                and log.detail
+                log.accion in ("alert_disappeared_recent", "alert_teacher_change_recent")
+                and log.detalle
             ),
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("fullname", ""),
-                log.detail.get("reason", ""),
-                str(round(log.detail.get("age_seconds", 0) / 86400, 1)),
-                log.detail.get("professor", "")
-                or log.detail.get("firstname", "") + " " + log.detail.get("lastname", ""),
+                log.identificador or "",
+                log.detalle.get("fullname", ""),
+                log.detalle.get("reason", ""),
+                str(round(log.detalle.get("age_seconds", 0) / 86400, 1)),
+                log.detalle.get("professor", "")
+                or log.detalle.get("firstname", "") + " " + log.detalle.get("lastname", ""),
             ],
         },
         {
@@ -163,34 +166,34 @@ class ReportService:
                 "Plantilla esperada",
                 "Plantilla usada (fallback)",
             ],
-            "match": lambda log: log.action == "template_not_found" and log.detail,
+            "match": lambda log: log.accion == "template_not_found" and log.detalle,
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("fullname", ""),
-                log.detail.get("template_shortname", ""),
-                log.detail.get("fallback", ""),
+                log.identificador or "",
+                log.detalle.get("fullname", ""),
+                log.detalle.get("template_shortname", ""),
+                log.detalle.get("fallback", ""),
             ],
         },
         {
             "key": "inc_correos_duplicados",
             "headers": ["Correo", "Usuarios encontrados", "Curso (shortname)", "Curso (nombre)"],
-            "match": lambda log: log.action == "duplicate_email" and log.detail,
+            "match": lambda log: log.accion == "duplicate_email" and log.detalle,
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("usernames", ""),
-                log.detail.get("course", ""),
-                log.detail.get("fullname", ""),
+                log.identificador or "",
+                log.detalle.get("usernames", ""),
+                log.detalle.get("course", ""),
+                log.detalle.get("fullname", ""),
             ],
         },
         # AUDITORÍA — 10 reportes
         {
             "key": "audit_categorias_creadas",
             "headers": ["ID Number", "Nombre", "Padre"],
-            "match": lambda log: log.action == "category_created",
+            "match": lambda log: log.accion == "category_created",
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("name", ""),
-                log.detail.get("parent", ""),
+                log.identificador or "",
+                log.detalle.get("name", ""),
+                log.detalle.get("parent", ""),
             ],
         },
         {
@@ -205,79 +208,79 @@ class ReportService:
                 "Plantilla",
             ],
             "match": lambda log: (
-                log.action
+                log.accion
                 in (
                     "course_created",
                     "course_created_with_template",
                     "course_recreated",
                     "course_hidden_and_created",
                 )
-                and log.detail
+                and log.detalle
             ),
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("fullname", ""),
-                log.detail.get("category_idnumber", ""),
-                log.detail.get("professor", "") or log.detail.get("username", ""),
-                f"{log.detail.get('firstname', '')} {log.detail.get('lastname', '')}".strip(),
-                log.detail.get("reason", ""),
-                log.detail.get("template_shortname", ""),
+                log.identificador or "",
+                log.detalle.get("fullname", ""),
+                log.detalle.get("category_idnumber", ""),
+                log.detalle.get("professor", "") or log.detalle.get("username", ""),
+                f"{log.detalle.get('firstname', '')} {log.detalle.get('lastname', '')}".strip(),
+                log.detalle.get("reason", ""),
+                log.detalle.get("template_shortname", ""),
             ],
         },
         {
             "key": "audit_cursos_eliminados",
             "headers": ["Shortname", "Curso", "Motivo", "Antigüedad (días)"],
-            "match": lambda log: log.action == "course_deleted",
+            "match": lambda log: log.accion == "course_deleted",
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("fullname", ""),
-                log.detail.get("reason", ""),
-                str(round(log.detail.get("age_seconds", 0) / 86400, 1)),
+                log.identificador or "",
+                log.detalle.get("fullname", ""),
+                log.detalle.get("reason", ""),
+                str(round(log.detalle.get("age_seconds", 0) / 86400, 1)),
             ],
         },
         {
             "key": "audit_cursos_ocultados",
             "headers": ["Shortname", "Curso", "Profesor (username)", "Profesor (nombre)"],
-            "match": lambda log: log.action == "course_hidden",
+            "match": lambda log: log.accion == "course_hidden",
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("fullname", ""),
-                log.detail.get("professor", "") or log.detail.get("username", ""),
-                f"{log.detail.get('firstname', '')} {log.detail.get('lastname', '')}".strip(),
+                log.identificador or "",
+                log.detalle.get("fullname", ""),
+                log.detalle.get("professor", "") or log.detalle.get("username", ""),
+                f"{log.detalle.get('firstname', '')} {log.detalle.get('lastname', '')}".strip(),
             ],
         },
         {
             "key": "audit_cursos_renombrados",
             "headers": ["Shortname anterior", "Curso anterior", "Shortname nuevo", "Curso nuevo"],
-            "match": lambda log: log.action == "course_renamed" and log.detail,
+            "match": lambda log: log.accion == "course_renamed" and log.detalle,
             "extract": lambda log: [
-                log.detail.get("old_shortname", ""),
-                log.detail.get("old_fullname", ""),
-                log.identifier or "",
-                log.detail.get("new_fullname", ""),
+                log.detalle.get("old_shortname", ""),
+                log.detalle.get("old_fullname", ""),
+                log.identificador or "",
+                log.detalle.get("new_fullname", ""),
             ],
         },
         {
             "key": "audit_cursos_activados",
             "headers": ["Shortname", "Curso", "Profesor (username)", "Profesor (nombre)"],
-            "match": lambda log: log.action == "course_activated",
+            "match": lambda log: log.accion == "course_activated",
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("fullname", ""),
-                log.detail.get("professor", "") or log.detail.get("username", ""),
-                f"{log.detail.get('firstname', '')} {log.detail.get('lastname', '')}".strip(),
+                log.identificador or "",
+                log.detalle.get("fullname", ""),
+                log.detalle.get("professor", "") or log.detalle.get("username", ""),
+                f"{log.detalle.get('firstname', '')} {log.detalle.get('lastname', '')}".strip(),
             ],
         },
         {
             "key": "audit_usuarios",
             "headers": ["Username", "Nombre", "Apellido", "Email", "Estado"],
-            "match": lambda log: log.action in ("user_created_createpassword", "user_resolved"),
+            "match": lambda log: log.accion in ("user_created_createpassword", "user_resolved"),
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("firstname", ""),
-                log.detail.get("lastname", ""),
-                log.detail.get("email", ""),
-                "Nuevo" if log.action == "user_created_createpassword" else "Existente",
+                log.identificador or "",
+                log.detalle.get("firstname", ""),
+                log.detalle.get("lastname", ""),
+                log.detalle.get("email", ""),
+                "Nuevo" if log.accion == "user_created_createpassword" else "Existente",
             ],
         },
         {
@@ -290,26 +293,26 @@ class ReportService:
                 "Resultado",
                 "Motivo",
             ],
-            "match": lambda log: log.action in ("enrolment_ok", "enrolment_failed"),
+            "match": lambda log: log.accion in ("enrolment_ok", "enrolment_failed"),
             "extract": lambda log: [
-                log.detail.get("course", ""),
-                log.detail.get("fullname", ""),
-                log.identifier or "",
-                f"{log.detail.get('firstname', '')} {log.detail.get('lastname', '')}".strip(),
-                "Éxito" if log.action == "enrolment_ok" else "Fallido",
-                log.detail.get("reason", ""),
+                log.detalle.get("course", ""),
+                log.detalle.get("fullname", ""),
+                log.identificador or "",
+                f"{log.detalle.get('firstname', '')} {log.detalle.get('lastname', '')}".strip(),
+                "Éxito" if log.accion == "enrolment_ok" else "Fallido",
+                log.detalle.get("reason", ""),
             ],
         },
         {
             "key": "audit_conflictos_identidad",
             "headers": ["Username ETL", "Correo", "Nombre ETL", "Nombre Moodle", "Matcheado por"],
-            "match": lambda log: log.action == "user_identity_conflict" and log.detail,
+            "match": lambda log: log.accion == "user_identity_conflict" and log.detalle,
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("email", ""),
-                log.detail.get("etl_fullname", ""),
-                log.detail.get("moodle_fullname", ""),
-                log.detail.get("matched_by", ""),
+                log.identificador or "",
+                log.detalle.get("email", ""),
+                log.detalle.get("etl_fullname", ""),
+                log.detalle.get("moodle_fullname", ""),
+                log.detalle.get("matched_by", ""),
             ],
         },
         {
@@ -321,25 +324,25 @@ class ReportService:
                 "Profesor",
                 "Antigüedad (días)",
             ],
-            "match": lambda log: log.action.startswith("planned_") and log.detail is not None,
+            "match": lambda log: log.accion.startswith("planned_") and log.detalle is not None,
             "extract": lambda log: [
-                log.identifier or "",
-                log.action[len("planned_") :],
-                log.detail.get("reason", ""),
-                log.detail.get("professor", "") or log.detail.get("old_professor", ""),
-                str(round(log.detail.get("age_seconds", 0) / 86400, 1)),
+                log.identificador or "",
+                log.accion[len("planned_") :],
+                log.detalle.get("reason", ""),
+                log.detalle.get("professor", "") or log.detalle.get("old_professor", ""),
+                str(round(log.detalle.get("age_seconds", 0) / 86400, 1)),
             ],
         },
         {
             "key": "usuarios_creados_manual",
             "headers": ["Username", "Correo institucional", "Nombre y Apellidos", "Base de datos"],
             "match": lambda log: (
-                log.action == "user_created_createpassword" and log.detail is not None
+                log.accion == "user_created_createpassword" and log.detalle is not None
             ),
             "extract": lambda log: [
-                log.identifier or "",
-                log.detail.get("email", ""),
-                f"{log.detail.get('firstname', '')} {log.detail.get('lastname', '')}".strip(),
+                log.identificador or "",
+                log.detalle.get("email", ""),
+                f"{log.detalle.get('firstname', '')} {log.detalle.get('lastname', '')}".strip(),
                 "Manual",
             ],
         },
@@ -347,7 +350,7 @@ class ReportService:
     ]
 
     @staticmethod
-    def _cleanup_old_reports(current_dir: str, max_age_days: int = 90):
+    def _limpiar_reportes_antiguos(current_dir: str, max_age_days: int = 90):
         """Elimina directorios y ZIPs de reportes más antiguos que max_age_days."""
         parent = os.path.dirname(current_dir)
         now = time.time()
@@ -370,21 +373,23 @@ class ReportService:
                     os.remove(zip_path)
 
     @classmethod
-    def _write_resumen_ejecutivo(cls, report_dir: str, logs: list[ExecutionLog], execution=None):
+    def _escribir_resumen_ejecutivo(
+        cls, report_dir: str, logs: list[RegistroEjecucion], execution=None
+    ):
         counts: dict[str, int] = {}
         for log in logs:
-            key = log.action
+            key = log.accion
             counts[key] = counts.get(key, 0) + 1
 
         rows = []
         if execution:
             rows += [
-                ["Semestre", execution.semester],
-                ["Archivo", execution.filename],
-                ["Duración (segundos)", str(round(execution.duration_seconds or 0))],
-                ["Versión Moodle", execution.moodle_version or "-"],
+                ["Semestre", execution.semestre],
+                ["Archivo", execution.nombre_archivo],
+                ["Duración (segundos)", str(round(execution.duracion_segundos or 0))],
+                ["Versión Moodle", execution.version_moodle or "-"],
                 ["Modalidad", execution.modalidad or "-"],
-                ["Errores totales (DB)", str(execution.errors_count or 0)],
+                ["Errores totales (DB)", str(execution.conteo_errores or 0)],
             ]
         metric_rows = [
             ("Categorías creadas", "category_created"),
@@ -419,33 +424,33 @@ class ReportService:
             if val > 0:
                 rows.append([label, str(val)])
         examples = (
-            (execution.metrics or {}).get("templates_missing_examples") if execution else None
+            (execution.metricas or {}).get("templates_missing_examples") if execution else None
         )
         if examples:
             rows.append(
                 ["Plantillas faltantes (ejemplos)", ", ".join(str(x) for x in examples[:10])]
             )
-        # Tasa de error
+            # Tasa de error
         total_ops = sum(v for k, v in counts.items() if k.startswith(("course_", "enrolment_")))
         total_errs = counts.get("enrolment_failed", 0)
         rate = round(total_errs / total_ops * 100, 1) if total_ops > 0 else 0
         rows.append(["Tasa de error (%)", str(rate)])
 
-        write_csv(
+        escribir_csv(
             os.path.join(report_dir, cls.REPORT_NAMES["resumen_ejecutivo"]),
             ["Métrica", "Valor"],
             rows,
         )
 
     @classmethod
-    def _write_audit_errores(cls, report_dir: str, db, execution_id: int):
-        from app.db.models import ErrorLog
+    def _escribir_auditoria_errores(cls, report_dir: str, db, execution_id: int):
+        from app.db.modelos import RegistroError
 
-        errors = db.query(ErrorLog).filter(ErrorLog.execution_id == execution_id).all()
+        errors = db.query(RegistroError).filter(RegistroError.ejecucion_id == execution_id).all()
         if not errors:
             return
-        rows = [[e.type, e.identifier or "", e.message or "", str(e.created_at)] for e in errors]
-        write_csv(
+        rows = [[e.tipo, e.identificador or "", e.mensaje or "", str(e.creado_en)] for e in errors]
+        escribir_csv(
             os.path.join(report_dir, cls.REPORT_NAMES["audit_errores"]),
             ["Fase/Tipo", "Identificador", "Mensaje", "Fecha"],
             rows,

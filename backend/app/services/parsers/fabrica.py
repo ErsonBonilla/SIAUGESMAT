@@ -1,9 +1,9 @@
 from typing import ClassVar
 
-from app.services.parsers.base import BaseExcelParser
+from app.services.parsers.base import AnalizadorExcelBase
 
 
-class ParserFactory:
+class FabricaAnalizadores:
     _registry: ClassVar[dict] = {}
 
     @classmethod
@@ -11,7 +11,7 @@ class ParserFactory:
         cls._registry[modalidad.upper()] = parser_cls
 
     @classmethod
-    def get_parser(cls, modalidad: str) -> BaseExcelParser:
+    def obtener_analizador(cls, modalidad: str) -> AnalizadorExcelBase:
         modalidad_upper = modalidad.upper()
         parser_cls = cls._registry.get(modalidad_upper)
         if not parser_cls:
