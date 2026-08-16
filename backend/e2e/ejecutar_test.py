@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
-Runner unificado para pruebas reales contra Moodle 3.9.
+Runner unificado para pruebas reales (o simuladas) contra Moodle.
 
 Uso:
     cd backend
     # Coloca tu fixture local (datos reales, NO se comitean) en e2e/fixtures/
-    python e2e/run_test.py e2e/fixtures/MI_CARGA.xlsx
-    python e2e/run_test.py e2e/fixtures/MI_CARGA.xlsx --mode users
-    python e2e/run_test.py e2e/fixtures/MI_CARGA.xlsx --mode both --confirm
+    python e2e/ejecutar_test.py e2e/fixtures/MI_CARGA.xlsx
+    python e2e/ejecutar_test.py e2e/fixtures/MI_CARGA.xlsx --mode users
+    python e2e/ejecutar_test.py e2e/fixtures/MI_CARGA.xlsx --mode both --confirm
+
+Modo simulado (sin Moodle real):
+    Levanta `e2e/moodle_simulado.py` y un backend/worker apuntando a su URL;
+    ver `e2e/README.md` -> "Modo simulado".
 
 Flujo:
     1. Genera token JWT automáticamente
@@ -21,17 +25,20 @@ Flujo:
 import argparse
 import json
 import os
+import sys
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
-
 BASE_URL = os.environ.get("SIAUGESMAT_URL", "http://localhost:8000")
 API = f"{BASE_URL}/api/v1"
 
+TIMEOUT_SEGUNDOS = 15
+REINTENTOS_CONSECUTIVOS_MAX = 5
 
-def upload_excel(filepath: str, semester: str, mode: str, modalidad: str, token: str) -> int:
+
+def subir_excel(filepath: str, semester: str, mode: str, modalidad: str, token: str) -> int:
     """Sube un archivo Excel y retorna el execution_id."""
     boundary = "----FormBoundarySIAUGESMAT"
     body = b""
@@ -42,7 +49,9 @@ def upload_excel(filepath: str, semester: str, mode: str, modalidad: str, token:
     filename = os.path.basename(filepath)
     body += f"--{boundary}\r\n".encode()
     body += f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'.encode()
-    body += b"Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n"
+    body += (
+        b"Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n"
+    )
     body += fd
 
     for name, val in [("semester", semester), ("mode", mode), ("modalidad", modalidad)]:
@@ -56,23 +65,23 @@ def upload_excel(filepath: str, semester: str, mode: str, modalidad: str, token:
     req.add_header("Authorization", f"Bearer {token}")
     req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
 
-    resp = urllib.request.urlopen(req)
+    resp = urllib.request.urlopen(req, timeout=TIMEOUT_SEGUNDOS)
     data = json.loads(resp.read().decode())
     return data["execution_id"]
 
 
-def process_execution(eid: int, token: str) -> None:
+def procesar_ejecucion(eid: int, token: str) -> None:
     """Dispara el procesamiento de una ejecución."""
     req = urllib.request.Request(f"{API}/jobs/{eid}/process", method="POST")
     req.add_header("Authorization", f"Bearer {token}")
-    urllib.request.urlopen(req)
+    urllib.request.urlopen(req, timeout=TIMEOUT_SEGUNDOS)
 
 
-def confirm_execution(eid: int, token: str) -> None:
+def confirmar_ejecucion(eid: int, token: str) -> None:
     """Confirma una ejecución bloqueada por delete masivo."""
     req = urllib.request.Request(f"{API}/jobs/{eid}/confirm", method="POST")
     req.add_header("Authorization", f"Bearer {token}")
-    resp = urllib.request.urlopen(req)
+    resp = urllib.request.urlopen(req, timeout=TIMEOUT_SEGUNDOS)
     return json.loads(resp.read().decode())
 
 
@@ -80,17 +89,40 @@ def get_status(eid: int, token: str) -> dict:
     """Obtiene el estado actual de una ejecución."""
     req = urllib.request.Request(f"{API}/jobs/{eid}")
     req.add_header("Authorization", f"Bearer {token}")
-    resp = urllib.request.urlopen(req)
+    resp = urllib.request.urlopen(req, timeout=TIMEOUT_SEGUNDOS)
     return json.loads(resp.read().decode())
 
 
-def poll_until_done(eid: int, token: str, auto_confirm: bool = False, interval: float = 2.0) -> dict:
-    """Espera hasta que la ejecución termine o requiera confirmación."""
+def consultar_hasta_terminar(
+    eid: int, token: str, auto_confirm: bool = False, interval: float = 2.0
+) -> dict:
+    """Espera hasta que la ejecución termine o requiera confirmación.
+
+    Si la API responde 5xx o deja de responder, se reintenta hasta
+    ``REINTENTOS_CONSECUTIVOS_MAX`` veces consecutivas y luego falla con un
+    mensaje claro (no queda en loop infinito).
+    """
     last_phase = ""
+    errores_consecutivos = 0
     while True:
         try:
             status = get_status(eid, token)
-        except urllib.error.HTTPError:
+            errores_consecutivos = 0
+        except urllib.error.HTTPError as e:
+            errores_consecutivos += 1
+            if errores_consecutivos > REINTENTOS_CONSECUTIVOS_MAX:
+                raise RuntimeError(
+                    f"La API responde {e.code} repetidamente al consultar la ejecución {eid} "
+                    f"({errores_consecutivos} intentos). Abortando."
+                ) from None
+            time.sleep(interval)
+            continue
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            errores_consecutivos += 1
+            if errores_consecutivos > REINTENTOS_CONSECUTIVOS_MAX:
+                raise RuntimeError(
+                    f"La API dejó de responder al consultar la ejecución {eid}: {e}. Abortando."
+                ) from None
             time.sleep(interval)
             continue
 
@@ -103,15 +135,15 @@ def poll_until_done(eid: int, token: str, auto_confirm: bool = False, interval: 
             last_phase = phase
 
         if st == "review_required":
-            print(f"\n  [WARN] DELETE MASIVO detectado -- requiere confirmacion")
+            print("\n  [WARN] DELETE MASIVO detectado -- requiere confirmacion")
             if auto_confirm:
-                print(f"  Confirmando automaticamente...")
-                result = confirm_execution(eid, token)
+                print("  Confirmando automaticamente...")
+                result = confirmar_ejecucion(eid, token)
                 print(f"  Reanudado: {result['message']}")
                 last_phase = ""
                 continue
             else:
-                print(f"  Usá --confirm para autorizar, o revisá en el frontend")
+                print("  Usá --confirm para autorizar, o revisá en el frontend")
                 return status
 
         if st in ("completed", "failed"):
@@ -120,10 +152,10 @@ def poll_until_done(eid: int, token: str, auto_confirm: bool = False, interval: 
         time.sleep(interval)
 
 
-def print_results(status: dict) -> None:
+def imprimir_resultados(status: dict) -> None:
     """Muestra un resumen de los resultados."""
     metrics = status.get("metrics", {}) or {}
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Resultados — Ejecución #{status.get('id')}")
     print(f"  Status:     {status.get('status')}")
     print(f"  Progreso:   {status.get('progress_pct', 0):.0f}%")
@@ -131,9 +163,17 @@ def print_results(status: dict) -> None:
     print(f"  Duración:   {dur:.1f}s")
     print(f"  Errores:    {status.get('errors_count', 0)}")
 
-    keys = ["categories_created", "courses_created", "courses_deleted",
-            "courses_activated", "courses_hidden", "users_created",
-            "enrolments", "enrolment_errors", "alerts"]
+    keys = [
+        "categories_created",
+        "courses_created",
+        "courses_deleted",
+        "courses_activated",
+        "courses_hidden",
+        "users_created",
+        "enrolments",
+        "enrolment_errors",
+        "alerts",
+    ]
     for k in keys:
         v = metrics.get(k, 0)
         if v:
@@ -147,14 +187,22 @@ def print_results(status: dict) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Prueba real del pipeline ETL SIAUGESMAT")
     parser.add_argument("file", help="Archivo Excel a procesar")
-    parser.add_argument("--mode", default="users", choices=["users", "courses", "both"],
-                        help="Modo de procesamiento (default: users)")
+    parser.add_argument(
+        "--mode",
+        default="users",
+        choices=["users", "courses", "both"],
+        help="Modo de procesamiento (default: users)",
+    )
     parser.add_argument("--semester", default="2026B", help="Semestre (default: 2026B)")
     parser.add_argument("--modalidad", default="DISTANCIA", help="Modalidad (default: DISTANCIA)")
-    parser.add_argument("--confirm", action="store_true",
-                        help="Confirmar automáticamente el delete masivo si se requiere")
-    parser.add_argument("--url", default=None,
-                        help="URL del backend (default: http://localhost:8000)")
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Confirmar automáticamente el delete masivo si se requiere",
+    )
+    parser.add_argument(
+        "--url", default=None, help="URL del backend (default: http://localhost:8000)"
+    )
     args = parser.parse_args()
 
     if args.url:
@@ -167,10 +215,11 @@ def main():
         sys.exit(1)
 
     # Generar token JWT
-    from jwt_helper import get_token
+    from ayudante_jwt import get_token
+
     token = get_token(modalidad=args.modalidad)
 
-    print(f"SIAUGESMAT - Prueba real")
+    print("SIAUGESMAT - Prueba real")
     print(f"  Archivo:   {filepath.name}")
     print(f"  Mode:      {args.mode}")
     print(f"  Semestre:  {args.semester}")
@@ -179,20 +228,24 @@ def main():
 
     # Subir y procesar
     print("Subiendo archivo...")
-    eid = upload_excel(str(filepath), args.semester, args.mode, args.modalidad, token)
+    eid = subir_excel(str(filepath), args.semester, args.mode, args.modalidad, token)
     print(f"  Upload OK -- execution_id={eid}")
 
     print("Procesando...")
-    process_execution(eid, token)
+    procesar_ejecucion(eid, token)
 
-    status = poll_until_done(eid, token, auto_confirm=args.confirm)
+    try:
+        status = consultar_hasta_terminar(eid, token, auto_confirm=args.confirm)
+    except RuntimeError as e:
+        print(f"\n[FAIL] {e}")
+        sys.exit(1)
 
     # Mostrar resultados
     if status.get("status") == "review_required":
         # Solo mostrar métricas parciales, no es error
-        print_results({**status, "status": "review_required (pendiente confirmación)"})
+        imprimir_resultados({**status, "status": "review_required (pendiente confirmación)"})
     else:
-        print_results(status)
+        imprimir_resultados(status)
 
     if status.get("status") == "completed":
         print("\n[OK] Pipeline completado exitosamente.")

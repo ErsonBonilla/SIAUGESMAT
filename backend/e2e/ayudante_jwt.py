@@ -10,13 +10,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.core.security import create_access_token
+from app.core.seguridad import crear_token_acceso
 
 
 def get_token(username: str = "admin", modalidad: str = "DISTANCIA") -> str:
     """Genera un token JWT firmado para pruebas."""
-    return create_access_token({
-        "sub": "1",
-        "username": username,
-        "modalidad": modalidad,
-    })
+    return crear_token_acceso(
+        {
+            "sub": "1",
+            "username": username,
+            "modalidad": modalidad,
+        }
+    )
