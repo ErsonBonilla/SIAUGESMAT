@@ -1,12 +1,12 @@
 // utils/profile.ts
 import { signal } from "@preact/signals";
-import type { UserProfile } from "../services/api.ts";
+import type { PerfilUsuario } from "../services/api.ts";
 
-export const profileSignal = signal<UserProfile | null>(null);
+export const profileSignal = signal<PerfilUsuario | null>(null);
 
 let fetchPromise: Promise<void> | null = null;
 
-export function ensureProfile(fetcher: () => Promise<UserProfile>) {
+export function garantizarPerfil(fetcher: () => Promise<PerfilUsuario>) {
   if (profileSignal.value) return;
   if (fetchPromise) return fetchPromise;
   fetchPromise = fetcher().then((p) => {

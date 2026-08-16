@@ -1,15 +1,15 @@
 // tests/services/api.test.ts
 import {
-  deleteExecution,
-  getExecution,
-  getExecutionErrors,
-  getHistory,
-  getLatest,
-  getSemaphore,
-  listExecutions,
-  login,
-  startProcess,
-  uploadFile,
+  eliminarEjecucion,
+  iniciarProceso,
+  iniciarSesion,
+  listarEjecuciones,
+  obtenerEjecucion,
+  obtenerErroresEjecucion,
+  obtenerHistorial,
+  obtenerReciente,
+  obtenerSemaforo,
+  subirArchivo,
 } from "../../services/api.ts";
 
 import { assertEquals, assertRejects } from "@std/assert";
@@ -69,7 +69,7 @@ Deno.test("api - login exitoso retorna datos del usuario", async () => {
     username: "juan",
     modalidad: "PRESENCIAL",
   });
-  const result = await login("juan", "secreto", "PRESENCIAL");
+  const result = await iniciarSesion("juan", "secreto", "PRESENCIAL");
   assertEquals(result.access_token, "jwt123");
   assertEquals(result.user_id, 1);
   const body = JSON.parse(lastFetchArgs.init?.body as string);
@@ -84,7 +84,7 @@ Deno.test(
     setup();
     mockFetch(400, { detail: "Credenciales incorrectas" });
     await assertRejects(
-      () => login("juan", "mal", "PRESENCIAL"),
+      () => iniciarSesion("juan", "mal", "PRESENCIAL"),
       Error,
       "Credenciales incorrectas",
     );
@@ -102,7 +102,7 @@ Deno.test("api - uploadFile envía el archivo y devuelve ejecución", async () =
     filename: "datos.xlsx",
     status: "pending",
   });
-  const result = await uploadFile(fakeFile, "2025A", "DISTANCIA");
+  const result = await subirArchivo(fakeFile, "2025A", "DISTANCIA");
   assertEquals(result.execution_id, 42);
 });
 
@@ -115,7 +115,7 @@ Deno.test(
     });
     mockFetch(403, { detail: "No autenticado" });
     await assertRejects(
-      () => uploadFile(fakeFile, "2025A", "DISTANCIA"),
+      () => subirArchivo(fakeFile, "2025A", "DISTANCIA"),
       Error,
       "No autenticado",
     );
@@ -126,7 +126,7 @@ Deno.test("api - startProcess encola una ejecución", async () => {
   setup();
   setFakeToken();
   mockFetch(202, { execution_id: 10, job_id: "rq:job:1" });
-  const result = await startProcess(10);
+  const result = await iniciarProceso(10);
   assertEquals(result.job_id, "rq:job:1");
   assertEquals(lastFetchArgs.url?.includes("/jobs/10/process"), true);
 });
@@ -143,7 +143,7 @@ Deno.test("api - getExecution retorna el objeto Execution", async () => {
     errors_count: 0,
     created_at: "2025-03-01T10:00:00Z",
   });
-  const exec = await getExecution(5);
+  const exec = await obtenerEjecucion(5);
   assertEquals(exec.id, 5);
   assertEquals(exec.semester, "2025A");
 });
@@ -152,7 +152,7 @@ Deno.test("api - listExecutions retorna lista paginada con filtros", async () =>
   setup();
   setFakeToken();
   mockFetch(200, { total: 2, items: [{ id: 1 }, { id: 2 }] });
-  const result = await listExecutions({
+  const result = await listarEjecuciones({
     semester: "2025A",
     limit: 5,
     offset: 0,
@@ -166,7 +166,7 @@ Deno.test("api - getExecutionErrors retorna lista de errores", async () => {
   setup();
   setFakeToken();
   mockFetch(200, [{ id: 1, type: "course", message: "Curso no encontrado" }]);
-  const errors = await getExecutionErrors(5, 10, 0);
+  const errors = await obtenerErroresEjecucion(5, 10, 0);
   assertEquals(errors.length, 1);
   assertEquals(errors[0].type, "course");
 });
@@ -175,14 +175,14 @@ Deno.test("api - deleteExecution sin error no lanza excepción (204)", async () 
   setup();
   setFakeToken();
   mockFetch(204, null);
-  await deleteExecution(10);
+  await eliminarEjecucion(10);
 });
 
 Deno.test("api - deleteExecution con error lanza", async () => {
   setup();
   setFakeToken();
   mockFetch(500, { detail: "Error interno" });
-  await assertRejects(() => deleteExecution(10), Error, "Error interno");
+  await assertRejects(() => eliminarEjecucion(10), Error, "Error interno");
 });
 
 Deno.test("api - getHistory retorna métricas por semestre", async () => {
@@ -196,7 +196,7 @@ Deno.test("api - getHistory retorna métricas por semestre", async () => {
       total_errors: 1,
     },
   ]);
-  const history = await getHistory(5);
+  const history = await obtenerHistorial(5);
   assertEquals(history[0].semester, "2025A");
 });
 
@@ -204,7 +204,7 @@ Deno.test("api - getSemaphore retorna estado del semáforo", async () => {
   setup();
   setFakeToken();
   mockFetch(200, { semester: "2025A", status: "green", error_rate: 0.5 });
-  const sem = await getSemaphore("2025A");
+  const sem = await obtenerSemaforo("2025A");
   assertEquals(sem.status, "green");
   assertEquals(lastFetchArgs.url?.includes("semester=2025A"), true);
 });
@@ -213,7 +213,7 @@ Deno.test("api - getSemaphore sin parámetro consulta último", async () => {
   setup();
   setFakeToken();
   mockFetch(200, { semester: "2025A", status: "yellow" });
-  const sem = await getSemaphore();
+  const sem = await obtenerSemaforo();
   assertEquals(sem.status, "yellow");
 });
 
@@ -227,7 +227,7 @@ Deno.test("api - getLatest retorna la última ejecución con semáforo", async (
     error_rate: 0.0,
     semaphore: "green",
   });
-  const latest = await getLatest();
+  const latest = await obtenerReciente();
   assertEquals(latest.id, 99);
   assertEquals(latest.semaphore, "green");
 });
@@ -238,7 +238,7 @@ Deno.test("api - respuesta 401 borra token y redirige al login", async () => {
 
   mockFetch(401, { detail: "Token expirado" });
   await assertRejects(
-    () => getExecution(1),
+    () => obtenerEjecucion(1),
     Error,
     "Sesión expirada. Vuelva a iniciar sesión.",
   );
@@ -249,7 +249,7 @@ Deno.test("api - error login sin mensaje detalle muestra fallback", async () => 
   setup();
   mockFetch(500, {});
   await assertRejects(
-    () => login("juan", "pass", "PRESENCIAL"),
+    () => iniciarSesion("juan", "pass", "PRESENCIAL"),
     Error,
     "Credenciales inválidas",
   );

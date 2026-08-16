@@ -1,14 +1,14 @@
 // routes/cursos/crear.tsx
-import { requireAuth } from "../../utils/auth-guard.ts";
-import Layout from "../../components/Layout.tsx";
+import { requerirAutenticacion } from "../../utils/guarda-autenticacion.ts";
+import Disposicion from "../../components/Disposicion.tsx";
 import CargaIsland from "../../islands/CargaIsland.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
-export default function UploadPage() {
+export default function PaginaSubida() {
   return (
-    <Layout title="Crear cursos">
+    <Disposicion title="Crear cursos">
       <CargaIsland />
-    </Layout>
+    </Disposicion>
   );
 }

@@ -33,8 +33,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.pipeline.duplicate_emails import DuplicateGroup, group_rows
-from app.services.moodle_factory import get_moodle_service
+from app.pipeline.correos_duplicados import GrupoDuplicados, agrupar_filas
+from app.services.fabrica_moodle import obtener_servicio_moodle
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ async def _get_users_batch(ms, usernames: list) -> list:
     return []
 
 
-async def _rename_user(ms, user_id: int, username: str) -> bool:
+async def _renombrar_usuario(ms, user_id: int, username: str) -> bool:
     try:
         await ms._request(
             "core_user_update_users",
@@ -100,7 +100,7 @@ async def _delete_user(ms, user_id: int) -> bool:
         return False
 
 
-async def _get_user_courses(ms, user_id: int) -> list:
+async def _obtener_cursos_usuario(ms, user_id: int) -> list:
     """Cursos en los que el usuario está matriculado."""
     try:
         result = await ms._request(
@@ -114,11 +114,12 @@ async def _get_user_courses(ms, user_id: int) -> list:
         pass
     return []
 
+    # ---------------------------------------------------------------------------
+    # Clasificación
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Clasificación
-# ---------------------------------------------------------------------------
-def _temp_username(target: str) -> str:
+
+def _username_temporal(target: str) -> str:
     """Username temporal que libera el deseado antes de borrar el duplicado."""
     suffix = f"{TEMP_PREFIX}{target}"
     return suffix[:MAX_USERNAME_LEN]
@@ -130,7 +131,7 @@ async def build_plan(ms, csv_path) -> list[dict]:
     with open(csv_path, encoding="utf-8-sig", newline="") as f:
         rows = list(csv.DictReader(f))
 
-    groups = group_rows(rows)
+    groups = agrupar_filas(rows)
     print(f"\n  {len(groups)} emails con cuentas agrupadas desde {csv_path.name}\n")
 
     usernames = sorted({r.username for g in groups for r in g.rows})
@@ -145,13 +146,13 @@ async def build_plan(ms, csv_path) -> list[dict]:
         plan = _classify_group(group, state)
         if plan["status"] == "SEGURO":
             newer_user = plan["newer_user"]
-            courses = await _get_user_courses(ms, newer_user["id"])
+            courses = await _obtener_cursos_usuario(ms, newer_user["id"])
             plan["cursos_duplicado"] = len(courses)
         plans.append(plan)
     return plans
 
 
-def _classify_group(group: DuplicateGroup, state: dict) -> dict:
+def _classify_group(group: GrupoDuplicados, state: dict) -> dict:
     plan: dict = {"group": group, "detail": ""}
 
     if group.count != 2:
@@ -159,8 +160,8 @@ def _classify_group(group: DuplicateGroup, state: dict) -> dict:
         plan["detail"] = f"{group.count} cuentas para el mismo correo"
         return plan
 
-    older = group.oldest()
-    newer = group.newest()
+    older = group.mas_antiguo()
+    newer = group.mas_reciente()
     if older is None or newer is None:
         plan["status"] = "AMBIGUO"
         plan["detail"] = "fecha de creación no interpretable"
@@ -202,10 +203,11 @@ def _classify_group(group: DuplicateGroup, state: dict) -> dict:
     plan["status"] = "SEGURO"
     return plan
 
+    # ---------------------------------------------------------------------------
+    # Auditoría (solo lectura)
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Auditoría (solo lectura)
-# ---------------------------------------------------------------------------
+
 async def run_audit(ms, plans: list[dict]):
     counts: dict = {}
     for plan in plans:
@@ -232,10 +234,11 @@ async def run_audit(ms, plans: list[dict]):
     print(f"  >>> {safe} pares listos para --fix (renombrar antigua + eliminar reciente)")
     print(f"  >>> {len(plans) - safe} requieren revisión manual\n")
 
+    # ---------------------------------------------------------------------------
+    # Fix: aplicar renombrado + borrado
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Fix: aplicar renombrado + borrado
-# ---------------------------------------------------------------------------
+
 async def run_fix(ms, plans: list[dict]):
     to_fix = [p for p in plans if p["status"] == "SEGURO"]
 
@@ -251,19 +254,19 @@ async def run_fix(ms, plans: list[dict]):
         older_user = plan["older_user"]
         newer_user = plan["newer_user"]
         newer_original = newer_user.get("username")
-        temp = _temp_username(target)
+        temp = _username_temporal(target)
         print(f"  [{i}/{len(to_fix)}] {g.email}")
-        print(f"      renombrar '{g.oldest().username}' -> '{target}'")
+        print(f"      renombrar '{g.mas_antiguo().username}' -> '{target}'")
 
-        if not await _rename_user(ms, newer_user["id"], temp):
+        if not await _renombrar_usuario(ms, newer_user["id"], temp):
             print(f"      [FAIL] no se pudo liberar '{target}' ({newer_original} -> {temp})")
             plan["detail"] = "falló liberación del username"
             fail += 1
             continue
 
-        if not await _rename_user(ms, older_user["id"], target):
+        if not await _renombrar_usuario(ms, older_user["id"], target):
             print(f"      [FAIL] no se pudo renombrar '{older_user.get('username')}' -> '{target}'")
-            await _rename_user(ms, newer_user["id"], newer_original)
+            await _renombrar_usuario(ms, newer_user["id"], newer_original)
             plan["detail"] = "falló el renombrado de la cuenta conservada"
             fail += 1
             continue
@@ -286,10 +289,11 @@ async def run_fix(ms, plans: list[dict]):
     print(f"\n  Correctos:  {ok}")
     print(f"  Fallidos:   {fail}\n")
 
+    # ---------------------------------------------------------------------------
+    # CSV de resultado
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# CSV de resultado
-# ---------------------------------------------------------------------------
+
 def write_result(csv_path: Path, plans: list[dict], output_path: Path | None):
     if not output_path:
         output_path = csv_path.with_name(f"{csv_path.stem}_resultado.csv")
@@ -311,8 +315,8 @@ def write_result(csv_path: Path, plans: list[dict], output_path: Path | None):
         writer.writeheader()
         for plan in plans:
             g = plan["group"]
-            older = g.oldest()
-            newer = g.newest()
+            older = g.mas_antiguo()
+            newer = g.mas_reciente()
             writer.writerow(
                 {
                     "email": g.email,
@@ -333,10 +337,11 @@ def _fmt_fecha(user_row) -> str:
         return ""
     return datetime.strftime(user_row.date, "%Y-%m-%d %H:%M:%S")
 
+    # ---------------------------------------------------------------------------
+    # Main
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
+
 async def main():
     parser = argparse.ArgumentParser(
         description="Corrige usernames de cuentas duplicadas por email (conserva la más antigua)"
@@ -361,7 +366,7 @@ async def main():
         print(f"  ERROR: No se encontró {args.csv}")
         sys.exit(1)
 
-    ms = get_moodle_service(args.modalidad)
+    ms = obtener_servicio_moodle(args.modalidad)
 
     try:
         plans = await build_plan(ms, args.csv)

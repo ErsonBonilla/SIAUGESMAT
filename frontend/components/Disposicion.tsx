@@ -1,15 +1,15 @@
-// components/Layout.tsx
+// components/Disposicion.tsx
 import { ComponentChildren } from "preact";
 import BarraLateral from "../islands/BarraLateral.tsx";
 import BotonMenuMovil from "../islands/BotonMenuMovil.tsx";
-import { profileSignal } from "../utils/profile.ts";
+import { profileSignal } from "../utils/perfil.ts";
 
-interface LayoutProps {
+interface PropsDisposicion {
   children: ComponentChildren;
   title?: string;
 }
 
-export default function Layout({ children, title }: LayoutProps) {
+export default function Disposicion({ children, title }: PropsDisposicion) {
   return (
     <div class="flex min-h-screen w-full text-[var(--text-primary)]">
       <BarraLateral />

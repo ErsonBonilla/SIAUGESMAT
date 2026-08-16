@@ -2,13 +2,13 @@ import csv
 import io
 import logging
 
-from app.services.category_utils import sort_categories
-from app.services.roles import resolve_role
+from app.services.roles import resolver_rol
+from app.services.utilidades_categorias import ordenar_categorias
 
 logger = logging.getLogger(__name__)
 
 
-def validate_and_parse_csv(content: str, column: str, label_plural: str) -> list[str]:
+def validar_y_parsear_csv(content: str, column: str, label_plural: str) -> list[str]:
     reader = csv.DictReader(io.StringIO(content))
     if not reader.fieldnames:
         raise ValueError("El archivo CSV está vacío o no tiene cabecera")
@@ -30,7 +30,7 @@ def validate_and_parse_csv(content: str, column: str, label_plural: str) -> list
     return values
 
 
-def validate_users_csv(content: str, default_role: str = None) -> list[dict]:
+def validar_csv_usuarios(content: str, default_role: str = None) -> list[dict]:
     reader = csv.DictReader(io.StringIO(content))
     if not reader.fieldnames:
         raise ValueError("El archivo CSV está vacío o no tiene cabecera")
@@ -55,10 +55,6 @@ def validate_users_csv(content: str, default_role: str = None) -> list[dict]:
                 raise ValueError(f"Fila {row_num}: '{col}' vacío")
             user[col] = value
 
-        password = (row.get("password") or "").strip()
-        if password:
-            user["password"] = password
-
         user["role1"] = default_role
         if has_role_column:
             role_actual = next(
@@ -67,7 +63,7 @@ def validate_users_csv(content: str, default_role: str = None) -> list[dict]:
             csv_role = (row.get(role_actual) or "").strip()
             if csv_role:
                 try:
-                    resolve_role(csv_role)
+                    resolver_rol(csv_role)
                 except (ValueError, KeyError):
                     raise ValueError(f"Fila {row_num}: rol inválido '{csv_role}'") from None
                 user["role1"] = csv_role
@@ -87,7 +83,7 @@ def validate_users_csv(content: str, default_role: str = None) -> list[dict]:
     return users
 
 
-def _get_field(
+def _obtener_campo(
     row: dict, fieldnames: list, column: str, required: bool = False, row_num: int = 0
 ) -> str:
     actual = next((n for n in fieldnames if n.strip().lower() == column), column)
@@ -97,7 +93,7 @@ def _get_field(
     return value
 
 
-def validate_categories_csv(content: str) -> list[dict]:
+def validar_csv_categorias(content: str) -> list[dict]:
     reader = csv.DictReader(io.StringIO(content))
     if not reader.fieldnames:
         raise ValueError("El archivo CSV está vacío o no tiene cabecera")
@@ -108,21 +104,21 @@ def validate_categories_csv(content: str) -> list[dict]:
 
     categories = []
     for row_num, row in enumerate(reader, start=2):
-        name = _get_field(row, reader.fieldnames, "name", required=True, row_num=row_num)
+        name = _obtener_campo(row, reader.fieldnames, "name", required=True, row_num=row_num)
         cat = {"name": name}
-        idnumber = _get_field(row, reader.fieldnames, "idnumber")
+        idnumber = _obtener_campo(row, reader.fieldnames, "idnumber")
         if idnumber:
             cat["idnumber"] = idnumber
-        parent = _get_field(row, reader.fieldnames, "parent")
+        parent = _obtener_campo(row, reader.fieldnames, "parent")
         cat["parent"] = parent
-        description = _get_field(row, reader.fieldnames, "description")
+        description = _obtener_campo(row, reader.fieldnames, "description")
         if description:
             cat["description"] = description
-        visible = _get_field(row, reader.fieldnames, "visible")
+        visible = _obtener_campo(row, reader.fieldnames, "visible")
         if visible in ("0", "1"):
             cat["visible"] = int(visible)
         categories.append(cat)
 
     if not categories:
         raise ValueError("No se encontraron categorías en el archivo CSV.")
-    return sort_categories(categories)
+    return ordenar_categorias(categories)

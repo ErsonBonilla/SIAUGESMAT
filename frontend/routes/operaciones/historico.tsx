@@ -1,12 +1,12 @@
-import { requireAuth } from "../../utils/auth-guard.ts";
-import Layout from "../../components/Layout.tsx";
+import { requerirAutenticacion } from "../../utils/guarda-autenticacion.ts";
+import Disposicion from "../../components/Disposicion.tsx";
 import HistoricoTabs from "../../islands/HistoricoTabs.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
 export default function HistoricoPage() {
   return (
-    <Layout title="Histórico de operaciones">
+    <Disposicion title="Histórico de operaciones">
       <p
         class="text-sm text-[var(--text-secondary)] mt-1"
         style={{ marginTop: "-0.75rem", marginBottom: "1.5rem" }}
@@ -14,6 +14,6 @@ export default function HistoricoPage() {
         Métricas históricas de todas las operaciones del sistema.
       </p>
       <HistoricoTabs />
-    </Layout>
+    </Disposicion>
   );
 }

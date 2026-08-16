@@ -22,8 +22,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.db.session import SessionLocal
-from app.services.moodle_factory import get_moodle_service
+from app.db.sesion import SessionLocal
+from app.services.fabrica_moodle import obtener_servicio_moodle
 
 
 def _load_logs(db, execution_id: int):
@@ -34,33 +34,33 @@ def _load_logs(db, execution_id: int):
             """
             WITH p430 AS (
                 SELECT DISTINCT
-                    p.identifier AS sn,
-                    p.detail->>'new_professor' AS etl_prof,
-                    p.detail->>'old_professor' AS old_prof,
-                    h.detail->>'fullname'      AS fullname,
-                    h.created_at               AS hidden_at
-                FROM execution_logs p
-                JOIN execution_logs h
-                  ON h.execution_id = :eid AND h.action = 'course_hidden'
-                 AND h.identifier = p.identifier
-                WHERE p.execution_id = :eid
-                  AND p.action = 'planned_course_hidden_and_created'
-                  AND p.detail->>'old_shortname' = p.identifier
+                    p.identificador AS sn,
+                    p.detalle->>'new_professor' AS etl_prof,
+                    p.detalle->>'old_professor' AS old_prof,
+                    h.detalle->>'fullname'      AS fullname,
+                    h.creado_en                 AS hidden_at
+                FROM registros_ejecucion p
+                JOIN registros_ejecucion h
+                  ON h.ejecucion_id = :eid AND h.accion = 'course_hidden'
+                 AND h.identificador = p.identificador
+                WHERE p.ejecucion_id = :eid
+                  AND p.accion = 'planned_course_hidden_and_created'
+                  AND p.detalle->>'old_shortname' = p.identificador
             ),
             resolved AS (
-                SELECT identifier AS u, 'resolved' AS st
-                FROM execution_logs WHERE execution_id = :eid AND action = 'user_resolved'
+                SELECT identificador AS u, 'resolved' AS st
+                FROM registros_ejecucion WHERE ejecucion_id = :eid AND accion = 'user_resolved'
             ),
             created AS (
-                SELECT identifier AS u, 'created' AS st
-                FROM execution_logs
-                WHERE execution_id = :eid
-                  AND action IN ('user_created', 'user_created_createpassword')
+                SELECT identificador AS u, 'created' AS st
+                FROM registros_ejecucion
+                WHERE ejecucion_id = :eid
+                  AND accion IN ('user_created', 'user_created_createpassword')
             ),
             reused AS (
-                SELECT identifier AS u, 'reused' AS st
-                FROM execution_logs
-                WHERE execution_id = :eid AND action = 'user_reused_by_email'
+                SELECT identificador AS u, 'reused' AS st
+                FROM registros_ejecucion
+                WHERE ejecucion_id = :eid AND accion = 'user_reused_by_email'
             )
             SELECT
                 p.sn,
@@ -83,9 +83,9 @@ def _load_logs(db, execution_id: int):
 
 def _activate(modalidad: str, shortnames: list[str], batch: int = 25):
     async def _run():
-        ms = get_moodle_service(modalidad)
+        ms = obtener_servicio_moodle(modalidad)
         try:
-            all_courses = await ms.get_courses()
+            all_courses = await ms.obtener_cursos()
             sn_to_id = {
                 c.get("shortname"): int(c["id"])
                 for c in all_courses

@@ -1,11 +1,11 @@
 import {
-  getToken,
-  getTokenPayload,
-  getUsername,
-  isTokenValid,
-  removeToken,
-  setToken,
-} from "../../utils/auth.ts";
+  eliminarToken,
+  esTokenValido,
+  guardarToken,
+  obtenerNombreUsuario,
+  obtenerPayloadToken,
+  obtenerToken,
+} from "../../utils/autenticacion.ts";
 import { assert, assertEquals, assertExists, assertFalse } from "@std/assert";
 
 function base64urlEncode(str: string): string {
@@ -25,63 +25,63 @@ function makeToken(payload: Record<string, unknown>): string {
 
 Deno.test("getToken - retorna null si no hay token", () => {
   localStorage.clear();
-  assertEquals(getToken(), null);
+  assertEquals(obtenerToken(), null);
 });
 Deno.test("setToken y getToken - guarda y recupera el token", () => {
   localStorage.clear();
-  setToken("mi-super-token");
-  assertEquals(getToken(), "mi-super-token");
+  guardarToken("mi-super-token");
+  assertEquals(obtenerToken(), "mi-super-token");
 });
 Deno.test("removeToken - elimina el token", () => {
   localStorage.clear();
-  setToken("otro-token");
-  removeToken();
-  assertEquals(getToken(), null);
+  guardarToken("otro-token");
+  eliminarToken();
+  assertEquals(obtenerToken(), null);
 });
 Deno.test("isTokenValid - false si no hay token", () => {
   localStorage.clear();
-  assertFalse(isTokenValid());
+  assertFalse(esTokenValido());
 });
 Deno.test("isTokenValid - true con token no expirado", () => {
   localStorage.clear();
-  setToken(makeToken({ exp: Math.floor(Date.now() / 1000) + 3600 }));
-  assert(isTokenValid());
+  guardarToken(makeToken({ exp: Math.floor(Date.now() / 1000) + 3600 }));
+  assert(esTokenValido());
 });
 Deno.test("isTokenValid - false con token expirado", () => {
   localStorage.clear();
-  setToken(makeToken({ exp: Math.floor(Date.now() / 1000) - 60 }));
-  assertFalse(isTokenValid());
+  guardarToken(makeToken({ exp: Math.floor(Date.now() / 1000) - 60 }));
+  assertFalse(esTokenValido());
 });
 Deno.test("isTokenValid - true si no hay campo exp", () => {
   localStorage.clear();
-  setToken(makeToken({ username: "test" }));
-  assert(isTokenValid());
+  guardarToken(makeToken({ username: "test" }));
+  assert(esTokenValido());
 });
 Deno.test("getTokenPayload - retorna payload decodificado", () => {
   localStorage.clear();
-  setToken(makeToken({ username: "juan", role: "admin" }));
-  const decoded = getTokenPayload();
+  guardarToken(makeToken({ username: "juan", role: "admin" }));
+  const decoded = obtenerPayloadToken();
   assertExists(decoded);
   assertEquals(decoded!.username, "juan");
 });
 Deno.test("getTokenPayload - retorna null si no hay token", () => {
   localStorage.clear();
-  assertEquals(getTokenPayload(), null);
+  assertEquals(obtenerPayloadToken(), null);
 });
 Deno.test("getUsername - retorna el username del token", () => {
   localStorage.clear();
-  setToken(makeToken({ username: "profesor_perez" }));
-  assertEquals(getUsername(), "profesor_perez");
+  guardarToken(makeToken({ username: "profesor_perez" }));
+  assertEquals(obtenerNombreUsuario(), "profesor_perez");
 });
 Deno.test("getUsername - retorna null si no hay token", () => {
   localStorage.clear();
-  assertEquals(getUsername(), null);
+  assertEquals(obtenerNombreUsuario(), null);
 });
 Deno.test("decodifica base64url con '_'/'-' y caracteres UTF-8", () => {
   // El username contiene "/" y "año": al codificar en base64url aparece "_"
   // y los bytes multibyte requieren decodificación UTF-8 (atob directo falla).
   localStorage.clear();
-  setToken(makeToken({ username: "profe/paño" }));
-  assertEquals(getUsername(), "profe/paño");
-  assert(isTokenValid());
+  guardarToken(makeToken({ username: "profe/paño" }));
+  assertEquals(obtenerNombreUsuario(), "profe/paño");
+  assert(esTokenValido());
 });

@@ -1,8 +1,8 @@
 import type { JSX } from "preact";
 import { useSignal } from "@preact/signals";
-import { EyeIcon, EyeOffIcon } from "../utils/icons.tsx";
+import { IconoOjo, IconoOjoCerrado } from "../utils/iconos.tsx";
 
-interface InputProps {
+interface PropsEntrada {
   label?: string;
   type?: "text" | "password" | "email";
   placeholder?: string;
@@ -13,7 +13,7 @@ interface InputProps {
   onInput?: (e: JSX.TargetedEvent<HTMLInputElement, Event>) => void;
 }
 
-export default function Input(
+export default function Entrada(
   {
     label,
     type = "text",
@@ -23,7 +23,7 @@ export default function Input(
     disabled,
     autocomplete,
     onInput,
-  }: InputProps,
+  }: PropsEntrada,
 ) {
   const showPassword = useSignal(false);
   const isPassword = type === "password";
@@ -58,8 +58,8 @@ export default function Input(
               : "Mostrar contraseña"}
           >
             {showPassword.value
-              ? <EyeOffIcon width={20} height={20} />
-              : <EyeIcon width={20} height={20} />}
+              ? <IconoOjoCerrado width={20} height={20} />
+              : <IconoOjo width={20} height={20} />}
           </button>
         )}
       </div>

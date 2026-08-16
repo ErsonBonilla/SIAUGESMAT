@@ -2,7 +2,7 @@ import { render } from "preact-render-to-string";
 import { assert, assertStringIncludes } from "@std/assert";
 
 import FormularioLogin from "../../islands/FormularioLogin.tsx";
-import { darkSignal } from "../../utils/theme.ts";
+import { darkSignal } from "../../utils/tema.ts";
 
 Deno.test("FormularioLogin - muestra selector de modalidad sin campos de login", () => {
   darkSignal.value = false;

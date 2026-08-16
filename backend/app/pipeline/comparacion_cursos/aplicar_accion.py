@@ -1,4 +1,4 @@
-def apply_action(
+def aplicar_accion(
     action: str,
     detail: dict,
     sn: str,

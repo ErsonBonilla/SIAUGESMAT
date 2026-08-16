@@ -1,6 +1,6 @@
-from app.services.parsers.distancia import DistanciaParser
-from app.services.parsers.factory import ParserFactory
+from app.services.parsers.distancia import AnalizadorDistancia
+from app.services.parsers.fabrica import FabricaAnalizadores
 
-ParserFactory.register("DISTANCIA", DistanciaParser)
+FabricaAnalizadores.register("DISTANCIA", AnalizadorDistancia)
 
 __all__ = ["DistanciaParser", "ParserFactory"]

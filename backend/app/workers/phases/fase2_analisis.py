@@ -1,19 +1,19 @@
 import logging
 
 from app.core.config import settings
-from app.pipeline.categories import classify_categories
-from app.pipeline.course_comparison import CourseComparisonService
-from app.pipeline.enrolments import resolve_enrolments, users_to_create
-from app.pipeline.plan import plan_log_entries
-from app.repositories import log_repo
-from app.repositories.execution_repo import is_reupload, update_progress
-from app.services.error_messages import translate_error
-from app.workers.phases.base import BasePhase, PhaseContext
+from app.pipeline.categorias import clasificar_categorias
+from app.pipeline.comparacion_cursos import ServicioComparacionCursos
+from app.pipeline.matriculaciones import resolver_matriculaciones, usuarios_a_crear
+from app.pipeline.plan import entradas_log_plan
+from app.repositories import repositorio_registros
+from app.repositories.repositorio_ejecuciones import actualizar_progreso, es_re_subida
+from app.services.mensajes_error import traducir_error
+from app.workers.phases.base import ContextoFase, FaseBase
 
 logger = logging.getLogger(__name__)
 
 
-def persist_plan_logs(db, execution_id: int, comparison: dict, fullname_map: dict = None) -> int:
+def persistir_logs_plan(db, execution_id: int, comparison: dict, fullname_map: dict = None) -> int:
     """Persiste el plan de acciones de la comparación a ExecutionLog.
 
     Los logs de comparación se guardan con prefijo ``planned_`` para
@@ -25,117 +25,117 @@ def persist_plan_logs(db, execution_id: int, comparison: dict, fullname_map: dic
         Número de registros persistidos.
     """
     count = 0
-    for action, identifier, detail in plan_log_entries(comparison, fullname_map):
-        log_repo.save_log(db, execution_id, "2", action, identifier, detail)
+    for action, identifier, detail in entradas_log_plan(comparison, fullname_map):
+        repositorio_registros.guardar_log(db, execution_id, "2", action, identifier, detail)
         count += 1
     db.commit()
     return count
 
 
-class AnalyzePhase(BasePhase):
+class FaseAnalisis(FaseBase):
     phase_name = "2"
 
-    async def run(self, ctx: PhaseContext) -> None:
+    async def ejecutar(self, ctx: ContextoFase) -> None:
         db = ctx.db
-        eid = ctx.execution_id
-        mode = ctx.mode
-        etl_data = ctx.etl_data
+        eid = ctx.ejecucion_id
+        mode = ctx.modo
+        etl_data = ctx.datos_etl
 
-        update_progress(db, eid, 16, "Analizando datos…", step=2)
+        actualizar_progreso(db, eid, 16, "Analizando datos…", paso=2)
 
         try:
-            resolved_enrolments = resolve_enrolments(
+            resolved_enrolments = resolver_matriculaciones(
                 etl_data["enrolments"],
-                ctx.username_map,
+                ctx.mapa_usuarios,
             )
-            ctx.resolved_enrolments = resolved_enrolments
+            ctx.matriculas_resueltas = resolved_enrolments
 
-            ctx.missing_categories, ctx.categories_to_relocate = classify_categories(
+            ctx.categorias_faltantes, ctx.categorias_a_reubicar = clasificar_categorias(
                 etl_data["categories"],
-                ctx.existing_cat_idnumbers,
-                ctx.all_categories_map,
+                ctx.idnumeros_categorias_existentes,
+                ctx.mapa_todas_categorias,
             )
 
-            if ctx.missing_categories:
-                log_repo.save_log(
+            if ctx.categorias_faltantes:
+                repositorio_registros.guardar_log(
                     db,
                     eid,
                     "2",
                     "categories_missing",
-                    detail={
-                        "count": len(ctx.missing_categories),
-                        "categories": [c["idnumber"] for c in ctx.missing_categories],
+                    detalle={
+                        "count": len(ctx.categorias_faltantes),
+                        "categories": [c["idnumber"] for c in ctx.categorias_faltantes],
                     },
                 )
-            if ctx.categories_to_relocate:
-                log_repo.save_log(
+            if ctx.categorias_a_reubicar:
+                repositorio_registros.guardar_log(
                     db,
                     eid,
                     "2",
                     "categories_to_relocate",
-                    detail={
-                        "count": len(ctx.categories_to_relocate),
-                        "categories": [c["idnumber"] for c in ctx.categories_to_relocate],
+                    detalle={
+                        "count": len(ctx.categorias_a_reubicar),
+                        "categories": [c["idnumber"] for c in ctx.categorias_a_reubicar],
                     },
                 )
 
-            ctx.re_upload = is_reupload(
+            ctx.nueva_subida = es_re_subida(
                 db,
-                ctx.execution.semester,
-                ctx.execution.modalidad or "",
+                ctx.ejecucion.semestre,
+                ctx.ejecucion.modalidad or "",
                 eid,
             )
 
-            ctx.comparison = await CourseComparisonService.compare(
-                ctx.existing_courses,
+            ctx.comparacion = await ServicioComparacionCursos.comparar(
+                ctx.cursos_existentes,
                 etl_data["courses"],
                 resolved_enrolments,
-                re_upload=ctx.re_upload,
-                courses_with_teacher=ctx.courses_with_teacher,
-                username_emails=ctx.username_emails,
+                re_upload=ctx.nueva_subida,
+                courses_with_teacher=ctx.cursos_con_docente,
+                username_emails=ctx.correos_usuarios,
                 max_age_seconds=settings.COURSE_MAX_AGE_SECONDS,
                 disappeared_age_seconds=settings.COURSE_DISAPPEARED_AGE_SECONDS,
             )
 
-            persist_plan_logs(
+            persistir_logs_plan(
                 db,
                 eid,
-                ctx.comparison,
-                {c.get("shortname", ""): c.get("fullname", "") for c in ctx.existing_courses},
+                ctx.comparacion,
+                {c.get("shortname", ""): c.get("fullname", "") for c in ctx.cursos_existentes},
             )
 
             if mode in ("users", "both"):
-                ctx.users_to_create = users_to_create(etl_data["users"], ctx.username_map)
+                ctx.usuarios_a_crear = usuarios_a_crear(etl_data["users"], ctx.mapa_usuarios)
 
-            ctx.metrics["alerts"] = len(ctx.comparison.get("alerts", []))
+            ctx.metricas["alerts"] = len(ctx.comparacion.get("alerts", []))
 
-            log_repo.save_log(
+            repositorio_registros.guardar_log(
                 db,
                 eid,
                 "2",
                 "phase2_complete",
-                detail={
-                    "categories_to_create": len(ctx.missing_categories),
-                    "courses_to_create": len(ctx.comparison.get("to_create", [])),
-                    "courses_to_delete": len(ctx.comparison.get("to_delete", [])),
-                    "courses_to_activate": len(ctx.comparison.get("to_activate", [])),
-                    "courses_to_hide": len(ctx.comparison.get("to_hide", [])),
-                    "courses_to_update": len(ctx.comparison.get("to_update", [])),
-                    "users_to_create": len(ctx.users_to_create),
-                    "alerts": ctx.metrics["alerts"],
+                detalle={
+                    "categories_to_create": len(ctx.categorias_faltantes),
+                    "courses_to_create": len(ctx.comparacion.get("to_create", [])),
+                    "courses_to_delete": len(ctx.comparacion.get("to_delete", [])),
+                    "courses_to_activate": len(ctx.comparacion.get("to_activate", [])),
+                    "courses_to_hide": len(ctx.comparacion.get("to_hide", [])),
+                    "courses_to_update": len(ctx.comparacion.get("to_update", [])),
+                    "users_to_create": len(ctx.usuarios_a_crear),
+                    "alerts": ctx.metricas["alerts"],
                 },
             )
             logger.info(
-                f"FASE 2: crear {len(ctx.missing_categories)} cats, "
-                f"reubicar {len(ctx.categories_to_relocate)} cats, "
-                f"{len(ctx.comparison.get('to_create', []))} cursos, "
-                f"eliminar {len(ctx.comparison.get('to_delete', []))}, "
-                f"{len(ctx.users_to_create)} usuarios"
+                f"FASE 2: crear {len(ctx.categorias_faltantes)} cats, "
+                f"reubicar {len(ctx.categorias_a_reubicar)} cats, "
+                f"{len(ctx.comparacion.get('to_create', []))} cursos, "
+                f"eliminar {len(ctx.comparacion.get('to_delete', []))}, "
+                f"{len(ctx.usuarios_a_crear)} usuarios"
             )
-            update_progress(db, eid, 24, "Plan de acciones definido")
+            actualizar_progreso(db, eid, 24, "Plan de acciones definido")
 
         except Exception as e:
             logger.exception(f"Error en FASE 2 (análisis): {e}")
-            log_repo.save_error(db, eid, "2", "", translate_error(e))
-            ctx.metrics["total_errors"] += 1
+            repositorio_registros.guardar_error(db, eid, "2", "", traducir_error(e))
+            ctx.metricas["total_errors"] += 1
             raise

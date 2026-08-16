@@ -11,13 +11,13 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.dependencies import get_current_user, get_db
-from app.repositories.execution_repo import create_execution, get_active_execution
-from app.repositories.operation_repo import get_active_batch
-from app.schemas.api import UploadStatusResponse
-from app.schemas.upload import SemesterResponse, UploadResponse
-from app.schemas.user import UserInToken
-from app.services.excel_validation import is_excel_content
+from app.core.dependencies import obtener_db, obtener_usuario_actual
+from app.repositories.repositorio_ejecuciones import crear_ejecucion, obtener_ejecucion_activa
+from app.repositories.repositorio_operaciones import obtener_lote_activo
+from app.schemas.respuestas import RespuestaEstadoSubida
+from app.schemas.subida import RespuestaSemestre, RespuestaSubida
+from app.schemas.usuario import UsuarioEnToken
+from app.services.validacion_excel import es_contenido_excel
 
 logger = logging.getLogger(__name__)
 
@@ -30,43 +30,43 @@ ALLOWED_MODES = {"courses", "users", "both"}
 
 @router.get(
     "/current",
-    response_model=SemesterResponse,
+    response_model=RespuestaSemestre,
     summary="Obtener el semestre actual según la fecha del servidor",
 )
-def get_current_semester():
+def obtener_semestre_actual():
     from datetime import datetime
 
     now = datetime.now(UTC)
     period = "A" if now.month <= 6 else "B"
-    return SemesterResponse(semester=f"{now.year}{period}")
+    return RespuestaSemestre(semester=f"{now.year}{period}")
 
 
 @router.get(
     "/status",
-    response_model=UploadStatusResponse,
+    response_model=RespuestaEstadoSubida,
     summary="Indica si se permite subir archivos para una modalidad",
 )
-def get_upload_status(
+def obtener_estado_subida(
     modalidad: str | None = Query(None),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    mod = (modalidad or current_user.modalidad or "DISTANCIA").strip().upper()
-    execution = get_active_execution(db, mod)
-    batch = get_active_batch(db, mod)
+    mod = (modalidad or usuario_actual.modalidad or "DISTANCIA").strip().upper()
+    execution = obtener_ejecucion_activa(db, mod)
+    batch = obtener_lote_activo(db, mod)
     return {
         "allowed": not (execution or batch),
         "execution": {
             "id": execution.id,
-            "status": execution.status,
-            "filename": execution.filename,
+            "status": execution.estado,
+            "filename": execution.nombre_archivo,
         }
         if execution
         else None,
         "batch": {
-            "batch_id": batch.batch_id,
-            "entity_type": batch.entity_type,
-            "action": batch.action,
+            "batch_id": batch.id_lote,
+            "entity_type": batch.tipo_entidad,
+            "action": batch.accion,
         }
         if batch
         else None,
@@ -75,26 +75,26 @@ def get_upload_status(
 
 @router.post(
     "",
-    response_model=UploadResponse,
+    response_model=RespuestaSubida,
     summary="Subir archivo Excel",
     status_code=status.HTTP_201_CREATED,
 )
-async def upload_excel(
-    file: UploadFile = File(...),
-    semester: str = Form(...),
-    mode: str = Form("both"),
+async def subir_excel(
+    archivo: UploadFile = File(..., alias="file"),
+    semestre: str = Form(..., alias="semester"),
+    modo: str = Form("both", alias="mode"),
     modalidad: str = Form(...),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    semester = semester.strip().upper()
-    if len(semester) != 5 or semester[-1] not in ("A", "B") or not semester[:4].isdigit():
+    semestre = semestre.strip().upper()
+    if len(semestre) != 5 or semestre[-1] not in ("A", "B") or not semestre[:4].isdigit():
         raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail=f"Formato de semestre inválido: '{semester}'."
+            status.HTTP_400_BAD_REQUEST, detail=f"Formato de semestre inválido: '{semestre}'."
         )
 
-    if mode not in ALLOWED_MODES:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Modo inválido: '{mode}'.")
+    if modo not in ALLOWED_MODES:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Modo inválido: '{modo}'.")
 
     modalidad = modalidad.strip().upper()
     allowed_modalidades = {"DISTANCIA"}
@@ -106,21 +106,21 @@ async def upload_excel(
             detail="Modalidad inválida. Solo DISTANCIA está disponible.",
         )
 
-    if get_active_execution(db, modalidad) or get_active_batch(db, modalidad):
+    if obtener_ejecucion_activa(db, modalidad) or obtener_lote_activo(db, modalidad):
         raise HTTPException(
             status.HTTP_409_CONFLICT,
             detail="Hay un proceso en curso en esta modalidad. "
             "No se pueden subir archivos hasta que el proceso en ejecución finalice.",
         )
 
-    if not file.filename:
+    if not archivo.filename:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="El archivo debe tener un nombre.")
 
-    ext = os.path.splitext(file.filename)[1].lower()
+    ext = os.path.splitext(archivo.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=f"Extensión no permitida: '{ext}'.")
 
-    file_bytes = await file.read()
+    file_bytes = await archivo.read()
     file_size_mb = len(file_bytes) / (1024 * 1024)
     if file_size_mb > MAX_FILE_SIZE_MB:
         raise HTTPException(
@@ -128,7 +128,7 @@ async def upload_excel(
             detail=f"El archivo excede {MAX_FILE_SIZE_MB} MB.",
         )
 
-    if not is_excel_content(file_bytes):
+    if not es_contenido_excel(file_bytes):
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -141,7 +141,7 @@ async def upload_excel(
     upload_dir = settings.UPLOAD_DIR
     os.makedirs(upload_dir, exist_ok=True)
 
-    safe_filename = os.path.basename(file.filename)
+    safe_filename = os.path.basename(archivo.filename)
     unique_name = f"{uuid.uuid4().hex[:8]}_{safe_filename}"
     file_path = os.path.join(upload_dir, unique_name)
 
@@ -154,21 +154,21 @@ async def upload_excel(
             status.HTTP_500_INTERNAL_SERVER_ERROR, detail="No se pudo guardar el archivo."
         ) from None
 
-    moodle_config = settings.get_moodle_config(modalidad)
-    execution = create_execution(
-        db, unique_name, semester, mode, modalidad, moodle_config["version"]
+    moodle_config = settings.obtener_config_moodle(modalidad)
+    execution = crear_ejecucion(
+        db, unique_name, semestre, modo, modalidad, moodle_config["version"]
     )
 
     logger.info(
-        f"Archivo '{unique_name}' subido por {current_user.username} "
-        f"(execution_id={execution.id}, mode={mode})"
+        f"Archivo '{unique_name}' subido por {usuario_actual.username} "
+        f"(execution_id={execution.id}, mode={modo})"
     )
 
-    return UploadResponse(
+    return RespuestaSubida(
         execution_id=execution.id,
         filename=unique_name,
-        semester=semester,
-        mode=mode,
-        status=execution.status,
+        semester=semestre,
+        mode=modo,
+        status=execution.estado,
         message="Archivo subido correctamente. Pendiente de procesamiento.",
     )

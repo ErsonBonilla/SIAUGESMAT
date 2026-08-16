@@ -1,11 +1,11 @@
 """Pruebas del núcleo puro que deriva los logs del plan (pipeline/plan.py)."""
 
-from app.pipeline.plan import ALERT_ACTION_BY_REASON, plan_log_entries
+from app.pipeline.plan import ALERT_ACTION_BY_REASON, entradas_log_plan
 
 
 class TestPlanLogEntries:
     def test_plan_logs_are_prefixed(self):
-        entries = plan_log_entries(
+        entries = entradas_log_plan(
             {
                 "logs": [
                     {"action": "course_created", "identifier": "C1", "detail": {"reason": "new"}},
@@ -24,7 +24,7 @@ class TestPlanLogEntries:
         ]
 
     def test_alert_with_known_reason(self):
-        entries = plan_log_entries(
+        entries = entradas_log_plan(
             {
                 "logs": [],
                 "alerts": [
@@ -46,7 +46,7 @@ class TestPlanLogEntries:
         ]
 
     def test_alert_teacher_change_sets_professor(self):
-        entries = plan_log_entries(
+        entries = entradas_log_plan(
             {
                 "logs": [],
                 "alerts": [
@@ -67,7 +67,7 @@ class TestPlanLogEntries:
         assert detail["fullname"] == ""
 
     def test_alert_fullname_from_map(self):
-        entries = plan_log_entries(
+        entries = entradas_log_plan(
             {
                 "logs": [],
                 "alerts": [
@@ -79,7 +79,7 @@ class TestPlanLogEntries:
         assert entries[0][2]["fullname"] == "Curso Uno"
 
     def test_unknown_reason_dropped(self):
-        entries = plan_log_entries(
+        entries = entradas_log_plan(
             {
                 "logs": [],
                 "alerts": [{"shortname": "C5", "reason": "reason_desconocido"}],
@@ -88,7 +88,7 @@ class TestPlanLogEntries:
         assert entries == []
 
     def test_empty_comparison(self):
-        assert plan_log_entries({}) == []
+        assert entradas_log_plan({}) == []
 
 
 class TestAlertActionByReason:

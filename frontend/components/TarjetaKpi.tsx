@@ -1,5 +1,5 @@
-// components/KpiCard.tsx
-export default function KpiCard(
+// components/TarjetaKpi.tsx
+export default function TarjetaKpi(
   { value, label }: { value: string | number; label: string },
 ) {
   return (

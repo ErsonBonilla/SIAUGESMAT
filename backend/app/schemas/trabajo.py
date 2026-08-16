@@ -3,82 +3,87 @@ Esquemas Pydantic para la entidad Job (Execution) y sus errores.
 
 Define los modelos de datos utilizados en las respuestas de los endpoints
 de gestión de ejecuciones y errores.
+
+Los nombres de campo internos son en español; los ``alias`` preservan el
+contrato (wire format) en inglés que consume el frontend.
 """
 
 from datetime import UTC, datetime
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ---------------------------------------------------------------------------
 # Error
 # ---------------------------------------------------------------------------
-class ErrorOut(BaseModel):
+class ErrorSalida(BaseModel):
     """Representa un error registrado durante una ejecución."""
 
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     id: int
-    execution_id: int
-    type: str
-    identifier: str | None = None
-    message: str | None = None
-    created_at: datetime
+    ejecucion_id: int = Field(alias="execution_id")
+    tipo: str = Field(alias="type")
+    identificador: str | None = Field(default=None, alias="identifier")
+    mensaje: str | None = Field(default=None, alias="message")
+    creado_en: datetime = Field(alias="created_at")
 
-    model_config = ConfigDict(from_attributes=True)
+    # ---------------------------------------------------------------------------
+    # Execution
+    # ---------------------------------------------------------------------------
 
 
-# ---------------------------------------------------------------------------
-# Execution
-# ---------------------------------------------------------------------------
-class ExecutionOut(BaseModel):
+class EjecucionSalida(BaseModel):
     """Detalles completos de una ejecución, incluyendo métricas."""
 
-    id: int
-    filename: str
-    semester: str
-    mode: str
-    status: str
-    metrics: dict[str, int] | None = None
-    errors_count: int = 0
-    current_phase: str | None = None
-    progress_pct: float | None = None
-    progress_updated_at: datetime | None = None
-    current_step: int | None = None
-    eta_seconds: float | None = None
-    started_at: datetime | None = None
-    completed_at: datetime | None = None
-    duration_seconds: float | None = None
-    moodle_version: str | None = None
-    modalidad: str | None = None
-    report_dir: str | None = None
-    celery_task_id: str | None = None
-    created_at: datetime
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    model_config = ConfigDict(from_attributes=True)
+    id: int
+    nombre_archivo: str = Field(alias="filename")
+    semestre: str = Field(alias="semester")
+    modo: str = Field(alias="mode")
+    estado: str = Field(alias="status")
+    metricas: dict[str, object] | None = Field(default=None, alias="metrics")
+    conteo_errores: int = Field(default=0, alias="errors_count")
+    fase_actual: str | None = Field(default=None, alias="current_phase")
+    porcentaje_progreso: float | None = Field(default=None, alias="progress_pct")
+    progreso_actualizado_en: datetime | None = Field(default=None, alias="progress_updated_at")
+    paso_actual: int | None = Field(default=None, alias="current_step")
+    eta_segundos: float | None = Field(default=None, alias="eta_seconds")
+    iniciado_en: datetime | None = Field(default=None, alias="started_at")
+    completado_en: datetime | None = Field(default=None, alias="completed_at")
+    duracion_segundos: float | None = Field(default=None, alias="duration_seconds")
+    version_moodle: str | None = Field(default=None, alias="moodle_version")
+    modalidad: str | None = Field(default=None, alias="modalidad")
+    directorio_reporte: str | None = Field(default=None, alias="report_dir")
+    id_tarea_celery: str | None = Field(default=None, alias="celery_task_id")
+    creado_en: datetime = Field(alias="created_at")
 
     @model_validator(mode="after")
-    def compute_eta(self):
-        if self.status == "running" and self.progress_pct is not None and self.started_at:
-            pct = self.progress_pct
-            elapsed = (datetime.now(UTC) - self.started_at).total_seconds()
+    def calcular_eta(self):
+        if self.estado == "running" and self.porcentaje_progreso is not None and self.iniciado_en:
+            pct = self.porcentaje_progreso
+            elapsed = (datetime.now(UTC) - self.iniciado_en).total_seconds()
             if elapsed > 5 and pct > 0:
                 rate = pct / elapsed
                 if rate > 0:
                     eta = (100 - pct) / rate
-                    self.eta_seconds = eta if eta < 86400 else None
+                    self.eta_segundos = eta if eta < 86400 else None
         return self
 
 
-class ExecutionList(BaseModel):
+class ListaEjecuciones(BaseModel):
     """Lista paginada de ejecuciones."""
 
     total: int
-    items: list[ExecutionOut]
+    items: list[EjecucionSalida]
+
+    # ---------------------------------------------------------------------------
+    # Procesamiento
+    # ---------------------------------------------------------------------------
 
 
-# ---------------------------------------------------------------------------
-# Procesamiento
-# ---------------------------------------------------------------------------
-class ProcessResponse(BaseModel):
+class RespuestaProceso(BaseModel):
     """Respuesta al encolar un proceso ETL."""
 
     execution_id: int

@@ -2,33 +2,33 @@
 import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import {
-  cancelExecution,
-  confirmExecution,
-  deleteExecution,
-  downloadReport,
-  type Execution,
-  getHistory,
-  getReportDownloadUrl,
-  listExecutions,
-  pauseExecution,
-  resumeExecution,
-  type SemesterMetrics,
-  startProcess,
+  cancelarEjecucion,
+  confirmarEjecucion,
+  descargarReporte,
+  type Ejecucion,
+  eliminarEjecucion,
+  iniciarProceso,
+  listarEjecuciones,
+  type MetricasSemestre,
+  obtenerHistorial,
+  obtenerUrlDescargaReporte,
+  pausarEjecucion,
+  reanudarEjecucion,
 } from "../services/api.ts";
 import { toast } from "../utils/toast.ts";
 import {
-  MODE_LABELS,
-  STATUS_COLORS,
-  STATUS_LABELS,
-} from "../utils/constants.ts";
-import ErrorBox from "../components/ErrorBox.tsx";
-import Pagination from "../components/Pagination.tsx";
-import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
+  COLORES_ESTADO,
+  ETIQUETAS_ESTADO,
+  ETIQUETAS_MODO,
+} from "../utils/constantes.ts";
+import CajaError from "../components/CajaError.tsx";
+import Paginacion from "../components/Paginacion.tsx";
+import EsqueletoCarga from "../components/EsqueletoCarga.tsx";
 
 const PAGE_SIZE = 20;
 
-export default function ExecutionList() {
-  const items = useSignal<Execution[]>([]);
+export default function ListaEjecuciones() {
+  const items = useSignal<Ejecucion[]>([]);
   const total = useSignal(0);
   const loading = useSignal(true);
   const error = useSignal("");
@@ -54,14 +54,14 @@ export default function ExecutionList() {
       // El listado es paginado (PAGE_SIZE); los semestres se obtienen del
       // histórico agregado para que el dropdown muestre todos, no solo los de la página actual.
       const [result, history] = await Promise.all([
-        listExecutions({
+        listarEjecuciones({
           semester: filterSemester.value || undefined,
           status: filterStatus.value || undefined,
           mode: filterMode.value || undefined,
           limit: PAGE_SIZE,
           offset: offset.value,
         }),
-        getHistory(50).catch(() => [] as SemesterMetrics[]),
+        obtenerHistorial(50).catch(() => [] as MetricasSemestre[]),
       ]);
       items.value = result.items;
       total.value = result.total;
@@ -95,8 +95,8 @@ export default function ExecutionList() {
   async function handleDownloadZip(execId: number) {
     downloading.value = execId;
     try {
-      await downloadReport(
-        getReportDownloadUrl(execId),
+      await descargarReporte(
+        obtenerUrlDescargaReporte(execId),
         `reportes_ejecucion_${execId}.zip`,
       );
     } catch {
@@ -109,7 +109,7 @@ export default function ExecutionList() {
   async function handleProcess(execId: number) {
     processing.value = execId;
     try {
-      await startProcess(execId);
+      await iniciarProceso(execId);
       toast("Procesamiento encolado correctamente", "success");
       load();
     } catch (e) {
@@ -128,7 +128,7 @@ export default function ExecutionList() {
     }
     deleting.value = execId;
     try {
-      await deleteExecution(execId);
+      await eliminarEjecucion(execId);
       toast("Ejecución eliminada", "success");
       load();
     } catch (e) {
@@ -149,7 +149,7 @@ export default function ExecutionList() {
     ) return;
     confirming.value = execId;
     try {
-      await confirmExecution(execId);
+      await confirmarEjecucion(execId);
       toast(
         "Procesamiento reanudado con eliminación masiva confirmada",
         "success",
@@ -165,7 +165,7 @@ export default function ExecutionList() {
   async function handlePause(execId: number) {
     pausing.value = execId;
     try {
-      await pauseExecution(execId);
+      await pausarEjecucion(execId);
       toast("Ejecución pausada", "success");
       load();
     } catch (e) {
@@ -178,7 +178,7 @@ export default function ExecutionList() {
   async function handleResume(execId: number) {
     resuming.value = execId;
     try {
-      await resumeExecution(execId);
+      await reanudarEjecucion(execId);
       toast("Ejecución reanudada", "success");
       load();
     } catch (e) {
@@ -196,7 +196,7 @@ export default function ExecutionList() {
     ) return;
     cancelling.value = execId;
     try {
-      await cancelExecution(execId);
+      await cancelarEjecucion(execId);
       toast("Ejecución cancelada", "success");
       load();
     } catch (e) {
@@ -293,9 +293,9 @@ export default function ExecutionList() {
 
       {/* Tabla */}
       {loading.value
-        ? <LoadingSkeleton />
+        ? <EsqueletoCarga />
         : error.value
-        ? <ErrorBox message={error.value} />
+        ? <CajaError message={error.value} />
         : items.value.length === 0
         ? (
           <div class="text-center py-12 text-[var(--text-secondary)]">
@@ -355,15 +355,15 @@ export default function ExecutionList() {
                           : <span class="text-[var(--text-muted)]">—</span>}
                       </td>
                       <td class="py-3 px-2">
-                        {MODE_LABELS[exec.mode] || exec.mode}
+                        {ETIQUETAS_MODO[exec.mode] || exec.mode}
                       </td>
                       <td class="py-3 px-2">
                         <span
                           class={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            STATUS_COLORS[exec.status] || "status-gray"
+                            COLORES_ESTADO[exec.status] || "status-gray"
                           }`}
                         >
-                          {STATUS_LABELS[exec.status] || exec.status}
+                          {ETIQUETAS_ESTADO[exec.status] || exec.status}
                         </span>
                       </td>
                       <td class="py-3 px-2 text-right whitespace-nowrap">
@@ -541,12 +541,12 @@ export default function ExecutionList() {
               </table>
             </div>
 
-            <Pagination
+            <Paginacion
               offset={offset.value}
-              pageSize={PAGE_SIZE}
+              tamanoPagina={PAGE_SIZE}
               total={total.value}
               label="ejecuciones"
-              onPageChange={(o) => {
+              alCambiarPagina={(o) => {
                 offset.value = o;
                 load();
               }}

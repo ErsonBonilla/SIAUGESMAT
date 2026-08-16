@@ -9,7 +9,7 @@ import io
 import pytest
 from fastapi import status
 
-from app.db.models import Execution, OperationBatch, OperationItem
+from app.db.modelos import Ejecucion, ItemOperacion, LoteOperacion
 
 
 def _valid_excel_bytes():
@@ -60,7 +60,7 @@ def _valid_excel_bytes():
 UPLOAD_URL = "/api/v1/upload"
 
 
-def _upload_request(client, auth_headers, *, modalidad="DISTANCIA"):
+def _upload_solicitar(client, encabezados_auth, *, modalidad="DISTANCIA"):
     return client.post(
         UPLOAD_URL,
         files={
@@ -71,7 +71,7 @@ def _upload_request(client, auth_headers, *, modalidad="DISTANCIA"):
             )
         },
         data={"semester": "2025B", "mode": "both", "modalidad": modalidad},
-        headers=auth_headers,
+        headers=encabezados_auth,
     )
 
 
@@ -80,52 +80,52 @@ class TestUploadGateExecution:
 
     @pytest.mark.parametrize("active_status", ["queued", "running", "paused", "review_required"])
     def test_upload_blocked_when_execution_active(
-        self, client, auth_headers, test_db, active_status
+        self, client, encabezados_auth, test_db, active_status
     ):
-        exec_active = Execution(
-            filename="otra.xlsx",
-            semester="2025B",
-            mode="both",
-            status=active_status,
+        exec_active = Ejecucion(
+            nombre_archivo="otra.xlsx",
+            semestre="2025B",
+            modo="both",
+            estado=active_status,
             modalidad="DISTANCIA",
         )
         test_db.add(exec_active)
         test_db.commit()
 
-        response = _upload_request(client, auth_headers)
+        response = _upload_solicitar(client, encabezados_auth)
         assert response.status_code == status.HTTP_409_CONFLICT
         assert "proceso en curso" in response.json()["detail"].lower()
 
-    def test_upload_blocked_only_same_modalidad(self, client, auth_headers, test_db):
-        exec_active = Execution(
-            filename="otra.xlsx",
-            semester="2025B",
-            mode="both",
-            status="running",
+    def test_upload_blocked_only_same_modalidad(self, client, encabezados_auth, test_db):
+        exec_active = Ejecucion(
+            nombre_archivo="otra.xlsx",
+            semestre="2025B",
+            modo="both",
+            estado="running",
             modalidad="PRESENCIAL",
         )
         test_db.add(exec_active)
         test_db.commit()
 
-        response = _upload_request(client, auth_headers, modalidad="DISTANCIA")
+        response = _upload_solicitar(client, encabezados_auth, modalidad="DISTANCIA")
         assert response.status_code == status.HTTP_201_CREATED
 
-    def test_upload_allowed_when_only_completed(self, client, auth_headers, test_db):
-        done = Execution(
-            filename="otra.xlsx",
-            semester="2025B",
-            mode="both",
-            status="completed",
+    def test_upload_allowed_when_only_completed(self, client, encabezados_auth, test_db):
+        done = Ejecucion(
+            nombre_archivo="otra.xlsx",
+            semestre="2025B",
+            modo="both",
+            estado="completed",
             modalidad="DISTANCIA",
         )
         test_db.add(done)
         test_db.commit()
 
-        response = _upload_request(client, auth_headers)
+        response = _upload_solicitar(client, encabezados_auth)
         assert response.status_code == status.HTTP_201_CREATED
 
-    def test_upload_allowed_when_nothing_active(self, client, auth_headers):
-        response = _upload_request(client, auth_headers)
+    def test_upload_allowed_when_nothing_active(self, client, encabezados_auth):
+        response = _upload_solicitar(client, encabezados_auth)
         assert response.status_code == status.HTTP_201_CREATED
 
 
@@ -133,22 +133,22 @@ class TestUploadGateBatch:
     """Bloqueo de subida de Excel mientras hay un lote CSV en curso."""
 
     def _active_batch(self, test_db):
-        batch = OperationBatch(
-            batch_id="batch-activo-1",
-            entity_type="courses",
-            action="delete",
+        batch = LoteOperacion(
+            id_lote="batch-activo-1",
+            tipo_entidad="courses",
+            accion="delete",
             total=1,
             modalidad="DISTANCIA",
         )
         test_db.add(batch)
-        item = OperationItem(batch_id=batch.batch_id, identifier="X", status="processing")
+        item = ItemOperacion(id_lote=batch.id_lote, identificador="X", estado="processing")
         test_db.add(item)
         test_db.commit()
         return batch
 
-    def test_upload_blocked_when_batch_active(self, client, auth_headers, test_db):
+    def test_upload_blocked_when_batch_active(self, client, encabezados_auth, test_db):
         self._active_batch(test_db)
-        response = _upload_request(client, auth_headers)
+        response = _upload_solicitar(client, encabezados_auth)
         assert response.status_code == status.HTTP_409_CONFLICT
         assert "proceso en curso" in response.json()["detail"].lower()
 
@@ -156,22 +156,22 @@ class TestUploadGateBatch:
 class TestStartProcessGate:
     """No se puede iniciar un proceso ETL si otra ejecución del mismo módulo corre."""
 
-    def test_process_blocked_when_other_active(self, client, auth_headers, test_db):
-        other = Execution(
-            filename="otra.xlsx",
-            semester="2025B",
-            mode="both",
-            status="running",
+    def test_process_blocked_when_other_active(self, client, encabezados_auth, test_db):
+        other = Ejecucion(
+            nombre_archivo="otra.xlsx",
+            semestre="2025B",
+            modo="both",
+            estado="running",
             modalidad="DISTANCIA",
         )
         test_db.add(other)
         test_db.commit()
 
-        exec_pending = Execution(
-            filename="test.xlsx",
-            semester="2025B",
-            mode="both",
-            status="pending",
+        exec_pending = Ejecucion(
+            nombre_archivo="test.xlsx",
+            semestre="2025B",
+            modo="both",
+            estado="pending",
             modalidad="DISTANCIA",
         )
         test_db.add(exec_pending)
@@ -179,32 +179,32 @@ class TestStartProcessGate:
 
         response = client.post(
             f"/api/v1/jobs/{exec_pending.id}/process",
-            headers=auth_headers,
+            headers=encabezados_auth,
         )
         assert response.status_code == status.HTTP_409_CONFLICT
         assert "proceso en ejecución" in response.json()["detail"].lower()
 
-    def test_process_allowed_without_other_active(self, client, auth_headers, test_db):
+    def test_process_allowed_without_other_active(self, client, encabezados_auth, test_db):
         from unittest.mock import patch
 
-        exec_pending = Execution(
-            filename="test.xlsx",
-            semester="2025B",
-            mode="both",
-            status="pending",
+        exec_pending = Ejecucion(
+            nombre_archivo="test.xlsx",
+            semestre="2025B",
+            modo="both",
+            estado="pending",
             modalidad="DISTANCIA",
         )
         test_db.add(exec_pending)
         test_db.commit()
 
         with (
-            patch("app.api.v1.endpoints.jobs.enqueue_etl") as mock_delay,
-            patch("app.api.v1.endpoints.jobs.os.path.isfile", return_value=True),
+            patch("app.api.v1.endpoints.trabajos.encolar_etl") as mock_delay,
+            patch("app.api.v1.endpoints.trabajos.os.path.isfile", return_value=True),
         ):
             mock_delay.return_value = type("AsyncResult", (), {"id": "mock-task-123"})()
             response = client.post(
                 f"/api/v1/jobs/{exec_pending.id}/process",
-                headers=auth_headers,
+                headers=encabezados_auth,
             )
         assert response.status_code == status.HTTP_202_ACCEPTED
 
@@ -212,12 +212,12 @@ class TestStartProcessGate:
 class TestCsvUploadGate:
     """Bloqueo de subida de CSV de operaciones mientras hay un proceso en curso."""
 
-    def test_csv_blocked_when_execution_active(self, client, auth_headers, test_db):
-        exec_active = Execution(
-            filename="otra.xlsx",
-            semester="2025B",
-            mode="both",
-            status="running",
+    def test_csv_blocked_when_execution_active(self, client, encabezados_auth, test_db):
+        exec_active = Ejecucion(
+            nombre_archivo="otra.xlsx",
+            semestre="2025B",
+            modo="both",
+            estado="running",
             modalidad="DISTANCIA",
         )
         test_db.add(exec_active)
@@ -226,15 +226,15 @@ class TestCsvUploadGate:
         response = client.post(
             "/api/v1/operations/courses/upload-csv",
             files={"file": ("cursos.csv", b"shortname\nXYZ", "text/csv")},
-            headers=auth_headers,
+            headers=encabezados_auth,
         )
         assert response.status_code == status.HTTP_409_CONFLICT
 
-    def test_csv_allowed_without_active(self, client, auth_headers):
+    def test_csv_allowed_without_active(self, client, encabezados_auth):
         response = client.post(
             "/api/v1/operations/courses/upload-csv",
             files={"file": ("cursos.csv", b"shortname\nXYZ", "text/csv")},
-            headers=auth_headers,
+            headers=encabezados_auth,
         )
         assert response.status_code == status.HTTP_200_OK
 
@@ -242,45 +242,45 @@ class TestCsvUploadGate:
 class TestUploadStatusEndpoint:
     """GET /api/v1/upload/status informa al frontend si se puede subir."""
 
-    def test_status_allowed(self, client, auth_headers):
-        response = client.get(f"{UPLOAD_URL}/status", headers=auth_headers)
+    def test_status_allowed(self, client, encabezados_auth):
+        response = client.get(f"{UPLOAD_URL}/status", headers=encabezados_auth)
         assert response.status_code == status.HTTP_200_OK
         body = response.json()
         assert body["allowed"] is True
         assert body["execution"] is None
         assert body["batch"] is None
 
-    def test_status_blocked_by_execution(self, client, auth_headers, test_db):
-        exec_active = Execution(
-            filename="otra.xlsx",
-            semester="2025B",
-            mode="both",
-            status="running",
+    def test_status_blocked_by_execution(self, client, encabezados_auth, test_db):
+        exec_active = Ejecucion(
+            nombre_archivo="otra.xlsx",
+            semestre="2025B",
+            modo="both",
+            estado="running",
             modalidad="DISTANCIA",
         )
         test_db.add(exec_active)
         test_db.commit()
 
-        response = client.get(f"{UPLOAD_URL}/status", headers=auth_headers)
+        response = client.get(f"{UPLOAD_URL}/status", headers=encabezados_auth)
         body = response.json()
         assert body["allowed"] is False
         assert body["execution"]["id"] == exec_active.id
         assert body["execution"]["status"] == "running"
 
-    def test_status_blocked_by_batch(self, client, auth_headers, test_db):
-        batch = OperationBatch(
-            batch_id="batch-activo-2",
-            entity_type="users",
-            action="create",
+    def test_status_blocked_by_batch(self, client, encabezados_auth, test_db):
+        batch = LoteOperacion(
+            id_lote="batch-activo-2",
+            tipo_entidad="users",
+            accion="create",
             total=1,
             modalidad="DISTANCIA",
         )
         test_db.add(batch)
-        item = OperationItem(batch_id=batch.batch_id, identifier="u1", status="pending")
+        item = ItemOperacion(id_lote=batch.id_lote, identificador="u1", estado="pending")
         test_db.add(item)
         test_db.commit()
 
-        response = client.get(f"{UPLOAD_URL}/status", headers=auth_headers)
+        response = client.get(f"{UPLOAD_URL}/status", headers=encabezados_auth)
         body = response.json()
         assert body["allowed"] is False
         assert body["batch"]["batch_id"] == "batch-activo-2"

@@ -6,9 +6,9 @@ persistir en los items (detail) y propagarse al log de auditoría.
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.db.models import OperationItem
-from app.workers.phases.item_task import _log_success
-from app.workers.phases.phase3_structure import _create_phase3_items
+from app.db.modelos import ItemOperacion
+from app.workers.phases.fase3_estructura import _crear_items_fase3
+from app.workers.phases.tarea_item import _log_success
 
 
 def _comparison():
@@ -67,45 +67,47 @@ class TestCreatePhase3ItemsPersistReason:
     def test_items_persist_reason_and_context(self, test_db):
         comparison = _comparison()
         with (
-            patch("app.workers.phases.phase3_structure._acquire_advisory_lock", return_value=True),
-            patch("app.workers.phases.phase3_structure.get_moodle_service") as mock_factory,
+            patch(
+                "app.workers.phases.fase3_estructura._adquirir_bloqueo_asesor", return_value=True
+            ),
+            patch("app.workers.phases.fase3_estructura.obtener_servicio_moodle") as mock_factory,
         ):
             mock_ms = MagicMock()
-            mock_ms.get_courses = AsyncMock(return_value=[])
+            mock_ms.obtener_cursos = AsyncMock(return_value=[])
             mock_ms.close = AsyncMock(return_value=None)
             mock_factory.return_value = mock_ms
 
-            _create_phase3_items(test_db, 999, _ctx_data(), comparison, "DISTANCIA")
+            _crear_items_fase3(test_db, 999, _ctx_data(), comparison, "DISTANCIA")
 
         items = (
-            test_db.query(OperationItem).filter(OperationItem.batch_id.like(f"etl_3_%_{999}")).all()
+            test_db.query(ItemOperacion).filter(ItemOperacion.id_lote.like(f"etl_3_%_{999}")).all()
         )
         by_action = {}
         for it in items:
-            by_action.setdefault((it.detail["action"], it.identifier), it)
+            by_action.setdefault((it.detalle["action"], it.identificador), it)
 
         create_item = by_action[("create", "IDE_0105_sI_505_G-01")]
-        assert create_item.detail["reason"] == "new"
-        assert create_item.detail["old_shortname"] == "IDE_0105_sI_404_G-01"
-        assert create_item.detail["professor"] == "prof1"
-        assert create_item.detail["age_seconds"] == 60
-        assert create_item.detail["fullname"] == "Curso Nuevo"
+        assert create_item.detalle["reason"] == "new"
+        assert create_item.detalle["old_shortname"] == "IDE_0105_sI_404_G-01"
+        assert create_item.detalle["professor"] == "prof1"
+        assert create_item.detalle["age_seconds"] == 60
+        assert create_item.detalle["fullname"] == "Curso Nuevo"
 
         delete_item = by_action[("delete", "IDE_0105_sI_202_G-01")]
-        assert delete_item.detail["reason"] == "disappeared"
-        assert delete_item.detail["age_seconds"] == 100
+        assert delete_item.detalle["reason"] == "disappeared"
+        assert delete_item.detalle["age_seconds"] == 100
 
         activate_item = by_action[("activate", "IDE_0105_sI_303_G-01")]
-        assert activate_item.detail["reason"] == "same_professor_hidden"
+        assert activate_item.detalle["reason"] == "same_professor_hidden"
 
         hide_item = by_action[("hide", "IDE_0105_sI_404_G-01")]
-        assert hide_item.detail["reason"] == "teacher_change_recent"
+        assert hide_item.detalle["reason"] == "teacher_change_recent"
 
         rename_item = by_action[("rename", "IDE_0105_sI_303_G-01")]
-        assert rename_item.detail["reason"] == "core_rename"
-        assert rename_item.detail["old_shortname"] == "IDE_0105_sI_202_G-01"
-        assert rename_item.detail["reactivate"] is True
-        assert rename_item.detail["fullname"] == "Curso Renombrado"
+        assert rename_item.detalle["reason"] == "core_rename"
+        assert rename_item.detalle["old_shortname"] == "IDE_0105_sI_202_G-01"
+        assert rename_item.detalle["reactivate"] is True
+        assert rename_item.detalle["fullname"] == "Curso Renombrado"
 
     def test_items_without_reason_default_empty(self, test_db):
         comparison = {
@@ -115,21 +117,23 @@ class TestCreatePhase3ItemsPersistReason:
             "to_update": [],
             "to_create": [],
         }
-        with patch("app.workers.phases.phase3_structure._acquire_advisory_lock", return_value=True):
-            _create_phase3_items(test_db, 998, {"courses": []}, comparison, "DISTANCIA")
+        with patch(
+            "app.workers.phases.fase3_estructura._adquirir_bloqueo_asesor", return_value=True
+        ):
+            _crear_items_fase3(test_db, 998, {"courses": []}, comparison, "DISTANCIA")
 
         items = (
-            test_db.query(OperationItem).filter(OperationItem.batch_id.like(f"etl_3_%_{998}")).all()
+            test_db.query(ItemOperacion).filter(ItemOperacion.id_lote.like(f"etl_3_%_{998}")).all()
         )
         assert len(items) == 1
-        assert "reason" not in items[0].detail
-        assert items[0].detail.get("age_seconds") is None
+        assert "reason" not in items[0].detalle
+        assert items[0].detalle.get("age_seconds") is None
 
 
 class TestLogSuccessPropagatesReason:
     def test_course_actions_copy_reason_to_log_detail(self):
         for action in ("delete", "activate", "hide", "create"):
-            with patch("app.workers.phases.item_task.save_log") as mock_save:
+            with patch("app.workers.phases.tarea_item.guardar_log") as mock_save:
                 _log_success(
                     MagicMock(),
                     1,
@@ -158,7 +162,7 @@ class TestLogSuccessPropagatesReason:
             assert log_detail["category_idnumber"] == "CAT"
 
     def test_rename_copies_old_shortname_and_new_fullname(self):
-        with patch("app.workers.phases.item_task.save_log") as mock_save:
+        with patch("app.workers.phases.tarea_item.guardar_log") as mock_save:
             _log_success(
                 MagicMock(),
                 1,
@@ -176,7 +180,7 @@ class TestLogSuccessPropagatesReason:
         assert "reason" not in args[5]
 
     def test_enrol_copies_fullname(self):
-        with patch("app.workers.phases.item_task.save_log") as mock_save:
+        with patch("app.workers.phases.tarea_item.guardar_log") as mock_save:
             _log_success(
                 MagicMock(),
                 1,
@@ -189,11 +193,11 @@ class TestLogSuccessPropagatesReason:
         assert args[5]["fullname"] == "Curso de Prueba"
 
     def test_skips_reason_for_user_created(self):
-        with patch("app.workers.phases.item_task.save_log") as mock_save:
+        with patch("app.workers.phases.tarea_item.guardar_log") as mock_save:
             _log_success(MagicMock(), 1, "create_user", "user1", {"reason": "user_reason"})
         assert not mock_save.called
 
     def test_no_execution_id_no_log(self):
-        with patch("app.workers.phases.item_task.save_log") as mock_save:
+        with patch("app.workers.phases.tarea_item.guardar_log") as mock_save:
             _log_success(MagicMock(), None, "delete", "SN_001", {"reason": "some_reason"})
         assert not mock_save.called

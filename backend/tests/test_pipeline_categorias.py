@@ -1,6 +1,6 @@
 """Pruebas del núcleo puro de clasificación de categorías."""
 
-from app.pipeline.categories import classify_categories
+from app.pipeline.categorias import clasificar_categorias
 
 
 def _cat(idnumber="IDE", parent=""):
@@ -9,13 +9,13 @@ def _cat(idnumber="IDE", parent=""):
 
 class TestClassifyCategories:
     def test_missing_category_detected(self):
-        missing, relocate = classify_categories([_cat()], set(), {})
+        missing, relocate = clasificar_categorias([_cat()], set(), {})
         assert len(missing) == 1
         assert missing[0]["idnumber"] == "IDE"
         assert relocate == []
 
     def test_existing_category_not_missing(self):
-        missing, _ = classify_categories(
+        missing, _ = clasificar_categorias(
             [_cat()],
             {"IDE"},
             {"IDE": {"id": 1, "parent": 0}},
@@ -23,7 +23,7 @@ class TestClassifyCategories:
         assert missing == []
 
     def test_existing_category_with_wrong_parent_relocated(self):
-        _, relocate = classify_categories(
+        _, relocate = clasificar_categorias(
             [_cat(parent="PADRE")],
             {"IDE"},
             {"IDE": {"id": 1, "parent": 5}},
@@ -36,7 +36,7 @@ class TestClassifyCategories:
         assert item["cat_data"]["idnumber"] == "IDE"
 
     def test_relocate_uses_idnumber_map_for_parent(self):
-        _, relocate = classify_categories(
+        _, relocate = clasificar_categorias(
             [_cat(parent="ROOT")],
             {"IDE", "PADRE"},
             {"IDE": {"id": 1, "parent": 7}, "PADRE": {"id": 7}},
@@ -46,7 +46,7 @@ class TestClassifyCategories:
         assert relocate[0]["expected_parent_idn"] == "ROOT"
 
     def test_correct_parent_not_relocated(self):
-        _, relocate = classify_categories(
+        _, relocate = clasificar_categorias(
             [_cat(parent="PADRE")],
             {"IDE", "PADRE"},
             {"IDE": {"id": 1, "parent": 7}, "PADRE": {"id": 7}},
@@ -54,7 +54,7 @@ class TestClassifyCategories:
         assert relocate == []
 
     def test_root_parent_not_relocated(self):
-        _, relocate = classify_categories(
+        _, relocate = clasificar_categorias(
             [_cat(parent="0")],
             {"IDE"},
             {"IDE": {"id": 1, "parent": 0}},
@@ -62,7 +62,7 @@ class TestClassifyCategories:
         assert relocate == []
 
     def test_multiple_categories(self):
-        missing, relocate = classify_categories(
+        missing, relocate = clasificar_categorias(
             [_cat("A"), _cat("B")],
             {"B"},
             {"B": {"id": 2, "parent": 0}},

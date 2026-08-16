@@ -1,12 +1,12 @@
 // services/api/types.ts
 
-export interface Execution {
+export interface Ejecucion {
   id: number;
   filename: string;
   semester: string;
   mode: string;
   status: string;
-  metrics: Record<string, number> | null;
+  metrics: Record<string, unknown> | null;
   errors_count: number;
   current_phase?: string | null;
   progress_pct?: number | null;
@@ -23,7 +23,7 @@ export interface Execution {
   created_at: string;
 }
 
-export interface ErrorLog {
+export interface RegistroError {
   id: number;
   execution_id: number;
   type: string;
@@ -32,7 +32,7 @@ export interface ErrorLog {
   created_at: string;
 }
 
-export interface SemesterMetrics {
+export interface MetricasSemestre {
   semester: string;
   total_executions: number;
   total_courses_created: number;
@@ -43,7 +43,7 @@ export interface SemesterMetrics {
   last_completed: string | null;
 }
 
-export interface SemaphoreStatus {
+export interface EstadoSemaforo {
   semester: string;
   status: "green" | "yellow" | "red" | "gray";
   error_rate: number;
@@ -51,49 +51,60 @@ export interface SemaphoreStatus {
   message: string;
 }
 
-export interface LatestExecution extends Execution {
+export interface EjecucionReciente {
+  id: number;
+  semester: string;
+  filename: string;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_seconds: number | null;
+  metrics: Record<string, unknown> | null;
+  errors_count: number;
   error_rate: number;
   semaphore: string;
+  moodle_version: string | null;
   modalidad: string | null;
 }
 
-export interface UserProfile {
+export interface PerfilUsuario {
   username: string;
   firstname: string;
   lastname: string;
   profileimageurl: string;
 }
 
-export interface ReportInfo {
+export interface InfoReporte {
   name: string;
   filename: string;
   size: number;
 }
 
-export interface ReportsListResponse {
+export interface RespuestaListaReportes {
   execution_id: number;
   report_dir: string;
-  reports: ReportInfo[];
+  reports: InfoReporte[];
 }
 
-export interface ChartInfo {
+export interface InfoGrafico {
   id: string;
   title: string;
   endpoint: string;
 }
 
-export interface ChartTracesLayout {
+export interface DisposicionTrazasGrafico {
   traces: unknown[];
   layout: Record<string, unknown>;
 }
 
-export interface ChartsListResponse {
+export interface RespuestaListaGraficos {
   execution_id: number;
+  moodle_version: string | null;
   modalidad: string | null;
-  charts: ChartInfo[];
+  charts: InfoGrafico[];
 }
 
-export interface OperationBatchStatus {
+export interface EstadoLoteOperacion {
   batch_id: string;
   entity_type: string;
   action: string;
@@ -109,17 +120,17 @@ export interface OperationBatchStatus {
   completed_at: string | null;
   offset: number;
   limit: number;
-  details: OperationItemOut[];
+  details: ItemOperacionSalida[];
 }
 
-export interface OperationItemOut {
+export interface ItemOperacionSalida {
   identifier: string;
   status: string;
   error_message: string | null;
   attempt: number;
 }
 
-export interface CsvUploadResponse {
+export interface RespuestaSubidaCsv {
   batch_id: string;
   entity_type: string;
   action: string;
@@ -127,7 +138,7 @@ export interface CsvUploadResponse {
   message: string;
 }
 
-export interface QueryTaskStatus {
+export interface EstadoTareaConsulta {
   task_id: string;
   entity: string;
   status: string;
@@ -136,7 +147,7 @@ export interface QueryTaskStatus {
   error?: string;
 }
 
-export interface OperationBatchOut {
+export interface LoteOperacionSalida {
   batch_id: string;
   entity_type: string;
   action: string;
@@ -149,7 +160,7 @@ export interface OperationBatchOut {
   completed_at: string | null;
 }
 
-export interface OperationsHistoryItem {
+export interface ItemHistorialOperaciones {
   month: string;
   users_created: number;
   users_deleted: number;
@@ -159,14 +170,14 @@ export interface OperationsHistoryItem {
   total_errors: number;
 }
 
-export interface BulkVisibilityResult {
+export interface ResultadoVisibilidadMasiva {
   updated: number;
   failed: number;
   not_found: number;
   duration_seconds: number;
 }
 
-export interface InactiveTeacherRow {
+export interface FilaDocenteInactivo {
   teacher_name: string;
   username: string;
   email: string;
@@ -179,7 +190,7 @@ export interface InactiveTeacherRow {
   days_since_last_access?: number;
 }
 
-export interface InactiveCourseRow {
+export interface FilaCursoInactivo {
   id: string;
   shortname: string;
   fullname: string;
@@ -192,16 +203,16 @@ export interface InactiveCourseRow {
   days_since_modified?: number;
 }
 
-export interface InactiveTeachersResponse {
+export interface RespuestaDocentesInactivos {
   task_id: string;
   entity: string;
   status: string;
   total_count: number;
-  result?: InactiveTeacherRow[];
+  result?: FilaDocenteInactivo[];
   error?: string;
 }
 
-export interface NovedadItem {
+export interface ItemNovedad {
   id: string;
   base_key: string;
   old_shortname: string;
@@ -215,10 +226,10 @@ export interface NovedadItem {
   target_course_id: number | null;
 }
 
-export interface NovedadesResponse {
+export interface RespuestaNovedades {
   semester: string;
   previous_execution_id: number;
   previous_filename: string;
   total_compared: number;
-  novedades: NovedadItem[];
+  novedades: ItemNovedad[];
 }

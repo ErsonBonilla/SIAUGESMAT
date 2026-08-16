@@ -1,4 +1,4 @@
-// components/LoadingSkeleton.tsx
+// components/EsqueletoCarga.tsx
 
 type Variant = "table" | "chart" | "kpi";
 
@@ -7,7 +7,7 @@ interface Props {
   rows?: number;
 }
 
-export default function LoadingSkeleton(
+export default function EsqueletoCarga(
   { variant = "table", rows = 5 }: Props,
 ) {
   if (variant === "chart") {

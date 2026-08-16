@@ -2,20 +2,23 @@
 import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import {
-  cancelBatch,
-  getBatchStatus,
-  type OperationBatchStatus,
-  pauseBatch,
-  resumeBatch,
+  cancelarLote,
+  type EstadoLoteOperacion,
+  obtenerEstadoLote,
+  pausarLote,
+  reanudarLote,
 } from "../services/api.ts";
-import { formatDateTime, formatDuration } from "../utils/date.ts";
-import { batchActionLabel, batchEntityLabel } from "../utils/batch-labels.ts";
-import BatchReportsSection from "../components/BatchReportsSection.tsx";
-import ErrorBox from "../components/ErrorBox.tsx";
-import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
-import Pagination from "../components/Pagination.tsx";
-import ProgressBar from "../components/ProgressBar.tsx";
-import { SpinnerIcon } from "../utils/icons.tsx";
+import { formatearDuracion, formatearFechaHora } from "../utils/fechas.ts";
+import {
+  etiquetaAccionLote,
+  etiquetaEntidadLote,
+} from "../utils/etiquetas-lote.ts";
+import SeccionReportesLote from "../components/SeccionReportesLote.tsx";
+import CajaError from "../components/CajaError.tsx";
+import EsqueletoCarga from "../components/EsqueletoCarga.tsx";
+import Paginacion from "../components/Paginacion.tsx";
+import BarraProgreso from "../components/BarraProgreso.tsx";
+import { IconoSpinner } from "../utils/iconos.tsx";
 import { toast } from "../utils/toast.ts";
 
 const PAGE_SIZE = 20;
@@ -24,8 +27,8 @@ interface Props {
   batchId: string;
 }
 
-export default function BatchDetailIsland({ batchId }: Props) {
-  const status = useSignal<OperationBatchStatus | null>(null);
+export default function IslandDetalleLote({ batchId }: Props) {
+  const status = useSignal<EstadoLoteOperacion | null>(null);
   const loading = useSignal(true);
   const errorMsg = useSignal("");
   const offset = useSignal(0);
@@ -35,7 +38,7 @@ export default function BatchDetailIsland({ batchId }: Props) {
 
   const fetchStatus = async (newOffset = offset.value) => {
     try {
-      const st = await getBatchStatus(batchId, newOffset, PAGE_SIZE);
+      const st = await obtenerEstadoLote(batchId, newOffset, PAGE_SIZE);
       status.value = st;
       offset.value = st.offset;
     } catch (e) {
@@ -65,7 +68,7 @@ export default function BatchDetailIsland({ batchId }: Props) {
     if (!status.value || !isRunning.value) return;
     const interval = setInterval(async () => {
       try {
-        const st = await getBatchStatus(batchId, offset.value, PAGE_SIZE);
+        const st = await obtenerEstadoLote(batchId, offset.value, PAGE_SIZE);
         status.value = st;
         if (st.pending === 0 && st.processing === 0) clearInterval(interval);
       } catch {
@@ -82,7 +85,7 @@ export default function BatchDetailIsland({ batchId }: Props) {
   const handlePause = async () => {
     pausing.value = true;
     try {
-      await pauseBatch(batchId);
+      await pausarLote(batchId);
       toast("Lote pausado", "success");
       fetchStatus();
     } catch (e) {
@@ -95,7 +98,7 @@ export default function BatchDetailIsland({ batchId }: Props) {
   const handleResume = async () => {
     resuming.value = true;
     try {
-      await resumeBatch(batchId);
+      await reanudarLote(batchId);
       toast("Lote reanudado", "success");
       fetchStatus();
     } catch (e) {
@@ -113,7 +116,7 @@ export default function BatchDetailIsland({ batchId }: Props) {
     ) return;
     cancelling.value = true;
     try {
-      await cancelBatch(batchId);
+      await cancelarLote(batchId);
       toast("Lote cancelado", "success");
       fetchStatus();
     } catch (e) {
@@ -123,8 +126,8 @@ export default function BatchDetailIsland({ batchId }: Props) {
     }
   };
 
-  if (loading.value) return <LoadingSkeleton variant="chart" />;
-  if (errorMsg.value) return <ErrorBox message={errorMsg.value} />;
+  if (loading.value) return <EsqueletoCarga variant="chart" />;
+  if (errorMsg.value) return <CajaError message={errorMsg.value} />;
   if (!status.value) {
     return <p class="text-[var(--text-secondary)]">El lote no existe.</p>;
   }
@@ -162,13 +165,14 @@ export default function BatchDetailIsland({ batchId }: Props) {
               Lote {batchId.slice(0, 12)}...
             </h2>
             <p class="text-sm text-[var(--text-secondary)]">
-              {batchEntityLabel(s.entity_type)} · {batchActionLabel(s.action)}
+              {etiquetaEntidadLote(s.entity_type)} ·{" "}
+              {etiquetaAccionLote(s.action)}
               {s.modalidad ? ` · ${s.modalidad}` : ""}
             </p>
           </div>
           <div class="flex items-center gap-3">
             {isRunning.value && (
-              <SpinnerIcon class="animate-spin h-4 w-4 text-[var(--accent)]" />
+              <IconoSpinner class="animate-spin h-4 w-4 text-[var(--accent)]" />
             )}
             <span class="text-sm font-medium">{statusLabel}</span>
           </div>
@@ -176,15 +180,15 @@ export default function BatchDetailIsland({ batchId }: Props) {
         <div class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           <div>
             <span class="text-[var(--text-secondary)]">Inicio</span>
-            <p>{formatDateTime(s.created_at)}</p>
+            <p>{formatearFechaHora(s.created_at)}</p>
           </div>
           <div>
             <span class="text-[var(--text-secondary)]">Fin</span>
-            <p>{formatDateTime(s.completed_at)}</p>
+            <p>{formatearFechaHora(s.completed_at)}</p>
           </div>
           <div>
             <span class="text-[var(--text-secondary)]">Duración</span>
-            <p>{formatDuration(durationSeconds)}</p>
+            <p>{formatearDuracion(durationSeconds)}</p>
           </div>
           <div>
             <span class="text-[var(--text-secondary)]">Progreso</span>
@@ -210,14 +214,14 @@ export default function BatchDetailIsland({ batchId }: Props) {
 
       {(isRunning.value || isPaused.value) && (
         <>
-          <ProgressBar
-            currentPhase={isPaused.value
+          <BarraProgreso
+            faseActual={isPaused.value
               ? "Lote pausado"
               : `Procesando ${
-                batchEntityLabel(s.entity_type).toLowerCase()
+                etiquetaEntidadLote(s.entity_type).toLowerCase()
               }...`}
-            currentStep={1}
-            progressPct={isPaused.value ? Math.min(99, pct) : pct}
+            pasoActual={1}
+            porcentajeProgreso={isPaused.value ? Math.min(99, pct) : pct}
             status={isPaused.value ? "paused" : "running"}
           />
           <div class="flex justify-end gap-2 mt-3">
@@ -295,7 +299,7 @@ export default function BatchDetailIsland({ batchId }: Props) {
 
       {isCompleted.value && (
         <div class="mb-6">
-          <BatchReportsSection batchId={batchId} />
+          <SeccionReportesLote batchId={batchId} />
         </div>
       )}
 
@@ -309,7 +313,7 @@ export default function BatchDetailIsland({ batchId }: Props) {
             <thead>
               <tr class="border-b border-[var(--border-primary)]">
                 <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">
-                  {batchEntityLabel(s.entity_type).slice(0, -1)}
+                  {etiquetaEntidadLote(s.entity_type).slice(0, -1)}
                 </th>
                 <th class="text-left py-2 px-2 font-medium text-[var(--text-secondary)]">
                   Estado
@@ -371,12 +375,12 @@ export default function BatchDetailIsland({ batchId }: Props) {
             </tbody>
           </table>
         </div>
-        <Pagination
+        <Paginacion
           offset={offset.value}
-          pageSize={PAGE_SIZE}
+          tamanoPagina={PAGE_SIZE}
           total={s.total}
           label="operaciones"
-          onPageChange={handlePageChange}
+          alCambiarPagina={handlePageChange}
         />
       </div>
 

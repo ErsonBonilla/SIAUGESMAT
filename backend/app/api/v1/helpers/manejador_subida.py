@@ -3,23 +3,23 @@ import uuid
 
 from fastapi import HTTPException, UploadFile
 
-from app.core.entity_config import ENTITY_CONFIG
-from app.repositories.execution_repo import get_active_execution
-from app.repositories.operation_repo import add_item, create_batch, get_active_batch
-from app.schemas.operations import CsvUploadResponse
-from app.services.csv_validator import (
-    validate_and_parse_csv,
-    validate_categories_csv,
-    validate_users_csv,
+from app.core.configuracion_entidades import ENTITY_CONFIG
+from app.repositories.repositorio_ejecuciones import obtener_ejecucion_activa
+from app.repositories.repositorio_operaciones import agregar_item, crear_lote, obtener_lote_activo
+from app.schemas.operaciones import RespuestaSubidaCsv
+from app.services.orquestacion import encolar_lote_operacion
+from app.services.validador_csv import (
+    validar_csv_categorias,
+    validar_csv_usuarios,
+    validar_y_parsear_csv,
 )
-from app.services.orchestration import enqueue_operation_batch
 
 logger = logging.getLogger(__name__)
 
 
 def _ensure_modalidad_free(db, modalidad: str) -> None:
     """Rechaza la subida si hay un proceso en curso para la modalidad."""
-    if get_active_execution(db, modalidad) or get_active_batch(db, modalidad):
+    if obtener_ejecucion_activa(db, modalidad) or obtener_lote_activo(db, modalidad):
         raise HTTPException(
             409,
             "Hay un proceso en ejecución en esta modalidad. "
@@ -27,7 +27,7 @@ def _ensure_modalidad_free(db, modalidad: str) -> None:
         )
 
 
-async def handle_visibility_upload(file: UploadFile, db, current_user, visibility: str):
+async def manejar_subida_visibilidad(file: UploadFile, db, current_user, visibility: str):
     config = ENTITY_CONFIG["courses"]
     _ensure_modalidad_free(db, current_user.modalidad)
 
@@ -41,18 +41,18 @@ async def handle_visibility_upload(file: UploadFile, db, current_user, visibilit
         raise HTTPException(400, "El archivo no es un texto UTF-8 válido") from None
 
     try:
-        identifiers = validate_and_parse_csv(text, config["column"], config["label_plural"])
+        identifiers = validar_y_parsear_csv(text, config["column"], config["label_plural"])
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
 
     batch_id = str(uuid.uuid4())
-    create_batch(db, batch_id, "courses", "visibility", len(identifiers), current_user.modalidad)
+    crear_lote(db, batch_id, "courses", "visibility", len(identifiers), current_user.modalidad)
 
     for identifier in identifiers:
-        add_item(db, batch_id, identifier, detail={"visibility": visibility})
+        agregar_item(db, batch_id, identifier, detalle={"visibility": visibility})
     db.commit()
 
-    enqueue_operation_batch(batch_id)
+    encolar_lote_operacion(batch_id)
 
     verb_label = "mostrar" if visibility == "show" else "ocultar"
     logger.info(
@@ -60,7 +60,7 @@ async def handle_visibility_upload(file: UploadFile, db, current_user, visibilit
         f"encolado por {current_user.username}"
     )
 
-    return CsvUploadResponse(
+    return RespuestaSubidaCsv(
         batch_id=batch_id,
         entity_type="courses",
         action="visibility",
@@ -69,7 +69,9 @@ async def handle_visibility_upload(file: UploadFile, db, current_user, visibilit
     )
 
 
-async def handle_upload(file: UploadFile, db, current_user, entity_type, action, default_role=None):
+async def manejar_subida(
+    file: UploadFile, db, current_user, entity_type, action, default_role=None
+):
     config = ENTITY_CONFIG[entity_type]
     _ensure_modalidad_free(db, current_user.modalidad)
 
@@ -86,41 +88,40 @@ async def handle_upload(file: UploadFile, db, current_user, entity_type, action,
         is_create_users = entity_type == "users" and action == "create"
         is_create_categories = entity_type == "categories" and action == "create"
         if is_create_users:
-            users = validate_users_csv(text, default_role=default_role)
+            users = validar_csv_usuarios(text, default_role=default_role)
             identifiers = [u["username"] for u in users]
         elif is_create_categories:
-            categories = validate_categories_csv(text)
+            categories = validar_csv_categorias(text)
             identifiers = [c["name"] for c in categories]
         else:
-            identifiers = validate_and_parse_csv(text, config["column"], config["label_plural"])
+            identifiers = validar_y_parsear_csv(text, config["column"], config["label_plural"])
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
 
     batch_id = str(uuid.uuid4())
-    create_batch(db, batch_id, entity_type, action, len(identifiers), current_user.modalidad)
+    crear_lote(db, batch_id, entity_type, action, len(identifiers), current_user.modalidad)
 
     if is_create_users:
         for user in users:
-            add_item(
+            agregar_item(
                 db,
                 batch_id,
                 user["username"],
-                detail={
+                detalle={
                     "firstname": user["firstname"],
                     "lastname": user["lastname"],
                     "email": user["email"],
-                    "password": user.get("password"),
                     "role1": user.get("role1"),
                     "forcepasswordchange": user.get("forcepasswordchange"),
                 },
             )
     elif is_create_categories:
         for cat in categories:
-            add_item(
+            agregar_item(
                 db,
                 batch_id,
                 cat["name"],
-                detail={
+                detalle={
                     "idnumber": cat.get("idnumber"),
                     "parent": cat.get("parent"),
                     "description": cat.get("description"),
@@ -129,10 +130,10 @@ async def handle_upload(file: UploadFile, db, current_user, entity_type, action,
             )
     else:
         for identifier in identifiers:
-            add_item(db, batch_id, identifier)
+            agregar_item(db, batch_id, identifier)
     db.commit()
 
-    enqueue_operation_batch(batch_id)
+    encolar_lote_operacion(batch_id)
 
     verb = "eliminación" if action == "delete" else "creación"
     logger.info(
@@ -140,7 +141,7 @@ async def handle_upload(file: UploadFile, db, current_user, entity_type, action,
         f"encolado por {current_user.username}"
     )
 
-    return CsvUploadResponse(
+    return RespuestaSubidaCsv(
         batch_id=batch_id,
         entity_type=entity_type,
         action=action,

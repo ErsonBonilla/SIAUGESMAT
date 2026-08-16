@@ -20,88 +20,87 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
-class TokenBucket:
+class CubetaTokens:
     def __init__(self, rate: float, burst: int):
         if rate <= 0:
             raise ValueError("La tasa (rate) debe ser positiva")
         if burst <= 0:
             raise ValueError("La capacidad (burst) debe ser positiva")
-        self.rate = rate
-        self.burst = burst
-        self.tokens = float(burst)
-        self.last_update = time.monotonic()
+        self.velocidad = rate
+        self.rafaga = burst
+        self.fichas = float(burst)
+        self.ultima_actualizacion = time.monotonic()
 
-    async def consume(self, tokens: int = 1) -> None:
-        if tokens > self.burst:
-            raise ValueError(f"No se pueden consumir {tokens} tokens, máximo {self.burst}")
+    async def consumir(self, tokens: int = 1) -> None:
+        if tokens > self.rafaga:
+            raise ValueError(f"No se pueden consumir {tokens} tokens, máximo {self.rafaga}")
         while True:
             now = time.monotonic()
-            elapsed = now - self.last_update
-            self.tokens = min(self.burst, self.tokens + elapsed * self.rate)
-            self.last_update = now
-            if self.tokens >= tokens:
-                self.tokens -= tokens
+            elapsed = now - self.ultima_actualizacion
+            self.fichas = min(self.rafaga, self.fichas + elapsed * self.velocidad)
+            self.ultima_actualizacion = now
+            if self.fichas >= tokens:
+                self.fichas -= tokens
                 return
-            wait = (tokens - self.tokens) / self.rate
+            wait = (tokens - self.fichas) / self.velocidad
             await asyncio.sleep(wait + 0.001)
 
 
-class RateLimiter:
+class LimitadorTasa:
     def __init__(self, rate: float, burst: int):
-        self.bucket = TokenBucket(rate, burst)
+        self.cubeta = CubetaTokens(rate, burst)
 
-    async def acquire(self) -> None:
-        await self.bucket.consume()
+    async def adquirir(self) -> None:
+        await self.cubeta.consumir()
+
+        # ---------------------------------------------------------------------------
+        # Redis Rate Limiter (distribuido, sliding-window via sorted sets)
+        # ---------------------------------------------------------------------------
 
 
-# ---------------------------------------------------------------------------
-# Redis Rate Limiter (distribuido, sliding-window via sorted sets)
-# ---------------------------------------------------------------------------
-
-
-class RedisRateLimiter:
+class LimitadorTasaRedis:
     """Rate limiter distribuido vía Redis.
     Usa sorted set con timestamps como scores para ventana deslizante.
     Todos los workers que comparten el mismo Redis coordinan el límite."""
 
     def __init__(self, rate: float = 5, window: int = 1):
-        self.rate = rate
-        self.window = window
-        self._pool = None
+        self.velocidad = rate
+        self.ventana = window
+        self._grupo_conexiones = None
         self._redis = None
 
-    async def _get_pool(self):
-        if self._pool is None:
+    async def _obtener_grupo_conexiones(self):
+        if self._grupo_conexiones is None:
             import redis.asyncio as aredis
 
-            self._pool = aredis.ConnectionPool.from_url(
+            self._grupo_conexiones = aredis.ConnectionPool.from_url(
                 settings.REDIS_URL,
                 max_connections=5,
                 socket_timeout=2,
                 socket_connect_timeout=2,
             )
-        return self._pool
+        return self._grupo_conexiones
 
-    async def acquire(self) -> None:
+    async def adquirir(self) -> None:
         import redis.asyncio as aredis
 
-        pool = await self._get_pool()
+        pool = await self._obtener_grupo_conexiones()
         if self._redis is None:
             self._redis = aredis.Redis(connection_pool=pool)
         key = "ratelimit:moodle"
         now = time.monotonic()
-        window_start = now - self.window
+        window_start = now - self.ventana
         pipe = self._redis.pipeline(transaction=True)
         pipe.zremrangebyscore(key, 0, window_start)
         pipe.zadd(key, {str(now) + str(secrets.randbits(16)): now})
         pipe.zcard(key)
-        pipe.expire(key, self.window + 1)
+        pipe.expire(key, self.ventana + 1)
         _, _, count, _ = await pipe.execute()
-        if count > self.rate:
-            wait = (count - self.rate) * (self.window / self.rate)
+        if count > self.velocidad:
+            wait = (count - self.velocidad) * (self.ventana / self.velocidad)
             await asyncio.sleep(wait)
 
     async def close(self):
-        if self._pool is not None:
-            await self._pool.disconnect()
-            self._pool = None
+        if self._grupo_conexiones is not None:
+            await self._grupo_conexiones.disconnect()
+            self._grupo_conexiones = None

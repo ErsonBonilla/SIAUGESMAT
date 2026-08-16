@@ -16,7 +16,7 @@ ROLE_MAPPING: dict[str, int] = {
 }
 
 
-def role_shortname_to_id(shortname: str) -> int:
+def rol_shortname_a_id(shortname: str) -> int:
     """Convierte el nombre corto de un rol a su ID estándar de Moodle."""
     role_id = ROLE_MAPPING.get(shortname)
     if role_id is None:
@@ -25,7 +25,7 @@ def role_shortname_to_id(shortname: str) -> int:
     return role_id
 
 
-def resolve_role(value: str) -> int:
+def resolver_rol(value: str) -> int:
     """Convierte un rol (shortname o roleid numérico) a roleid de Moodle."""
     try:
         role_id = int(value)
@@ -33,4 +33,4 @@ def resolve_role(value: str) -> int:
             return role_id
     except ValueError:
         pass
-    return role_shortname_to_id(value.strip().lower())
+    return rol_shortname_a_id(value.strip().lower())

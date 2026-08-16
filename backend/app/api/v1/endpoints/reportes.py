@@ -11,53 +11,53 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_db
-from app.repositories.execution_repo import get_execution
-from app.schemas.api import ReportsListResponse
-from app.schemas.user import UserInToken
-from app.services.reports import ReportService
+from app.core.dependencies import obtener_db, obtener_usuario_actual
+from app.repositories.repositorio_ejecuciones import obtener_ejecucion
+from app.schemas.respuestas import RespuestaListaReportes
+from app.schemas.usuario import UsuarioEnToken
+from app.services.reportes import ServicioReportes
 
 router = APIRouter()
 
 
-@router.get("/{execution_id}/reports", response_model=ReportsListResponse)
-async def list_reports(
-    execution_id: int,
-    db: Session = Depends(get_db),
-    _current_user: UserInToken = Depends(get_current_user),
+@router.get("/{ejecucion_id}/reports", response_model=RespuestaListaReportes)
+async def listar_reportes(
+    ejecucion_id: int,
+    db: Session = Depends(obtener_db),
+    _usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
     """Lista los reportes disponibles para una ejecución."""
-    execution = get_execution(db, execution_id)
+    execution = obtener_ejecucion(db, ejecucion_id)
     if not execution:
         raise HTTPException(status_code=404, detail="Ejecución no encontrada")
-    if not execution.report_dir or not os.path.exists(execution.report_dir):
+    if not execution.directorio_reporte or not os.path.exists(execution.directorio_reporte):
         raise HTTPException(
             status_code=404,
             detail="No hay reportes disponibles para esta ejecución",
         )
-    reports = ReportService.list_reports(execution.report_dir)
+    reports = ServicioReportes.listar_reportes(execution.directorio_reporte)
     return {
-        "execution_id": execution_id,
-        "report_dir": execution.report_dir,
+        "execution_id": ejecucion_id,
+        "report_dir": execution.directorio_reporte,
         "reports": reports,
     }
 
 
-@router.get("/{execution_id}/reports/{report_name}.csv")
-async def download_report(
-    execution_id: int,
-    report_name: str,
-    db: Session = Depends(get_db),
-    _current_user: UserInToken = Depends(get_current_user),
+@router.get("/{ejecucion_id}/reports/{nombre_reporte}.csv")
+async def descargar_reporte(
+    ejecucion_id: int,
+    nombre_reporte: str,
+    db: Session = Depends(obtener_db),
+    _usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
     """Descarga un reporte CSV específico."""
-    execution = get_execution(db, execution_id)
+    execution = obtener_ejecucion(db, ejecucion_id)
     if not execution:
         raise HTTPException(status_code=404, detail="Ejecución no encontrada")
-    if not execution.report_dir:
+    if not execution.directorio_reporte:
         raise HTTPException(status_code=404, detail="No hay reportes disponibles")
 
-    filepath = ReportService.get_report_path(execution.report_dir, report_name)
+    filepath = ServicioReportes.obtener_ruta_reporte(execution.directorio_reporte, nombre_reporte)
     if not filepath:
         raise HTTPException(status_code=404, detail="Reporte no encontrado")
 
@@ -68,25 +68,25 @@ async def download_report(
     )
 
 
-@router.get("/{execution_id}/reports/download")
-async def download_all_reports(
-    execution_id: int,
-    db: Session = Depends(get_db),
-    _current_user: UserInToken = Depends(get_current_user),
+@router.get("/{ejecucion_id}/reports/download")
+async def descargar_todos_los_reportes(
+    ejecucion_id: int,
+    db: Session = Depends(obtener_db),
+    _usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
     """Descarga un ZIP con todos los reportes de la ejecución."""
-    execution = get_execution(db, execution_id)
+    execution = obtener_ejecucion(db, ejecucion_id)
     if not execution:
         raise HTTPException(status_code=404, detail="Ejecución no encontrada")
-    if not execution.report_dir:
+    if not execution.directorio_reporte:
         raise HTTPException(status_code=404, detail="No hay reportes disponibles")
 
-    zip_path = ReportService.get_zip_path(execution.report_dir)
+    zip_path = ServicioReportes.obtener_ruta_zip(execution.directorio_reporte)
     if not zip_path:
         raise HTTPException(status_code=404, detail="ZIP de reportes no encontrado")
 
     return FileResponse(
         zip_path,
         media_type="application/zip",
-        filename=f"reportes_ejecucion_{execution_id}.zip",
+        filename=f"reportes_ejecucion_{ejecucion_id}.zip",
     )

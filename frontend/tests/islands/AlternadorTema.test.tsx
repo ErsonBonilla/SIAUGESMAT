@@ -2,7 +2,7 @@ import { render } from "preact-render-to-string";
 import { assertEquals, assertStringIncludes } from "@std/assert";
 
 import AlternadorTema from "../../islands/AlternadorTema.tsx";
-import { darkSignal } from "../../utils/theme.ts";
+import { darkSignal } from "../../utils/tema.ts";
 
 Deno.test("AlternadorTema - renders sun icon in dark mode", () => {
   darkSignal.value = true;

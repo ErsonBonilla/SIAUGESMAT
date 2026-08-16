@@ -1,30 +1,35 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { listBatches } from "../services/api.ts";
-import type { OperationBatchOut } from "../services/api.ts";
-import { SpinnerIcon } from "../utils/icons.tsx";
-import LoadingSkeleton from "./LoadingSkeleton.tsx";
+import { listarLotes } from "../services/api.ts";
+import type { LoteOperacionSalida } from "../services/api.ts";
+import { IconoSpinner } from "../utils/iconos.tsx";
+import EsqueletoCarga from "./EsqueletoCarga.tsx";
 
 interface Props {
   entityType: string;
   action: string;
-  currentBatchId: string;
+  idLoteActual: string;
   onSelectBatch: (batchId: string) => void;
-  refreshTrigger?: number;
+  disparadorActualizacion?: number;
 }
 
-export default function OperationHistorySection(
-  { entityType, action, currentBatchId, onSelectBatch, refreshTrigger = 0 }:
-    Props,
+export default function SeccionHistorialOperaciones(
+  {
+    entityType,
+    action,
+    idLoteActual,
+    onSelectBatch,
+    disparadorActualizacion = 0,
+  }: Props,
 ) {
-  const recentBatches = useSignal<OperationBatchOut[]>([]);
+  const recentBatches = useSignal<LoteOperacionSalida[]>([]);
   const loading = useSignal(true);
 
   useEffect(() => {
     (async () => {
       loading.value = true;
       try {
-        const { items } = await listBatches({
+        const { items } = await listarLotes({
           entity_type: entityType,
           action,
           limit: 5,
@@ -36,7 +41,7 @@ export default function OperationHistorySection(
         loading.value = false;
       }
     })();
-  }, [entityType, action, refreshTrigger]);
+  }, [entityType, action, disparadorActualizacion]);
 
   const verbLabel = action === "delete"
     ? "eliminación"
@@ -50,7 +55,7 @@ export default function OperationHistorySection(
         Operaciones anteriores ({verbLabel})
       </h3>
       {loading.value
-        ? <LoadingSkeleton variant="table" rows={3} />
+        ? <EsqueletoCarga variant="table" rows={3} />
         : recentBatches.value.length === 0
         ? (
           <p class="text-sm text-[var(--text-secondary)]">
@@ -60,7 +65,7 @@ export default function OperationHistorySection(
         : (
           <div class="space-y-2">
             {recentBatches.value.map((b) => {
-              const isActive = b.batch_id === currentBatchId;
+              const isActive = b.batch_id === idLoteActual;
               const isComplete = b.completed + b.failed >= b.total;
               return (
                 <div
@@ -85,7 +90,7 @@ export default function OperationHistorySection(
                   <div class="flex items-center gap-2 text-sm shrink-0">
                     {!isComplete && (
                       <span class="flex items-center gap-1 text-yellow-600">
-                        <SpinnerIcon class="animate-spin w-3 h-3" />
+                        <IconoSpinner class="animate-spin w-3 h-3" />
                       </span>
                     )}
                     <span class="text-[var(--text-muted)]">C:</span>
@@ -100,7 +105,7 @@ export default function OperationHistorySection(
             })}
           </div>
         )}
-      {currentBatchId && (
+      {idLoteActual && (
         <p class="text-xs text-[var(--text-muted)] mt-3">
           Haz clic en un lote para ver su detalle.
         </p>

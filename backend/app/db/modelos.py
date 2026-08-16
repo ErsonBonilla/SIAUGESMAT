@@ -1,8 +1,10 @@
 """
 Modelos de base de datos (SQLAlchemy ORM) para SIAUGESMAT.
 
-Define las tablas `executions` y `error_logs` utilizadas para el
-seguimiento de los procesos ETL y el registro de errores.
+Define las tablas `ejecuciones`, `registros_error`, `registros_ejecucion`,
+`lotes_operacion`, `items_operacion` y `resultados_consulta` utilizadas
+para el seguimiento de los procesos ETL, las operaciones masivas y las
+consultas asíncronas.
 """
 
 from datetime import UTC, datetime
@@ -13,7 +15,7 @@ from sqlalchemy.orm import relationship
 from app.db.base import Base
 
 
-class Execution(Base):
+class Ejecucion(Base):
     """
     Representa una ejecución del proceso ETL a partir de un archivo Excel.
 
@@ -21,55 +23,59 @@ class Execution(Base):
     métricas finales y los tiempos de inicio y fin.
     """
 
-    __tablename__ = "executions"
+    __tablename__ = "ejecuciones"
 
     id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String(500), nullable=False)
-    semester = Column(String(10), nullable=False, index=True)
-    mode = Column(String(20), nullable=False, default="both")
-    status = Column(String(20), nullable=False, default="pending", index=True)
-    metrics = Column(JSON, nullable=True)
-    errors_count = Column(Integer, default=0)
-    report_dir = Column(String(500), nullable=True)
-    started_at = Column(DateTime(timezone=True), nullable=True)
-    completed_at = Column(DateTime(timezone=True), nullable=True)
-    duration_seconds = Column(Float, nullable=True)
-    current_phase = Column(String(100), nullable=True)
-    progress_pct = Column(Float, nullable=True)
-    progress_updated_at = Column(DateTime(timezone=True), nullable=True)
-    current_step = Column(Integer, nullable=True)
-    moodle_version = Column(String(10), nullable=True)
+    nombre_archivo = Column(String(500), nullable=False)
+    semestre = Column(String(10), nullable=False, index=True)
+    modo = Column(String(20), nullable=False, default="both")
+    estado = Column(String(20), nullable=False, default="pending", index=True)
+    metricas = Column(JSON, nullable=True)
+    conteo_errores = Column(Integer, default=0)
+    directorio_reporte = Column(String(500), nullable=True)
+    iniciado_en = Column(DateTime(timezone=True), nullable=True)
+    completado_en = Column(DateTime(timezone=True), nullable=True)
+    duracion_segundos = Column(Float, nullable=True)
+    fase_actual = Column(String(100), nullable=True)
+    porcentaje_progreso = Column(Float, nullable=True)
+    progreso_actualizado_en = Column(DateTime(timezone=True), nullable=True)
+    paso_actual = Column(Integer, nullable=True)
+    version_moodle = Column(String(10), nullable=True)
     modalidad = Column(String(20), nullable=True, index=True)
-    phase_checkpoint = Column(JSON, nullable=True)
-    celery_task_id = Column(String(255), nullable=True, index=True)
-    created_at = Column(
+    checkpoint_fase = Column(JSON, nullable=True)
+    id_tarea_celery = Column(String(255), nullable=True, index=True)
+    creado_en = Column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), index=True
     )
 
-    errors = relationship("ErrorLog", back_populates="execution", cascade="all, delete-orphan")
-    logs = relationship("ExecutionLog", back_populates="execution", cascade="all, delete-orphan")
+    errores = relationship(
+        "RegistroError", back_populates="ejecucion", cascade="all, delete-orphan"
+    )
+    registros = relationship(
+        "RegistroEjecucion", back_populates="ejecucion", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
-        return f"<Execution id={self.id} filename={self.filename!r} status={self.status!r}>"
+        return f"<Ejecucion id={self.id} nombre={self.nombre_archivo!r} estado={self.estado!r}>"
 
 
-class ErrorLog(Base):
-    __tablename__ = "error_logs"
+class RegistroError(Base):
+    __tablename__ = "registros_error"
 
     id = Column(Integer, primary_key=True, index=True)
-    execution_id = Column(Integer, ForeignKey("executions.id"), nullable=False, index=True)
-    type = Column(String(50), nullable=False)
-    identifier = Column(String(255), nullable=True)
-    message = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    ejecucion_id = Column(Integer, ForeignKey("ejecuciones.id"), nullable=False, index=True)
+    tipo = Column(String(50), nullable=False)
+    identificador = Column(String(255), nullable=True)
+    mensaje = Column(Text, nullable=True)
+    creado_en = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
-    execution = relationship("Execution", back_populates="errors")
+    ejecucion = relationship("Ejecucion", back_populates="errores")
 
     def __repr__(self) -> str:
-        return f"<ErrorLog id={self.id} execution_id={self.execution_id} type={self.type!r}>"
+        return f"<RegistroError id={self.id} ejecucion_id={self.ejecucion_id} tipo={self.tipo!r}>"
 
 
-class ExecutionLog(Base):
+class RegistroEjecucion(Base):
     """
     Registro detallado de acciones e incidencias durante una ejecución ETL.
 
@@ -77,25 +83,26 @@ class ExecutionLog(Base):
     con datos estructurados para la generación de reportes.
     """
 
-    __tablename__ = "execution_logs"
+    __tablename__ = "registros_ejecucion"
 
     id = Column(Integer, primary_key=True, index=True)
-    execution_id = Column(Integer, ForeignKey("executions.id"), nullable=False, index=True)
-    phase = Column(String(10), nullable=False)  # valores: "1","2","3","4","critical"
-    action = Column(String(50), nullable=False)
-    identifier = Column(String(255), nullable=True)
-    detail = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    ejecucion_id = Column(Integer, ForeignKey("ejecuciones.id"), nullable=False, index=True)
+    fase = Column(String(10), nullable=False)  # valores: "1","2","3","4","critical"
+    accion = Column(String(50), nullable=False)
+    identificador = Column(String(255), nullable=True)
+    detalle = Column(JSON, nullable=True)
+    creado_en = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
 
-    execution = relationship("Execution", back_populates="logs")
+    ejecucion = relationship("Ejecucion", back_populates="registros")
 
     def __repr__(self) -> str:
         return (
-            f"<ExecutionLog id={self.id} execution_id={self.execution_id} action={self.action!r}>"
+            f"<RegistroEjecucion id={self.id} ejecucion_id={self.ejecucion_id} "
+            f"accion={self.accion!r}>"
         )
 
 
-class OperationBatch(Base):
+class LoteOperacion(Base):
     """
     Lote de operaciones masivas (creación o eliminación) de entidades en Moodle.
 
@@ -103,61 +110,62 @@ class OperationBatch(Base):
     con seguimiento de progreso por lote.
     """
 
-    __tablename__ = "operation_batches"
+    __tablename__ = "lotes_operacion"
 
     id = Column(Integer, primary_key=True, index=True)
-    batch_id = Column(String(64), unique=True, index=True, nullable=False)
-    entity_type = Column(String(20), nullable=False)
-    action = Column(String(20), nullable=False)
+    id_lote = Column(String(64), unique=True, index=True, nullable=False)
+    tipo_entidad = Column(String(20), nullable=False)
+    accion = Column(String(20), nullable=False)
     total = Column(Integer, default=0)
-    completed = Column(Integer, default=0)
-    failed = Column(Integer, default=0)
+    completados = Column(Integer, default=0)
+    fallidos = Column(Integer, default=0)
     modalidad = Column(String(20), nullable=False)
-    created_at = Column(
+    creado_en = Column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), index=True
     )
-    completed_at = Column(DateTime(timezone=True), nullable=True)
+    completado_en = Column(DateTime(timezone=True), nullable=True)
 
-    items = relationship("OperationItem", back_populates="batch", cascade="all, delete-orphan")
+    items = relationship("ItemOperacion", back_populates="lote", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return (
-            f"<OperationBatch id={self.id} batch_id={self.batch_id!r} entity={self.entity_type!r}>"
+            f"<LoteOperacion id={self.id} id_lote={self.id_lote!r} entidad={self.tipo_entidad!r}>"
         )
 
 
-class OperationItem(Base):
+class ItemOperacion(Base):
     """
     Detalle individual de una operación dentro de un lote.
 
     Registra el estado, intentos y errores de cada entidad procesada.
     """
 
-    __tablename__ = "operation_items"
+    __tablename__ = "items_operacion"
 
     id = Column(Integer, primary_key=True, index=True)
-    batch_id = Column(
-        String(64), ForeignKey("operation_batches.batch_id"), nullable=False, index=True
-    )
-    identifier = Column(String(255), nullable=False)
-    status = Column(String(20), nullable=False, default="pending", index=True)
-    attempt = Column(Integer, default=0)
-    error_message = Column(Text, nullable=True)
-    detail = Column(JSON, nullable=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
-    updated_at = Column(
+    id_lote = Column(String(64), ForeignKey("lotes_operacion.id_lote"), nullable=False, index=True)
+    identificador = Column(String(255), nullable=False)
+    estado = Column(String(20), nullable=False, default="pending", index=True)
+    intento = Column(Integer, default=0)
+    mensaje_error = Column(Text, nullable=True)
+    detalle = Column(JSON, nullable=True)
+    creado_en = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    actualizado_en = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC),
     )
 
-    batch = relationship("OperationBatch", back_populates="items")
+    lote = relationship("LoteOperacion", back_populates="items")
 
     def __repr__(self) -> str:
-        return f"<OperationItem id={self.id} identifier={self.identifier!r} status={self.status!r}>"
+        return (
+            f"<ItemOperacion id={self.id} identificador={self.identificador!r} "
+            f"estado={self.estado!r}>"
+        )
 
 
-class QueryResult(Base):
+class ResultadoConsulta(Base):
     """
     Almacena el resultado de una consulta asíncrona a la API de Moodle.
 
@@ -165,19 +173,21 @@ class QueryResult(Base):
     completo queda almacenado para consulta y exportación CSV.
     """
 
-    __tablename__ = "query_results"
+    __tablename__ = "resultados_consulta"
 
     id = Column(Integer, primary_key=True, index=True)
-    task_id = Column(String(64), unique=True, index=True, nullable=False)
-    entity = Column(String(20), nullable=False)
-    params = Column(JSON, nullable=True)
-    status = Column(String(20), nullable=False, default="pending")
-    result_json = Column(JSON, nullable=True)
-    error_message = Column(Text, nullable=True)
-    total_count = Column(Integer, default=0)
+    id_tarea = Column(String(64), unique=True, index=True, nullable=False)
+    entidad = Column(String(20), nullable=False)
+    parametros = Column(JSON, nullable=True)
+    estado = Column(String(20), nullable=False, default="pending")
+    resultado_json = Column(JSON, nullable=True)
+    mensaje_error = Column(Text, nullable=True)
+    conteo_total = Column(Integer, default=0)
     modalidad = Column(String(20), nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
-    completed_at = Column(DateTime(timezone=True), nullable=True)
+    creado_en = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC))
+    completado_en = Column(DateTime(timezone=True), nullable=True)
 
     def __repr__(self) -> str:
-        return f"<QueryResult id={self.id} entity={self.entity!r} task_id={self.task_id!r}>"
+        return (
+            f"<ResultadoConsulta id={self.id} entidad={self.entidad!r} id_tarea={self.id_tarea!r}>"
+        )

@@ -11,47 +11,47 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.config import settings
-from app.core.dependencies import get_current_user, get_db
-from app.repositories.execution_repo import (
-    atomic_mark_queued,
-    cancel_execution,
-    delete_execution,
-    get_active_execution,
-    get_execution,
-    get_execution_errors,
-    list_executions,
-    pause_execution,
+from app.core.dependencies import obtener_db, obtener_usuario_actual
+from app.repositories.repositorio_ejecuciones import (
+    cancelar_ejecucion,
+    eliminar_ejecucion,
+    listar_ejecuciones,
+    marcar_en_cola_atomicamente,
+    obtener_ejecucion,
+    obtener_ejecucion_activa,
+    obtener_errores_ejecucion,
+    pausar_ejecucion,
 )
-from app.repositories.operation_repo import get_active_batch
-from app.schemas.job import (
-    ErrorOut,
-    ExecutionList,
-    ExecutionOut,
-    ProcessResponse,
+from app.repositories.repositorio_operaciones import obtener_lote_activo
+from app.schemas.trabajo import (
+    EjecucionSalida,
+    ErrorSalida,
+    ListaEjecuciones,
+    RespuestaProceso,
 )
-from app.schemas.user import UserInToken
-from app.services.orchestration import enqueue_etl, revoke_task
+from app.schemas.usuario import UsuarioEnToken
+from app.services.orquestacion import encolar_etl, revocar_tarea
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-def _resolve_execution(
-    db: Session, execution_id: int, expected_statuses=None, conflict_message=None
+def _resolver_ejecucion(
+    db: Session, ejecucion_id: int, expected_statuses=None, conflict_message=None
 ):
     """Obtiene una ejecución y valida que exista y esté en el estado esperado."""
-    execution = get_execution(db, execution_id)
+    execution = obtener_ejecucion(db, ejecucion_id)
     if not execution:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Ejecución no encontrada."
         )
-    if expected_statuses and execution.status not in expected_statuses:
+    if expected_statuses and execution.estado not in expected_statuses:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=conflict_message
             or (
-                f"La ejecución está en estado '{execution.status}'"
+                f"La ejecución está en estado '{execution.estado}'"
                 f" y no puede ser procesada nuevamente."
             ),
         )
@@ -59,19 +59,19 @@ def _resolve_execution(
 
 
 @router.post(
-    "/{execution_id}/process",
-    response_model=ProcessResponse,
+    "/{ejecucion_id}/process",
+    response_model=RespuestaProceso,
     summary="Iniciar el procesamiento ETL de una ejecución",
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def start_process(
-    execution_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def iniciar_proceso(
+    ejecucion_id: int,
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    execution = _resolve_execution(
+    execution = _resolver_ejecucion(
         db,
-        execution_id,
+        ejecucion_id,
         expected_statuses={"pending", "failed", "queued", "review_required", "paused"},
     )
 
@@ -81,16 +81,16 @@ async def start_process(
             detail="No se puede procesar una ejecución de modalidad PRESENCIAL.",
         )
 
-    if get_active_execution(db, execution.modalidad, exclude_id=execution_id) or get_active_batch(
-        db, execution.modalidad
-    ):
+    if obtener_ejecucion_activa(
+        db, execution.modalidad, exclude_id=ejecucion_id
+    ) or obtener_lote_activo(db, execution.modalidad):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Ya existe un proceso en ejecución en esta modalidad. "
             "Espere a que finalice antes de iniciar otro.",
         )
 
-    file_path = os.path.join(settings.UPLOAD_DIR, execution.filename)
+    file_path = os.path.join(settings.UPLOAD_DIR, execution.nombre_archivo)
     if not os.path.isfile(file_path):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -98,7 +98,7 @@ async def start_process(
         )
 
     try:
-        job = enqueue_etl(execution_id, file_path, execution.semester)
+        job = encolar_etl(ejecucion_id, file_path, execution.semestre)
     except Exception:
         logger.exception("Error al encolar la tarea ETL")
         raise HTTPException(
@@ -106,23 +106,23 @@ async def start_process(
             detail="No se pudo encolar la tarea de procesamiento.",
         ) from None
 
-    # Atomic: check status + update + save task_id en un solo UPDATE
+        # Atomic: check status + update + save task_id en un solo UPDATE
     ALLOWED = ("pending", "failed", "queued", "review_required", "paused")
-    if not atomic_mark_queued(db, execution_id, job.id, ALLOWED):
+    if not marcar_en_cola_atomicamente(db, ejecucion_id, job.id, ALLOWED):
         # Otro request ya ganó la carrera — revocar task y responder 409
-        revoke_task(job.id)
+        revocar_tarea(job.id)
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="La ejecución ya fue procesada por otra solicitud concurrente.",
         )
 
     logger.info(
-        f"Tarea encolada para ejecución {execution_id}: task_id={job.id} "
-        f"por {current_user.username} (modo={execution.mode})"
+        f"Tarea encolada para ejecución {ejecucion_id}: task_id={job.id} "
+        f"por {usuario_actual.username} (modo={execution.modo})"
     )
 
-    return ProcessResponse(
-        execution_id=execution_id,
+    return RespuestaProceso(
+        execution_id=ejecucion_id,
         job_id=job.id,
         status="queued",
         message="Procesamiento encolado correctamente.",
@@ -130,102 +130,102 @@ async def start_process(
 
 
 @router.get(
-    "/{execution_id}",
-    response_model=ExecutionOut,
+    "/{ejecucion_id}",
+    response_model=EjecucionSalida,
     summary="Obtener detalles de una ejecución",
 )
-async def get_execution_endpoint(
-    execution_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def endpoint_obtener_ejecucion(
+    ejecucion_id: int,
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    return _resolve_execution(db, execution_id)
+    return _resolver_ejecucion(db, ejecucion_id)
 
 
 @router.get(
-    "/{execution_id}/errors",
-    response_model=list[ErrorOut],
+    "/{ejecucion_id}/errors",
+    response_model=list[ErrorSalida],
     summary="Listar errores de una ejecución",
 )
-async def get_execution_errors_endpoint(
-    execution_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
+async def endpoint_errores_ejecucion(
+    ejecucion_id: int,
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
+    limite: int = Query(100, ge=1, le=1000, alias="limit"),
+    desplazamiento: int = Query(0, ge=0, alias="offset"),
 ):
-    _resolve_execution(db, execution_id)
-    return get_execution_errors(db, execution_id, limit, offset)
+    _resolver_ejecucion(db, ejecucion_id)
+    return obtener_errores_ejecucion(db, ejecucion_id, limite, desplazamiento)
 
 
 @router.get(
     "",
-    response_model=ExecutionList,
+    response_model=ListaEjecuciones,
     summary="Listar ejecuciones históricas",
 )
-async def list_executions_endpoint(
-    semester: str | None = Query(None),
-    status: str | None = Query(None),
-    mode: str | None = Query(None),
+async def endpoint_listar_ejecuciones(
+    semestre: str | None = Query(None, alias="semester"),
+    estado: str | None = Query(None, alias="status"),
+    modo: str | None = Query(None, alias="mode"),
     moodle_version: str | None = Query(None),
     modalidad: str | None = Query(None),
-    limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+    limite: int = Query(20, ge=1, le=100, alias="limit"),
+    desplazamiento: int = Query(0, ge=0, alias="offset"),
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    total, executions = list_executions(
+    total, executions = listar_ejecuciones(
         db,
-        semester=semester,
-        status=status,
-        mode=mode,
-        moodle_version=moodle_version,
+        semestre=semestre,
+        estado=estado,
+        modo=modo,
+        version_moodle=moodle_version,
         modalidad=modalidad,
-        limit=limit,
-        offset=offset,
+        limit=limite,
+        offset=desplazamiento,
     )
-    return ExecutionList(
+    return ListaEjecuciones(
         total=total,
-        items=[ExecutionOut.model_validate(e) for e in executions],
+        items=[EjecucionSalida.model_validate(e) for e in executions],
     )
 
 
 @router.delete(
-    "/{execution_id}",
+    "/{ejecucion_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Eliminar una ejecución",
 )
-async def delete_execution_endpoint(
-    execution_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def endpoint_eliminar_ejecucion(
+    ejecucion_id: int,
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    _resolve_execution(
+    _resolver_ejecucion(
         db,
-        execution_id,
+        ejecucion_id,
         expected_statuses={"pending", "failed", "review_required", "cancelled", "queued"},
     )
-    delete_execution(db, execution_id)
-    logger.info(f"Ejecución {execution_id} eliminada por {current_user.username}")
+    eliminar_ejecucion(db, ejecucion_id)
+    logger.info(f"Ejecución {ejecucion_id} eliminada por {usuario_actual.username}")
 
 
 @router.post(
-    "/{execution_id}/confirm",
-    response_model=ProcessResponse,
+    "/{ejecucion_id}/confirm",
+    response_model=RespuestaProceso,
     summary="Confirmar eliminación masiva de cursos",
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def confirm_mass_delete(
-    execution_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def confirmar_eliminacion_masiva(
+    ejecucion_id: int,
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    execution = _resolve_execution(db, execution_id)
+    execution = _resolver_ejecucion(db, ejecucion_id)
 
-    if execution.status != "review_required":
+    if execution.estado != "review_required":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"La ejecución está en estado '{execution.status}'. "
+            detail=f"La ejecución está en estado '{execution.estado}'. "
             f"Solo se puede confirmar ejecuciones en 'review_required'.",
         )
 
@@ -235,17 +235,17 @@ async def confirm_mass_delete(
             detail="No se puede procesar una ejecución de modalidad PRESENCIAL.",
         )
 
-    # 1. Validar archivo PRIMERO
-    file_path = os.path.join(settings.UPLOAD_DIR, execution.filename)
+        # 1. Validar archivo PRIMERO
+    file_path = os.path.join(settings.UPLOAD_DIR, execution.nombre_archivo)
     if not os.path.isfile(file_path):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El archivo asociado a la ejecución no se encuentra en el servidor.",
         )
 
-    # 2. Encolar Celery task
+        # 2. Encolar Celery task
     try:
-        job = enqueue_etl(execution_id, file_path, execution.semester)
+        job = encolar_etl(ejecucion_id, file_path, execution.semestre)
     except Exception:
         logger.exception("Error al encolar la tarea ETL")
         raise HTTPException(
@@ -253,24 +253,24 @@ async def confirm_mass_delete(
             detail="No se pudo encolar la tarea de procesamiento.",
         ) from None
 
-    # 3. Actualizar DB en un solo commit atómico
-    if execution.phase_checkpoint is None:
-        execution.phase_checkpoint = {}
-    execution.phase_checkpoint["delete_confirmed"] = True
-    flag_modified(execution, "phase_checkpoint")
-    execution.status = "pending"
-    execution.current_phase = "Eliminación masiva confirmada"
-    execution.progress_pct = 30
-    execution.celery_task_id = job.id
-    execution.started_at = datetime.now(UTC)
+        # 3. Actualizar DB en un solo commit atómico
+    if execution.checkpoint_fase is None:
+        execution.checkpoint_fase = {}
+    execution.checkpoint_fase["delete_confirmed"] = True
+    flag_modified(execution, "checkpoint_fase")
+    execution.estado = "pending"
+    execution.fase_actual = "Eliminación masiva confirmada"
+    execution.porcentaje_progreso = 30
+    execution.id_tarea_celery = job.id
+    execution.iniciado_en = datetime.now(UTC)
     db.commit()
 
     logger.info(
-        f"Eliminación masiva confirmada para ejecución {execution_id} por {current_user.username}"
+        f"Eliminación masiva confirmada para ejecución {ejecucion_id} por {usuario_actual.username}"
     )
 
-    return ProcessResponse(
-        execution_id=execution_id,
+    return RespuestaProceso(
+        execution_id=ejecucion_id,
         job_id=job.id,
         status="queued",
         message="Confirmación recibida. Procesamiento reanudado.",
@@ -278,24 +278,24 @@ async def confirm_mass_delete(
 
 
 @router.post(
-    "/{execution_id}/pause",
-    response_model=ProcessResponse,
+    "/{ejecucion_id}/pause",
+    response_model=RespuestaProceso,
     summary="Pausar una ejecución en curso",
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def pause_execution_endpoint(
-    execution_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def endpoint_pausar_ejecucion(
+    ejecucion_id: int,
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    _resolve_execution(
+    _resolver_ejecucion(
         db,
-        execution_id,
+        ejecucion_id,
         expected_statuses={"running"},
         conflict_message="Solo se puede pausar ejecuciones en 'running'.",
     )
 
-    success, task_id = pause_execution(db, execution_id)
+    success, task_id = pausar_ejecucion(db, ejecucion_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -303,12 +303,12 @@ async def pause_execution_endpoint(
         )
 
     if task_id:
-        revoke_task(task_id)
-        logger.info(f"Tarea Celery {task_id} revocada para ejecución {execution_id}")
+        revocar_tarea(task_id)
+        logger.info(f"Tarea Celery {task_id} revocada para ejecución {ejecucion_id}")
 
-    logger.info(f"Ejecución {execution_id} pausada por {current_user.username}")
-    return ProcessResponse(
-        execution_id=execution_id,
+    logger.info(f"Ejecución {ejecucion_id} pausada por {usuario_actual.username}")
+    return RespuestaProceso(
+        execution_id=ejecucion_id,
         job_id="",
         status="paused",
         message="Ejecución pausada. Usa /process para continuar.",
@@ -316,24 +316,24 @@ async def pause_execution_endpoint(
 
 
 @router.post(
-    "/{execution_id}/cancel",
-    response_model=ProcessResponse,
+    "/{ejecucion_id}/cancel",
+    response_model=RespuestaProceso,
     summary="Cancelar una ejecución",
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def cancel_execution_endpoint(
-    execution_id: int,
-    db: Session = Depends(get_db),
-    current_user: UserInToken = Depends(get_current_user),
+async def endpoint_cancelar_ejecucion(
+    ejecucion_id: int,
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    _resolve_execution(
+    _resolver_ejecucion(
         db,
-        execution_id,
+        ejecucion_id,
         expected_statuses={"running", "paused", "queued"},
         conflict_message=("Solo se puede cancelar ejecuciones en 'running', 'paused' o 'queued'."),
     )
 
-    success, task_id = cancel_execution(db, execution_id)
+    success, task_id = cancelar_ejecucion(db, ejecucion_id)
     if not success:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -341,12 +341,12 @@ async def cancel_execution_endpoint(
         )
 
     if task_id:
-        revoke_task(task_id)
-        logger.info(f"Tarea Celery {task_id} revocada para ejecución {execution_id}")
+        revocar_tarea(task_id)
+        logger.info(f"Tarea Celery {task_id} revocada para ejecución {ejecucion_id}")
 
-    logger.info(f"Ejecución {execution_id} cancelada por {current_user.username}")
-    return ProcessResponse(
-        execution_id=execution_id,
+    logger.info(f"Ejecución {ejecucion_id} cancelada por {usuario_actual.username}")
+    return RespuestaProceso(
+        execution_id=ejecucion_id,
         job_id=task_id,
         status="cancelled",
         message="Ejecución cancelada.",

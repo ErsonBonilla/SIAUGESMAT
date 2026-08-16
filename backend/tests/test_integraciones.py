@@ -10,81 +10,84 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.core.config import settings
-from app.integrations.moodle import MoodleIntegration
-from app.services.moodle_errors import MoodleAPIError
+from app.integrations.integracion_moodle import IntegracionMoodle
+from app.services.errores_moodle import ErrorApiMoodle
 
 
 @pytest.fixture
 def integration():
     mock_service = AsyncMock()
-    mock_service.get_users.return_value = []
-    mock_service.get_user_by_username.return_value = None
-    mock_service.create_users.return_value = [{"id": 1, "username": "testuser"}]
-    mock_service.enrol_users.return_value = {
+    mock_service.obtener_usuarios.return_value = []
+    mock_service.obtener_usuario_por_username.return_value = None
+    mock_service.crear_usuarios.return_value = [{"id": 1, "username": "testuser"}]
+    mock_service.matricular_usuarios.return_value = {
         "success": True,
         "enrolled": 1,
         "failed": 0,
         "errors": [],
     }
-    return MoodleIntegration(mock_service)
+    return IntegracionMoodle(mock_service)
+
+    # ---------------------------------------------------------------------------
+    # is_user_active
+    # ---------------------------------------------------------------------------
 
 
-# ---------------------------------------------------------------------------
-# is_user_active
-# ---------------------------------------------------------------------------
 class TestIsUserActive:
     def test_active_no_suspended_key(self):
-        assert MoodleIntegration.is_user_active({}) is True
+        assert IntegracionMoodle.es_usuario_activo({}) is True
 
     def test_active_suspended_0_int(self):
-        assert MoodleIntegration.is_user_active({"suspended": 0}) is True
+        assert IntegracionMoodle.es_usuario_activo({"suspended": 0}) is True
 
     def test_inactive_suspended_1_int(self):
-        assert MoodleIntegration.is_user_active({"suspended": 1}) is False
+        assert IntegracionMoodle.es_usuario_activo({"suspended": 1}) is False
 
     def test_active_suspended_0_str(self):
-        assert MoodleIntegration.is_user_active({"suspended": "0"}) is True
+        assert IntegracionMoodle.es_usuario_activo({"suspended": "0"}) is True
 
     def test_inactive_suspended_1_str(self):
-        assert MoodleIntegration.is_user_active({"suspended": "1"}) is False
+        assert IntegracionMoodle.es_usuario_activo({"suspended": "1"}) is False
+
+        # ---------------------------------------------------------------------------
+        # find_user_by_email
+        # ---------------------------------------------------------------------------
 
 
-# ---------------------------------------------------------------------------
-# find_user_by_email
-# ---------------------------------------------------------------------------
 class TestFindUserByEmail:
     @pytest.mark.asyncio
     async def test_found(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"username": "teacher1", "email": "a@ut.edu.co"}
         ]
-        user = await integration.find_user_by_email("a@ut.edu.co")
+        user = await integration.encontrar_usuario_por_correo("a@ut.edu.co")
         assert user is not None
         assert user["username"] == "teacher1"
 
     @pytest.mark.asyncio
     async def test_not_found(self, integration):
-        integration.service.get_users.return_value = []
-        user = await integration.find_user_by_email("noexiste@ut.edu.co")
+        integration.servicio.obtener_usuarios.return_value = []
+        user = await integration.encontrar_usuario_por_correo("noexiste@ut.edu.co")
         assert user is None
 
     @pytest.mark.asyncio
     async def test_multiple_found(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "2", "username": "teacher2", "email": "a@ut.edu.co", "timecreated": "200"},
             {"id": "1", "username": "teacher1", "email": "a@ut.edu.co", "timecreated": "100"},
         ]
-        integration.service._request.return_value = []
-        user = await integration.find_user_by_email("a@ut.edu.co")
+        integration.servicio._solicitar.return_value = []
+        user = await integration.encontrar_usuario_por_correo("a@ut.edu.co")
         assert user is not None
         # La cuenta vieja (id=1) queda renombrada con el username de la nueva.
         assert user["username"] == "teacher2"
         assert user["id"] == "1"
 
+        # ---------------------------------------------------------------------------
+        # Consolidación de duplicados por email (conservar antigua + eliminar modernas)
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Consolidación de duplicados por email (conservar antigua + eliminar modernas)
-# ---------------------------------------------------------------------------
+
 class TestConsolidateDuplicates:
     @staticmethod
     def _auth_calls(calls):
@@ -104,23 +107,23 @@ class TestConsolidateDuplicates:
 
     @pytest.mark.asyncio
     async def test_duplicate_sin_cursos_renombra_vieja_y_elimina_nueva(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
             {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
         ]
-        integration.service._request.return_value = []
-        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        integration.servicio._solicitar.return_value = []
+        result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
         # La cuenta vieja queda renombrada con el username de la nueva.
         assert result["a@ut.edu.co"]["username"] == "nuevo"
         assert result["a@ut.edu.co"]["id"] == "1"
         # 1) nueva -> temp libera el username, 2) vieja -> nueva
-        renames = self._rename_calls(integration.service.update_users.await_args_list)
+        renames = self._rename_calls(integration.servicio.actualizar_usuarios.await_args_list)
         assert renames == [
             [{"id": "2", "username": "zzdel_nuevo"}],
             [{"id": "1", "username": "nuevo"}],
         ]
-        integration.service.delete_users.assert_awaited_with(["zzdel_nuevo"])
-        c = integration.last_email_conflicts[0]
+        integration.servicio.eliminar_usuarios.assert_awaited_with(["zzdel_nuevo"])
+        c = integration.ultimos_conflictos_correo[0]
         assert c["renamed"] == "nuevo"
         assert c["selected"] == "nuevo"
         assert set(c["usernames"]) == {"viejo", "nuevo"}
@@ -129,97 +132,98 @@ class TestConsolidateDuplicates:
 
     @pytest.mark.asyncio
     async def test_duplicate_con_cursos_no_se_elimina_ni_renombra(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
             {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
         ]
-        integration.service._request.return_value = [{"id": 111}]
-        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        integration.servicio._solicitar.return_value = [{"id": 111}]
+        result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
         assert result["a@ut.edu.co"]["username"] == "viejo"
-        integration.service.delete_users.assert_not_awaited()
-        integration.service.update_users.assert_not_awaited()
-        c = integration.last_email_conflicts[0]
+        integration.servicio.eliminar_usuarios.assert_not_awaited()
+        integration.servicio.actualizar_usuarios.assert_not_awaited()
+        c = integration.ultimos_conflictos_correo[0]
         assert c["renamed"] == ""
         assert c["deleted"] == []
         assert c["pending_review"] == ["nuevo"]
 
     @pytest.mark.asyncio
     async def test_webservice_no_expone_cursos_no_se_elimina(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
             {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
         ]
-        integration.service._request.side_effect = Exception("acceso denegado")
-        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        integration.servicio._solicitar.side_effect = Exception("acceso denegado")
+        result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
         assert result["a@ut.edu.co"]["username"] == "viejo"
-        integration.service.delete_users.assert_not_awaited()
-        c = integration.last_email_conflicts[0]
+        integration.servicio.eliminar_usuarios.assert_not_awaited()
+        c = integration.ultimos_conflictos_correo[0]
         assert c["renamed"] == ""
         assert c["deleted"] == []
         assert c["pending_review"] == ["nuevo"]
 
     @pytest.mark.asyncio
     async def test_mas_de_dos_elimina_recientes_sin_cursos(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "3", "username": "nueva", "email": "a@ut.edu.co", "timecreated": "300"},
             {"id": "2", "username": "media", "email": "a@ut.edu.co", "timecreated": "200"},
             {"id": "1", "username": "vieja", "email": "a@ut.edu.co", "timecreated": "100"},
         ]
-        integration.service._request.return_value = []
-        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        integration.servicio._solicitar.return_value = []
+        result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
         assert result["a@ut.edu.co"]["username"] == "nueva"
         assert result["a@ut.edu.co"]["id"] == "1"
-        integration.service.delete_users.assert_awaited()
-        args = integration.service.delete_users.await_args.args[0]
+        integration.servicio.eliminar_usuarios.assert_awaited()
+        args = integration.servicio.eliminar_usuarios.await_args.args[0]
         assert set(args) == {"media", "zzdel_nueva"}
-        c = integration.last_email_conflicts[0]
+        c = integration.ultimos_conflictos_correo[0]
         assert c["renamed"] == "nueva"
         assert set(c["deleted"]) == {"media", "zzdel_nueva"}
 
     @pytest.mark.asyncio
     async def test_no_se_puede_liberar_username_se_omite_rename(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
             {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
         ]
-        integration.service._request.return_value = []
-        integration.service.update_users.side_effect = Exception("API caída")
-        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        integration.servicio._solicitar.return_value = []
+        integration.servicio.actualizar_usuarios.side_effect = Exception("API caída")
+        result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
         assert result["a@ut.edu.co"]["username"] == "viejo"
-        integration.service.delete_users.assert_awaited_with(["nuevo"])
-        c = integration.last_email_conflicts[0]
+        integration.servicio.eliminar_usuarios.assert_awaited_with(["nuevo"])
+        c = integration.ultimos_conflictos_correo[0]
         assert c["renamed"] == ""
         assert c["deleted"] == ["nuevo"]
 
     @pytest.mark.asyncio
     async def test_fallo_rename_antigua_hace_rollback(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
             {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
         ]
-        integration.service._request.return_value = []
+        integration.servicio._solicitar.return_value = []
         # 1) nueva->temp OK, 2) vieja->nueva falla, 3) rollback nueva->nueva
-        integration.service.update_users.side_effect = [
+        integration.servicio.actualizar_usuarios.side_effect = [
             {"id": 2},
             Exception("rename falló"),
             {"id": 2},
         ]
-        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
         assert result["a@ut.edu.co"]["username"] == "viejo"
-        renames = self._rename_calls(integration.service.update_users.await_args_list)
+        renames = self._rename_calls(integration.servicio.actualizar_usuarios.await_args_list)
         assert renames == [
             [{"id": "2", "username": "zzdel_nuevo"}],
             [{"id": "1", "username": "nuevo"}],
             [{"id": "2", "username": "nuevo"}],
         ]
-        integration.service.delete_users.assert_awaited_with(["nuevo"])
-        c = integration.last_email_conflicts[0]
+        integration.servicio.eliminar_usuarios.assert_awaited_with(["nuevo"])
+        c = integration.ultimos_conflictos_correo[0]
         assert c["renamed"] == ""
 
+        # ---------------------------------------------------------------------------
+        # Paso a base de datos externa (auth manual -> db)
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Paso a base de datos externa (auth manual -> db)
-# ---------------------------------------------------------------------------
+
 class TestExternalAuthSwitch:
     @staticmethod
     def _auth_calls(calls):
@@ -231,7 +235,7 @@ class TestExternalAuthSwitch:
 
     @pytest.mark.asyncio
     async def test_institucional_manual_pasa_a_externa(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {
                 "id": "2",
                 "username": "nuevo",
@@ -247,18 +251,18 @@ class TestExternalAuthSwitch:
                 "auth": "manual",
             },
         ]
-        integration.service._request.return_value = []
-        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        integration.servicio._solicitar.return_value = []
+        result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
         assert result["a@ut.edu.co"]["username"] == "nuevo"
-        auth_calls = self._auth_calls(integration.service.update_users.await_args_list)
+        auth_calls = self._auth_calls(integration.servicio.actualizar_usuarios.await_args_list)
         assert auth_calls == [[{"id": "1", "auth": "db"}]]
-        c = integration.last_email_conflicts[0]
+        c = integration.ultimos_conflictos_correo[0]
         assert c["auth_switched"] is True
         assert c["auth_reason"] == "manual->db"
 
     @pytest.mark.asyncio
     async def test_no_institucional_queda_en_manual(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {
                 "id": "2",
                 "username": "nuevo",
@@ -274,17 +278,17 @@ class TestExternalAuthSwitch:
                 "auth": "manual",
             },
         ]
-        integration.service._request.return_value = []
-        await integration.find_users_by_emails(["x@gmail.com"])
-        assert self._auth_calls(integration.service.update_users.await_args_list) == []
-        c = integration.last_email_conflicts[0]
+        integration.servicio._solicitar.return_value = []
+        await integration.encontrar_usuarios_por_correos(["x@gmail.com"])
+        assert self._auth_calls(integration.servicio.actualizar_usuarios.await_args_list) == []
+        c = integration.ultimos_conflictos_correo[0]
         assert c["auth_switched"] is False
         assert "no institucional" in c["auth_reason"]
 
     @pytest.mark.asyncio
     async def test_admin_excluido_por_email_queda_en_manual(self, integration, monkeypatch):
         monkeypatch.setattr(settings, "EXTERNAL_AUTH_EXCLUDED_USERS", "admin1@ut.edu.co")
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {
                 "id": "2",
                 "username": "nuevo",
@@ -300,10 +304,10 @@ class TestExternalAuthSwitch:
                 "auth": "manual",
             },
         ]
-        integration.service._request.return_value = []
-        await integration.find_users_by_emails(["admin1@ut.edu.co"])
-        assert self._auth_calls(integration.service.update_users.await_args_list) == []
-        c = integration.last_email_conflicts[0]
+        integration.servicio._solicitar.return_value = []
+        await integration.encontrar_usuarios_por_correos(["admin1@ut.edu.co"])
+        assert self._auth_calls(integration.servicio.actualizar_usuarios.await_args_list) == []
+        c = integration.ultimos_conflictos_correo[0]
         assert c["auth_switched"] is False
         assert "admin" in c["auth_reason"]
 
@@ -311,7 +315,7 @@ class TestExternalAuthSwitch:
     async def test_admin_excluido_por_username_queda_en_manual(self, integration, monkeypatch):
         monkeypatch.setattr(settings, "EXTERNAL_AUTH_EXCLUDED_USERS", "admin2@ut.edu.co")
         # La reciente tiene cursos: no hay rename, el username 'admin2' es la llave de exclusión.
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {
                 "id": "2",
                 "username": "admin2",
@@ -327,16 +331,16 @@ class TestExternalAuthSwitch:
                 "auth": "manual",
             },
         ]
-        integration.service._request.return_value = [{"id": 111}]
-        await integration.find_users_by_emails(["admin2@ut.edu.co"])
-        assert self._auth_calls(integration.service.update_users.await_args_list) == []
-        c = integration.last_email_conflicts[0]
+        integration.servicio._solicitar.return_value = [{"id": 111}]
+        await integration.encontrar_usuarios_por_correos(["admin2@ut.edu.co"])
+        assert self._auth_calls(integration.servicio.actualizar_usuarios.await_args_list) == []
+        c = integration.ultimos_conflictos_correo[0]
         assert c["auth_switched"] is False
         assert "admin" in c["auth_reason"]
 
     @pytest.mark.asyncio
     async def test_ya_externa_no_se_cambia(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {
                 "id": "2",
                 "username": "nuevo",
@@ -352,25 +356,26 @@ class TestExternalAuthSwitch:
                 "auth": "db",
             },
         ]
-        integration.service._request.return_value = []
-        await integration.find_users_by_emails(["a@ut.edu.co"])
-        assert self._auth_calls(integration.service.update_users.await_args_list) == []
-        c = integration.last_email_conflicts[0]
+        integration.servicio._solicitar.return_value = []
+        await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
+        assert self._auth_calls(integration.servicio.actualizar_usuarios.await_args_list) == []
+        c = integration.ultimos_conflictos_correo[0]
         assert c["auth_switched"] is False
         assert c["auth_reason"] == "ya db"
 
+        # ---------------------------------------------------------------------------
+        # find_users_by_emails / usernames / idnumbers (criterio "más antiguo")
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# find_users_by_emails / usernames / idnumbers (criterio "más antiguo")
-# ---------------------------------------------------------------------------
+
 class TestFindUsersByFieldOldest:
     @pytest.mark.asyncio
     async def test_email_duplicate_picks_oldest(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
             {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
         ]
-        result = await integration.find_users_by_emails(["a@ut.edu.co"])
+        result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
         assert result == {
             "a@ut.edu.co": {
                 "id": "1",
@@ -379,8 +384,8 @@ class TestFindUsersByFieldOldest:
                 "timecreated": "100",
             }
         }
-        assert len(integration.last_email_conflicts) == 1
-        c = integration.last_email_conflicts[0]
+        assert len(integration.ultimos_conflictos_correo) == 1
+        c = integration.ultimos_conflictos_correo[0]
         assert c["email"] == "a@ut.edu.co"
         assert c["selected"] == "nuevo"
         assert c["renamed"] == "nuevo"
@@ -388,61 +393,62 @@ class TestFindUsersByFieldOldest:
 
     @pytest.mark.asyncio
     async def test_email_single_match_no_conflict(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "1", "username": "unico", "email": "b@ut.edu.co", "timecreated": "100"},
         ]
-        result = await integration.find_users_by_emails(["b@ut.edu.co"])
+        result = await integration.encontrar_usuarios_por_correos(["b@ut.edu.co"])
         assert result["b@ut.edu.co"]["username"] == "unico"
-        assert integration.last_email_conflicts == []
+        assert integration.ultimos_conflictos_correo == []
 
     @pytest.mark.asyncio
     async def test_email_picks_oldest_by_id_without_timecreated(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "7", "username": "nuevo", "email": "c@ut.edu.co"},
             {"id": "3", "username": "viejo", "email": "c@ut.edu.co"},
         ]
-        result = await integration.find_users_by_emails(["c@ut.edu.co"])
+        result = await integration.encontrar_usuarios_por_correos(["c@ut.edu.co"])
         # Se conserva la antigua (id=3) renombrada al username de la nueva.
         assert result["c@ut.edu.co"]["username"] == "nuevo"
         assert result["c@ut.edu.co"]["id"] == "3"
 
     @pytest.mark.asyncio
     async def test_grouped_emails(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "1", "username": "a1", "email": "a@ut.edu.co"},
             {"id": "2", "username": "a2", "email": "a@ut.edu.co"},
             {"id": "3", "username": "b1", "email": "b@ut.edu.co"},
         ]
-        result = await integration.find_users_by_emails(["a@ut.edu.co", "b@ut.edu.co"])
+        result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co", "b@ut.edu.co"])
         assert result["a@ut.edu.co"]["username"] == "a2"
         assert result["b@ut.edu.co"]["username"] == "b1"
 
     @pytest.mark.asyncio
     async def test_username_duplicate_picks_oldest(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "2", "username": "doc", "timecreated": "200"},
             {"id": "1", "username": "doc", "timecreated": "100"},
         ]
-        result = await integration.find_users_by_usernames(["doc"])
+        result = await integration.encontrar_usuarios_por_usernames(["doc"])
         assert result["doc"]["id"] == "1"
 
     @pytest.mark.asyncio
     async def test_idnumber_duplicate_picks_oldest(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"id": "2", "username": "doc_b", "idnumber": "12345"},
             {"id": "1", "username": "doc_a", "idnumber": "12345"},
         ]
-        result = await integration.find_users_by_idnumbers(["12345"])
+        result = await integration.encontrar_usuarios_por_idnumbers(["12345"])
         assert result["12345"]["username"] == "doc_a"
 
+        # ---------------------------------------------------------------------------
+        # create_user_if_not_exists
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# create_user_if_not_exists
-# ---------------------------------------------------------------------------
+
 class TestCreateUserIfNotExists:
     @pytest.mark.asyncio
     async def test_non_institutional_email(self, integration):
-        username, created = await integration.create_user_if_not_exists(
+        username, created = await integration.crear_usuario_si_no_existe(
             {
                 "email": "personal@gmail.com",
             }
@@ -452,10 +458,10 @@ class TestCreateUserIfNotExists:
 
     @pytest.mark.asyncio
     async def test_existing_user_by_institutional_email(self, integration):
-        integration.service.get_users.return_value = [
+        integration.servicio.obtener_usuarios.return_value = [
             {"username": "teacher1", "email": "a@ut.edu.co"}
         ]
-        username, created = await integration.create_user_if_not_exists(
+        username, created = await integration.crear_usuario_si_no_existe(
             {
                 "email": "a@ut.edu.co",
                 "firstname": "Ana",
@@ -475,9 +481,9 @@ class TestCreateUserIfNotExists:
                 return [{"username": "teacher1", "email": "personal@gmail.com"}]
             return []
 
-        integration.service.get_users.side_effect = side_effect
+        integration.servicio.obtener_usuarios.side_effect = side_effect
 
-        username, created = await integration.create_user_if_not_exists(
+        username, created = await integration.crear_usuario_si_no_existe(
             {
                 "email": "institucional@ut.edu.co",
                 "email_personal": "personal@gmail.com",
@@ -490,13 +496,13 @@ class TestCreateUserIfNotExists:
 
     @pytest.mark.asyncio
     async def test_new_user_created(self, integration):
-        integration.service.get_users.return_value = []
-        integration.service.get_user_by_username.side_effect = [
+        integration.servicio.obtener_usuarios.return_value = []
+        integration.servicio.obtener_usuario_por_username.side_effect = [
             None,  # no existe por username (lookup previo a crear)
             {"id": 10, "username": "anita"},  # verificación post-creación
         ]
-        integration.service.create_users.return_value = [{"id": 10, "username": "anita"}]
-        username, created = await integration.create_user_if_not_exists(
+        integration.servicio.crear_usuarios.return_value = [{"id": 10, "username": "anita"}]
+        username, created = await integration.crear_usuario_si_no_existe(
             {
                 "email": "anita@ut.edu.co",
                 "firstname": "Ana",
@@ -507,18 +513,18 @@ class TestCreateUserIfNotExists:
         assert username == "anita"
         assert created is True
         # Verificar que create_users recibió city y description
-        call_args = integration.service.create_users.call_args[0][0]
+        call_args = integration.servicio.crear_usuarios.call_args[0][0]
         assert "city" in call_args[0] or not call_args[0].get("city")
 
     @pytest.mark.asyncio
     async def test_new_user_with_city_and_description(self, integration):
-        integration.service.get_users.return_value = []
-        integration.service.get_user_by_username.side_effect = [
+        integration.servicio.obtener_usuarios.return_value = []
+        integration.servicio.obtener_usuario_por_username.side_effect = [
             None,
             {"id": 10, "username": "anita"},
         ]
-        integration.service.create_users.return_value = [{"id": 10, "username": "anita"}]
-        await integration.create_user_if_not_exists(
+        integration.servicio.crear_usuarios.return_value = [{"id": 10, "username": "anita"}]
+        await integration.crear_usuario_si_no_existe(
             {
                 "email": "anita@ut.edu.co",
                 "firstname": "Ana",
@@ -528,14 +534,14 @@ class TestCreateUserIfNotExists:
                 "description": "Perfil docente",
             }
         )
-        call_args = integration.service.create_users.call_args[0][0][0]
+        call_args = integration.servicio.crear_usuarios.call_args[0][0][0]
         assert call_args["city"] == "IBAGUE"
         assert call_args["description"] == "Perfil docente"
 
     @pytest.mark.asyncio
     async def test_lookup_error_returns_none(self, integration):
-        integration.service.get_users.side_effect = MoodleAPIError("API down")
-        username, created = await integration.create_user_if_not_exists(
+        integration.servicio.obtener_usuarios.side_effect = ErrorApiMoodle("API down")
+        username, created = await integration.crear_usuario_si_no_existe(
             {
                 "email": "anita@ut.edu.co",
             }
@@ -545,9 +551,9 @@ class TestCreateUserIfNotExists:
 
     @pytest.mark.asyncio
     async def test_creation_error_returns_none(self, integration):
-        integration.service.get_users.return_value = []
-        integration.service.create_users.side_effect = MoodleAPIError("Duplicate")
-        username, created = await integration.create_user_if_not_exists(
+        integration.servicio.obtener_usuarios.return_value = []
+        integration.servicio.crear_usuarios.side_effect = ErrorApiMoodle("Duplicate")
+        username, created = await integration.crear_usuario_si_no_existe(
             {
                 "email": "anita@ut.edu.co",
                 "firstname": "Ana",
@@ -559,16 +565,16 @@ class TestCreateUserIfNotExists:
 
     @pytest.mark.asyncio
     async def test_new_user_auth_manual_warning_on_non_manual(self, integration, caplog):
-        integration.service.get_users.return_value = []
-        integration.service.get_user_by_username.side_effect = [
+        integration.servicio.obtener_usuarios.return_value = []
+        integration.servicio.obtener_usuario_por_username.side_effect = [
             None,
             {"id": 10, "username": "anita", "auth": "db"},
         ]
-        integration.service.create_users.return_value = [{"id": 10, "username": "anita"}]
+        integration.servicio.crear_usuarios.return_value = [{"id": 10, "username": "anita"}]
         import logging
 
-        with caplog.at_level(logging.WARNING, logger="app.integrations.moodle"):
-            username, created = await integration.create_user_if_not_exists(
+        with caplog.at_level(logging.WARNING, logger="app.integrations.integracion_moodle"):
+            username, created = await integration.crear_usuario_si_no_existe(
                 {
                     "email": "anita@ut.edu.co",
                     "firstname": "Ana",
@@ -580,44 +586,45 @@ class TestCreateUserIfNotExists:
         assert created is True
         assert any("auth='db'" in r.message for r in caplog.records)
 
+        # ---------------------------------------------------------------------------
+        # enrol_teacher
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# enrol_teacher
-# ---------------------------------------------------------------------------
+
 class TestEnrolTeacher:
     @pytest.mark.asyncio
     async def test_user_resolution_failure(self, integration):
-        integration.service.enrol_users.return_value = {
+        integration.servicio.matricular_usuarios.return_value = {
             "success": False,
             "enrolled": 0,
             "failed": 1,
             "errors": ["user=teacher1, course=CURSO1"],
         }
-        result = await integration.enrol_teacher("teacher1", "CURSO1")
+        result = await integration.matricular_docente("teacher1", "CURSO1")
         assert result["success"] is False
         assert "teacher1" in result["reason"]
 
     @pytest.mark.asyncio
     async def test_enrolment_success(self, integration):
-        result = await integration.enrol_teacher("teacher1", "CURSO1")
+        result = await integration.matricular_docente("teacher1", "CURSO1")
         assert result["success"] is True
         assert result["reason"] == "enrolled"
 
     @pytest.mark.asyncio
     async def test_enrolment_resolution_failure(self, integration):
-        integration.service.enrol_users.return_value = {
+        integration.servicio.matricular_usuarios.return_value = {
             "success": False,
             "enrolled": 0,
             "failed": 1,
             "errors": ["user=teacher1, course=NO_EXISTE"],
         }
-        result = await integration.enrol_teacher("teacher1", "NO_EXISTE")
+        result = await integration.matricular_docente("teacher1", "NO_EXISTE")
         assert result["success"] is False
         assert "teacher1" in result["reason"] or "NO_EXISTE" in result["reason"]
 
     @pytest.mark.asyncio
     async def test_enrolment_api_error(self, integration):
-        integration.service.enrol_users.side_effect = MoodleAPIError("API error")
-        result = await integration.enrol_teacher("teacher1", "CURSO1")
+        integration.servicio.matricular_usuarios.side_effect = ErrorApiMoodle("API error")
+        result = await integration.matricular_docente("teacher1", "CURSO1")
         assert result["success"] is False
         assert result["reason"] is not None

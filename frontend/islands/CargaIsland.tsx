@@ -1,12 +1,12 @@
 // islands/CargaIsland.tsx
-import FileUploader from "./SubirArchivoIsland.tsx";
-import ExecutionButton from "../components/ExecutionButton.tsx";
-import QueryHelp from "../components/QueryHelp.tsx";
+import SubidorArchivo from "./SubirArchivoIsland.tsx";
+import BotonEjecucion from "../components/BotonEjecucion.tsx";
+import AyudaConsulta from "../components/AyudaConsulta.tsx";
 
-export default function UploadIsland() {
+export default function IslandSubida() {
   return (
     <div class="max-w-3xl mx-auto">
-      <QueryHelp
+      <AyudaConsulta
         sections={[
           {
             title: "Qué hace el proceso",
@@ -47,8 +47,8 @@ export default function UploadIsland() {
         ]}
       />
 
-      <FileUploader />
-      <ExecutionButton tab="crear_cursos" />
+      <SubidorArchivo />
+      <BotonEjecucion tab="crear_cursos" />
     </div>
   );
 }

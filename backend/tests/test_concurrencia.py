@@ -2,17 +2,17 @@
 Pruebas de concurrencia para mecanismos de locking.
 
 Verifica:
-- _acquire_advisory_lock: comportamiento básico (determinista)
+- _adquirir_bloqueo_asesor: comportamiento básico (determinista)
 - _create_phase4_items: concurrencia con threading simulado
-- _create_phase3_items: mismo patrón
+- _crear_items_fase3: mismo patrón
 """
 
 from unittest.mock import patch
 
 import pytest
 
-from app.db.session import SessionLocal
-from app.workers.phases.phase4_people import _create_phase4_items, _create_phase4_items_async
+from app.db.sesion import SessionLocal
+from app.workers.phases.fase4_personas import _crear_items_fase4_async, _create_phase4_items
 
 
 def _make_ctx_data(users=None, enrolments=None):
@@ -44,7 +44,7 @@ class TestAdvisoryLock:
         key = b"etl_lock_1_4"
         expected = int(hashlib.sha256(key).hexdigest(), 16) % (2**63)
 
-        # Forzar el cálculo igual que en _acquire_advisory_lock
+        # Forzar el cálculo igual que en _adquirir_bloqueo_asesor
         # No podemos llamar a la función sin DB, pero podemos verificar el hash
         assert expected == int(hashlib.sha256(b"etl_lock_1_4").hexdigest(), 16) % (2**63)
 
@@ -78,15 +78,17 @@ class TestConcurrentPhase4:
         def worker(worker_id):
             db = SessionLocal()
             try:
-                with patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory:
+                with patch(
+                    "app.workers.phases.fase4_personas.obtener_servicio_moodle"
+                ) as mock_factory:
                     instance = __import__("unittest").mock.AsyncMock()
-                    instance.get_courses.return_value = [
+                    instance.obtener_cursos.return_value = [
                         {"id": 1, "shortname": "TST_0001_sI_001_G-1_12345"},
                     ]
                     mock_factory.return_value = instance
 
                     with patch(
-                        "app.workers.phases.phase4_people._acquire_advisory_lock"
+                        "app.workers.phases.fase4_personas._adquirir_bloqueo_asesor"
                     ) as mock_lock:
                         # Primer worker obtiene lock, segundo no
                         mock_lock.side_effect = [True, False]
@@ -111,18 +113,18 @@ class TestConcurrentPhase4:
     async def test_no_duplicate_items_on_retry(self, test_db):
         """Si los items ya existen, _create_phase4_items retorna vacío."""
         with (
-            patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True),
-            patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory,
+            patch("app.workers.phases.fase4_personas._adquirir_bloqueo_asesor", return_value=True),
+            patch("app.workers.phases.fase4_personas.obtener_servicio_moodle") as mock_factory,
         ):
             instance = __import__("unittest").mock.AsyncMock()
-            instance.get_courses.return_value = []
+            instance.obtener_cursos.return_value = []
             mock_factory.return_value = instance
 
             ctx = _make_ctx_data()
-            r1 = await _create_phase4_items_async(test_db, 98, ctx, "DISTANCIA")
+            r1 = await _crear_items_fase4_async(test_db, 98, ctx, "DISTANCIA")
             assert r1.get("create_users") == 1
 
             # Segunda llamada con mismo execution_id: retoma pendientes
-            r2 = await _create_phase4_items_async(test_db, 98, ctx, "DISTANCIA")
+            r2 = await _crear_items_fase4_async(test_db, 98, ctx, "DISTANCIA")
             assert r2.get("create_user") == 1
             assert r2.get("enrol") == 1

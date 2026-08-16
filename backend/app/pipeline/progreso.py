@@ -3,7 +3,7 @@
 Number = int | float
 
 
-def compute_phase_progress(
+def calcular_progreso_fase(
     phase3_total: Number,
     phase3_done: Number,
     phase4_total: Number,

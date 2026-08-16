@@ -1,17 +1,17 @@
 import uuid
 from unittest.mock import patch
 
-from app.repositories.query_repo import create_query, set_query_completed
+from app.repositories.repositorio_consultas import crear_consulta, marcar_consulta_completada
 
 
 class TestEnqueueQuery:
-    def test_unknown_entity(self, client, auth_headers):
-        resp = client.post("/api/v1/queries/invalid", json={}, headers=auth_headers)
+    def test_unknown_entity(self, client, encabezados_auth):
+        resp = client.post("/api/v1/queries/invalid", json={}, headers=encabezados_auth)
         assert resp.status_code == 400
 
-    def test_successful_enqueue(self, client, auth_headers, test_db):
-        with patch("app.api.v1.endpoints.queries.enqueue_async_query") as mock_delay:
-            resp = client.post("/api/v1/queries/courses", json={}, headers=auth_headers)
+    def test_successful_enqueue(self, client, encabezados_auth, test_db):
+        with patch("app.api.v1.endpoints.consultas.encolar_consulta_async") as mock_delay:
+            resp = client.post("/api/v1/queries/courses", json={}, headers=encabezados_auth)
             assert resp.status_code == 200
             data = resp.json()
             assert data["entity"] == "courses"
@@ -19,9 +19,11 @@ class TestEnqueueQuery:
             assert uuid.UUID(data["task_id"])
             mock_delay.assert_called_once_with(data["task_id"])
 
-    def test_enqueue_duplicate_emails(self, client, auth_headers, test_db):
-        with patch("app.api.v1.endpoints.queries.enqueue_async_query") as mock_delay:
-            resp = client.post("/api/v1/queries/duplicate_emails", json={}, headers=auth_headers)
+    def test_enqueue_duplicate_emails(self, client, encabezados_auth, test_db):
+        with patch("app.api.v1.endpoints.consultas.encolar_consulta_async") as mock_delay:
+            resp = client.post(
+                "/api/v1/queries/duplicate_emails", json={}, headers=encabezados_auth
+            )
             assert resp.status_code == 200
             data = resp.json()
             assert data["entity"] == "duplicate_emails"
@@ -34,13 +36,13 @@ class TestEnqueueQuery:
 
 
 class TestGetTaskStatus:
-    def test_not_found(self, client, auth_headers):
-        resp = client.get("/api/v1/queries/tasks/nonexistent", headers=auth_headers)
+    def test_not_found(self, client, encabezados_auth):
+        resp = client.get("/api/v1/queries/tasks/nonexistent", headers=encabezados_auth)
         assert resp.status_code == 404
 
-    def test_returns_task(self, client, auth_headers, test_db):
-        create_query(test_db, "test-task-id", "courses", {}, "DISTANCIA")
-        resp = client.get("/api/v1/queries/tasks/test-task-id", headers=auth_headers)
+    def test_returns_task(self, client, encabezados_auth, test_db):
+        crear_consulta(test_db, "test-task-id", "courses", {}, "DISTANCIA")
+        resp = client.get("/api/v1/queries/tasks/test-task-id", headers=encabezados_auth)
         assert resp.status_code == 200
         data = resp.json()
         assert data["task_id"] == "test-task-id"
@@ -48,16 +50,16 @@ class TestGetTaskStatus:
 
 
 class TestDownloadCsv:
-    def test_not_found(self, client, auth_headers):
-        resp = client.get("/api/v1/queries/tasks/nonexistent/download", headers=auth_headers)
+    def test_not_found(self, client, encabezados_auth):
+        resp = client.get("/api/v1/queries/tasks/nonexistent/download", headers=encabezados_auth)
         assert resp.status_code == 404
 
-    def test_not_completed(self, client, auth_headers, test_db):
-        create_query(test_db, "test-task-id", "courses", {}, "DISTANCIA")
-        resp = client.get("/api/v1/queries/tasks/test-task-id/download", headers=auth_headers)
+    def test_not_completed(self, client, encabezados_auth, test_db):
+        crear_consulta(test_db, "test-task-id", "courses", {}, "DISTANCIA")
+        resp = client.get("/api/v1/queries/tasks/test-task-id/download", headers=encabezados_auth)
         assert resp.status_code == 409
 
-    def test_duplicate_emails_csv(self, client, auth_headers, test_db):
+    def test_duplicate_emails_csv(self, client, encabezados_auth, test_db):
         rows = [
             {
                 "email": "a@ut.edu.co",
@@ -76,9 +78,9 @@ class TestDownloadCsv:
                 "duplicate_count": 2,
             },
         ]
-        create_query(test_db, "task-dup", "duplicate_emails", {}, "DISTANCIA")
-        set_query_completed(test_db, "task-dup", rows, len(rows))
-        resp = client.get("/api/v1/queries/tasks/task-dup/download", headers=auth_headers)
+        crear_consulta(test_db, "task-dup", "duplicate_emails", {}, "DISTANCIA")
+        marcar_consulta_completada(test_db, "task-dup", rows, len(rows))
+        resp = client.get("/api/v1/queries/tasks/task-dup/download", headers=encabezados_auth)
         assert resp.status_code == 200
         content = resp.content.decode("utf-8-sig")
         assert "Email,Username,Nombres,Apellidos,ID Moodle,Nº de cuentas" in content

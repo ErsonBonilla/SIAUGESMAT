@@ -4,7 +4,7 @@ Enrolment = dict[str, object]
 User = dict[str, object]
 
 
-def resolve_enrolments(
+def resolver_matriculaciones(
     enrolments: list[Enrolment],
     username_map: dict[str, str],
 ) -> list[Enrolment]:
@@ -19,7 +19,7 @@ def resolve_enrolments(
     return resolved
 
 
-def users_to_create(
+def usuarios_a_crear(
     etl_users: list[User],
     username_map: dict[str, str],
 ) -> list[User]:

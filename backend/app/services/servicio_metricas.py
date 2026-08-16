@@ -12,22 +12,22 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import Execution
-from app.pipeline.metrics import (
-    calculate_error_rate,
-    semaphore_color,
-    semaphore_message,
+from app.db.modelos import Ejecucion
+from app.pipeline.metricas import (
+    calcular_tasa_error,
+    color_semaforo,
+    mensaje_semaforo,
 )
-from app.schemas.analytics import (
-    LatestExecution,
-    SemaphoreStatus,
-    SemesterMetrics,
+from app.schemas.analitica import (
+    EjecucionReciente,
+    EstadoSemaforo,
+    MetricasSemestre,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def _get_semaphore_thresholds() -> dict[str, float]:
+def _obtener_umbrales_semaforo() -> dict[str, float]:
     """Obtiene los umbrales configurables desde las variables de entorno."""
     return {
         "error_rate_yellow": settings.ANALYTICS_ERROR_THRESHOLD_YELLOW,
@@ -37,9 +37,9 @@ def _get_semaphore_thresholds() -> dict[str, float]:
     }
 
 
-def get_history_metrics(
+def obtener_metricas_historial(
     db: Session, limit: int = 10, modalidad: str | None = None
-) -> list[SemesterMetrics]:
+) -> list[MetricasSemestre]:
     """
     Retorna una lista de métricas agregadas por semestre,
     ordenadas del más reciente al más antiguo.
@@ -54,44 +54,44 @@ def get_history_metrics(
     """
     # Consulta base agrupada por semestre
     query = db.query(
-        Execution.semester,
-        func.count(Execution.id).label("total_executions"),
-        func.sum(Execution.errors_count).label("total_errors"),
-        func.avg(Execution.duration_seconds).label("avg_duration"),
-        func.max(Execution.completed_at).label("last_completed"),
+        Ejecucion.semestre,
+        func.count(Ejecucion.id).label("total_executions"),
+        func.sum(Ejecucion.conteo_errores).label("total_errors"),
+        func.avg(Ejecucion.duracion_segundos).label("avg_duration"),
+        func.max(Ejecucion.completado_en).label("last_completed"),
     )
     if modalidad:
-        query = query.filter(Execution.modalidad == modalidad.upper())
+        query = query.filter(Ejecucion.modalidad == modalidad.upper())
     aggregate = (
-        query.group_by(Execution.semester).order_by(Execution.semester.desc()).limit(limit).all()
+        query.group_by(Ejecucion.semestre).order_by(Ejecucion.semestre.desc()).limit(limit).all()
     )
 
     if not aggregate:
         return []
 
-    semesters = [row.semester for row in aggregate]
+    semesters = [row.semestre for row in aggregate]
 
     # Obtener todas las ejecuciones de esos semestres para sumar métricas JSON
-    detail_query = db.query(Execution).filter(Execution.semester.in_(semesters))
+    detail_query = db.query(Ejecucion).filter(Ejecucion.semestre.in_(semesters))
     if modalidad:
-        detail_query = detail_query.filter(Execution.modalidad == modalidad.upper())
+        detail_query = detail_query.filter(Ejecucion.modalidad == modalidad.upper())
     executions = detail_query.all()
 
     # Agrupar ejecuciones por semestre
-    grouped: dict[str, list[Execution]] = {}
+    grouped: dict[str, list[Ejecucion]] = {}
     for ex in executions:
-        grouped.setdefault(ex.semester, []).append(ex)
+        grouped.setdefault(ex.semestre, []).append(ex)
 
-    results: list[SemesterMetrics] = []
+    results: list[MetricasSemestre] = []
     for row in aggregate:
-        semester = row.semester
+        semester = row.semestre
         execs = grouped.get(semester, [])
         total_courses = 0
         total_users = 0
         total_enrolments = 0
 
         for ex in execs:
-            metrics = ex.metrics or {}
+            metrics = ex.metricas or {}
             total_courses += metrics.get("courses_created", 0)
             total_users += metrics.get("users_created", 0)
             total_enrolments += metrics.get("enrolments", 0)
@@ -99,7 +99,7 @@ def get_history_metrics(
         avg_duration = round(row.avg_duration or 0.0, 2)
 
         results.append(
-            SemesterMetrics(
+            MetricasSemestre(
                 semester=semester,
                 total_executions=row.total_executions,
                 total_courses_created=total_courses,
@@ -114,9 +114,9 @@ def get_history_metrics(
     return results
 
 
-def get_semaphore_status(
+def obtener_estado_semaforo(
     db: Session, semester: str | None = None, modalidad: str | None = None
-) -> SemaphoreStatus:
+) -> EstadoSemaforo:
     """
     Calcula el estado del semáforo para el último proceso completado
     del semestre especificado o del más reciente si no se indica.
@@ -129,21 +129,21 @@ def get_semaphore_status(
     Returns:
         SemaphoreStatus: Estado del semáforo con métricas y mensaje.
     """
-    thresholds = _get_semaphore_thresholds()
+    thresholds = _obtener_umbrales_semaforo()
 
-    base_query = db.query(Execution).filter(Execution.status == "completed")
+    base_query = db.query(Ejecucion).filter(Ejecucion.estado == "completed")
     if modalidad:
-        base_query = base_query.filter(Execution.modalidad == modalidad.upper())
+        base_query = base_query.filter(Ejecucion.modalidad == modalidad.upper())
 
     if semester:
         execution = (
-            base_query.filter(Execution.semester == semester)
-            .order_by(Execution.completed_at.desc())
+            base_query.filter(Ejecucion.semestre == semester)
+            .order_by(Ejecucion.completado_en.desc())
             .first()
         )
         if not execution:
             logger.warning(f"No se encontraron ejecuciones completadas para {semester}")
-            return SemaphoreStatus(
+            return EstadoSemaforo(
                 semester=semester,
                 status="gray",
                 error_rate=0.0,
@@ -151,24 +151,24 @@ def get_semaphore_status(
                 message=f"No hay ejecuciones completadas para {semester}.",
             )
     else:
-        execution = base_query.order_by(Execution.completed_at.desc()).first()
+        execution = base_query.order_by(Ejecucion.completado_en.desc()).first()
         if not execution:
-            return SemaphoreStatus(
+            return EstadoSemaforo(
                 semester="N/A",
                 status="gray",
                 error_rate=0.0,
                 avg_duration=0.0,
                 message="No hay ejecuciones completadas aún.",
             )
-        semester = execution.semester
+        semester = execution.semestre
 
-    error_rate = calculate_error_rate(execution.metrics, execution.errors_count)
-    duration = execution.duration_seconds or 0.0
+    error_rate = calcular_tasa_error(execution.metricas, execution.conteo_errores)
+    duration = execution.duracion_segundos or 0.0
 
-    color = semaphore_color(error_rate, duration, thresholds)
-    message = semaphore_message(color)
+    color = color_semaforo(error_rate, duration, thresholds)
+    message = mensaje_semaforo(color)
 
-    return SemaphoreStatus(
+    return EstadoSemaforo(
         semester=semester,
         status=color,
         error_rate=round(error_rate, 2),
@@ -177,7 +177,9 @@ def get_semaphore_status(
     )
 
 
-def get_latest_execution_data(db: Session, modalidad: str | None = None) -> LatestExecution:
+def obtener_datos_ejecucion_reciente(
+    db: Session, modalidad: str | None = None
+) -> EjecucionReciente:
     """
     Obtiene un resumen completo de la ejecución más reciente,
     incluyendo métricas y estado del semáforo.
@@ -192,34 +194,34 @@ def get_latest_execution_data(db: Session, modalidad: str | None = None) -> Late
     Raises:
         ValueError: Si no existen ejecuciones registradas.
     """
-    query = db.query(Execution)
+    query = db.query(Ejecucion)
     if modalidad:
-        query = query.filter(Execution.modalidad == modalidad.upper())
-    execution = query.order_by(Execution.created_at.desc()).first()
+        query = query.filter(Ejecucion.modalidad == modalidad.upper())
+    execution = query.order_by(Ejecucion.creado_en.desc()).first()
     if not execution:
         raise ValueError("No hay ejecuciones registradas en la base de datos.")
 
-    error_rate = calculate_error_rate(execution.metrics, execution.errors_count)
-    thresholds = _get_semaphore_thresholds()
-    duration = execution.duration_seconds or 0.0
+    error_rate = calcular_tasa_error(execution.metricas, execution.conteo_errores)
+    thresholds = _obtener_umbrales_semaforo()
+    duration = execution.duracion_segundos or 0.0
 
-    if execution.status in ("queued", "running", "pending", "review_required"):
+    if execution.estado in ("queued", "running", "pending", "review_required"):
         semaphore = "yellow"
     else:
-        semaphore = semaphore_color(error_rate, duration, thresholds)
+        semaphore = color_semaforo(error_rate, duration, thresholds)
 
-    return LatestExecution(
+    return EjecucionReciente(
         id=execution.id,
-        semester=execution.semester,
-        filename=execution.filename,
-        status=execution.status,
-        started_at=execution.started_at,
-        completed_at=execution.completed_at,
-        duration_seconds=execution.duration_seconds,
-        metrics=execution.metrics,
-        errors_count=execution.errors_count or 0,
+        semester=execution.semestre,
+        filename=execution.nombre_archivo,
+        status=execution.estado,
+        started_at=execution.iniciado_en,
+        completed_at=execution.completado_en,
+        duration_seconds=execution.duracion_segundos,
+        metrics=execution.metricas,
+        errors_count=execution.conteo_errores or 0,
         error_rate=round(error_rate, 2),
         semaphore=semaphore,
-        moodle_version=execution.moodle_version,
+        moodle_version=execution.version_moodle,
         modalidad=execution.modalidad,
     )

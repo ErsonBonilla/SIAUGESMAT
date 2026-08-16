@@ -1,24 +1,33 @@
 import logging
 from datetime import UTC, datetime
 
+from celery.signals import worker_process_init
 from sqlalchemy import func
 
 from app.celery_app import celery_app
-from app.core.logging_config import ExecutionContextFilter
-from app.db.session import SessionLocal
-from app.integrations.moodle import MoodleIntegration
-from app.repositories.execution_repo import increment_metric, should_cancel, sync_errors_count
-from app.repositories.log_repo import save_error, save_log
-from app.repositories.operation_repo import claim_item, get_item, resolve_orphan_items, update_item
-from app.services.error_messages import translate_error
-from app.services.moodle_errors import MoodleOverloadedError, is_moodle_overloaded
-from app.services.moodle_factory import get_moodle_service
-from app.workers.utils import reset_stuck_items, run_moodle_async
+from app.core.configuracion_logging import FiltroContextoEjecucion
+from app.db.sesion import SessionLocal
+from app.integrations.integracion_moodle import IntegracionMoodle
+from app.repositories.repositorio_ejecuciones import (
+    debe_cancelarse,
+    incrementar_metrica,
+    sincronizar_conteo_errores,
+)
+from app.repositories.repositorio_operaciones import (
+    actualizar_item,
+    obtener_item,
+    reclamar_item,
+    resolver_items_huerfanos,
+)
+from app.repositories.repositorio_registros import guardar_error, guardar_log
+from app.services.errores_moodle import ErrorMoodleSobrecargado, es_moodle_sobrecargado
+from app.services.fabrica_moodle import obtener_servicio_moodle
+from app.services.mensajes_error import traducir_error
+from app.workers.utilidades import ejecutar_moodle_async, reiniciar_items_atascados
 
 logger = logging.getLogger(__name__)
 
 
-# Cleanup items stuck in "processing" on worker start
 def _reset_stuck_items():
     try:
         db = SessionLocal()
@@ -26,20 +35,23 @@ def _reset_stuck_items():
         # no, el reset global de abajo los devolvería a "pending" y nadie los
         # reclamaría (el chord/sweeper solo operan sobre ejecuciones activas),
         # dejando su lote "activo" y bloqueando subidas.
-        resolve_orphan_items(db)
-        reset_stuck_items(db)
+        resolver_items_huerfanos(db)
+        reiniciar_items_atascados(db)
     except Exception:
         logger.exception("Error reseteando items stuck en etl_item_task")
     finally:
         db.close()
 
 
-_reset_stuck_items()
+@worker_process_init.connect
+def _reset_stuck_items_al_iniciar_worker(**kwargs):
+    _reset_stuck_items()
 
 
 @celery_app.task(
+    name="app.workers.phases.item_task.process_etl_item",
     bind=True,
-    autoretry_for=(MoodleOverloadedError,),
+    autoretry_for=(ErrorMoodleSobrecargado,),
     max_retries=10,
     default_retry_delay=60,
     retry_backoff=True,
@@ -48,59 +60,59 @@ _reset_stuck_items()
     soft_time_limit=900,
     time_limit=1800,
 )
-def process_etl_item(self, item_id: int):
+def procesar_item_etl(self, item_id: int):
     db = SessionLocal()
     try:
-        item = get_item(db, item_id)
+        item = obtener_item(db, item_id)
         if not item:
             logger.error(f"Item {item_id} no encontrado")
             return
-        if item.status == "completed":
+        if item.estado == "completed":
             return
 
-        detail = item.detail or {}
+        detail = item.detalle or {}
         action = detail.get("action")
         execution_id = detail.get("execution_id")
         modalidad = detail.get("modalidad", "DISTANCIA")
-        identifier = item.identifier
+        identifier = item.identificador
 
-        ExecutionContextFilter.set_context(
+        FiltroContextoEjecucion.establecer_contexto(
             execution_id=execution_id,
             item_id=item_id,
             action=action,
         )
 
         if not action:
-            update_item(db, item.id, "failed", "Falta 'action' en detail")
+            actualizar_item(db, item.id, "failed", "Falta 'action' en detail")
             return
 
-        if execution_id and should_cancel(db, execution_id):
-            update_item(db, item.id, "failed", "Ejecución cancelada")
+        if execution_id and debe_cancelarse(db, execution_id):
+            actualizar_item(db, item.id, "failed", "Ejecución cancelada")
             db.commit()
             return
 
-        moodle = get_moodle_service(modalidad)
-        integration = MoodleIntegration(moodle)
+        moodle = obtener_servicio_moodle(modalidad)
+        integration = IntegracionMoodle(moodle)
 
-        if not claim_item(db, item.id):
+        if not reclamar_item(db, item.id):
             return
 
-        async def _execute():
+        async def _ejecutar():
             success = False
             if action == "delete":
-                success = await integration.delete_course(identifier)
+                success = await integration.eliminar_curso(identifier)
             elif action == "activate":
-                success = await integration.activate_course(identifier)
+                success = await integration.activar_curso(identifier)
             elif action == "hide":
-                success = await integration.hide_course(identifier)
+                success = await integration.ocultar_curso(identifier)
             elif action == "rename":
-                success = await integration.rename_course(
+                success = await integration.renombrar_curso(
                     old_shortname=detail.get("old_shortname", identifier),
                     new_shortname=identifier,
                     new_fullname=detail.get("fullname", ""),
                 )
             elif action == "create":
-                success = await integration.create_course(
+                success = await integration.crear_curso(
                     shortname=identifier,
                     fullname=detail.get("fullname", ""),
                     category_idnumber=detail.get("category_idnumber", ""),
@@ -108,7 +120,7 @@ def process_etl_item(self, item_id: int):
                     recreate=detail.get("recreate", False),
                 )
             elif action == "create_user":
-                username, created = await integration.create_user_if_not_exists(
+                username, created = await integration.crear_usuario_si_no_existe(
                     {
                         "username": identifier,
                         "firstname": detail.get("firstname", ""),
@@ -127,21 +139,21 @@ def process_etl_item(self, item_id: int):
                     # con el username real en lugar del username ETL.
                     from sqlalchemy import text as sql_text
 
-                    from app.db.models import OperationItem
+                    from app.db.modelos import ItemOperacion
 
                     logger.warning(
                         f"create_user: '{identifier}' existe en Moodle como '{username}', "
                         f"actualizando enrolments pendientes"
                     )
-                    db.query(OperationItem).filter(
-                        OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
-                        sql_text("detail->>'action' = 'enrol'"),
-                        OperationItem.status == "pending",
-                        OperationItem.identifier == identifier,
-                    ).update({"identifier": username}, synchronize_session=False)
+                    db.query(ItemOperacion).filter(
+                        ItemOperacion.id_lote.like(f"etl_4_%_{execution_id}"),
+                        sql_text("detalle->>'action' = 'enrol'"),
+                        ItemOperacion.estado == "pending",
+                        ItemOperacion.identificador == identifier,
+                    ).update({"identificador": username}, synchronize_session=False)
                     db.commit()
                     if not created:
-                        save_log(
+                        guardar_log(
                             db,
                             execution_id,
                             "4",
@@ -155,7 +167,7 @@ def process_etl_item(self, item_id: int):
                             },
                         )
                 if success and created and execution_id:
-                    save_log(
+                    guardar_log(
                         db,
                         execution_id,
                         "4",
@@ -166,7 +178,7 @@ def process_etl_item(self, item_id: int):
             elif action == "enrol":
                 course_id = detail.get("_course_id")
                 course_map = {detail.get("course_shortname", ""): course_id} if course_id else None
-                result = await integration.enrol_teacher(
+                result = await integration.matricular_docente(
                     username=identifier,
                     course_shortname=detail.get("course_shortname", ""),
                     course_map=course_map,
@@ -174,44 +186,44 @@ def process_etl_item(self, item_id: int):
                 )
                 success = result["success"]
             else:
-                update_item(db, item.id, "failed", f"Acción desconocida: {action}")
+                actualizar_item(db, item.id, "failed", f"Acción desconocida: {action}")
                 db.commit()
                 return
 
             if success:
-                update_item(db, item.id, "completed")
+                actualizar_item(db, item.id, "completed")
                 _log_success(db, execution_id, action, identifier, detail)
             else:
-                error = integration.last_error or f"Error desconocido ({action}:{identifier})"
+                error = integration.ultimo_error or f"Error desconocido ({action}:{identifier})"
                 if action == "enrol":
                     _log_enrol_failure(db, execution_id, identifier, detail, error)
-                update_item(db, item.id, "failed", error)
-                _handle_error(execution_id, action, identifier, error, db=db)
+                actualizar_item(db, item.id, "failed", error)
+                _manejar_error(execution_id, action, identifier, error, db=db)
             db.commit()
 
         try:
-            run_moodle_async(moodle, _execute())
-        except MoodleOverloadedError:
+            ejecutar_moodle_async(moodle, _ejecutar())
+        except ErrorMoodleSobrecargado:
             db.commit()
             raise
         except Exception as e:
-            if is_moodle_overloaded(e):
+            if es_moodle_sobrecargado(e):
                 db.commit()
-                raise MoodleOverloadedError(str(e)[:200]) from e
-            update_item(db, item.id, "failed", translate_error(e))
-            _handle_error(execution_id, action, identifier, translate_error(e), db=db)
+                raise ErrorMoodleSobrecargado(str(e)[:200]) from e
+            actualizar_item(db, item.id, "failed", traducir_error(e))
+            _manejar_error(execution_id, action, identifier, traducir_error(e), db=db)
             db.commit()
 
         if execution_id:
-            _refresh_phase_progress(execution_id, db=db)
+            _refrescar_progreso_fase(execution_id, db=db)
 
-    except MoodleOverloadedError:
+    except ErrorMoodleSobrecargado:
         if self.request.retries >= self.max_retries:
             error_msg = "Agotados reintentos por sobrecarga de Moodle"
             try:
-                update_item(db, item.id, "failed", error_msg)
+                actualizar_item(db, item.id, "failed", error_msg)
                 if execution_id:
-                    _handle_error(execution_id, action, identifier, error_msg, db=db)
+                    _manejar_error(execution_id, action, identifier, error_msg, db=db)
                 db.commit()
                 logger.exception(
                     f"Item {item_id} marcado failed tras agotar reintentos por sobrecarga"
@@ -225,80 +237,80 @@ def process_etl_item(self, item_id: int):
         try:
             db.rollback()
             if execution_id and item:
-                update_item(db, item.id, "failed", translate_error(e))
-                _handle_error(execution_id, action, identifier, translate_error(e), db=db)
+                actualizar_item(db, item.id, "failed", traducir_error(e))
+                _manejar_error(execution_id, action, identifier, traducir_error(e), db=db)
                 db.commit()
         except Exception as e:
             logger.exception(f"Error actualizando progreso para ejecución {execution_id}: {e}")
     finally:
-        ExecutionContextFilter.clear_context()
+        FiltroContextoEjecucion.limpiar_contexto()
         db.close()
 
 
 PROGRESS_REFRESH_SECONDS = 5
 
 
-def _refresh_phase_progress(execution_id, db):
-    from app.db.models import Execution, OperationItem
-    from app.pipeline.progress import compute_phase_progress
+def _refrescar_progreso_fase(execution_id, db):
+    from app.db.modelos import Ejecucion, ItemOperacion
+    from app.pipeline.progreso import calcular_progreso_fase
 
     try:
-        ex = db.query(Execution).filter(Execution.id == execution_id).first()
+        ex = db.query(Ejecucion).filter(Ejecucion.id == execution_id).first()
         if not ex:
             return
         now = datetime.now(UTC)
-        if ex.progress_updated_at:
-            last_update = ex.progress_updated_at
+        if ex.progreso_actualizado_en:
+            last_update = ex.progreso_actualizado_en
             if last_update.tzinfo is None:
                 last_update = last_update.replace(tzinfo=UTC)
             if (now - last_update).total_seconds() < PROGRESS_REFRESH_SECONDS:
                 return
 
         phase3_total = (
-            db.query(func.count(OperationItem.id))
-            .filter(OperationItem.batch_id.like(f"etl_3_%_{execution_id}"))
+            db.query(func.count(ItemOperacion.id))
+            .filter(ItemOperacion.id_lote.like(f"etl_3_%_{execution_id}"))
             .scalar()
             or 0
         )
         phase3_done = (
-            db.query(func.count(OperationItem.id))
+            db.query(func.count(ItemOperacion.id))
             .filter(
-                OperationItem.batch_id.like(f"etl_3_%_{execution_id}"),
-                OperationItem.status.in_(["completed", "failed"]),
+                ItemOperacion.id_lote.like(f"etl_3_%_{execution_id}"),
+                ItemOperacion.estado.in_(["completed", "failed"]),
             )
             .scalar()
             or 0
         )
 
         phase4_total = (
-            db.query(func.count(OperationItem.id))
-            .filter(OperationItem.batch_id.like(f"etl_4_%_{execution_id}"))
+            db.query(func.count(ItemOperacion.id))
+            .filter(ItemOperacion.id_lote.like(f"etl_4_%_{execution_id}"))
             .scalar()
             or 0
         )
         phase4_done = (
-            db.query(func.count(OperationItem.id))
+            db.query(func.count(ItemOperacion.id))
             .filter(
-                OperationItem.batch_id.like(f"etl_4_%_{execution_id}"),
-                OperationItem.status.in_(["completed", "failed"]),
+                ItemOperacion.id_lote.like(f"etl_4_%_{execution_id}"),
+                ItemOperacion.estado.in_(["completed", "failed"]),
             )
             .scalar()
             or 0
         )
 
-        pct = compute_phase_progress(
+        pct = calcular_progreso_fase(
             phase3_total,
             phase3_done,
             phase4_total,
             phase4_done,
         )
-        if ex.progress_pct is None or pct > ex.progress_pct:
-            ex.progress_pct = pct
-            ex.progress_updated_at = now
+        if ex.porcentaje_progreso is None or pct > ex.porcentaje_progreso:
+            ex.porcentaje_progreso = pct
+            ex.progreso_actualizado_en = now
             db.commit()
     except Exception as e:
         logger.exception(f"Error actualizando progreso para ejecución {execution_id}: {e}")
-    # Nota: No cerramos db porque la sesión pertenece al caller
+        # Nota: No cerramos db porque la sesión pertenece al caller
 
 
 def _log_success(db, execution_id, action, identifier, detail):
@@ -345,26 +357,26 @@ def _log_success(db, execution_id, action, identifier, detail):
             if key in detail:
                 log_detail[key] = detail.get(key)
     if log_action != "user_created":
-        save_log(db, execution_id, phase, log_action, identifier, log_detail)
+        guardar_log(db, execution_id, phase, log_action, identifier, log_detail)
 
 
-def _handle_error(execution_id, action, identifier, error_msg, db):
+def _manejar_error(execution_id, action, identifier, error_msg, db):
     if not execution_id:
         return
     try:
         phase = "3" if action in ("delete", "activate", "hide", "rename", "create") else "4"
-        save_error(db, execution_id, phase, identifier, error_msg)
+        guardar_error(db, execution_id, phase, identifier, error_msg)
         metric_key = "enrolment_errors" if action == "enrol" else "total_errors"
-        increment_metric(db, execution_id, metric_key)
+        incrementar_metrica(db, execution_id, metric_key)
         if metric_key != "total_errors":
-            increment_metric(db, execution_id, "total_errors")
-        sync_errors_count(db, execution_id)
+            incrementar_metrica(db, execution_id, "total_errors")
+        sincronizar_conteo_errores(db, execution_id)
     except Exception:
         logger.exception(f"Error manejando fallo ETL para {identifier}")
-    # Nota: No cerramos db porque la sesión pertenece al caller
+        # Nota: No cerramos db porque la sesión pertenece al caller
 
 
-def _normalize_enrol_reason(error_msg: str) -> str:
+def _normalizar_motivo_matriculacion(error_msg: str) -> str:
     """Normaliza el motivo de un fallo de matriculación para el reporte.
 
     Los reportes inc_usuarios_inactivos y audit_matriculas esperan reasons
@@ -386,7 +398,7 @@ def _normalize_enrol_reason(error_msg: str) -> str:
 def _log_enrol_failure(db, execution_id, identifier, detail, error_msg):
     if not execution_id:
         return
-    save_log(
+    guardar_log(
         db,
         execution_id,
         "4",
@@ -395,6 +407,6 @@ def _log_enrol_failure(db, execution_id, identifier, detail, error_msg):
         {
             "course": detail.get("course_shortname", ""),
             "fullname": detail.get("fullname", ""),
-            "reason": _normalize_enrol_reason(error_msg),
+            "reason": _normalizar_motivo_matriculacion(error_msg),
         },
     )

@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class UploadResponse(BaseModel):
+class RespuestaSubida(BaseModel):
     execution_id: int
     filename: str
     semester: str
@@ -10,5 +10,5 @@ class UploadResponse(BaseModel):
     message: str
 
 
-class SemesterResponse(BaseModel):
+class RespuestaSemestre(BaseModel):
     semester: str

@@ -1,14 +1,14 @@
 export const MODALIDADES = ["PRESENCIAL", "DISTANCIA"] as const;
 export type Modalidad = typeof MODALIDADES[number];
 
-export const SEMAPHORE_COLORS: Record<string, string> = {
+export const COLORES_SEMAFORO: Record<string, string> = {
   green: "var(--brand-green)",
   yellow: "#F59E0B",
   red: "var(--brand-red)",
   gray: "#9CA3AF",
 };
 
-export const STATUS_COLORS: Record<string, string> = {
+export const COLORES_ESTADO: Record<string, string> = {
   completed: "status-green",
   running: "status-blue",
   queued: "status-yellow",
@@ -19,7 +19,7 @@ export const STATUS_COLORS: Record<string, string> = {
   cancelled: "status-gray",
 };
 
-export const STATUS_LABELS: Record<string, string> = {
+export const ETIQUETAS_ESTADO: Record<string, string> = {
   completed: "Completado",
   running: "En ejecución",
   queued: "Encolado",
@@ -30,13 +30,13 @@ export const STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelado",
 };
 
-export const MODE_LABELS: Record<string, string> = {
+export const ETIQUETAS_MODO: Record<string, string> = {
   both: "Completo",
   courses: "Solo cursos",
   users: "Solo usuarios",
 };
 
-export const MONTH_LABELS: Record<string, string> = {
+export const ETIQUETAS_MESES: Record<string, string> = {
   A: "Ene - Jun",
   B: "Jul - Dic",
 };

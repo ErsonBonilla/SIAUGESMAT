@@ -1,7 +1,7 @@
-// hooks/useUploadGate.ts
+// hooks/usePuertaSubida.ts
 import { useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import { getUploadStatus, type UploadStatus } from "../services/api.ts";
+import { type EstadoSubida, obtenerEstadoSubida } from "../services/api.ts";
 
 /**
  * Indica si se permite subir archivos para una modalidad mientras no haya
@@ -9,8 +9,8 @@ import { getUploadStatus, type UploadStatus } from "../services/api.ts";
  * y hace polling mientras haya un proceso activo para que la interfaz se
  * desbloquee sola cuando este finalice.
  */
-export function useUploadGate(modalidad: () => string) {
-  const status = useSignal<UploadStatus | null>(null);
+export function usePuertaSubida(modalidad: () => string) {
+  const status = useSignal<EstadoSubida | null>(null);
   const checking = useSignal(true);
   const error = useSignal("");
 
@@ -23,7 +23,7 @@ export function useUploadGate(modalidad: () => string) {
 
     const check = async () => {
       try {
-        const st = await getUploadStatus(modalidadRef.current());
+        const st = await obtenerEstadoSubida(modalidadRef.current());
         if (stopped) return;
         status.value = st;
         error.value = "";

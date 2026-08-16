@@ -1,14 +1,14 @@
-// components/MiniBarChart.tsx
-interface MiniBarChartProps {
+// components/MiniGraficoBarras.tsx
+interface PropsMiniGraficoBarras {
   data: { label: string; value: number }[];
   width?: number;
   height?: number;
   color?: string;
 }
 
-export default function MiniBarChart(
+export default function MiniGraficoBarras(
   { data, width = 400, height = 180, color = "var(--brand-green)" }:
-    MiniBarChartProps,
+    PropsMiniGraficoBarras,
 ) {
   if (!data.length) return null;
   const max = Math.max(...data.map((d) => d.value), 1);

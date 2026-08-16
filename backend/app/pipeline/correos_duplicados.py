@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 
-def parse_fecha(text: str | None) -> datetime | None:
+def parsear_fecha(text: str | None) -> datetime | None:
     """Convierte `fecha_creacion` (YYYY-MM-DD[ HH:MM:SS]). Devuelve None si no
     se puede interpretar."""
     if not text:
@@ -47,7 +47,7 @@ def parse_fecha(text: str | None) -> datetime | None:
 
 
 @dataclass(frozen=True)
-class UserRow:
+class FilaUsuario:
     username: str
     email: str
     fecha_creacion: str
@@ -55,31 +55,31 @@ class UserRow:
 
 
 @dataclass(frozen=True)
-class DuplicateGroup:
+class GrupoDuplicados:
     email: str
-    rows: tuple[UserRow, ...]
+    rows: tuple[FilaUsuario, ...]
 
     @property
     def count(self) -> int:
         return len(self.rows)
 
-    def oldest(self) -> UserRow | None:
+    def mas_antiguo(self) -> FilaUsuario | None:
         valid = [r for r in self.rows if r.date is not None]
         return min(valid, key=lambda r: r.date) if valid else None
 
-    def newest(self) -> UserRow | None:
+    def mas_reciente(self) -> FilaUsuario | None:
         valid = [r for r in self.rows if r.date is not None]
         return max(valid, key=lambda r: r.date) if valid else None
 
 
-def group_rows(rows: list[dict]) -> list[DuplicateGroup]:
+def agrupar_filas(rows: list[dict]) -> list[GrupoDuplicados]:
     """Agrupa filas de CSV por email (normalizado a minúsculas).
 
     Cada fila debe tener las claves `username`, `email` y `fecha_creacion`.
     El resultado se ordena por email y por fecha/username para que sea
     reproducible.
     """
-    grouped: dict[str, list[UserRow]] = {}
+    grouped: dict[str, list[FilaUsuario]] = {}
     for row in rows:
         username = (row.get("username") or "").strip()
         email = (row.get("email") or "").strip().lower()
@@ -87,30 +87,30 @@ def group_rows(rows: list[dict]) -> list[DuplicateGroup]:
             continue
         fecha = row.get("fecha_creacion") or ""
         grouped.setdefault(email, []).append(
-            UserRow(
+            FilaUsuario(
                 username=username,
                 email=email,
                 fecha_creacion=fecha,
-                date=parse_fecha(fecha),
+                date=parsear_fecha(fecha),
             )
         )
 
-    groups: list[DuplicateGroup] = []
+    groups: list[GrupoDuplicados] = []
     for email in sorted(grouped):
         entries = sorted(grouped[email], key=lambda u: (u.date is None, u.date, u.username))
-        groups.append(DuplicateGroup(email=email, rows=tuple(entries)))
+        groups.append(GrupoDuplicados(email=email, rows=tuple(entries)))
     return groups
 
 
-def is_ambiguous(group: DuplicateGroup) -> bool:
+def es_ambiguo(group: GrupoDuplicados) -> bool:
     """Un par es ambiguo si no hay dos cuentas o si no se puede decidir cuál es
     la más antigua (fecha no parseada o idéntica)."""
     if group.count != 2:
         return True
-    older = group.oldest()
+    older = group.mas_antiguo()
     if older is None:
         return True
-    newer = group.newest()
+    newer = group.mas_reciente()
     if newer is None:
         return True
     return older.date == newer.date

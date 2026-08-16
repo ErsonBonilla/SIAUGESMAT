@@ -4,7 +4,7 @@
 // barras (horizontal/vertical) y donuts (pie con hole).
 import type { ChartConfiguration, ChartType } from "chart.js";
 
-interface PlotlyTrace {
+interface TrazaPlotly {
   type?: string;
   orientation?: string;
   x?: unknown[];
@@ -20,7 +20,7 @@ interface PlotlyTrace {
   hole?: number;
 }
 
-interface PlotlyLayout {
+interface DisposicionPlotly {
   title?: { text?: string };
   paper_bgcolor?: string;
   plot_bgcolor?: string;
@@ -32,9 +32,9 @@ interface PlotlyLayout {
   barmode?: string;
 }
 
-export interface PlotlyChartData {
+export interface DatosGraficoPlotly {
   traces: unknown[];
-  layout: PlotlyLayout;
+  layout: DisposicionPlotly;
 }
 
 function titleText(t: unknown): string {
@@ -46,10 +46,10 @@ function titleText(t: unknown): string {
   return "";
 }
 
-export function plotlyToChartConfig(
-  data: PlotlyChartData,
+export function configGraficoDesdePlotly(
+  data: DatosGraficoPlotly,
 ): ChartConfiguration {
-  const traces = (data.traces ?? []) as PlotlyTrace[];
+  const traces = (data.traces ?? []) as TrazaPlotly[];
   const layout = data.layout ?? {};
   const textColor = layout.font?.color ?? "#374151";
   const gridColor = layout.plot_bgcolor === "#1e1e2e" ? "#45475a" : "#E0E0E0";

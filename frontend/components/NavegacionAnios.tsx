@@ -1,10 +1,10 @@
-export default function YearNav(
-  { year, minYear, maxYear, onPrev, onNext, shadow, scale }: {
+export default function NavegacionAnios(
+  { year, anioMinimo, anioMaximo, alAnterior, alSiguiente, shadow, scale }: {
     year: number;
-    minYear: number;
-    maxYear: number;
-    onPrev: () => void;
-    onNext: () => void;
+    anioMinimo: number;
+    anioMaximo: number;
+    alAnterior: () => void;
+    alSiguiente: () => void;
     shadow?: boolean;
     scale?: boolean;
   },
@@ -19,8 +19,8 @@ export default function YearNav(
     <div class="flex items-center gap-3">
       <button
         type="button"
-        onClick={onPrev}
-        disabled={year <= minYear}
+        onClick={alAnterior}
+        disabled={year <= anioMinimo}
         class={btn}
         aria-label="Año anterior"
       >
@@ -31,8 +31,8 @@ export default function YearNav(
       </span>
       <button
         type="button"
-        onClick={onNext}
-        disabled={year >= maxYear}
+        onClick={alSiguiente}
+        disabled={year >= anioMaximo}
         class={btn}
         aria-label="Año siguiente"
       >

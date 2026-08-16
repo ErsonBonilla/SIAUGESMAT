@@ -7,16 +7,16 @@ la base de datos ni el filesystem.
 
 from typing import Any
 
-from app.pipeline.course_index import build_enrolment_map, index_courses
+from app.pipeline.indice_cursos import construir_mapa_matriculaciones, indexar_cursos
 
 Novedad = dict[str, Any]
 
 
-def _build_user_map(users: list[dict]) -> dict[str, dict]:
+def _construir_mapa_usuarios(users: list[dict]) -> dict[str, dict]:
     return {u.get("cedula", ""): u for u in users if u.get("cedula")}
 
 
-def _resolve_prof_name(username: str, users: list[dict]) -> str:
+def _resolver_nombre_docente(username: str, users: list[dict]) -> str:
     if not username:
         return ""
     for u in users:
@@ -27,13 +27,13 @@ def _resolve_prof_name(username: str, users: list[dict]) -> str:
     return username
 
 
-def _new_prof_name(new_suffix: str, user_map_new: dict[str, dict], username: str) -> str:
+def _nuevo_nombre_prof(new_suffix: str, user_map_new: dict[str, dict], username: str) -> str:
     prof_user = user_map_new.get(new_suffix, {})
     full = f"{prof_user.get('firstname', '')} {prof_user.get('lastname', '')}".strip()
     return full or username
 
 
-def detect_novedades(
+def detectar_novedades(
     old_data: dict[str, Any],
     new_data: dict[str, Any],
 ) -> tuple[list[Novedad], dict[str, int]]:
@@ -53,12 +53,12 @@ def detect_novedades(
     old_enrolments = old_data.get("enrolments", [])
     new_enrolments = new_data.get("enrolments", [])
 
-    old_index = index_courses(old_courses)
-    new_index = index_courses(new_courses)
+    old_index = indexar_cursos(old_courses)
+    new_index = indexar_cursos(new_courses)
 
-    enrolment_map_old = build_enrolment_map(old_enrolments)
-    enrolment_map_new = build_enrolment_map(new_enrolments)
-    user_map_new = _build_user_map(new_users)
+    enrolment_map_old = construir_mapa_matriculaciones(old_enrolments)
+    enrolment_map_new = construir_mapa_matriculaciones(new_enrolments)
+    user_map_new = _construir_mapa_usuarios(new_users)
 
     common_keys = set(old_index.keys()) & set(new_index.keys())
 
@@ -89,15 +89,15 @@ def detect_novedades(
                 "new_shortname": new_sn,
                 "old_prof_cedula": old_suffix or None,
                 "new_prof_cedula": new_suffix or None,
-                "old_prof_name": _resolve_prof_name(old_username, old_users),
-                "new_prof_name": _new_prof_name(new_suffix, user_map_new, new_username),
+                "old_prof_name": _resolver_nombre_docente(old_username, old_users),
+                "new_prof_name": _nuevo_nombre_prof(new_suffix, user_map_new, new_username),
                 "course_fullname": new_course.get("fullname", ""),
                 "action": "cambio_profesor",
                 "target_course_id": None,
             }
         )
 
-    # Cursos que desaparecieron (en old pero no en new)
+        # Cursos que desaparecieron (en old pero no en new)
     for bk, courses in old_index.items():
         if bk in new_index:
             continue
@@ -113,7 +113,7 @@ def detect_novedades(
                 "new_shortname": "",
                 "old_prof_cedula": old_suffix or None,
                 "new_prof_cedula": None,
-                "old_prof_name": _resolve_prof_name(old_username, old_users),
+                "old_prof_name": _resolver_nombre_docente(old_username, old_users),
                 "new_prof_name": "",
                 "course_fullname": old_course.get("fullname", ""),
                 "action": "curso_eliminado",
@@ -121,7 +121,7 @@ def detect_novedades(
             }
         )
 
-    # Cursos nuevos (en new pero no en old)
+        # Cursos nuevos (en new pero no en old)
     for bk, courses in new_index.items():
         if bk in old_index:
             continue
@@ -138,7 +138,7 @@ def detect_novedades(
                 "old_prof_cedula": None,
                 "new_prof_cedula": new_suffix or None,
                 "old_prof_name": "",
-                "new_prof_name": _new_prof_name(new_suffix, user_map_new, new_username),
+                "new_prof_name": _nuevo_nombre_prof(new_suffix, user_map_new, new_username),
                 "course_fullname": new_course.get("fullname", ""),
                 "action": "curso_nuevo",
                 "target_course_id": None,

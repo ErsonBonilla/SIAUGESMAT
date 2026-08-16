@@ -1,15 +1,15 @@
-import type { Column, Filter } from "../islands/TablaConsultaIsland.tsx";
-import type { QueryHelpSection } from "../components/QueryHelp.tsx";
+import type { Columna, Filtro } from "../islands/TablaConsultaIsland.tsx";
+import type { SeccionAyudaConsulta } from "../components/AyudaConsulta.tsx";
 
-interface EntityConfig {
+interface ConfiguracionEntidad {
   title: string;
   searchPlaceholder: string;
-  columns: Column[];
-  filters?: Filter[];
-  help?: QueryHelpSection[];
+  columns: Columna[];
+  filters?: Filtro[];
+  help?: SeccionAyudaConsulta[];
 }
 
-export const ENTITY_CONSULT_CONFIGS: Record<string, EntityConfig> = {
+export const ENTITY_CONSULT_CONFIGS: Record<string, ConfiguracionEntidad> = {
   categories: {
     title: "Categorías",
     searchPlaceholder: "Buscar por idnumber...",
@@ -137,18 +137,18 @@ export const ENTITY_CONSULT_CONFIGS: Record<string, EntityConfig> = {
   },
 };
 
-interface CsvActionConfig {
+interface ConfiguracionAccionCsv {
   title: string;
   description: string;
   endpoint: string;
   singular: string;
   plural: string;
-  help?: QueryHelpSection[];
+  help?: SeccionAyudaConsulta[];
 }
 
 export const ENTITY_CSV_CONFIGS: Record<
   string,
-  Record<string, CsvActionConfig>
+  Record<string, ConfiguracionAccionCsv>
 > = {
   categories: {
     create: {

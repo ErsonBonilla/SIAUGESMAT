@@ -2,44 +2,49 @@
 import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import {
-  deleteBatch,
-  downloadReport,
-  getBatchReportUrl,
-  listBatches,
-  type OperationBatchOut,
-  pauseBatch,
-  resumeBatch,
+  descargarReporte,
+  eliminarLote,
+  listarLotes,
+  type LoteOperacionSalida,
+  obtenerUrlDescargaReporteLote,
+  pausarLote,
+  reanudarLote,
 } from "../services/api.ts";
-import { STATUS_COLORS, STATUS_LABELS } from "../utils/constants.ts";
-import { batchActionLabel, batchEntityLabel } from "../utils/batch-labels.ts";
-import ErrorBox from "../components/ErrorBox.tsx";
-import Pagination from "../components/Pagination.tsx";
-import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
+import { COLORES_ESTADO, ETIQUETAS_ESTADO } from "../utils/constantes.ts";
+import {
+  etiquetaAccionLote,
+  etiquetaEntidadLote,
+} from "../utils/etiquetas-lote.ts";
+import CajaError from "../components/CajaError.tsx";
+import Paginacion from "../components/Paginacion.tsx";
+import EsqueletoCarga from "../components/EsqueletoCarga.tsx";
 
 const PAGE_SIZE = 20;
 
-function statusFromBatch(b: OperationBatchOut): string {
+function statusFromBatch(b: LoteOperacionSalida): string {
   if (b.completed_at) return "completed";
   if ((b.completed || 0) + (b.failed || 0) > 0) return "running";
   return "pending";
 }
 
 interface Props {
-  defaultEntity?: string;
-  defaultAction?: string;
+  entidadPredeterminada?: string;
+  accionPredeterminada?: string;
 }
 
-export default function OperationList({ defaultEntity, defaultAction }: Props) {
-  const items = useSignal<OperationBatchOut[]>([]);
+export default function ListaOperaciones(
+  { entidadPredeterminada, accionPredeterminada }: Props,
+) {
+  const items = useSignal<LoteOperacionSalida[]>([]);
   const total = useSignal(0);
   const loading = useSignal(true);
   const error = useSignal("");
   const actionLoading = useSignal<string | null>(null);
 
-  const isLocked = !!(defaultEntity && defaultAction);
+  const isLocked = !!(entidadPredeterminada && accionPredeterminada);
 
-  const filterEntity = useSignal(defaultEntity || "");
-  const filterAction = useSignal(defaultAction || "");
+  const filterEntity = useSignal(entidadPredeterminada || "");
+  const filterAction = useSignal(accionPredeterminada || "");
   const filterModalidad = useSignal("");
   const offset = useSignal(0);
 
@@ -47,7 +52,7 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
     loading.value = true;
     error.value = "";
     try {
-      const result = await listBatches({
+      const result = await listarLotes({
         entity_type: filterEntity.value || undefined,
         action: filterAction.value || undefined,
         modalidad: filterModalidad.value || undefined,
@@ -71,7 +76,7 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
     if (actionLoading.value) return;
     actionLoading.value = batchId;
     try {
-      await pauseBatch(batchId);
+      await pausarLote(batchId);
       load();
     } catch (e) {
       error.value = e instanceof Error ? e.message : "Error al pausar el lote";
@@ -84,7 +89,7 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
     if (actionLoading.value) return;
     actionLoading.value = batchId;
     try {
-      await resumeBatch(batchId);
+      await reanudarLote(batchId);
       load();
     } catch (e) {
       error.value = e instanceof Error
@@ -104,11 +109,11 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
     ) return;
     actionLoading.value = batchId;
     try {
-      await downloadReport(
-        getBatchReportUrl(batchId),
+      await descargarReporte(
+        obtenerUrlDescargaReporteLote(batchId),
         `reportes_${batchId.slice(0, 8)}.zip`,
       );
-      await deleteBatch(batchId);
+      await eliminarLote(batchId);
       load();
     } catch (e) {
       error.value = e instanceof Error
@@ -206,9 +211,9 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
       </div>
 
       {loading.value
-        ? <LoadingSkeleton />
+        ? <EsqueletoCarga />
         : error.value
-        ? <ErrorBox message={error.value} />
+        ? <CajaError message={error.value} />
         : items.value.length === 0
         ? (
           <div class="text-center py-12 text-[var(--text-secondary)]">
@@ -260,10 +265,10 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                         {b.batch_id.slice(0, 12)}
                       </td>
                       <td class="py-3 px-2">
-                        {batchEntityLabel(b.entity_type)}
+                        {etiquetaEntidadLote(b.entity_type)}
                       </td>
                       <td class="py-3 px-2">
-                        {batchActionLabel(b.action)}
+                        {etiquetaAccionLote(b.action)}
                       </td>
                       <td class="py-3 px-2 text-center">{b.total}</td>
                       <td class="py-3 px-2 text-center text-[var(--brand-green)]">
@@ -280,10 +285,10 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                       <td class="py-3 px-2">
                         <span
                           class={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                            STATUS_COLORS[statusFromBatch(b)]
+                            COLORES_ESTADO[statusFromBatch(b)]
                           }`}
                         >
-                          {STATUS_LABELS[statusFromBatch(b)]}
+                          {ETIQUETAS_ESTADO[statusFromBatch(b)]}
                         </span>
                       </td>
                       <td class="py-3 px-2 text-right whitespace-nowrap">
@@ -327,8 +332,8 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
                             <button
                               type="button"
                               onClick={() =>
-                                downloadReport(
-                                  getBatchReportUrl(b.batch_id),
+                                descargarReporte(
+                                  obtenerUrlDescargaReporteLote(b.batch_id),
                                   `reportes_${b.batch_id.slice(0, 8)}.zip`,
                                 )}
                               class="text-[var(--text-muted)] hover:text-[var(--text-secondary)] text-sm font-medium ml-1 cursor-pointer bg-transparent border-none p-0 font-inherit"
@@ -350,12 +355,12 @@ export default function OperationList({ defaultEntity, defaultAction }: Props) {
               </table>
             </div>
 
-            <Pagination
+            <Paginacion
               offset={offset.value}
-              pageSize={PAGE_SIZE}
+              tamanoPagina={PAGE_SIZE}
               total={total.value}
               label="lotes"
-              onPageChange={(o) => {
+              alCambiarPagina={(o) => {
                 offset.value = o;
                 load();
               }}

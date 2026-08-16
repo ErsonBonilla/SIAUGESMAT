@@ -1,8 +1,8 @@
-import { requireAuth } from "../../utils/auth-guard.ts";
-import CsvActionPage from "../../components/CsvActionPage.tsx";
+import { requerirAutenticacion } from "../../utils/guarda-autenticacion.ts";
+import PaginaAccionCsv from "../../components/PaginaAccionCsv.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
 export default function CrearCategoriasPage() {
-  return <CsvActionPage entity="categories" action="create" />;
+  return <PaginaAccionCsv entity="categories" action="create" />;
 }

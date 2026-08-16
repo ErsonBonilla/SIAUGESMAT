@@ -10,19 +10,19 @@ from datetime import UTC, datetime, timedelta
 
 from app.celery_app import celery_app
 from app.core.config import settings
-from app.db.models import Execution
-from app.db.session import SessionLocal
-from app.repositories.execution_repo import delete_old_pending_executions
+from app.db.modelos import Ejecucion
+from app.db.sesion import SessionLocal
+from app.repositories.repositorio_ejecuciones import eliminar_ejecuciones_pendientes_antiguas
 
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task
-def cleanup_pending_executions():
+@celery_app.task(name="app.workers.cleanup_tasks.cleanup_pending_executions")
+def limpiar_ejecuciones_pendientes():
     """Elimina ejecuciones en estado 'pending' con más de 24 horas de antigüedad."""
     db = SessionLocal()
     try:
-        deleted = delete_old_pending_executions(db, hours=24)
+        deleted = eliminar_ejecuciones_pendientes_antiguas(db, hours=24)
         if deleted:
             logger.info(f"Limpieza automática: {deleted} ejecuciones pending eliminadas")
     except Exception:
@@ -32,29 +32,29 @@ def cleanup_pending_executions():
         db.close()
 
 
-@celery_app.task
-def cleanup_stuck_executions():
+@celery_app.task(name="app.workers.cleanup_tasks.cleanup_stuck_executions")
+def limpiar_ejecuciones_atascadas():
     """Marca como 'failed' ejecuciones 'running'/'queued' sin cambios por más de 6h."""
     db = SessionLocal()
     try:
         cutoff = datetime.now(UTC)
         stuck = (
-            db.query(Execution)
+            db.query(Ejecucion)
             .filter(
-                Execution.status.in_(["running", "queued"]),
+                Ejecucion.estado.in_(["running", "queued"]),
             )
             .all()
         )
         count = 0
         for ex in stuck:
             age = (
-                cutoff - (ex.progress_updated_at or ex.started_at or ex.created_at)
+                cutoff - (ex.progreso_actualizado_en or ex.iniciado_en or ex.creado_en)
             ).total_seconds()
             if age > settings.STUCK_EXECUTION_TIMEOUT:
-                ex.status = "failed"
-                ex.current_phase = f"{ex.current_phase or ''} (timeout 6h)"
-                ex.completed_at = cutoff
-                ex.duration_seconds = round(age, 2)
+                ex.estado = "failed"
+                ex.fase_actual = f"{ex.fase_actual or ''} (timeout 6h)"
+                ex.completado_en = cutoff
+                ex.duracion_segundos = round(age, 2)
                 count += 1
         db.commit()
         if count:
@@ -66,39 +66,39 @@ def cleanup_stuck_executions():
         db.close()
 
 
-def _relaunch_phase4(db, eid: int) -> None:
+def _relanzar_fase4(db, eid: int) -> None:
     from celery import chord
 
-    from app.workers.phases.common import (
-        _get_pending_items,
-        _mark_chord_active,
-        _reset_failed_items,
-        on_phase_items_done,
-        on_users_done,
+    from app.workers.phases.comunes import (
+        _marcar_chord_activo,
+        _obtener_items_pendientes,
+        _reiniciar_items_fallidos,
+        al_terminar_items_fase,
+        al_terminar_usuarios,
     )
-    from app.workers.phases.item_task import process_etl_item
+    from app.workers.phases.tarea_item import procesar_item_etl
 
-    _reset_failed_items(db, eid, "4")
+    _reiniciar_items_fallidos(db, eid, "4")
 
-    pending_users = _get_pending_items(db, eid, "4", sub_phase="create_user")
+    pending_users = _obtener_items_pendientes(db, eid, "4", sub_phase="create_user")
     if pending_users:
-        task_ids = [process_etl_item.si(item.id) for item in pending_users]
-        chord(task_ids)(on_users_done.s(execution_id=eid))
-        _mark_chord_active(eid)
+        task_ids = [procesar_item_etl.si(item.id) for item in pending_users]
+        chord(task_ids)(al_terminar_usuarios.s(execution_id=eid))
+        _marcar_chord_activo(eid)
         return
 
-    pending_enrols = _get_pending_items(db, eid, "4", sub_phase="enrol")
+    pending_enrols = _obtener_items_pendientes(db, eid, "4", sub_phase="enrol")
     if pending_enrols:
-        task_ids = [process_etl_item.si(item.id) for item in pending_enrols]
-        chord(task_ids)(on_phase_items_done.s(execution_id=eid, phase="4"))
-        _mark_chord_active(eid)
+        task_ids = [procesar_item_etl.si(item.id) for item in pending_enrols]
+        chord(task_ids)(al_terminar_items_fase.s(execution_id=eid, phase="4"))
+        _marcar_chord_activo(eid)
         return
 
-    on_phase_items_done.delay([], eid, "4")
+    al_terminar_items_fase.delay([], eid, "4")
 
 
-@celery_app.task
-def recover_stuck_phase():
+@celery_app.task(name="app.workers.cleanup_tasks.recover_stuck_phase")
+def recuperar_fase_atascada():
     """Red de seguridad: relanza chords de FASE 3/4 atascados.
 
     Un chord puede quedar huérfano si un worker cae y su callback nunca se
@@ -108,11 +108,11 @@ def recover_stuck_phase():
       (marcador `chord_active` expirado/ausente) y no hay items procesándose
       recientemente, relanza el chord de la fase.
     """
-    from app.db.models import OperationItem
-    from app.repositories.operation_repo import resolve_orphan_items
-    from app.workers.phases.common import _get_pending_items, _items_exist_for_execution
-    from app.workers.phases.phase3_structure import on_delete_items_done
-    from app.workers.utils import STUCK_ITEM_TIMEOUT_MINUTES, reset_stuck_items
+    from app.db.modelos import ItemOperacion
+    from app.repositories.repositorio_operaciones import resolver_items_huerfanos
+    from app.workers.phases.comunes import _existen_items_para_ejecucion, _obtener_items_pendientes
+    from app.workers.phases.fase3_estructura import al_terminar_items_eliminacion
+    from app.workers.utilidades import STUCK_ITEM_TIMEOUT_MINUTES, reiniciar_items_atascados
 
     db = SessionLocal()
     try:
@@ -121,12 +121,12 @@ def recover_stuck_phase():
         # Resolver items huérfanos de ejecuciones ya finalizadas antes de
         # procesar las activas: evita que un lote terminado quede "activo"
         # bloqueando subidas (get_active_batch).
-        resolve_orphan_items(db)
+        resolver_items_huerfanos(db)
 
-        executions = db.query(Execution).filter(Execution.status == "running").all()
+        executions = db.query(Ejecucion).filter(Ejecucion.estado == "running").all()
         for ex in executions:
             eid = ex.id
-            checkpoint = ex.phase_checkpoint or {}
+            checkpoint = ex.checkpoint_fase or {}
             active_ts = checkpoint.get("chord_active")
             chord_alive = False
             if isinstance(active_ts, str):
@@ -135,29 +135,29 @@ def recover_stuck_phase():
                 except ValueError:
                     chord_alive = False
 
-            # 1) Siempre resetear items 'processing' viejos: pueden quedar
-            #    atascados aunque otros items de la fase sigan activos.
+                    # 1) Siempre resetear items 'processing' viejos: pueden quedar
+                    #    atascados aunque otros items de la fase sigan activos.
             for phase in ("3", "4"):
-                reset_stuck_items(
+                reiniciar_items_atascados(
                     db,
                     batch_id_prefix=f"etl_{phase}_%",
                     execution_id=eid,
                     increment_attempt=True,
                 )
 
-            # 2) Relanzar solo si hay pendientes, sin chord vivo y sin
-            #    procesamiento reciente en la fase.
+                # 2) Relanzar solo si hay pendientes, sin chord vivo y sin
+                #    procesamiento reciente en la fase.
             phase_relaunched = False
             for phase in ("3", "4"):
-                pending = _get_pending_items(db, eid, phase)
+                pending = _obtener_items_pendientes(db, eid, phase)
                 if not pending:
                     continue
                 recent_processing = (
-                    db.query(OperationItem)
+                    db.query(ItemOperacion)
                     .filter(
-                        OperationItem.batch_id.like(f"etl_{phase}_%_{eid}"),
-                        OperationItem.status == "processing",
-                        OperationItem.updated_at
+                        ItemOperacion.id_lote.like(f"etl_{phase}_%_{eid}"),
+                        ItemOperacion.estado == "processing",
+                        ItemOperacion.actualizado_en
                         >= now - timedelta(minutes=STUCK_ITEM_TIMEOUT_MINUTES),
                     )
                     .count()
@@ -170,18 +170,18 @@ def recover_stuck_phase():
                     f"pendientes sin chord activo ni items recientes, relanzando"
                 )
                 if phase == "3":
-                    on_delete_items_done.delay([], eid)
+                    al_terminar_items_eliminacion.delay([], eid)
                 else:
-                    _relaunch_phase4(db, eid)
+                    _relanzar_fase4(db, eid)
                 phase_relaunched = True
                 break
 
             if not phase_relaunched and not checkpoint.get("phase3_ctx"):
-                has_items = _items_exist_for_execution(db, eid, "3") or _items_exist_for_execution(
-                    db, eid, "4"
-                )
+                has_items = _existen_items_para_ejecucion(
+                    db, eid, "3"
+                ) or _existen_items_para_ejecucion(db, eid, "4")
                 if not has_items:
-                    heartbeat = ex.progress_updated_at or ex.created_at
+                    heartbeat = ex.progreso_actualizado_en or ex.creado_en
                     stale = heartbeat is not None and (
                         now - heartbeat.replace(tzinfo=UTC)
                         if heartbeat.tzinfo is None
@@ -192,18 +192,18 @@ def recover_stuck_phase():
                         if retry < 3:
                             import os
 
-                            file_path = os.path.join(settings.UPLOAD_DIR, ex.filename)
+                            file_path = os.path.join(settings.UPLOAD_DIR, ex.nombre_archivo)
                             if os.path.isfile(file_path):
-                                from app.workers.tasks import process_etl_file
+                                from app.workers.tareas import procesar_archivo_etl
 
                                 checkpoint["_retry_count"] = retry + 1
-                                ex.phase_checkpoint = checkpoint
+                                ex.checkpoint_fase = checkpoint
                                 db.commit()
                                 logger.warning(
                                     f"Sweeper: ejecución {eid} atascada en fases 1-2 "
                                     f"(intento {retry + 1}/3), relanzando ETL"
                                 )
-                                process_etl_file.delay(ex.id, file_path, ex.semester)
+                                procesar_archivo_etl.delay(ex.id, file_path, ex.semestre)
     except Exception:
         logger.exception("Error en recuperación de fases atascadas")
         db.rollback()

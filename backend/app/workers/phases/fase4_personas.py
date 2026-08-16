@@ -2,30 +2,30 @@ import logging
 import uuid
 from functools import wraps
 
-from app.repositories.operation_repo import add_item, create_batch
-from app.services.moodle_factory import get_moodle_service
-from app.workers.phases.common import (
-    _acquire_advisory_lock,
-    _get_pending_counts,
-    _items_exist_for_execution,
+from app.repositories.repositorio_operaciones import agregar_item, crear_lote
+from app.services.fabrica_moodle import obtener_servicio_moodle
+from app.workers.phases.comunes import (
+    _adquirir_bloqueo_asesor,
+    _existen_items_para_ejecucion,
+    _obtener_conteos_pendientes,
 )
-from app.workers.utils import _run_async
+from app.workers.utilidades import _ejecutar_async
 
 logger = logging.getLogger(__name__)
 
 
-def _sync_wrap(async_fn):
+def _envoltura_sincronizacion(async_fn):
     @wraps(async_fn)
     def wrapper(*args, **kwargs):
-        return _run_async(async_fn(*args, **kwargs))
+        return _ejecutar_async(async_fn(*args, **kwargs))
 
     return wrapper
 
 
-async def _resolve_course_map(modalidad, all_sns):
-    ms = get_moodle_service(modalidad)
+async def _resolver_mapa_cursos(modalidad, all_sns):
+    ms = obtener_servicio_moodle(modalidad)
     try:
-        all_courses = await ms.get_courses()
+        all_courses = await ms.obtener_cursos()
         course_map = {c["shortname"]: int(c["id"]) for c in all_courses if c.get("shortname")}
         course_fullname = {
             c["shortname"]: c.get("fullname", "") for c in all_courses if c.get("shortname")
@@ -36,15 +36,16 @@ async def _resolve_course_map(modalidad, all_sns):
             for i in range(0, len(missing), BATCH):
                 chunk = missing[i : i + BATCH]
                 try:
-                    resolved = await ms.get_courses_by_shortnames(chunk)
+                    resolved = await ms.obtener_cursos_por_shortnames(chunk)
                     for c in resolved:
                         if c.get("shortname"):
                             course_map[c["shortname"]] = int(c["id"])
                             course_fullname[c["shortname"]] = c.get("fullname", "")
-                except Exception:
+                except Exception as e:
+                    logger.warning(f"Falló resolver cursos por shortnames (lote): {e}")
                     for sn in chunk:
                         try:
-                            courses = await ms.get_courses_by_field("shortname", sn)
+                            courses = await ms.obtener_cursos_por_campo("shortname", sn)
                             if courses and courses[0].get("id"):
                                 course_map[sn] = int(courses[0]["id"])
                                 course_fullname[sn] = courses[0].get("fullname", "")
@@ -55,8 +56,8 @@ async def _resolve_course_map(modalidad, all_sns):
         await ms.close()
 
 
-async def _resolve_fallback(modalidad, all_sns):
-    ms = get_moodle_service(modalidad)
+async def _resolver_respaldo(modalidad, all_sns):
+    ms = obtener_servicio_moodle(modalidad)
     try:
         fallback_map = {}
         fallback_fullname = {}
@@ -64,15 +65,16 @@ async def _resolve_fallback(modalidad, all_sns):
         for i in range(0, len(all_sns), BATCH):
             chunk = all_sns[i : i + BATCH]
             try:
-                resolved = await ms.get_courses_by_shortnames(chunk)
+                resolved = await ms.obtener_cursos_por_shortnames(chunk)
                 for c in resolved:
                     if c.get("shortname"):
                         fallback_map[c["shortname"]] = int(c["id"])
                         fallback_fullname[c["shortname"]] = c.get("fullname", "")
-            except Exception:
+            except Exception as e:
+                logger.warning(f"Falló resolver cursos por shortnames (fallback): {e}")
                 for sn in chunk:
                     try:
-                        courses = await ms.get_courses_by_field("shortname", sn)
+                        courses = await ms.obtener_cursos_por_campo("shortname", sn)
                         if courses and courses[0].get("id"):
                             fallback_map[sn] = int(courses[0]["id"])
                             fallback_fullname[sn] = courses[0].get("fullname", "")
@@ -83,9 +85,9 @@ async def _resolve_fallback(modalidad, all_sns):
         await ms.close()
 
 
-async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> dict[str, int]:
-    if _items_exist_for_execution(db, execution_id, "4"):
-        pending = _get_pending_counts(db, execution_id, "4")
+async def _crear_items_fase4_async(db, execution_id, ctx_data, modalidad) -> dict[str, int]:
+    if _existen_items_para_ejecucion(db, execution_id, "4"):
+        pending = _obtener_conteos_pendientes(db, execution_id, "4")
         if pending:
             logger.info(
                 f"Items FASE 4 ya existen con {sum(pending.values())} pendientes, retomando"
@@ -93,25 +95,25 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> d
             return pending
         logger.info("Items FASE 4 ya existen y todos procesados, saltando creación")
         return {}
-    if not _acquire_advisory_lock(db, execution_id, "4"):
+    if not _adquirir_bloqueo_asesor(db, execution_id, "4"):
         logger.info(
             f"Lock FASE 4 ya tomado para ejecución {execution_id}, otro worker crea los items"
         )
         return {}
 
     counts: dict[str, int] = {}
-    users_to_create = ctx_data.get("users_to_create", [])
+    usuarios_a_crear = ctx_data.get("users_to_create", [])
     resolved_enrolments = ctx_data.get("resolved_enrolments", [])
 
-    def _batch_id(suffix):
+    def _id_lote(suffix):
         return f"etl_4_{suffix}_{execution_id}"
 
-    if users_to_create:
-        batch = create_batch(
-            db, _batch_id("users"), "users", "create", len(users_to_create), modalidad
+    if usuarios_a_crear:
+        batch = crear_lote(
+            db, _id_lote("users"), "users", "create", len(usuarios_a_crear), modalidad
         )
         count = 0
-        for user in users_to_create:
+        for user in usuarios_a_crear:
             username = (
                 user.get("email", "").split("@")[0]
                 if user.get("email")
@@ -132,13 +134,13 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> d
                 "email_personal": user.get("email_personal", ""),
             }
             identifier = user.get("username", username)
-            add_item(db, batch.batch_id, identifier, detail)
+            agregar_item(db, batch.id_lote, identifier, detail)
             count += 1
         counts["create_users"] = count
 
     if resolved_enrolments:
-        batch = create_batch(
-            db, _batch_id("enrol"), "enrolments", "enrol", len(resolved_enrolments), modalidad
+        batch = crear_lote(
+            db, _id_lote("enrol"), "enrolments", "enrol", len(resolved_enrolments), modalidad
         )
         count = 0
 
@@ -152,11 +154,11 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> d
             }
         )
         try:
-            course_map, course_fullname = await _resolve_course_map(modalidad, all_sns)
+            course_map, course_fullname = await _resolver_mapa_cursos(modalidad, all_sns)
         except Exception as e:
             logger.warning(f"Error resolviendo course_map global: {e}, intentando por shortname")
             try:
-                course_map, course_fullname = await _resolve_fallback(modalidad, all_sns)
+                course_map, course_fullname = await _resolver_respaldo(modalidad, all_sns)
             except Exception as e2:
                 logger.warning(f"Error resolviendo course_map fallback: {e2}, usando map vacío")
                 course_map, course_fullname = {}, {}
@@ -178,7 +180,7 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> d
                 detail["firstname"] = user_data.get("firstname", "")
                 detail["lastname"] = user_data.get("lastname", "")
                 detail["email"] = user_data.get("email", "")
-            add_item(db, batch.batch_id, username, detail)
+            agregar_item(db, batch.id_lote, username, detail)
             count += 1
         counts["enrol"] = count
 
@@ -186,4 +188,4 @@ async def _create_phase4_items_async(db, execution_id, ctx_data, modalidad) -> d
     return counts
 
 
-_create_phase4_items = _sync_wrap(_create_phase4_items_async)
+_create_phase4_items = _envoltura_sincronizacion(_crear_items_fase4_async)

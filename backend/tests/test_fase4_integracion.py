@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.workers.phases.phase4_people import _create_phase4_items_async as _create_phase4_items
+from app.workers.phases.fase4_personas import _crear_items_fase4_async as _create_phase4_items
 
 
 def _make_ctx_data(users=None, enrolments=None):
@@ -50,11 +50,11 @@ class TestCreatePhase4Items:
     async def test_happy_path_users_and_enrolments(self, test_db):
         """Crea usuarios + enrolments correctamente."""
         with (
-            patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True),
-            patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory,
+            patch("app.workers.phases.fase4_personas._adquirir_bloqueo_asesor", return_value=True),
+            patch("app.workers.phases.fase4_personas.obtener_servicio_moodle") as mock_factory,
         ):
             instance = AsyncMock()
-            instance.get_courses.return_value = [
+            instance.obtener_cursos.return_value = [
                 {"id": 100, "shortname": "TST_0001_sI_001_G-1_12345"},
             ]
             mock_factory.return_value = instance
@@ -70,18 +70,18 @@ class TestCreatePhase4Items:
         assert counts.get("enrol") == 1
 
         # Verificar en DB
-        from app.db.models import OperationItem
+        from app.db.modelos import ItemOperacion
 
-        items = test_db.query(OperationItem).filter(OperationItem.batch_id.like("etl_4_%_1")).all()
+        items = test_db.query(ItemOperacion).filter(ItemOperacion.id_lote.like("etl_4_%_1")).all()
         assert len(items) == 2
-        usernames = [(i.identifier, (i.detail or {}).get("action")) for i in items]
+        usernames = [(i.identificador, (i.detalle or {}).get("action")) for i in items]
         assert ("testuser", "create_user") in usernames
         assert ("testuser", "enrol") in usernames
 
     @pytest.mark.asyncio
     async def test_lock_contention(self, test_db):
         """Advisory lock evita duplicados: segundo llamado retorna vacío."""
-        with patch("app.workers.phases.phase4_people._acquire_advisory_lock") as mock_lock:
+        with patch("app.workers.phases.fase4_personas._adquirir_bloqueo_asesor") as mock_lock:
             # Primer worker obtiene el lock
             mock_lock.side_effect = [True, False]
 
@@ -102,11 +102,11 @@ class TestCreatePhase4Items:
     async def test_already_exists(self, test_db):
         """Items ya existen → retomar sin duplicar."""
         with (
-            patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True),
-            patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory,
+            patch("app.workers.phases.fase4_personas._adquirir_bloqueo_asesor", return_value=True),
+            patch("app.workers.phases.fase4_personas.obtener_servicio_moodle") as mock_factory,
         ):
             instance = AsyncMock()
-            instance.get_courses.return_value = []
+            instance.obtener_cursos.return_value = []
             mock_factory.return_value = instance
 
             # Primera llamada: crear items
@@ -117,13 +117,13 @@ class TestCreatePhase4Items:
             counts_1 = await _create_phase4_items(test_db, 3, ctx, "DISTANCIA")
             assert counts_1.get("create_users") == 1
 
-        # Segunda llamada: ya existen, debe retomar
+            # Segunda llamada: ya existen, debe retomar
         with (
-            patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True),
-            patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory,
+            patch("app.workers.phases.fase4_personas._adquirir_bloqueo_asesor", return_value=True),
+            patch("app.workers.phases.fase4_personas.obtener_servicio_moodle") as mock_factory,
         ):
             instance = AsyncMock()
-            instance.get_courses.return_value = []
+            instance.obtener_cursos.return_value = []
             mock_factory.return_value = instance
 
             counts_2 = await _create_phase4_items(test_db, 3, ctx, "DISTANCIA")
@@ -135,11 +135,11 @@ class TestCreatePhase4Items:
     async def test_enrol_items_have_course_id(self, test_db):
         """Items de enrolment deben tener _course_id resuelto."""
         with (
-            patch("app.workers.phases.phase4_people._acquire_advisory_lock", return_value=True),
-            patch("app.workers.phases.phase4_people.get_moodle_service") as mock_factory,
+            patch("app.workers.phases.fase4_personas._adquirir_bloqueo_asesor", return_value=True),
+            patch("app.workers.phases.fase4_personas.obtener_servicio_moodle") as mock_factory,
         ):
             instance = AsyncMock()
-            instance.get_courses.return_value = [
+            instance.obtener_cursos.return_value = [
                 {"id": 200, "shortname": "TST_0001_sI_001_G-1_12345"},
             ]
             mock_factory.return_value = instance
@@ -149,15 +149,15 @@ class TestCreatePhase4Items:
             )
             await _create_phase4_items(test_db, 4, ctx, "DISTANCIA")
 
-        from app.db.models import OperationItem
+        from app.db.modelos import ItemOperacion
 
         enrol_item = (
-            test_db.query(OperationItem)
+            test_db.query(ItemOperacion)
             .filter(
-                OperationItem.batch_id.like("etl_4_%_4"),
-                OperationItem.detail["action"].as_string() == "enrol",
+                ItemOperacion.id_lote.like("etl_4_%_4"),
+                ItemOperacion.detalle["action"].as_string() == "enrol",
             )
             .first()
         )
         assert enrol_item is not None
-        assert (enrol_item.detail or {}).get("_course_id") == 200
+        assert (enrol_item.detalle or {}).get("_course_id") == 200

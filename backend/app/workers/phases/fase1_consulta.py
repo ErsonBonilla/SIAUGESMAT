@@ -1,68 +1,68 @@
 import logging
 
-from app.pipeline.shortnames import SIAUGESMAT_PATTERN
-from app.pipeline.users import (
-    index_teachers,
-    lookup_teacher_candidates,
-    names_differ,
-    normalize_name,
-    resolve_users,
+from app.pipeline.nombres_cortos import SIAUGESMAT_PATTERN
+from app.pipeline.usuarios import (
+    buscar_candidatos_docente,
+    indexar_docentes,
+    nombres_difieren,
+    normalizar_nombre,
+    resolver_usuarios,
 )
-from app.repositories import log_repo
-from app.repositories.execution_repo import touch_heartbeat, update_progress
-from app.services.error_messages import translate_error
-from app.workers.phases.base import BasePhase, PhaseContext
+from app.repositories import repositorio_registros
+from app.repositories.repositorio_ejecuciones import actualizar_heartbeat, actualizar_progreso
+from app.services.mensajes_error import traducir_error
+from app.workers.phases.base import ContextoFase, FaseBase
 
 logger = logging.getLogger(__name__)
 
 # Re-export público del núcleo puro (los tests importan estos helpers aquí).
-_normalize_name = normalize_name
-_names_differ = names_differ
+_normalize_name = normalizar_nombre
+_names_differ = nombres_difieren
 
 
-class ConsultPhase(BasePhase):
+class FaseConsulta(FaseBase):
     phase_name = "1"
 
-    async def run(self, ctx: PhaseContext) -> None:
+    async def ejecutar(self, ctx: ContextoFase) -> None:
         db = ctx.db
-        eid = ctx.execution_id
-        mode = ctx.mode
-        etl_data = ctx.etl_data
-        moodle_service = ctx.moodle_service
-        integration = ctx.integration
+        eid = ctx.ejecucion_id
+        mode = ctx.modo
+        etl_data = ctx.datos_etl
+        moodle_service = ctx.servicio_moodle
+        integration = ctx.integracion
 
         try:
-            update_progress(db, eid, 2, "Consultando categorías…", step=1)
+            actualizar_progreso(db, eid, 2, "Consultando categorías…", paso=1)
 
-            all_moodle_cats = await moodle_service.get_categories()
-            ctx.all_categories_map = {
+            all_moodle_cats = await moodle_service.obtener_categorias()
+            ctx.mapa_todas_categorias = {
                 c.get("idnumber", ""): c for c in all_moodle_cats if c.get("idnumber")
             }
-            ctx.existing_cat_idnumbers = set(ctx.all_categories_map.keys())
+            ctx.idnumeros_categorias_existentes = set(ctx.mapa_todas_categorias.keys())
 
-            update_progress(db, eid, 5, "Consultando cursos…")
+            actualizar_progreso(db, eid, 5, "Consultando cursos…")
 
-            all_courses = await moodle_service.get_courses()
+            all_courses = await moodle_service.obtener_cursos()
             if not isinstance(all_courses, list):
                 raise ValueError(
                     f"get_courses() devolvió {type(all_courses).__name__} "
                     f"en vez de list: {str(all_courses)[:200]}"
                 )
-            ctx.existing_courses = [
+            ctx.cursos_existentes = [
                 c for c in all_courses if SIAUGESMAT_PATTERN.match(c.get("shortname", ""))
             ]
 
-            update_progress(db, eid, 10, "Consultando usuarios…")
+            actualizar_progreso(db, eid, 10, "Consultando usuarios…")
 
             etl_users = etl_data["users"]
 
             all_institutional = {u["email"] for u in etl_users if u.get("email")}
             all_personal = {u["email_personal"] for u in etl_users if u.get("email_personal")}
 
-            def _persist_email_conflicts(integration=None):
-                conflicts = getattr(integration, "last_email_conflicts", [])
+            def _persistir_conflictos_correo(integration=None):
+                conflicts = getattr(integration, "ultimos_conflictos_correo", [])
                 for conflict in conflicts:
-                    log_repo.save_log(
+                    repositorio_registros.guardar_log(
                         db,
                         eid,
                         "1",
@@ -82,21 +82,23 @@ class ConsultPhase(BasePhase):
                     )
 
             institutional_map = (
-                await integration.find_users_by_emails(list(all_institutional))
+                await integration.encontrar_usuarios_por_correos(list(all_institutional))
                 if all_institutional
                 else {}
             )
-            _persist_email_conflicts(integration)
+            _persistir_conflictos_correo(integration)
             personal_map = (
-                await integration.find_users_by_emails(list(all_personal - all_institutional))
+                await integration.encontrar_usuarios_por_correos(
+                    list(all_personal - all_institutional)
+                )
                 if all_personal
                 else {}
             )
-            _persist_email_conflicts(integration)
-            username_index = await integration.find_users_by_usernames(
+            _persistir_conflictos_correo(integration)
+            username_index = await integration.encontrar_usuarios_por_usernames(
                 [u.get("username", "") for u in etl_users if u.get("username")]
             )
-            idnumber_index = await integration.find_users_by_idnumbers(
+            idnumber_index = await integration.encontrar_usuarios_por_idnumbers(
                 [u.get("cedula", "") for u in etl_users if u.get("cedula")]
             )
 
@@ -110,9 +112,9 @@ class ConsultPhase(BasePhase):
                     email = user.get("email", "")
                     if uname and email:
                         username_emails[uname] = email
-            ctx.username_emails = username_emails
+            ctx.correos_usuarios = username_emails
 
-            username_map, user_events = resolve_users(
+            username_map, user_events = resolver_usuarios(
                 etl_users,
                 institutional_map,
                 personal_map,
@@ -122,20 +124,20 @@ class ConsultPhase(BasePhase):
             for tipo, identifier, detail in user_events:
                 if tipo == "user_resolved" and mode not in ("users", "both"):
                     continue
-                log_repo.save_log(db, eid, "1", tipo, identifier, detail)
+                repositorio_registros.guardar_log(db, eid, "1", tipo, identifier, detail)
                 if tipo == "user_identity_conflict":
                     logger.warning(
                         f"Conflicto de identidad {identifier}: ETL='{detail['etl_fullname']}' "
                         f"vs Moodle='{detail['moodle_fullname']}' "
                         f"(match por {detail['matched_by']})"
                     )
-            ctx.username_map = username_map
+            ctx.mapa_usuarios = username_map
 
             courses_by_sn = {
                 c["shortname"]: c.get("fullname", "") for c in etl_data.get("courses", [])
             }
             for dup in etl_data.get("duplicates", []):
-                log_repo.save_log(
+                repositorio_registros.guardar_log(
                     db,
                     eid,
                     "1",
@@ -148,62 +150,62 @@ class ConsultPhase(BasePhase):
                     },
                 )
 
-            log_repo.save_log(
+            repositorio_registros.guardar_log(
                 db,
                 eid,
                 "1",
                 "phase1_complete",
-                detail={
-                    "categories_found": len(ctx.existing_cat_idnumbers),
-                    "courses_found": len(ctx.existing_courses),
+                detalle={
+                    "categories_found": len(ctx.idnumeros_categorias_existentes),
+                    "courses_found": len(ctx.cursos_existentes),
                     "users_resolved": len(username_map),
                 },
             )
             logger.info(
-                f"FASE 1: {len(ctx.existing_cat_idnumbers)} cats, "
-                f"{len(ctx.existing_courses)} cursos, "
+                f"FASE 1: {len(ctx.idnumeros_categorias_existentes)} cats, "
+                f"{len(ctx.cursos_existentes)} cursos, "
                 f"{len(username_map)} usuarios resueltos"
             )
-            update_progress(db, eid, 14, "Análisis de datos completado")
+            actualizar_progreso(db, eid, 14, "Análisis de datos completado")
 
             courses_with_teacher: dict[str, str] = {}
             if mode in ("courses", "both"):
-                teacher_index = index_teachers(etl_data["users"], etl_data["enrolments"])
+                teacher_index = indexar_docentes(etl_data["users"], etl_data["enrolments"])
 
                 import asyncio
 
                 sem = asyncio.Semaphore(10)
 
-                async def _fetch_teacher(c, idx):
+                async def _obtener_docente(c, idx):
                     sn = c.get("shortname", "")
-                    emails, usernames, idnumbers = lookup_teacher_candidates(sn, teacher_index)
+                    emails, usernames, idnumbers = buscar_candidatos_docente(sn, teacher_index)
                     async with sem:
-                        teachers = await moodle_service.get_enrolled_teachers(
+                        teachers = await moodle_service.obtener_docentes_matriculados(
                             int(c["id"]),
                             emails,
                             teacher_usernames=usernames,
                             teacher_idnumbers=idnumbers,
                         )
                     if idx > 0 and idx % 25 == 0:
-                        touch_heartbeat(db, eid)
+                        actualizar_heartbeat(db, eid)
                     if teachers:
                         return sn, teachers[0].get("username", "")
                     return sn, None
 
-                tasks = [_fetch_teacher(c, i) for i, c in enumerate(ctx.existing_courses)]
+                tasks = [_obtener_docente(c, i) for i, c in enumerate(ctx.cursos_existentes)]
                 results = await asyncio.gather(*tasks)
                 for sn, username in results:
                     if username:
                         courses_with_teacher[sn] = username
-            ctx.courses_with_teacher = courses_with_teacher
+            ctx.cursos_con_docente = courses_with_teacher
 
             logger.info(
                 f"FASE 1d: {len(courses_with_teacher)} cursos con editingteacher, "
-                f"{len(ctx.existing_courses) - len(courses_with_teacher)} cursos huérfanos"
+                f"{len(ctx.cursos_existentes) - len(courses_with_teacher)} cursos huérfanos"
             )
 
         except Exception as e:
             logger.exception(f"Error en FASE 1 (consulta): {e}")
-            log_repo.save_error(db, eid, "1", "", translate_error(e))
-            ctx.metrics["total_errors"] += 1
+            repositorio_registros.guardar_error(db, eid, "1", "", traducir_error(e))
+            ctx.metricas["total_errors"] += 1
             raise

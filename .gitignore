@@ -67,3 +67,5 @@ build/
 # cada integrador coloca los suyos en backend/e2e/fixtures/. Solo se
 # commitean scripts .py y documentación.
 # ---------------------------------------------------------------------------
+backend/e2e/tmp_uploads/
+backend/e2e/tmp_reports/

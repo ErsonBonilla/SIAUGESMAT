@@ -13,7 +13,7 @@ from jose import jwt
 from app.core.config import settings
 
 
-def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
+def crear_token_acceso(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
     """
     Crea un token JWT firmado con los datos suministrados.
     """
@@ -32,7 +32,7 @@ def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = 
     return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
 
 
-def decode_access_token(token: str) -> dict[str, Any]:
+def decodificar_token_acceso(token: str) -> dict[str, Any]:
     """
     Decodifica y valida un token JWT.
 

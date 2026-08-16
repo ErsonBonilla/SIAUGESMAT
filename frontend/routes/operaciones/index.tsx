@@ -1,22 +1,22 @@
-import { requireAuth } from "../../utils/auth-guard.ts";
-import HubPage from "../../components/HubPage.tsx";
-import { ChartBarIcon, ListIcon } from "../../utils/icons.tsx";
+import { requerirAutenticacion } from "../../utils/guarda-autenticacion.ts";
+import PaginaHub from "../../components/PaginaHub.tsx";
+import { IconoGraficoBarras, IconoLista } from "../../utils/iconos.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
 export default function OperacionesHub() {
-  return HubPage({
+  return PaginaHub({
     title: "Operaciones",
     cards: [
       {
-        icon: ListIcon,
+        icon: IconoLista,
         title: "Ejecuciones",
         description:
           "Visualiza y gestiona las ejecuciones de carga académica ETL.",
         href: "/operaciones/ejecuciones",
       },
       {
-        icon: ChartBarIcon,
+        icon: IconoGraficoBarras,
         title: "Histórico",
         description:
           "Analítica histórica de operaciones y ejecuciones por semestre.",

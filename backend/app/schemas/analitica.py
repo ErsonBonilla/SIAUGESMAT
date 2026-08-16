@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import BaseModel
 
 
-class SemesterMetrics(BaseModel):
+class MetricasSemestre(BaseModel):
     semester: str
     total_executions: int
     total_courses_created: int
@@ -15,7 +15,7 @@ class SemesterMetrics(BaseModel):
     last_completed: datetime | None = None
 
 
-class SemaphoreStatus(BaseModel):
+class EstadoSemaforo(BaseModel):
     semester: str
     status: str  # green, yellow, red, gray
     error_rate: float
@@ -23,7 +23,7 @@ class SemaphoreStatus(BaseModel):
     message: str
 
 
-class LatestExecution(BaseModel):
+class EjecucionReciente(BaseModel):
     id: int
     semester: str
     filename: str

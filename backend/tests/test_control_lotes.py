@@ -9,27 +9,29 @@ def mock_batch():
     from datetime import datetime
 
     class MockBatch:
-        batch_id = "test-batch-1"
-        entity_type = "course"
-        action = "create"
+        id_lote = "test-batch-1"
+        tipo_entidad = "course"
+        accion = "create"
         modalidad = "DISTANCIA"
-        created_at = datetime.now(UTC)
-        completed_at = None
+        creado_en = datetime.now(UTC)
+        completado_en = None
 
     return MockBatch()
 
 
 class TestGetBatchStatus:
-    def test_not_found(self, client, auth_headers):
-        with patch("app.api.v1.endpoints.batch_control.get_batch", return_value=None):
-            resp = client.get("/api/v1/operations/batch/nonexistent/status", headers=auth_headers)
+    def test_not_found(self, client, encabezados_auth):
+        with patch("app.api.v1.endpoints.control_lotes.obtener_lote", return_value=None):
+            resp = client.get(
+                "/api/v1/operations/batch/nonexistent/status", headers=encabezados_auth
+            )
             assert resp.status_code == 404
 
-    def test_returns_status(self, client, auth_headers, mock_batch):
+    def test_returns_status(self, client, encabezados_auth, mock_batch):
         with (
-            patch("app.api.v1.endpoints.batch_control.get_batch", return_value=mock_batch),
+            patch("app.api.v1.endpoints.control_lotes.obtener_lote", return_value=mock_batch),
             patch(
-                "app.api.v1.endpoints.batch_control.get_batch_status",
+                "app.api.v1.endpoints.control_lotes.obtener_estado_lote",
                 return_value={
                     "total": 10,
                     "pending": 2,
@@ -40,9 +42,11 @@ class TestGetBatchStatus:
                     "cancelled": 0,
                 },
             ),
-            patch("app.api.v1.endpoints.batch_control.get_batch_items", return_value=[]),
+            patch("app.api.v1.endpoints.control_lotes.obtener_items_lote", return_value=[]),
         ):
-            resp = client.get("/api/v1/operations/batch/test-batch-1/status", headers=auth_headers)
+            resp = client.get(
+                "/api/v1/operations/batch/test-batch-1/status", headers=encabezados_auth
+            )
             assert resp.status_code == 200
             data = resp.json()
             assert data["batch_id"] == "test-batch-1"
@@ -51,86 +55,96 @@ class TestGetBatchStatus:
 
 
 class TestPauseBatch:
-    def test_not_found(self, client, auth_headers):
-        with patch("app.api.v1.endpoints.batch_control.get_batch", return_value=None):
-            resp = client.post("/api/v1/operations/batch/nonexistent/pause", headers=auth_headers)
+    def test_not_found(self, client, encabezados_auth):
+        with patch("app.api.v1.endpoints.control_lotes.obtener_lote", return_value=None):
+            resp = client.post(
+                "/api/v1/operations/batch/nonexistent/pause", headers=encabezados_auth
+            )
             assert resp.status_code == 404
 
-    def test_pause_success(self, client, auth_headers, mock_batch):
+    def test_pause_success(self, client, encabezados_auth, mock_batch):
         with (
-            patch("app.api.v1.endpoints.batch_control.get_batch", return_value=mock_batch),
-            patch("app.api.v1.endpoints.batch_control.pause_batch", return_value=5),
+            patch("app.api.v1.endpoints.control_lotes.obtener_lote", return_value=mock_batch),
+            patch("app.api.v1.endpoints.control_lotes.pausar_lote", return_value=5),
         ):
-            resp = client.post("/api/v1/operations/batch/test-batch-1/pause", headers=auth_headers)
+            resp = client.post(
+                "/api/v1/operations/batch/test-batch-1/pause", headers=encabezados_auth
+            )
             assert resp.status_code == 200
             assert resp.json()["paused"] == 5
 
 
 class TestResumeBatch:
-    def test_not_found(self, client, auth_headers):
-        with patch("app.api.v1.endpoints.batch_control.get_batch", return_value=None):
-            resp = client.post("/api/v1/operations/batch/nonexistent/resume", headers=auth_headers)
+    def test_not_found(self, client, encabezados_auth):
+        with patch("app.api.v1.endpoints.control_lotes.obtener_lote", return_value=None):
+            resp = client.post(
+                "/api/v1/operations/batch/nonexistent/resume", headers=encabezados_auth
+            )
             assert resp.status_code == 404
 
-    def test_resume_success(self, client, auth_headers, mock_batch):
+    def test_resume_success(self, client, encabezados_auth, mock_batch):
         with (
-            patch("app.api.v1.endpoints.batch_control.get_batch", return_value=mock_batch),
-            patch("app.api.v1.endpoints.batch_control.resume_batch", return_value=5),
+            patch("app.api.v1.endpoints.control_lotes.obtener_lote", return_value=mock_batch),
+            patch("app.api.v1.endpoints.control_lotes.reanudar_lote", return_value=5),
         ):
-            resp = client.post("/api/v1/operations/batch/test-batch-1/resume", headers=auth_headers)
+            resp = client.post(
+                "/api/v1/operations/batch/test-batch-1/resume", headers=encabezados_auth
+            )
             assert resp.status_code == 200
             assert resp.json()["resumed"] == 5
 
 
 class TestDeleteBatch:
-    def test_not_found(self, client, auth_headers):
-        with patch("app.api.v1.endpoints.batch_control.get_batch", return_value=None):
-            resp = client.delete("/api/v1/operations/batch/nonexistent", headers=auth_headers)
+    def test_not_found(self, client, encabezados_auth):
+        with patch("app.api.v1.endpoints.control_lotes.obtener_lote", return_value=None):
+            resp = client.delete("/api/v1/operations/batch/nonexistent", headers=encabezados_auth)
             assert resp.status_code == 404
 
-    def test_delete_success(self, client, auth_headers, mock_batch):
+    def test_delete_success(self, client, encabezados_auth, mock_batch):
         with (
-            patch("app.api.v1.endpoints.batch_control.get_batch", return_value=mock_batch),
-            patch("app.api.v1.endpoints.batch_control.delete_batch", return_value=True),
+            patch("app.api.v1.endpoints.control_lotes.obtener_lote", return_value=mock_batch),
+            patch("app.api.v1.endpoints.control_lotes.eliminar_lote", return_value=True),
         ):
-            resp = client.delete("/api/v1/operations/batch/test-batch-1", headers=auth_headers)
+            resp = client.delete("/api/v1/operations/batch/test-batch-1", headers=encabezados_auth)
             assert resp.status_code == 200
 
-    def test_delete_internal_error(self, client, auth_headers, mock_batch):
+    def test_delete_internal_error(self, client, encabezados_auth, mock_batch):
         with (
-            patch("app.api.v1.endpoints.batch_control.get_batch", return_value=mock_batch),
-            patch("app.api.v1.endpoints.batch_control.delete_batch", return_value=False),
+            patch("app.api.v1.endpoints.control_lotes.obtener_lote", return_value=mock_batch),
+            patch("app.api.v1.endpoints.control_lotes.eliminar_lote", return_value=False),
         ):
-            resp = client.delete("/api/v1/operations/batch/test-batch-1", headers=auth_headers)
+            resp = client.delete("/api/v1/operations/batch/test-batch-1", headers=encabezados_auth)
             assert resp.status_code == 500
 
 
 class TestDownloadReports:
-    def test_not_found(self, client, auth_headers):
-        with patch("app.api.v1.endpoints.batch_control.get_batch", return_value=None):
+    def test_not_found(self, client, encabezados_auth):
+        with patch("app.api.v1.endpoints.control_lotes.obtener_lote", return_value=None):
             resp = client.get(
-                "/api/v1/operations/batch/nonexistent/reports/download", headers=auth_headers
+                "/api/v1/operations/batch/nonexistent/reports/download", headers=encabezados_auth
             )
             assert resp.status_code == 404
 
-    def test_download_zip_reaches_zip_endpoint(self, client, auth_headers, mock_batch, tmp_path):
+    def test_download_zip_reaches_zip_endpoint(
+        self, client, encabezados_auth, mock_batch, tmp_path
+    ):
         """El endpoint /reports/download debe llegar al ZIP (no a /{report_name})
         y `settings` debe estar importado (NameError si no)."""
         zf = tmp_path / "batch.zip"
         zf.write_bytes(b"zip-data")
         with (
-            patch("app.api.v1.endpoints.batch_control.get_batch", return_value=mock_batch),
-            patch("app.api.v1.endpoints.batch_control.get_all_batch_items", return_value=[]),
-            patch("app.api.v1.endpoints.batch_control.save_batch_reports"),
+            patch("app.api.v1.endpoints.control_lotes.obtener_lote", return_value=mock_batch),
+            patch("app.api.v1.endpoints.control_lotes.obtener_todos_items_lote", return_value=[]),
+            patch("app.api.v1.endpoints.control_lotes.guardar_reportes_lote"),
             patch(
-                "app.api.v1.endpoints.batch_control.build_batch_report_zip",
+                "app.api.v1.endpoints.control_lotes.construir_zip_reportes_lote",
                 return_value=(str(zf), "batch.zip"),
             ),
-            patch("app.api.v1.endpoints.batch_control.os.path.exists", return_value=False),
+            patch("app.api.v1.endpoints.control_lotes.os.path.exists", return_value=False),
         ):
             resp = client.get(
                 "/api/v1/operations/batch/test-batch-1/reports/download",
-                headers=auth_headers,
+                headers=encabezados_auth,
             )
             assert resp.status_code == 200
             assert resp.content == b"zip-data"

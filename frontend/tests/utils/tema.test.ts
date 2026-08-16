@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { darkSignal } from "../../utils/theme.ts";
+import { darkSignal } from "../../utils/tema.ts";
 
 Deno.test("theme - darkSignal defaults to true", () => {
   const initial = darkSignal.value;

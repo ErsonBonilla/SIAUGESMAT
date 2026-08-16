@@ -13,11 +13,11 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.core.dependencies import get_current_user
-from app.core.security import create_access_token
-from app.schemas.user import UserInToken
-from app.services.moodle_errors import MoodleAPIError
-from app.services.moodle_factory import get_moodle_service
+from app.core.dependencies import obtener_usuario_actual
+from app.core.seguridad import crear_token_acceso
+from app.schemas.usuario import UsuarioEnToken
+from app.services.errores_moodle import ErrorApiMoodle
+from app.services.fabrica_moodle import obtener_servicio_moodle
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 
-class LoginRequest(BaseModel):
+class SolicitudLogin(BaseModel):
     """Credenciales de inicio de sesión."""
 
     username: str = Field(..., description="Nombre de usuario en Moodle")
@@ -37,7 +37,7 @@ class LoginRequest(BaseModel):
     modalidad: str = Field(..., description="Modalidad: PRESENCIAL o DISTANCIA")
 
 
-class LoginResponse(BaseModel):
+class RespuestaLogin(BaseModel):
     """Respuesta exitosa con token de acceso."""
 
     access_token: str
@@ -47,7 +47,7 @@ class LoginResponse(BaseModel):
     modalidad: str
 
 
-class UserProfileResponse(BaseModel):
+class RespuestaPerfilUsuario(BaseModel):
     """Perfil público del usuario autenticado."""
 
     username: str
@@ -55,13 +55,12 @@ class UserProfileResponse(BaseModel):
     lastname: str
     profileimageurl: str  # URL de la imagen de perfil en Moodle
 
+    # ---------------------------------------------------------------------------
+    # Lógica de validación contra Moodle
+    # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Lógica de validación contra Moodle
-# ---------------------------------------------------------------------------
 
-
-async def _get_moodle_token(moodle_url: str, username: str, password: str) -> str:
+async def _obtener_token_moodle(moodle_url: str, username: str, password: str) -> str:
     """
     Obtiene un token de autenticación de Moodle para el usuario dado.
 
@@ -117,7 +116,7 @@ async def _get_moodle_token(moodle_url: str, username: str, password: str) -> st
         return token
 
 
-async def _check_moodle_permissions(moodle_url: str, token: str) -> int:
+async def _verificar_permisos_moodle(moodle_url: str, token: str) -> int:
     """
     Verifica que el token de Moodle tenga los privilegios necesarios.
 
@@ -179,7 +178,7 @@ async def _check_moodle_permissions(moodle_url: str, token: str) -> int:
                 detail="No se pudo determinar el identificador del usuario.",
             )
 
-        # 2. Llamada de prueba a una función administrativa
+            # 2. Llamada de prueba a una función administrativa
         params["wsfunction"] = "core_course_get_categories"
         params["criteria[0][key]"] = "name"
         params["criteria[0][value]"] = ""  # Buscar cualquier categoría, solo para probar acceso
@@ -209,14 +208,13 @@ async def _check_moodle_permissions(moodle_url: str, token: str) -> int:
         logger.info(f"Usuario {userid} validado con permisos adecuados.")
         return userid
 
+        # ---------------------------------------------------------------------------
+        # Endpoints
+        # ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------------------------
 
-
-@router.post("/login", response_model=LoginResponse, summary="Iniciar sesión")
-async def login(request: LoginRequest, response: Response):
+@router.post("/login", response_model=RespuestaLogin, summary="Iniciar sesión")
+async def iniciar_sesion(request: SolicitudLogin, response: Response):
     """
     Autentica al usuario contra Moodle y devuelve un token JWT propio.
 
@@ -232,18 +230,18 @@ async def login(request: LoginRequest, response: Response):
             detail="Modalidad PRESENCIAL no disponible actualmente.",
         )
 
-    # 2. Resolver Moodle según la modalidad
-    moodle_config = settings.get_moodle_config(request.modalidad)
+        # 2. Resolver Moodle según la modalidad
+    moodle_config = settings.obtener_config_moodle(request.modalidad)
     moodle_url = moodle_config["url"]
 
     # 3. Obtener token de Moodle
-    moodle_token = await _get_moodle_token(moodle_url, request.username, request.password)
+    moodle_token = await _obtener_token_moodle(moodle_url, request.username, request.password)
 
     # 4. Verificar permisos y obtener userid
-    user_id = await _check_moodle_permissions(moodle_url, moodle_token)
+    user_id = await _verificar_permisos_moodle(moodle_url, moodle_token)
 
     # 5. Generar token JWT local (con modalidad)
-    access_token = create_access_token(
+    access_token = crear_token_acceso(
         data={
             "sub": str(user_id),
             "username": request.username,
@@ -268,7 +266,7 @@ async def login(request: LoginRequest, response: Response):
         samesite="lax",
     )
 
-    return LoginResponse(
+    return RespuestaLogin(
         access_token=access_token,
         user_id=user_id,
         username=request.username,
@@ -277,40 +275,40 @@ async def login(request: LoginRequest, response: Response):
 
 
 @router.post("/logout", summary="Cerrar sesión")
-async def logout(response: Response):
+async def cerrar_sesion(response: Response):
     """Elimina la cookie de sesión (HttpOnly) del navegador."""
     response.delete_cookie("auth_token", path="/")
     return {"status": "ok"}
 
 
 @router.get(
-    "/me", response_model=UserProfileResponse, summary="Obtener perfil del usuario autenticado"
+    "/me", response_model=RespuestaPerfilUsuario, summary="Obtener perfil del usuario autenticado"
 )
-async def get_my_profile(current_user: UserInToken = Depends(get_current_user)):
+async def obtener_mi_perfil(usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual)):
     """
     Devuelve el primer nombre, apellido y la URL de la imagen de perfil
     del usuario autenticado, obtenidos desde Moodle.
 
     Requiere el token JWT en la cabecera Authorization.
     """
-    moodle = get_moodle_service(current_user.modalidad)
+    moodle = obtener_servicio_moodle(usuario_actual.modalidad)
     try:
         # Buscar el usuario en Moodle por su username (el que viene en el JWT)
-        users = await moodle.get_users("username", [current_user.username])
+        users = await moodle.obtener_usuarios("username", [usuario_actual.username])
         if not users:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado en Moodle"
             )
 
         user = users[0]
-        return UserProfileResponse(
-            username=current_user.username,
-            firstname=user.get("firstname") or current_user.username,
+        return RespuestaPerfilUsuario(
+            username=usuario_actual.username,
+            firstname=user.get("firstname") or usuario_actual.username,
             lastname=user.get("lastname") or "",
             profileimageurl=user.get("profileimageurl") or "",
         )
-    except MoodleAPIError as e:
-        logger.exception(f"Error al obtener perfil de {current_user.username}: {e}")
+    except ErrorApiMoodle as e:
+        logger.exception(f"Error al obtener perfil de {usuario_actual.username}: {e}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="No se pudo obtener el perfil del usuario",

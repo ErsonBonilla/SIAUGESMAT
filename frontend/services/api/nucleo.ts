@@ -1,19 +1,19 @@
 // services/api/core.ts
-import { getToken, removeToken } from "../../utils/auth.ts";
+import { eliminarToken, obtenerToken } from "../../utils/autenticacion.ts";
 
 export const BASE_URL = typeof Deno !== "undefined"
   ? Deno.env.get("BACKEND_URL")
   : "/api/v1";
 
-export function authHeaders(): Record<string, string> {
-  const token = getToken();
+export function cabecerasAuth(): Record<string, string> {
+  const token = obtenerToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function handleResponse<T>(response: Response): Promise<T> {
+export async function manejarRespuesta<T>(response: Response): Promise<T> {
   if (!response.ok) {
     if (response.status === 401) {
-      removeToken();
+      eliminarToken();
       try {
         await fetch(`${BASE_URL}/auth/logout`, { method: "POST" });
       } catch {

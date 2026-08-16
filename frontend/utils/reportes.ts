@@ -1,4 +1,4 @@
-export const REPORT_LABELS: Record<string, string> = {
+export const ETIQUETAS_REPORTES: Record<string, string> = {
   resumen_ejecutivo: "Resumen ejecutivo",
   inc_usuarios_inactivos: "Incidencias: Usuarios inactivos",
   inc_cursos_recientes: "Incidencias: Cursos recientes",
@@ -18,7 +18,7 @@ export const REPORT_LABELS: Record<string, string> = {
   usuarios_creados_manual: "Auditoría: Usuarios creados (Base manual)",
 };
 
-export function formatSize(bytes: number): string {
+export function formatearTamano(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;

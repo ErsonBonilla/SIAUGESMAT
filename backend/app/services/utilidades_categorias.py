@@ -1,4 +1,4 @@
-def sort_categories(categories: list[dict]) -> list[dict]:
+def ordenar_categorias(categories: list[dict]) -> list[dict]:
     sorted_cats = []
     roots = [c for c in categories if not c.get("parent")]
     for root in roots:

@@ -6,83 +6,95 @@ import logging
 
 from app.celery_app import celery_app
 from app.core.config import settings
-from app.db.models import OperationItem
-from app.db.session import SessionLocal
-from app.repositories.operation_repo import (
-    complete_batch,
-    get_batch,
-    get_pending_items,
-    update_batch_counts,
-    update_item,
+from app.db.modelos import ItemOperacion
+from app.db.sesion import SessionLocal
+from app.repositories.repositorio_operaciones import (
+    actualizar_conteos_lote,
+    actualizar_item,
+    completar_lote,
+    obtener_items_pendientes,
+    obtener_lote,
 )
-from app.services.error_messages import translate_error
-from app.services.moodle_errors import MoodleAPIError
-from app.services.moodle_factory import get_moodle_service
-from app.services.moodle_operations import MoodleService
-from app.services.roles import resolve_role
-from app.workers.utils import run_moodle_async
+from app.services.errores_moodle import ErrorApiMoodle
+from app.services.fabrica_moodle import obtener_servicio_moodle
+from app.services.mensajes_error import traducir_error
+from app.services.operaciones_moodle import ServicioMoodle
+from app.services.roles import resolver_rol
+from app.workers.utilidades import ejecutar_moodle_async
 
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(bind=True, max_retries=2, default_retry_delay=5)
-def process_operation_batch(self, batch_id: str):
+@celery_app.task(
+    name="app.workers.operations_tasks.process_operation_batch",
+    bind=True,
+    max_retries=2,
+    default_retry_delay=5,
+)
+def procesar_lote_operacion(self, batch_id: str):
     db = SessionLocal()
     try:
-        batch = get_batch(db, batch_id)
+        batch = obtener_lote(db, batch_id)
         if not batch:
             logger.error(f"Lote {batch_id} no encontrado")
             return
 
-        moodle = get_moodle_service(batch.modalidad)
-        items = get_pending_items(db, batch_id)
+        moodle = obtener_servicio_moodle(batch.modalidad)
+        items = obtener_items_pendientes(db, batch_id)
 
-        async def _process_all():
-            if batch.entity_type == "categories" and batch.action == "create":
-                await _ensure_root_category(moodle)
+        async def _procesar_todos():
+            if batch.tipo_entidad == "categories" and batch.accion == "create":
+                await _asegurar_categoria_raiz(moodle)
 
+            detenido_por_control = False
             for item in items:
                 # Re-consultar batch por si fue pausado o cancelado
                 try:
                     paused = (
-                        db.query(OperationItem)
-                        .filter_by(batch_id=batch_id, status="paused")
-                        .count()
+                        db.query(ItemOperacion).filter_by(id_lote=batch_id, estado="paused").count()
                     )
                     cancelled = (
-                        db.query(OperationItem)
-                        .filter_by(batch_id=batch_id, status="cancelled")
+                        db.query(ItemOperacion)
+                        .filter_by(id_lote=batch_id, estado="cancelled")
                         .count()
                     )
                     if paused > 0:
                         logger.info(
                             f"Lote {batch_id} pausado, deteniendo procesamiento ({paused} items)"
                         )
+                        detenido_por_control = True
                         break
                     if cancelled > 0:
                         logger.info(
                             f"Lote {batch_id} cancelado, deteniendo procesamiento ({cancelled} items)"
                         )
+                        detenido_por_control = True
                         break
-                except TypeError:
-                    pass
+                except TypeError as exc:
+                    logger.warning(
+                        f"Error al consultar pausa/cancelación del lote {batch_id}: {exc}"
+                    )
                 try:
-                    await _process_single_item(item, batch, moodle, db)
-                except MoodleAPIError as e:
-                    msg = _format_moodle_error(e, batch.entity_type, item)
-                    logger.exception(f"Error en {batch.entity_type} '{item.identifier}': {msg}")
-                    update_item(db, item.id, "failed", msg)
-                    update_batch_counts(db, batch_id, failed=1)
+                    await _procesar_item_unico(item, batch, moodle, db)
+                except ErrorApiMoodle as e:
+                    msg = _formatear_error_moodle(e, batch.tipo_entidad, item)
+                    logger.exception(f"Error en {batch.tipo_entidad} '{item.identificador}': {msg}")
+                    actualizar_item(db, item.id, "failed", msg)
+                    actualizar_conteos_lote(db, batch_id, failed=1)
                 except Exception as exc:
                     logger.exception(
-                        f"Error en {batch.entity_type} '{item.identifier}' (lote {batch_id})"
+                        f"Error en {batch.tipo_entidad} '{item.identificador}' (lote {batch_id})"
                     )
-                    update_item(db, item.id, "failed", translate_error(exc))
-                    update_batch_counts(db, batch_id, failed=1)
+                    actualizar_item(db, item.id, "failed", traducir_error(exc))
+                    actualizar_conteos_lote(db, batch_id, failed=1)
+            return detenido_por_control
 
-        run_moodle_async(moodle, _process_all())
+        detenido = ejecutar_moodle_async(moodle, _procesar_todos())
 
-        complete_batch(db, batch_id)
+        if not detenido:
+            completar_lote(db, batch_id)
+        else:
+            logger.info(f"Lote {batch_id} no completado: pausado o cancelado")
 
     except Exception:
         logger.exception(f"Fallo crítico en lote {batch_id}")
@@ -101,25 +113,25 @@ _DELETE_NOT_FOUND_MESSAGE = {
 _DELETED_USER_ERROR_CODES = frozenset({"invaliduser", "invalidrecord"})
 
 
-async def _entity_exists(moodle, entity_type: str, identifier: str) -> bool:
+async def _entidad_existe(moodle, entity_type: str, identifier: str) -> bool:
     if entity_type == "users":
         try:
-            return await moodle.get_user_by_username(identifier) is not None
-        except MoodleAPIError as e:
+            return await moodle.obtener_usuario_por_username(identifier) is not None
+        except ErrorApiMoodle as e:
             # Algunos Moodle (p. ej. tuaulavirtual) lanzan invaliduser en vez
             # de devolver una lista vacía cuando el usuario ya fue eliminado.
             # Se trata como "no existe": el borrado ya está consumado.
-            if getattr(e, "error_code", None) in _DELETED_USER_ERROR_CODES:
+            if getattr(e, "codigo_error", None) in _DELETED_USER_ERROR_CODES:
                 return False
             raise
     if entity_type == "courses":
-        return bool(await moodle.get_courses(shortname=identifier))
+        return bool(await moodle.obtener_cursos(shortname=identifier))
     if entity_type == "categories":
-        return bool(await moodle.get_categories(idnumber=identifier))
+        return bool(await moodle.obtener_categorias(idnumber=identifier))
     return True
 
 
-async def _delete_entity(moodle, entity_type: str, identifier: str) -> str:
+async def _eliminar_entidad(moodle, entity_type: str, identifier: str) -> str:
     """Elimina la entidad en Moodle de forma idempotente.
 
     Devuelve ``"deleted"`` si el borrado se concretó (o ya no existía tras un
@@ -132,101 +144,95 @@ async def _delete_entity(moodle, entity_type: str, identifier: str) -> str:
     """
     try:
         if entity_type == "users":
-            result = await moodle.delete_users([identifier])
+            result = await moodle.eliminar_usuarios([identifier])
             return "deleted" if result is not None else "not_found"
         if entity_type == "courses":
-            result = await moodle.delete_courses([identifier])
+            result = await moodle.eliminar_cursos([identifier])
             return "deleted" if result is not None else "not_found"
         if entity_type == "categories":
-            cats = await moodle.get_categories(idnumber=identifier)
+            cats = await moodle.obtener_categorias(idnumber=identifier)
             if not cats:
                 return "not_found"
-            await moodle.delete_category(int(cats[0]["id"]))
+            await moodle.eliminar_categoria(int(cats[0]["id"]))
             return "deleted"
         return "deleted"
-    except MoodleAPIError as e:
+    except ErrorApiMoodle as e:
         # core_user_delete_users (y su lookup previo) rechaza con invaliduser /
         # invalidrecord a los usuarios ya eliminados en Moodle (deleted=1). Como
         # el borrado ya está consumado, se omite en lugar de fallar.
-        if entity_type == "users" and getattr(e, "error_code", None) in _DELETED_USER_ERROR_CODES:
+        if entity_type == "users" and getattr(e, "codigo_error", None) in _DELETED_USER_ERROR_CODES:
             return "not_found"
         raise
     except Exception:
-        if await _entity_exists(moodle, entity_type, identifier):
+        if await _entidad_existe(moodle, entity_type, identifier):
             raise
         return "deleted"
 
 
-async def _process_single_item(item, batch, moodle, db):
-    update_item(db, item.id, "processing")
+async def _procesar_item_unico(item, batch, moodle, db):
+    actualizar_item(db, item.id, "processing")
     note = None
 
-    if batch.action == "delete":
-        outcome = await _delete_entity(moodle, batch.entity_type, item.identifier)
+    if batch.accion == "delete":
+        outcome = await _eliminar_entidad(moodle, batch.tipo_entidad, item.identificador)
         if outcome == "not_found":
             note = _DELETE_NOT_FOUND_MESSAGE.get(
-                batch.entity_type, "Entidad no encontrada en Moodle. Se omite (ya no existía)."
+                batch.tipo_entidad, "Entidad no encontrada en Moodle. Se omite (ya no existía)."
             )
 
-    elif batch.action == "create":
-        if batch.entity_type == "users":
-            detail = item.detail or {}
+    elif batch.accion == "create":
+        if batch.tipo_entidad == "users":
+            detail = item.detalle or {}
             user_data = {
-                "username": item.identifier,
-                "firstname": detail.get("firstname", item.identifier),
+                "username": item.identificador,
+                "firstname": detail.get("firstname", item.identificador),
                 "lastname": detail.get("lastname", ""),
                 "email": detail.get(
-                    "email", f"{item.identifier}{settings.INSTITUTIONAL_EMAIL_DOMAIN}"
+                    "email", f"{item.identificador}{settings.INSTITUTIONAL_EMAIL_DOMAIN}"
                 ),
+                "createpassword": True,
             }
-            if detail.get("password"):
-                user_data["password"] = detail["password"]
-                user_data["forcepasswordchange"] = True
-            elif detail.get("forcepasswordchange") == "1":
-                user_data["forcepasswordchange"] = True
-            else:
-                user_data["createpassword"] = True
-            created = await moodle.create_users([user_data])
+            created = await moodle.crear_usuarios([user_data])
 
             role = detail.get("role1")
             if role and created and len(created) > 0:
                 user_id = created[0].get("id")
                 if user_id:
-                    role_id = resolve_role(str(role))
-                    await moodle.assign_role(int(user_id), role_id)
+                    role_id = resolver_rol(str(role))
+                    await moodle.asignar_rol(int(user_id), role_id)
 
-        elif batch.entity_type == "categories":
-            detail = item.detail or {}
+        elif batch.tipo_entidad == "categories":
+            detail = item.detalle or {}
             parent_idnumber = detail.get("parent") or "DISTANCIA"
             cat_data = {
-                "name": item.identifier,
-                "idnumber": detail.get("idnumber") or item.identifier,
+                "name": item.identificador,
+                "idnumber": detail.get("idnumber") or item.identificador,
                 "parent": parent_idnumber,
             }
             if detail.get("description"):
                 cat_data["description"] = detail["description"]
             if detail.get("visible") is not None:
                 cat_data["visible"] = int(detail["visible"])
-            await moodle.create_categories([cat_data])
+            await moodle.crear_categorias([cat_data])
 
-    elif batch.action == "visibility":
-        if batch.entity_type == "courses":
-            detail = item.detail or {}
+    elif batch.accion == "visibility":
+        if batch.tipo_entidad == "courses":
+            detail = item.detalle or {}
             visible = 1 if detail.get("visibility") == "show" else 0
-            courses = await moodle.get_courses_by_field("shortname", item.identifier)
+            courses = await moodle.obtener_cursos_por_campo("shortname", item.identificador)
             if not courses:
-                raise ValueError(f"Curso no encontrado en Moodle: {item.identifier}")
-            await moodle.update_courses([{"id": int(courses[0]["id"]), "visible": visible}])
+                raise ValueError(f"Curso no encontrado en Moodle: {item.identificador}")
+            await moodle.actualizar_cursos([{"id": int(courses[0]["id"]), "visible": visible}])
 
-    update_item(db, item.id, "completed", note)
-    update_batch_counts(db, batch.batch_id, completed=1)
+    actualizar_item(db, item.id, "completed", note)
+    actualizar_conteos_lote(db, batch.id_lote, completed=1)
 
 
-async def _ensure_root_category(moodle: MoodleService):
+async def _asegurar_categoria_raiz(moodle: ServicioMoodle):
     try:
-        cats = await moodle.get_categories(idnumber="DISTANCIA")
+        cats = await moodle.obtener_categorias(idnumber="DISTANCIA")
         if not cats:
-            await moodle.create_categories(
+            await moodle.crear_categorias(
                 [
                     {
                         "name": settings.ROOT_CATEGORY_NAME,
@@ -238,30 +244,28 @@ async def _ensure_root_category(moodle: MoodleService):
             logger.info(
                 f"Categoría raíz {settings.ROOT_CATEGORY_NAME} (DISTANCIA) creada automáticamente"
             )
-    except MoodleAPIError as e:
+    except ErrorApiMoodle as e:
         logger.exception(f"Error al crear categoría raíz {settings.ROOT_CATEGORY_NAME}: {e}")
         raise
 
 
-def _format_moodle_error(e: MoodleAPIError, entity_type: str, item) -> str:
-    code = getattr(e, "error_code", None)
-    detail = item.detail or {}
+def _formatear_error_moodle(e: ErrorApiMoodle, entity_type: str, item) -> str:
+    code = getattr(e, "codigo_error", None)
+    detail = item.detalle or {}
 
     if code == "duplicateuser":
-        return f"El usuario '{item.identifier}' ya existe en Moodle (username duplicado)."
+        return f"El usuario '{item.identificador}' ya existe en Moodle (username duplicado)."
     if code == "invalidemail":
         email = detail.get("email", "")
-        return f"Email inválido '{email}' para el usuario '{item.identifier}'."
+        return f"Email inválido '{email}' para el usuario '{item.identificador}'."
     if code == "emailnotallowed":
         email = detail.get("email", "")
-        return (
-            f"El dominio del email '{email}' no está permitido en Moodle para '{item.identifier}'."
-        )
+        return f"El dominio del email '{email}' no está permitido en Moodle para '{item.identificador}'."
     if code == "duplicatecategory":
-        return f"La categoría '{item.identifier}' ya existe en Moodle (idnumber duplicado)."
+        return f"La categoría '{item.identificador}' ya existe en Moodle (idnumber duplicado)."
     if code == "cannotfindparentcategory":
         parent = detail.get("parent") or "DISTANCIA"
         return f"Categoría padre '{parent}' no encontrada en Moodle."
     if code == "invalidparameter":
-        return f"Parámetro inválido para '{item.identifier}': {e}"
-    return e.spanish_message
+        return f"Parámetro inválido para '{item.identificador}': {e}"
+    return e.mensaje_espanol

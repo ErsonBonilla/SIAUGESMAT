@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.services.moodle_factory import get_moodle_service
+from app.services.fabrica_moodle import obtener_servicio_moodle
 
 
 async def main():
@@ -42,10 +42,10 @@ async def main():
 
     print(f"Loaded {len(shortnames)} shortnames from {args.csv}")
 
-    moodle = get_moodle_service(args.modalidad)
+    moodle = obtener_servicio_moodle(args.modalidad)
 
     print("Resolving course IDs...")
-    all_courses = await moodle.get_courses()
+    all_courses = await moodle.obtener_cursos()
     sn_to_id = {
         c.get("shortname"): int(c["id"]) for c in all_courses if c.get("shortname") and c.get("id")
     }

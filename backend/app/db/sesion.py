@@ -44,7 +44,7 @@ SessionLocal = sessionmaker(
 )
 
 
-def get_db() -> Generator[Session, None, None]:
+def obtener_db() -> Generator[Session, None, None]:
     """
     Generador de sesiones de base de datos para FastAPI.
 
@@ -65,7 +65,7 @@ def get_db() -> Generator[Session, None, None]:
         session.close()
 
 
-def init_db() -> None:
+def inicializar_db() -> None:
     """Crea tablas (solo desarrollo; migraciones vía Alembic en producción)."""
     if not settings.DEBUG:
         logger.info("Modo producción — no se crean tablas automáticamente, usar Alembic")
