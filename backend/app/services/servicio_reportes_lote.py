@@ -6,7 +6,7 @@ import tempfile
 import zipfile
 
 from app.core.config import settings
-from app.core.configuracion_entidades import ENTITY_CONFIG
+from app.core.configuracion_entidades import CONFIG_ENTIDADES
 from app.db.modelos import ItemOperacion, LoteOperacion
 from app.services.utilidades_reportes import (
     crear_zip,
@@ -26,7 +26,7 @@ def _directorio_lote(batch_id: str) -> str:
 
 def _build_rows(batch: LoteOperacion, items: list[ItemOperacion]) -> dict[str, list]:
     """Returns {csv_name: (headers, rows)} for each CSV to generate."""
-    config = ENTITY_CONFIG.get(batch.tipo_entidad, ENTITY_CONFIG["courses"])
+    config = CONFIG_ENTIDADES.get(batch.tipo_entidad, CONFIG_ENTIDADES["courses"])
 
     all_rows, failed_rows, success_rows, not_found_rows = [], [], [], []
     for item in items:

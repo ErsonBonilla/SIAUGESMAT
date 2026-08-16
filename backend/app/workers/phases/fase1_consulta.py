@@ -4,8 +4,6 @@ from app.pipeline.nombres_cortos import SIAUGESMAT_PATTERN
 from app.pipeline.usuarios import (
     buscar_candidatos_docente,
     indexar_docentes,
-    nombres_difieren,
-    normalizar_nombre,
     resolver_usuarios,
 )
 from app.repositories import repositorio_registros
@@ -15,13 +13,9 @@ from app.workers.phases.base import ContextoFase, FaseBase
 
 logger = logging.getLogger(__name__)
 
-# Re-export público del núcleo puro (los tests importan estos helpers aquí).
-_normalize_name = normalizar_nombre
-_names_differ = nombres_difieren
-
 
 class FaseConsulta(FaseBase):
-    phase_name = "1"
+    nombre_fase = "1"
 
     async def ejecutar(self, ctx: ContextoFase) -> None:
         db = ctx.db

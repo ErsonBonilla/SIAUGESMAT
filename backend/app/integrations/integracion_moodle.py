@@ -30,7 +30,7 @@ class IntegracionMoodle:
         # Cursos
         # ------------------------------------------------------------------
 
-    @manejar_errores_moodle(log_message="No se pudo reubicar categoría")
+    @manejar_errores_moodle(mensaje_log="No se pudo reubicar categoría")
     async def reubicar_categoria(
         self, idnumber: str, moodle_id: int, target_parent_idn: str
     ) -> bool:
@@ -121,7 +121,7 @@ class IntegracionMoodle:
             self.ultimo_error = extraer_error(e)
             return False
 
-    @manejar_errores_moodle(log_message="Error al eliminar curso")
+    @manejar_errores_moodle(mensaje_log="Error al eliminar curso")
     async def eliminar_curso(self, shortname: str) -> bool:
         result = await self.servicio.eliminar_cursos([shortname])
         if result is None:
@@ -130,7 +130,7 @@ class IntegracionMoodle:
         logger.info(f"Curso eliminado: {shortname}")
         return True
 
-    @manejar_errores_moodle(log_message="Error al activar curso")
+    @manejar_errores_moodle(mensaje_log="Error al activar curso")
     async def activar_curso(self, shortname: str) -> bool:
         existing = await self.servicio.obtener_cursos(shortname=shortname)
         if not existing:
@@ -152,7 +152,7 @@ class IntegracionMoodle:
         logger.info(f"Curso activado: {shortname}")
         return True
 
-    @manejar_errores_moodle(log_message="Error al ocultar curso")
+    @manejar_errores_moodle(mensaje_log="Error al ocultar curso")
     async def ocultar_curso(self, shortname: str) -> bool:
         existing = await self.servicio.obtener_cursos(shortname=shortname)
         if not existing:
@@ -174,7 +174,7 @@ class IntegracionMoodle:
         logger.info(f"Curso oculto: {shortname}")
         return True
 
-    @manejar_errores_moodle(log_message="Error al renombrar curso")
+    @manejar_errores_moodle(mensaje_log="Error al renombrar curso")
     async def renombrar_curso(
         self, old_shortname: str, new_shortname: str, new_fullname: str
     ) -> bool:
@@ -376,7 +376,7 @@ class IntegracionMoodle:
         return users[0] if users else None
 
     @manejar_errores_moodle(
-        log_message="Error al buscar usuarios por email en lote", default_return={}
+        mensaje_log="Error al buscar usuarios por email en lote", retorno_por_defecto={}
     )
     async def encontrar_usuarios_por_correos(self, emails: list[str]) -> dict[str, dict]:
         result: dict[str, dict] = {}
@@ -401,7 +401,7 @@ class IntegracionMoodle:
         return result
 
     @manejar_errores_moodle(
-        log_message="Error al buscar usuarios por username en lote", default_return={}
+        mensaje_log="Error al buscar usuarios por username en lote", retorno_por_defecto={}
     )
     async def encontrar_usuarios_por_usernames(self, usernames: list[str]) -> dict[str, dict]:
         result: dict[str, dict] = {}
@@ -423,7 +423,7 @@ class IntegracionMoodle:
         return result
 
     @manejar_errores_moodle(
-        log_message="Error al buscar usuarios por cédula en lote", default_return={}
+        mensaje_log="Error al buscar usuarios por cédula en lote", retorno_por_defecto={}
     )
     async def encontrar_usuarios_por_idnumbers(self, idnumbers: list[str]) -> dict[str, dict]:
         result: dict[str, dict] = {}
@@ -572,7 +572,8 @@ class IntegracionMoodle:
             return None, False
 
     @manejar_errores_moodle(
-        log_message="", default_return={"success": False, "reason": "Error del servidor Moodle"}
+        mensaje_log="",
+        retorno_por_defecto={"success": False, "reason": "Error del servidor Moodle"},
     )
     async def matricular_docente(
         self, username: str, course_shortname: str, course_map=None, courses=None, email: str = ""

@@ -8,7 +8,7 @@ from app.db.modelos import ItemOperacion
 
 logger = logging.getLogger(__name__)
 
-STUCK_ITEM_TIMEOUT_MINUTES = 30
+MINUTOS_TIMEOUT_ITEM_ATASCADO = 30
 
 
 def _ejecutar_async(coro):
@@ -26,7 +26,7 @@ def ejecutar_moodle_async(moodle, coro):
         try:
             return await coro
         finally:
-            await moodle.close()
+            await moodle.cerrar()
 
     return _ejecutar_async(_ejecutar_y_cerrar())
 
@@ -36,7 +36,7 @@ def reiniciar_items_atascados(
     batch_id_prefix: str | None = None,
     execution_id: str | None = None,
     increment_attempt: bool = False,
-    cutoff_minutes: int = STUCK_ITEM_TIMEOUT_MINUTES,
+    cutoff_minutes: int = MINUTOS_TIMEOUT_ITEM_ATASCADO,
 ) -> list[ItemOperacion]:
     """Resetea items stuck en 'processing' más allá del timeout.
 

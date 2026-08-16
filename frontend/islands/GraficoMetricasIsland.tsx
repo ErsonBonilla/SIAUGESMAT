@@ -5,9 +5,9 @@ import {
   COLORES_METRICAS,
   crearGradiente,
   ETIQUETAS_METRICAS,
-  useChart,
+  usarGrafico,
 } from "../utils/grafico.ts";
-import { darkSignal } from "../utils/tema.ts";
+import { senalTemaOscuro } from "../utils/tema.ts";
 
 interface PropsGraficoMetricas {
   data: MetricasSemestre[];
@@ -56,8 +56,8 @@ function gradientPlugin(
 export default function GraficoMetricas(
   { data, metrics, semestresSeleccionados }: PropsGraficoMetricas,
 ) {
-  const dark = useComputed(() => darkSignal.value);
-  const { canvasRef, createChart } = useChart();
+  const dark = useComputed(() => senalTemaOscuro.value);
+  const { canvasRef, crearGrafico } = usarGrafico();
 
   useEffect(() => {
     if (!data || data.length === 0) return;
@@ -98,7 +98,7 @@ export default function GraficoMetricas(
     if (!ctx) return;
     const plugin = gradientPlugin(ctx, height, dark.value);
 
-    createChart({
+    crearGrafico({
       type: "bar",
       data: { labels, datasets },
       options: {

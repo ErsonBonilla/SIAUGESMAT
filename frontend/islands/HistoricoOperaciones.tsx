@@ -4,7 +4,7 @@ import {
   type ItemHistorialOperaciones,
   obtenerAnaliticaOperaciones,
 } from "../services/api.ts";
-import { useChart } from "../utils/grafico.ts";
+import { usarGrafico } from "../utils/grafico.ts";
 import CajaError from "../components/CajaError.tsx";
 import EsqueletoCarga from "../components/EsqueletoCarga.tsx";
 
@@ -40,7 +40,7 @@ export default function HistoricoOperaciones({ entityType, action }: Props) {
   const loading = useSignal(true);
   const error = useSignal("");
   const view = useSignal<"history" | "table">("history");
-  const { canvasRef, createChart } = useChart();
+  const { canvasRef, crearGrafico } = usarGrafico();
   const keys = useComputed(() => getRelevantKeys(entityType, action));
 
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function HistoricoOperaciones({ entityType, action }: Props) {
     const months = data.value.map((d) => d.month);
     const relevant = METRICS.filter((m) => keys.value.includes(m.key));
 
-    createChart({
+    crearGrafico({
       type: "bar",
       data: {
         labels: months,

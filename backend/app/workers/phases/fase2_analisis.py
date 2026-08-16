@@ -33,7 +33,7 @@ def persistir_logs_plan(db, execution_id: int, comparison: dict, fullname_map: d
 
 
 class FaseAnalisis(FaseBase):
-    phase_name = "2"
+    nombre_fase = "2"
 
     async def ejecutar(self, ctx: ContextoFase) -> None:
         db = ctx.db

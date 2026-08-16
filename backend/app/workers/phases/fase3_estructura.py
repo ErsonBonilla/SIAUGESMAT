@@ -159,7 +159,7 @@ def _crear_items_fase3(db, execution_id, ctx_data, comparison, modalidad) -> dic
 
                 return await asyncio.gather(*[_resolver_unico(item) for item in create_items])
             finally:
-                await ms.close()
+                await ms.cerrar()
 
         try:
             resolved = _ejecutar_async(_resolver_plantillas())

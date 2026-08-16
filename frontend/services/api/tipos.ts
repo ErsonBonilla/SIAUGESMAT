@@ -1,4 +1,4 @@
-// services/api/types.ts
+// services/api/tipos.ts
 
 export interface Ejecucion {
   id: number;
@@ -168,13 +168,6 @@ export interface ItemHistorialOperaciones {
   categories_deleted: number;
   courses_deleted: number;
   total_errors: number;
-}
-
-export interface ResultadoVisibilidadMasiva {
-  updated: number;
-  failed: number;
-  not_found: number;
-  duration_seconds: number;
 }
 
 export interface FilaDocenteInactivo {

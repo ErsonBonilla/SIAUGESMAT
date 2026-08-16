@@ -567,7 +567,7 @@ async def main():
             print("  Usa --fix, --conflicts-fix, --recreate-gone, o --all para aplicar cambios.\n")
 
     finally:
-        await ms.close()
+        await ms.cerrar()
 
 
 if __name__ == "__main__":

@@ -16,9 +16,9 @@ import pytest
 
 from app.integrations.integracion_moodle import IntegracionMoodle
 from app.pipeline.comparacion_cursos.aplicar_accion import aplicar_accion
+from app.pipeline.usuarios import nombres_difieren, normalizar_nombre
 from app.services.errores_moodle import ErrorApiMoodle, ErrorMoodleSobrecargado
 from app.services.operaciones_moodle import ServicioMoodle
-from app.workers.phases.fase1_consulta import _names_differ, _normalize_name
 from app.workers.phases.tarea_item import procesar_item_etl
 
 
@@ -44,7 +44,7 @@ def _make_item(item_id=1, accion="delete", execution_id=1, estado="processing", 
 
 def _make_moodle():
     m = MagicMock()
-    m.close = AsyncMock(return_value=None)
+    m.cerrar = AsyncMock(return_value=None)
     return m
 
     # ---------------------------------------------------------------------------
@@ -72,20 +72,20 @@ class TestSpanishMessage:
 
 class TestNameComparison:
     def test_normalize_removes_accents_and_case(self):
-        assert _normalize_name("  MARÍA  José  ") == "maria jose"
+        assert normalizar_nombre("  MARÍA  José  ") == "maria jose"
 
     def test_same_name_not_different(self):
-        assert _names_differ("María José Suárez", "MARIA JOSE SUAREZ") is False
+        assert nombres_difieren("María José Suárez", "MARIA JOSE SUAREZ") is False
 
     def test_different_name_is_different(self):
-        assert _names_differ("María José Suárez", "Carlos Andrés López") is True
+        assert nombres_difieren("María José Suárez", "Carlos Andrés López") is True
 
     def test_minor_token_overlap_not_different(self):
         # Comparten >50% de tokens (apellidos coinciden)
-        assert _names_differ("Ana María Pérez", "Ana Pérez") is False
+        assert nombres_difieren("Ana María Pérez", "Ana Pérez") is False
 
     def test_empty_names_not_different(self):
-        assert _names_differ("", "") is False
+        assert nombres_difieren("", "") is False
 
         # ---------------------------------------------------------------------------
         # M2.2: create_user_if_not_exists recupera por username
@@ -250,7 +250,7 @@ class TestItemTaskRecreate:
             "recreate": True,
         }
         moodle = MagicMock()
-        moodle.close = AsyncMock(return_value=None)
+        moodle.cerrar = AsyncMock(return_value=None)
         mock_integ = AsyncMock()
         mock_integ.crear_curso.return_value = True
         with (

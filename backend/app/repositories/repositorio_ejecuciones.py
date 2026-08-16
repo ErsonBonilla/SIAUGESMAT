@@ -11,7 +11,7 @@ def obtener_ejecucion(db: Session, ejecucion_id: int) -> Ejecucion | None:
     return db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
 
 
-ACTIVE_EXECUTION_STATUSES = ("queued", "running", "paused", "review_required")
+ESTADOS_EJECUCION_ACTIVA = ("queued", "running", "paused", "review_required")
 
 
 def obtener_ejecucion_activa(
@@ -24,7 +24,7 @@ def obtener_ejecucion_activa(
     al reanudar/confirmar una ejecución).
     """
     query = db.query(Ejecucion).filter(
-        Ejecucion.estado.in_(ACTIVE_EXECUTION_STATUSES),
+        Ejecucion.estado.in_(ESTADOS_EJECUCION_ACTIVA),
     )
     if modalidad:
         query = query.filter(Ejecucion.modalidad == modalidad)

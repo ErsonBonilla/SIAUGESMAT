@@ -9,7 +9,7 @@ interface ConfiguracionEntidad {
   help?: SeccionAyudaConsulta[];
 }
 
-export const ENTITY_CONSULT_CONFIGS: Record<string, ConfiguracionEntidad> = {
+export const CONFIG_CONSULTA_ENTIDADES: Record<string, ConfiguracionEntidad> = {
   categories: {
     title: "Categorías",
     searchPlaceholder: "Buscar por idnumber...",
@@ -146,7 +146,7 @@ interface ConfiguracionAccionCsv {
   help?: SeccionAyudaConsulta[];
 }
 
-export const ENTITY_CSV_CONFIGS: Record<
+export const CONFIG_CSV_ENTIDADES: Record<
   string,
   Record<string, ConfiguracionAccionCsv>
 > = {

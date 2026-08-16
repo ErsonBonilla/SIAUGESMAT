@@ -2,13 +2,13 @@ import { useSignal } from "@preact/signals";
 import TablaConsultaIsland from "./TablaConsultaIsland.tsx";
 import ConsultaDocentesSinAcceso from "./ConsultaDocentesSinAcceso.tsx";
 import ConsultaCorreosDuplicados from "./ConsultaCorreosDuplicados.tsx";
-import { ENTITY_CONSULT_CONFIGS } from "../utils/configuracion-entidad.ts";
+import { CONFIG_CONSULTA_ENTIDADES } from "../utils/configuracion-entidad.ts";
 
 type Modo = "normal" | "inactive" | "duplicates";
 
 export default function UsuariosConsultas() {
   const mode = useSignal<Modo>("normal");
-  const usersConfig = ENTITY_CONSULT_CONFIGS.users;
+  const usersConfig = CONFIG_CONSULTA_ENTIDADES.users;
 
   return (
     <div class="max-w-6xl mx-auto">

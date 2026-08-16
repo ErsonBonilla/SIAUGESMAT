@@ -383,7 +383,7 @@ async def main():
             write_result(args.csv, plans, args.output)
 
     finally:
-        await ms.close()
+        await ms.cerrar()
 
 
 if __name__ == "__main__":

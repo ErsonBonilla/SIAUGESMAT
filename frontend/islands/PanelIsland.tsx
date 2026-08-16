@@ -13,7 +13,7 @@ import {
   obtenerHistorial,
   obtenerReciente,
 } from "../services/api.ts";
-import { profileSignal } from "../utils/perfil.ts";
+import { senalPerfil } from "../utils/perfil.ts";
 import { obtenerPayloadToken } from "../utils/autenticacion.ts";
 import { COLORES_SEMAFORO, ETIQUETAS_ESTADO } from "../utils/constantes.ts";
 import {
@@ -69,7 +69,7 @@ export default function IslandPanel() {
       });
   }, []);
 
-  const displayName = profileSignal.value?.firstname || "Usuario";
+  const displayName = senalPerfil.value?.firstname || "Usuario";
 
   const kpis = useComputed(() => {
     const data = historyData.value;

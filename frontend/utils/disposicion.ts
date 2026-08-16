@@ -1,3 +1,3 @@
 import { signal } from "@preact/signals";
 
-export const mobileOpenSignal = signal(false);
+export const senalMenuMovilAbierto = signal(false);

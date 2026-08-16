@@ -51,11 +51,11 @@ export function crearGradiente(
   return gradient;
 }
 
-export function useChart() {
+export function usarGrafico() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
 
-  function createChart<
+  function crearGrafico<
     TType extends ChartType = ChartType,
     TData extends DefaultDataPoint<TType> = DefaultDataPoint<TType>,
   >(
@@ -73,5 +73,5 @@ export function useChart() {
     return () => chartRef.current?.destroy();
   }, []);
 
-  return { canvasRef, chartRef, createChart };
+  return { canvasRef, chartRef, crearGrafico };
 }

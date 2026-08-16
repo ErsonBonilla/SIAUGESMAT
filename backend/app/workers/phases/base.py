@@ -62,7 +62,7 @@ class ContextoFase:
 
 
 class FaseBase(ABC):
-    phase_name: str = ""
+    nombre_fase: str = ""
 
     @abstractmethod
     async def ejecutar(self, ctx: ContextoFase) -> None: ...

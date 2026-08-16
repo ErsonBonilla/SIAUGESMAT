@@ -1,7 +1,7 @@
 import Disposicion from "./Disposicion.tsx";
 import SubirCsv from "../islands/CsvUploader.tsx";
 import BotonEjecucion from "./BotonEjecucion.tsx";
-import { ENTITY_CSV_CONFIGS } from "../utils/configuracion-entidad.ts";
+import { CONFIG_CSV_ENTIDADES } from "../utils/configuracion-entidad.ts";
 import type { ClavePestana } from "../utils/pestanas-operaciones.ts";
 
 interface Props {
@@ -17,7 +17,7 @@ const EXECUTION_TAB: Record<string, ClavePestana> = {
 };
 
 export default function PaginaAccionCsv({ entity, action }: Props) {
-  const config = ENTITY_CSV_CONFIGS[entity]?.[action];
+  const config = CONFIG_CSV_ENTIDADES[entity]?.[action];
   if (!config) return null;
   const executionTab = EXECUTION_TAB[`${entity}:${action}`];
   return (

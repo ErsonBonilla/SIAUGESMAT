@@ -29,7 +29,7 @@ from app.workers.phases.fase3_estructura import (
     _crear_items_fase3,
     _lanzar_chord_eliminacion,
 )
-from app.workers.phases.fase4_personas import _create_phase4_items
+from app.workers.phases.fase4_personas import _crear_items_fase4_sincrono
 from app.workers.phases.tarea_item import procesar_item_etl
 from app.workers.utilidades import _ejecutar_async
 
@@ -114,7 +114,7 @@ def procesar_fase_etl(self, execution_id: int, phase: str):
                             )
                             incrementar_metrica(db, execution_id, "categories_created")
                     finally:
-                        await ms.close()
+                        await ms.cerrar()
 
                 try:
                     _ejecutar_async(_crear_categorias())
@@ -138,7 +138,7 @@ def procesar_fase_etl(self, execution_id: int, phase: str):
                             if ok:
                                 logger.info(f"Categoría {cat['idnumber']} reubicada correctamente")
                     finally:
-                        await ms.close()
+                        await ms.cerrar()
 
                 try:
                     _ejecutar_async(_reubicar_categorias())
@@ -176,7 +176,7 @@ def procesar_fase_etl(self, execution_id: int, phase: str):
 
         elif phase == "4":
             actualizar_progreso(db, execution_id, 65, "Creando items de personas…", paso=4)
-            item_counts = _create_phase4_items(db, execution_id, ctx_data, modalidad)
+            item_counts = _crear_items_fase4_sincrono(db, execution_id, ctx_data, modalidad)
             total = sum(item_counts.values())
             if total == 0:
                 logger.info("FASE 4: sin items que procesar")
@@ -215,8 +215,8 @@ def procesar_fase_etl(self, execution_id: int, phase: str):
         db.close()
 
 
-def _guardar_checkpoint_fase(db, eid, ctx: ContextoFase, phase_name: str):
-    if phase_name == "1":
+def _guardar_checkpoint_fase(db, eid, ctx: ContextoFase, nombre_fase: str):
+    if nombre_fase == "1":
         guardar_checkpoint(
             db,
             eid,
@@ -228,7 +228,7 @@ def _guardar_checkpoint_fase(db, eid, ctx: ContextoFase, phase_name: str):
                 "courses_with_teacher": dict(ctx.cursos_con_docente),
             },
         )
-    elif phase_name == "2":
+    elif nombre_fase == "2":
         guardar_checkpoint(
             db,
             eid,
@@ -244,13 +244,13 @@ def _guardar_checkpoint_fase(db, eid, ctx: ContextoFase, phase_name: str):
         )
 
 
-def _restaurar_checkpoint(ctx: ContextoFase, data: dict, phase_name: str):
-    if phase_name == "1":
+def _restaurar_checkpoint(ctx: ContextoFase, data: dict, nombre_fase: str):
+    if nombre_fase == "1":
         ctx.idnumeros_categorias_existentes = set(data.get("cat_idnumbers", []))
         ctx.cursos_existentes = data.get("courses", [])
         ctx.mapa_usuarios = data.get("username_map", {})
         ctx.cursos_con_docente = dict(data.get("courses_with_teacher", {}))
-    elif phase_name == "2":
+    elif nombre_fase == "2":
         ctx.comparacion = data.get("comparison", {})
         ctx.categorias_faltantes = data.get("missing_categories", [])
         ctx.categorias_a_reubicar = data.get("categories_to_relocate", [])
@@ -259,7 +259,7 @@ def _restaurar_checkpoint(ctx: ContextoFase, data: dict, phase_name: str):
         ctx.nueva_subida = data.get("re_upload", False)
 
 
-def _restaurar_checkpoint_progreso(ctx: ContextoFase, data: dict, phase_name: str):
+def _restaurar_checkpoint_progreso(ctx: ContextoFase, data: dict, nombre_fase: str):
     ctx.metricas.update(data.get("metrics", {}))
     ctx.mapa_usuarios.update(data.get("username_map", {}))
 

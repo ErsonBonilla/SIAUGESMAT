@@ -5,7 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.db.modelos import Ejecucion, ItemOperacion, LoteOperacion
-from app.repositories.repositorio_ejecuciones import ACTIVE_EXECUTION_STATUSES
+from app.repositories.repositorio_ejecuciones import ESTADOS_EJECUCION_ACTIVA
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ def resolver_items_huerfanos(db: Session) -> list[ItemOperacion]:
         return []
 
     ejecuciones = db.query(Ejecucion).filter(Ejecucion.id.in_(by_execution)).all()
-    active_ids = {ex.id for ex in ejecuciones if ex.estado in ACTIVE_EXECUTION_STATUSES}
+    active_ids = {ex.id for ex in ejecuciones if ex.estado in ESTADOS_EJECUCION_ACTIVA}
 
     orphaned: list[ItemOperacion] = []
     for eid, exec_items in by_execution.items():

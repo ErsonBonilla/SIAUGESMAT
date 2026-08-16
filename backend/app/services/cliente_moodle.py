@@ -127,9 +127,9 @@ class ClienteMoodle:
 
         return data
 
-    async def close(self):
+    async def cerrar(self):
         await self._cliente.aclose()
-        cerrar_limitador = getattr(self._limitador_tasa, "close", None)
+        cerrar_limitador = getattr(self._limitador_tasa, "cerrar", None)
         if cerrar_limitador is not None:
             await cerrar_limitador()
 
@@ -137,4 +137,4 @@ class ClienteMoodle:
         return self
 
     async def __aexit__(self, *args):
-        await self.close()
+        await self.cerrar()

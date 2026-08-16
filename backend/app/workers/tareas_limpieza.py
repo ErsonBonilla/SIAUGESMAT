@@ -112,7 +112,7 @@ def recuperar_fase_atascada():
     from app.repositories.repositorio_operaciones import resolver_items_huerfanos
     from app.workers.phases.comunes import _existen_items_para_ejecucion, _obtener_items_pendientes
     from app.workers.phases.fase3_estructura import al_terminar_items_eliminacion
-    from app.workers.utilidades import STUCK_ITEM_TIMEOUT_MINUTES, reiniciar_items_atascados
+    from app.workers.utilidades import MINUTOS_TIMEOUT_ITEM_ATASCADO, reiniciar_items_atascados
 
     db = SessionLocal()
     try:
@@ -158,7 +158,7 @@ def recuperar_fase_atascada():
                         ItemOperacion.id_lote.like(f"etl_{phase}_%_{eid}"),
                         ItemOperacion.estado == "processing",
                         ItemOperacion.actualizado_en
-                        >= now - timedelta(minutes=STUCK_ITEM_TIMEOUT_MINUTES),
+                        >= now - timedelta(minutes=MINUTOS_TIMEOUT_ITEM_ATASCADO),
                     )
                     .count()
                 )
@@ -186,7 +186,7 @@ def recuperar_fase_atascada():
                         now - heartbeat.replace(tzinfo=UTC)
                         if heartbeat.tzinfo is None
                         else (now - heartbeat)
-                    ) >= timedelta(minutes=STUCK_ITEM_TIMEOUT_MINUTES)
+                    ) >= timedelta(minutes=MINUTOS_TIMEOUT_ITEM_ATASCADO)
                     if stale:
                         retry = checkpoint.get("_retry_count", 0)
                         if retry < 3:

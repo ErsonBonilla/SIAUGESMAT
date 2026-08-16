@@ -1,4 +1,4 @@
-// services/api/auth.ts
+// services/api/autenticacion.ts
 import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
 import type { PerfilUsuario } from "./tipos.ts";
 

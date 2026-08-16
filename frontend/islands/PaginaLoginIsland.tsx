@@ -2,12 +2,14 @@
 import { useComputed, useSignal } from "@preact/signals";
 import FormularioLogin from "./FormularioLogin.tsx";
 import AlternadorTema from "./AlternadorTema.tsx";
-import { darkSignal } from "../utils/tema.ts";
+import { senalTemaOscuro } from "../utils/tema.ts";
 
 export default function IslandPaginaLogin() {
-  const outerBg = useComputed(() => darkSignal.value ? "#111827" : "#F3F4F6");
+  const outerBg = useComputed(() =>
+    senalTemaOscuro.value ? "#111827" : "#F3F4F6"
+  );
   const circleWhiteBg = useComputed(() =>
-    darkSignal.value ? "#F9FAFB" : "#FFFFFF"
+    senalTemaOscuro.value ? "#F9FAFB" : "#FFFFFF"
   );
   const modalidad = useSignal("");
 

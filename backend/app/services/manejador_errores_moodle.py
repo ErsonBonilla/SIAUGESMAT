@@ -26,25 +26,25 @@ def extraer_error(e: Exception) -> str:
     return msg if msg.strip() else "Error sin mensaje específico del servidor"
 
 
-def manejar_errores_moodle(log_message: str = "", default_return: Any = False) -> Callable:
+def manejar_errores_moodle(mensaje_log: str = "", retorno_por_defecto: Any = False) -> Callable:
     """Decorador que captura excepciones en métodos de MoodleIntegration,
     maneja errores de sobrecarga, registra el error y retorna un valor por defecto."""
 
-    def decorator(func: Callable) -> Callable:
-        @wraps(func)
-        async def wrapper(self, *args, **kwargs) -> Any:
+    def decorador(funcion: Callable) -> Callable:
+        @wraps(funcion)
+        async def envoltorio(self, *args, **kwargs) -> Any:
             try:
-                return await func(self, *args, **kwargs)
+                return await funcion(self, *args, **kwargs)
             except ErrorMoodleSobrecargado:
                 raise
             except Exception as e:
                 if es_moodle_sobrecargado(e):
                     raise ErrorMoodleSobrecargado(extraer_error(e)[:200]) from e
                 self.ultimo_error = extraer_error(e)
-                if log_message:
-                    logger.exception(log_message)
-                return default_return
+                if mensaje_log:
+                    logger.exception(mensaje_log)
+                return retorno_por_defecto
 
-        return wrapper
+        return envoltorio
 
-    return decorator
+    return decorador

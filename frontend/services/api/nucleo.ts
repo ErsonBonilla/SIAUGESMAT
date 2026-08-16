@@ -1,4 +1,4 @@
-// services/api/core.ts
+// services/api/nucleo.ts
 import { eliminarToken, obtenerToken } from "../../utils/autenticacion.ts";
 
 export const BASE_URL = typeof Deno !== "undefined"
