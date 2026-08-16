@@ -3,10 +3,10 @@ import { assert, assertStringIncludes } from "@std/assert";
 
 import SubirArchivoIsland from "../../islands/SubirArchivoIsland.tsx";
 import BannerProcesoEnCurso from "../../components/BannerProcesoEnCurso.tsx";
-import { darkSignal } from "../../utils/tema.ts";
+import { senalTemaOscuro } from "../../utils/tema.ts";
 
 Deno.test("SubirArchivoIsland - muestra el formulario de subida con todos los elementos", () => {
-  darkSignal.value = false;
+  senalTemaOscuro.value = false;
   const html = render(<SubirArchivoIsland />);
 
   assertStringIncludes(html, "Archivo Excel");
@@ -20,7 +20,7 @@ Deno.test("SubirArchivoIsland - muestra el formulario de subida con todos los el
 });
 
 Deno.test("ProcessInProgressBanner - muestra aviso cuando hay proceso en curso", () => {
-  darkSignal.value = false;
+  senalTemaOscuro.value = false;
   const html = render(
     <BannerProcesoEnCurso
       status={{
@@ -36,7 +36,7 @@ Deno.test("ProcessInProgressBanner - muestra aviso cuando hay proceso en curso",
 });
 
 Deno.test("ProcessInProgressBanner - no muestra nada si no hay proceso", () => {
-  darkSignal.value = false;
+  senalTemaOscuro.value = false;
   const html = render(
     <BannerProcesoEnCurso
       status={{ allowed: true, execution: null, batch: null }}

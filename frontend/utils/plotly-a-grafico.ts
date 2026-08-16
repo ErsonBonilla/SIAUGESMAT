@@ -1,4 +1,4 @@
-// utils/plotlyToChart.ts
+// utils/plotly-a-grafico.ts
 // Adaptador que convierte el JSON Plotly ({traces, layout}) que sirve el backend
 // en una configuración de Chart.js. Soporta los 5 gráficos de reportes:
 // barras (horizontal/vertical) y donuts (pie con hole).

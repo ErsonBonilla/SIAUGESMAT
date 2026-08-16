@@ -2,10 +2,10 @@ import { render } from "preact-render-to-string";
 import { assert, assertStringIncludes } from "@std/assert";
 
 import FormularioLogin from "../../islands/FormularioLogin.tsx";
-import { darkSignal } from "../../utils/tema.ts";
+import { senalTemaOscuro } from "../../utils/tema.ts";
 
 Deno.test("FormularioLogin - muestra selector de modalidad sin campos de login", () => {
-  darkSignal.value = false;
+  senalTemaOscuro.value = false;
   const html = render(
     <FormularioLogin modalidad="" onModalidadChange={() => {}} />,
   );
@@ -18,7 +18,7 @@ Deno.test("FormularioLogin - muestra selector de modalidad sin campos de login",
 });
 
 Deno.test("FormularioLogin - muestra campos de login cuando se selecciona modalidad", () => {
-  darkSignal.value = false;
+  senalTemaOscuro.value = false;
   const html = render(
     <FormularioLogin modalidad="DISTANCIA" onModalidadChange={() => {}} />,
   );

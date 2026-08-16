@@ -42,6 +42,7 @@ de contrato; no "arreglarlos" con un rename:
 | Nombres de tablas/columnas en SQL crudo | debe ser SIEMPRE español | `tests/test_contrato_sql_espanol.py` |
 | Claves JSON internas de datos (`detalle`) | `action`, `phase`, `identifier` | — |
 | Nombres de pkey/index de sistema | `operation_batches_pkey` (sin renombrar) | — |
+| Hooks de override de librerías | `JsonFormatter.add_fields`, `logging.Filter.filter`, `__aenter__`/`__aexit__` | `tests/test_configuracion_logging.py` |
 
 Regla de oro: se renombra lo **interno** (Python, ORM, tablas/columnas en migraciones,
 SQL crudo), nunca un contrato **externo**. Tras cualquier rename, correr: `ruff`,

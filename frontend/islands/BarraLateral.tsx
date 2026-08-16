@@ -4,8 +4,8 @@ import type { JSX } from "preact";
 import { cerrarSesion } from "../services/api.ts";
 import { eliminarToken } from "../utils/autenticacion.ts";
 import { obtenerMiPerfil } from "../services/api.ts";
-import { garantizarPerfil, profileSignal } from "../utils/perfil.ts";
-import { mobileOpenSignal } from "../utils/disposicion.ts";
+import { garantizarPerfil, senalPerfil } from "../utils/perfil.ts";
+import { senalMenuMovilAbierto } from "../utils/disposicion.ts";
 import {
   IconoCarpeta,
   IconoEngranaje,
@@ -59,8 +59,8 @@ export default function BarraLateral() {
     garantizarPerfil(obtenerMiPerfil);
   }, []);
 
-  const displayName = profileSignal.value?.firstname || "Usuario";
-  const avatarUrl = profileSignal.value?.profileimageurl || null;
+  const displayName = senalPerfil.value?.firstname || "Usuario";
+  const avatarUrl = senalPerfil.value?.profileimageurl || null;
   const initial = displayName.charAt(0).toUpperCase();
 
   const handleLogout = () => {
@@ -72,7 +72,7 @@ export default function BarraLateral() {
   };
 
   const closeMobile = () => {
-    mobileOpenSignal.value = false;
+    senalMenuMovilAbierto.value = false;
   };
 
   const isActive = (match: string) => currentPath.value.startsWith(match);
@@ -81,14 +81,14 @@ export default function BarraLateral() {
     <>
       <div
         class={`fixed inset-0 bg-black/40 z-25 md:hidden ${
-          mobileOpenSignal.value ? "" : "hidden"
+          senalMenuMovilAbierto.value ? "" : "hidden"
         }`}
         onClick={closeMobile}
       />
 
       <aside
         class={`w-[220px] h-screen flex flex-col fixed left-0 top-0 z-30 border-r border-[var(--border-secondary)] bg-[var(--navbar-bg)] text-[var(--navbar-text)] ${
-          mobileOpenSignal.value ? "translate-x-0" : "-translate-x-full"
+          senalMenuMovilAbierto.value ? "translate-x-0" : "-translate-x-full"
         } md:translate-x-0`}
       >
         <a

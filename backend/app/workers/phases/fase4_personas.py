@@ -53,7 +53,7 @@ async def _resolver_mapa_cursos(modalidad, all_sns):
                             logger.debug(f"No se pudo resolver curso {sn} por field fallback")
         return course_map, course_fullname
     finally:
-        await ms.close()
+        await ms.cerrar()
 
 
 async def _resolver_respaldo(modalidad, all_sns):
@@ -82,7 +82,7 @@ async def _resolver_respaldo(modalidad, all_sns):
                         logger.debug(f"No se pudo resolver curso {sn} en fallback")
         return fallback_map, fallback_fullname
     finally:
-        await ms.close()
+        await ms.cerrar()
 
 
 async def _crear_items_fase4_async(db, execution_id, ctx_data, modalidad) -> dict[str, int]:
@@ -188,4 +188,4 @@ async def _crear_items_fase4_async(db, execution_id, ctx_data, modalidad) -> dic
     return counts
 
 
-_create_phase4_items = _envoltura_sincronizacion(_crear_items_fase4_async)
+_crear_items_fase4_sincrono = _envoltura_sincronizacion(_crear_items_fase4_async)

@@ -109,7 +109,7 @@ def _activate(modalidad: str, shortnames: list[str], batch: int = 25):
             if not_found:
                 print(f"  No encontrados en Moodle: {not_found[:20]}")
         finally:
-            await ms.close()
+            await ms.cerrar()
 
     asyncio.run(_run())
 

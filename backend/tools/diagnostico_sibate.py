@@ -42,7 +42,7 @@ async def check():
     for pref, count in prefixes.most_common(15):
         print(f"  {pref}: {count}")
 
-    await ms.close()
+    await ms.cerrar()
 
 
 asyncio.run(check())

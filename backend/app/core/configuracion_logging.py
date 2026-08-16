@@ -57,8 +57,8 @@ class FormateadorJSON(jsonlogger.JsonFormatter):
             timestamp=True,
         )
 
-    def agregar_campos(self, log_record, record, message_dict):
-        super().agregar_campos(log_record, record, message_dict)
+    def add_fields(self, log_record, record, message_dict):
+        super().add_fields(log_record, record, message_dict)
         log_record["level"] = record.levelname
         log_record["logger"] = record.name
         if not log_record.get("timestamp"):

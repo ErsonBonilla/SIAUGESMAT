@@ -74,7 +74,7 @@ class TestCreatePhase3ItemsPersistReason:
         ):
             mock_ms = MagicMock()
             mock_ms.obtener_cursos = AsyncMock(return_value=[])
-            mock_ms.close = AsyncMock(return_value=None)
+            mock_ms.cerrar = AsyncMock(return_value=None)
             mock_factory.return_value = mock_ms
 
             _crear_items_fase3(test_db, 999, _ctx_data(), comparison, "DISTANCIA")

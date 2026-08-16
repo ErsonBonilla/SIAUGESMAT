@@ -5,7 +5,7 @@ import type { MetricasSemestre } from "../services/api.ts";
 import {
   CLAVES_METRICAS,
   ETIQUETAS_METRICAS,
-  useChart,
+  usarGrafico,
 } from "../utils/grafico.ts";
 import SelectorSemestre from "../components/SelectorSemestre.tsx";
 
@@ -21,7 +21,7 @@ export default function ComparacionSemestre(
 ) {
   const semesterA = useSignal<string>("");
   const semesterB = useSignal<string>("");
-  const { canvasRef, createChart } = useChart();
+  const { canvasRef, crearGrafico } = usarGrafico();
 
   const semestresDisponibles = useComputed(() => {
     return allMetrics.map((m) => m.semester).sort();
@@ -56,7 +56,7 @@ export default function ComparacionSemestre(
       metricsB.value![key] as number || 0
     );
 
-    createChart({
+    crearGrafico({
       type: "bar",
       data: {
         labels,

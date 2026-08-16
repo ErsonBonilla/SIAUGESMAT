@@ -69,7 +69,7 @@ class TestRealMoodleCategoria:
             cats2 = await ms.obtener_categorias(idnumber=cat_idn)
             assert not cats2, "La categoría no se eliminó correctamente"
         finally:
-            await ms.close()
+            await ms.cerrar()
 
 
 class TestRealMoodleCurso:
@@ -123,7 +123,7 @@ class TestRealMoodleCurso:
             if cats:
                 await ms.eliminar_categoria(int(cats[0]["id"]), recursive=True)
         finally:
-            await ms.close()
+            await ms.cerrar()
 
 
 class TestRealMoodleUsuario:
@@ -156,7 +156,7 @@ class TestRealMoodleUsuario:
             users2 = await ms.obtener_usuarios("username", [username])
             assert not users2, "El usuario no se eliminó"
         finally:
-            await ms.close()
+            await ms.cerrar()
 
 
 class TestRealMoodleFlujoCompleto:
@@ -229,7 +229,7 @@ class TestRealMoodleFlujoCompleto:
                 cats2 = await ms.obtener_categorias(idnumber=cat_idn)
                 assert not cats2, "6. Eliminar categoría falló"
         finally:
-            await ms.close()
+            await ms.cerrar()
 
 
 class TestRealMoodleCursoConTemplate:
@@ -276,7 +276,7 @@ class TestRealMoodleCursoConTemplate:
             if cats:
                 await ms.eliminar_categoria(int(cats[0]["id"]), recursive=True)
         finally:
-            await ms.close()
+            await ms.cerrar()
 
     @pytest.mark.asyncio
     async def test_crear_curso_con_import_content(self):
@@ -328,7 +328,7 @@ class TestRealMoodleCursoConTemplate:
             if cats:
                 await ms.eliminar_categoria(int(cats[0]["id"]), recursive=True)
         finally:
-            await ms.close()
+            await ms.cerrar()
 
     @pytest.mark.asyncio
     async def test_duplicate_course_endpoint(self):
@@ -368,4 +368,4 @@ class TestRealMoodleCursoConTemplate:
             if cats:
                 await ms.eliminar_categoria(int(cats[0]["id"]), recursive=True)
         finally:
-            await ms.close()
+            await ms.cerrar()

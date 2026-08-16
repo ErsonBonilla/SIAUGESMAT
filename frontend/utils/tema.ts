@@ -1,4 +1,4 @@
-// utils/theme.ts
+// utils/tema.ts
 import { signal } from "@preact/signals";
 
 declare global {
@@ -26,9 +26,9 @@ function getInitialTheme(): boolean {
  * - `true`  → Modo oscuro (valor por defecto en SSR).
  * - `false` → Modo claro.
  */
-export const darkSignal = signal(getInitialTheme());
+export const senalTemaOscuro = signal(getInitialTheme());
 
-export const DARK_THEME_VARS: Record<string, string> = {
+export const VARIABLES_TEMA_OSCURO: Record<string, string> = {
   "--bg-primary": "#1e1e2e",
   "--bg-secondary": "#181825",
   "--bg-tertiary": "#313244",
@@ -57,7 +57,7 @@ export const DARK_THEME_VARS: Record<string, string> = {
   "--brand-orange": "#f97316",
 };
 
-export const LIGHT_THEME_VARS: Record<string, string> = {
+export const VARIABLES_TEMA_CLARO: Record<string, string> = {
   "--bg-primary": "#FFFFFF",
   "--bg-secondary": "#F9FAFB",
   "--bg-tertiary": "#F3F4F6",

@@ -14,7 +14,7 @@ from app.workers.tareas_operaciones import (
 
 def _make_moodle():
     m = MagicMock()
-    m.close = AsyncMock(return_value=None)
+    m.cerrar = AsyncMock(return_value=None)
     return m
 
 

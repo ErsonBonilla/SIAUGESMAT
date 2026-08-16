@@ -319,4 +319,4 @@ async def obtener_mi_perfil(usuario_actual: UsuarioEnToken = Depends(obtener_usu
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error interno"
         ) from None
     finally:
-        await moodle.close()
+        await moodle.cerrar()

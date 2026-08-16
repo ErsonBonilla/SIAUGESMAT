@@ -4,7 +4,7 @@ import GraficoMetricas from "./GraficoMetricasIsland.tsx";
 import ComparacionSemestre from "./ComparacionSemestre.tsx";
 import SelectorMultiplesSemestres from "../components/SelectorMultiplesSemestres.tsx";
 import { type MetricasSemestre, obtenerHistorial } from "../services/api.ts";
-import { darkSignal } from "../utils/tema.ts";
+import { senalTemaOscuro } from "../utils/tema.ts";
 import CajaError from "../components/CajaError.tsx";
 import EsqueletoCarga from "../components/EsqueletoCarga.tsx";
 
@@ -51,7 +51,7 @@ export default function Historico() {
               view.value === v
                 ? activeBtn
                 : `${inactiveBase} ${
-                  darkSignal.value ? inactiveDark : inactiveLight
+                  senalTemaOscuro.value ? inactiveDark : inactiveLight
                 }`
             }`}
           >

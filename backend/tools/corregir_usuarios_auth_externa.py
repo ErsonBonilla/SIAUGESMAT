@@ -499,7 +499,7 @@ async def main():
         print("   o --user USERNAME para un usuario individual.\n")
 
     finally:
-        await ms.close()
+        await ms.cerrar()
 
 
 if __name__ == "__main__":

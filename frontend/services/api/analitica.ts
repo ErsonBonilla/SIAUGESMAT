@@ -1,4 +1,4 @@
-// services/api/analytics.ts
+// services/api/analitica.ts
 import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
 import type {
   DisposicionTrazasGrafico,

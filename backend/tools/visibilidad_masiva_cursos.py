@@ -94,7 +94,7 @@ async def main():
         f"DONE: {updated} {action_label.lower()}, {failed} failed, {len(not_found)} not found ({elapsed:.0f}s)"
     )
 
-    await moodle.close()
+    await moodle.cerrar()
 
 
 if __name__ == "__main__":

@@ -120,7 +120,7 @@ class TestRequest:
     @pytest.mark.asyncio
     async def test_close(self, client):
         c, mock_http, _ = client
-        await c.close()
+        await c.cerrar()
         mock_http.aclose.assert_awaited_once()
 
     @pytest.mark.asyncio

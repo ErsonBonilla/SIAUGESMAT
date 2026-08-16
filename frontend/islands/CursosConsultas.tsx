@@ -1,13 +1,13 @@
 import { useSignal } from "@preact/signals";
 import TablaConsultaIsland from "./TablaConsultaIsland.tsx";
 import ConsultaCursosSinUso from "./ConsultaCursosSinUso.tsx";
-import { ENTITY_CONSULT_CONFIGS } from "../utils/configuracion-entidad.ts";
+import { CONFIG_CONSULTA_ENTIDADES } from "../utils/configuracion-entidad.ts";
 
 type Modo = "normal" | "inactive";
 
 export default function CursosConsultas() {
   const mode = useSignal<Modo>("normal");
-  const coursesConfig = ENTITY_CONSULT_CONFIGS.courses;
+  const coursesConfig = CONFIG_CONSULTA_ENTIDADES.courses;
 
   return (
     <div class="max-w-6xl mx-auto">

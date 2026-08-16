@@ -3,7 +3,7 @@ import uuid
 
 from fastapi import HTTPException, UploadFile
 
-from app.core.configuracion_entidades import ENTITY_CONFIG
+from app.core.configuracion_entidades import CONFIG_ENTIDADES
 from app.repositories.repositorio_ejecuciones import obtener_ejecucion_activa
 from app.repositories.repositorio_operaciones import agregar_item, crear_lote, obtener_lote_activo
 from app.schemas.operaciones import RespuestaSubidaCsv
@@ -28,7 +28,7 @@ def _ensure_modalidad_free(db, modalidad: str) -> None:
 
 
 async def manejar_subida_visibilidad(file: UploadFile, db, current_user, visibility: str):
-    config = ENTITY_CONFIG["courses"]
+    config = CONFIG_ENTIDADES["courses"]
     _ensure_modalidad_free(db, current_user.modalidad)
 
     if not file.filename or not file.filename.endswith(".csv"):
@@ -72,7 +72,7 @@ async def manejar_subida_visibilidad(file: UploadFile, db, current_user, visibil
 async def manejar_subida(
     file: UploadFile, db, current_user, entity_type, action, default_role=None
 ):
-    config = ENTITY_CONFIG[entity_type]
+    config = CONFIG_ENTIDADES[entity_type]
     _ensure_modalidad_free(db, current_user.modalidad)
 
     if not file.filename or not file.filename.endswith(".csv"):

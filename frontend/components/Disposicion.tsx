@@ -2,7 +2,7 @@
 import { ComponentChildren } from "preact";
 import BarraLateral from "../islands/BarraLateral.tsx";
 import BotonMenuMovil from "../islands/BotonMenuMovil.tsx";
-import { profileSignal } from "../utils/perfil.ts";
+import { senalPerfil } from "../utils/perfil.ts";
 
 interface PropsDisposicion {
   children: ComponentChildren;
@@ -19,10 +19,10 @@ export default function Disposicion({ children, title }: PropsDisposicion) {
         <BotonMenuMovil />
         <span class="text-base font-bold ml-2">SIAUGESMAT</span>
         <div class="ml-auto flex items-center gap-2">
-          {profileSignal.value?.profileimageurl
+          {senalPerfil.value?.profileimageurl
             ? (
               <img
-                src={profileSignal.value.profileimageurl}
+                src={senalPerfil.value.profileimageurl}
                 alt=""
                 class="w-8 h-8 rounded-full object-cover"
               />
@@ -35,7 +35,7 @@ export default function Disposicion({ children, title }: PropsDisposicion) {
                   color: "var(--navbar-user-text)",
                 }}
               >
-                {profileSignal.value?.firstname?.charAt(0).toUpperCase() || "U"}
+                {senalPerfil.value?.firstname?.charAt(0).toUpperCase() || "U"}
               </div>
             )}
         </div>

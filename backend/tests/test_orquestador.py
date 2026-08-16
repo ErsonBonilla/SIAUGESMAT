@@ -302,7 +302,7 @@ class TestProcessEtlPhase:
             mock_done.delay.assert_called_once_with([], 1, "3")
 
     @patch(
-        "app.workers.phases.orquestador._create_phase4_items",
+        "app.workers.phases.orquestador._crear_items_fase4_sincrono",
         return_value={"create_user": 1, "enrol": 0},
     )
     @patch("app.workers.phases.orquestador._obtener_items_pendientes")

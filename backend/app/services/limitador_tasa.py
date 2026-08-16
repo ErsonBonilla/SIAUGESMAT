@@ -100,7 +100,7 @@ class LimitadorTasaRedis:
             wait = (count - self.velocidad) * (self.ventana / self.velocidad)
             await asyncio.sleep(wait)
 
-    async def close(self):
+    async def cerrar(self):
         if self._grupo_conexiones is not None:
             await self._grupo_conexiones.disconnect()
             self._grupo_conexiones = None

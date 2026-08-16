@@ -3,7 +3,7 @@ Pruebas de concurrencia para mecanismos de locking.
 
 Verifica:
 - _adquirir_bloqueo_asesor: comportamiento básico (determinista)
-- _create_phase4_items: concurrencia con threading simulado
+- _crear_items_fase4_sincrono: concurrencia con threading simulado
 - _crear_items_fase3: mismo patrón
 """
 
@@ -12,7 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from app.db.sesion import SessionLocal
-from app.workers.phases.fase4_personas import _crear_items_fase4_async, _create_phase4_items
+from app.workers.phases.fase4_personas import _crear_items_fase4_async, _crear_items_fase4_sincrono
 
 
 def _make_ctx_data(users=None, enrolments=None):
@@ -68,7 +68,7 @@ class TestAdvisoryLock:
 class TestConcurrentPhase4:
     @pytest.mark.asyncio
     async def test_concurrent_create_items(self, test_db):
-        """Dos llamadas concurrentes a _create_phase4_items con el mismo
+        """Dos llamadas concurrentes a _crear_items_fase4_sincrono con el mismo
         execution_id: solo la primera debe crear items."""
         import threading
 
@@ -93,7 +93,7 @@ class TestConcurrentPhase4:
                         # Primer worker obtiene lock, segundo no
                         mock_lock.side_effect = [True, False]
 
-                        result = _create_phase4_items(db, 99, ctx, "DISTANCIA")
+                        result = _crear_items_fase4_sincrono(db, 99, ctx, "DISTANCIA")
                         results[worker_id] = result
             finally:
                 db.close()
@@ -111,7 +111,7 @@ class TestConcurrentPhase4:
 
     @pytest.mark.asyncio
     async def test_no_duplicate_items_on_retry(self, test_db):
-        """Si los items ya existen, _create_phase4_items retorna vacío."""
+        """Si los items ya existen, _crear_items_fase4_sincrono retorna vacío."""
         with (
             patch("app.workers.phases.fase4_personas._adquirir_bloqueo_asesor", return_value=True),
             patch("app.workers.phases.fase4_personas.obtener_servicio_moodle") as mock_factory,

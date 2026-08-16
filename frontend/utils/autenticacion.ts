@@ -1,4 +1,4 @@
-// utils/auth.ts
+// utils/autenticacion.ts
 
 /**
  * Clave única utilizada para almacenar el token JWT tanto en localStorage

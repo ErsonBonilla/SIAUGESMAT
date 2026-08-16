@@ -23,7 +23,7 @@ def _make_item(item_id=1, accion="delete", execution_id=1, estado="pending", **e
 
 def _make_moodle():
     m = MagicMock()
-    m.close = AsyncMock(return_value=None)
+    m.cerrar = AsyncMock(return_value=None)
     return m
 
 

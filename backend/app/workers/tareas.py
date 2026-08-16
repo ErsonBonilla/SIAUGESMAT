@@ -93,16 +93,16 @@ def procesar_archivo_etl(self, execution_id: int, file_path: str, semester: str)
             checkpoint = obtener_checkpoint(db, execution_id) or {}
 
             for i, phase in enumerate(PHASES):
-                phase_name = PHASE_NAMES[i]
+                nombre_fase = PHASE_NAMES[i]
 
                 if debe_cancelarse(db, execution_id):
                     actualizar_progreso(
                         db,
                         execution_id,
                         PROGRESS_RESTORE[i - 1] if i > 0 else 12,
-                        f"FASE {phase_name} cancelada",
+                        f"FASE {nombre_fase} cancelada",
                     )
-                    logger.info(f"FASE {phase_name}: cancelada por el usuario")
+                    logger.info(f"FASE {nombre_fase}: cancelada por el usuario")
                     return ctx.metricas
 
                 if debe_pausarse(db, execution_id):
@@ -110,35 +110,35 @@ def procesar_archivo_etl(self, execution_id: int, file_path: str, semester: str)
                         db,
                         execution_id,
                         PROGRESS_RESTORE[i - 1] if i > 0 else 12,
-                        f"FASE {phase_name} pausada",
+                        f"FASE {nombre_fase} pausada",
                     )
-                    logger.info(f"FASE {phase_name}: pausada por el usuario")
+                    logger.info(f"FASE {nombre_fase}: pausada por el usuario")
                     return ctx.metricas
 
-                if phase_name in checkpoint:
-                    _restaurar_checkpoint(ctx, checkpoint[phase_name], phase_name)
+                if nombre_fase in checkpoint:
+                    _restaurar_checkpoint(ctx, checkpoint[nombre_fase], nombre_fase)
                     retry_count = _incrementar_conteo_reintentos(db, execution_id)
                     retry_label = f" (reintento {retry_count})" if retry_count > 0 else ""
                     actualizar_progreso(
                         db,
                         execution_id,
                         PROGRESS_RESTORE[i],
-                        f"FASE {phase_name} restaurada desde checkpoint{retry_label}",
+                        f"FASE {nombre_fase} restaurada desde checkpoint{retry_label}",
                     )
                     logger.info(
-                        f"FASE {phase_name}: restaurada desde checkpoint (reintento {retry_count})"
+                        f"FASE {nombre_fase}: restaurada desde checkpoint (reintento {retry_count})"
                     )
                 else:
-                    progress_key = f"{phase_name}_progress"
+                    progress_key = f"{nombre_fase}_progress"
                     if progress_key in checkpoint:
-                        _restaurar_checkpoint_progreso(ctx, checkpoint[progress_key], phase_name)
-                        logger.info(f"FASE {phase_name}: progreso parcial restaurado")
+                        _restaurar_checkpoint_progreso(ctx, checkpoint[progress_key], nombre_fase)
+                        logger.info(f"FASE {nombre_fase}: progreso parcial restaurado")
                     await phase.ejecutar(ctx)
-                    _guardar_checkpoint_fase(db, execution_id, ctx, phase_name)
-                    logger.info(f"FASE {phase_name}: completada, checkpoint guardado")
+                    _guardar_checkpoint_fase(db, execution_id, ctx, nombre_fase)
+                    logger.info(f"FASE {nombre_fase}: completada, checkpoint guardado")
 
                     if (
-                        phase_name == "2"
+                        nombre_fase == "2"
                         and ctx.modo in ("courses", "both")
                         and not _es_eliminacion_confirmada(db, execution_id)
                     ):

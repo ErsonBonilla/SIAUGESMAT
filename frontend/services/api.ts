@@ -1,4 +1,4 @@
-// services/api.ts — barrel (split: types, core, auth, trabajos, analytics, reportes, operaciones, consultas)
+// services/api.ts — barrel (split: tipos, nucleo, autenticacion, trabajos, analitica, reportes, operaciones, consultas)
 export {
   cerrarSesion,
   iniciarSesion,
