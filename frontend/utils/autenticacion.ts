@@ -1,11 +1,5 @@
 // utils/autenticacion.ts
 
-/**
- * Clave única utilizada para almacenar el token JWT tanto en localStorage
- * como en las cookies de sesión.
- */
-const TOKEN_KEY = "auth_token";
-
 // ---------------------------------------------------------------------------
 // Tipos internos
 // ---------------------------------------------------------------------------
@@ -18,41 +12,7 @@ export interface PayloadToken {
 }
 
 // ---------------------------------------------------------------------------
-// Gestión del token en localStorage (cliente)
-// ---------------------------------------------------------------------------
-
-/**
- * Obtiene el token JWT desde localStorage.
- * Retorna null si localStorage no está disponible (entorno de servidor)
- * o si el token no existe.
- */
-export function obtenerToken(): string | null {
-  if (typeof localStorage === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-/**
- * Guarda el token JWT en localStorage.
- * En entornos donde localStorage no existe (servidor), la función
- * simplemente no hace nada.
- */
-export function guardarToken(token: string): void {
-  if (typeof localStorage !== "undefined") {
-    localStorage.setItem(TOKEN_KEY, token);
-  }
-}
-
-/**
- * Elimina el token JWT de localStorage.
- */
-export function eliminarToken(): void {
-  if (typeof localStorage !== "undefined") {
-    localStorage.removeItem(TOKEN_KEY);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Utilidades de validación y extracción de datos del token
+// Utilidades de validación del token
 // ---------------------------------------------------------------------------
 
 /**
@@ -76,6 +36,9 @@ function base64UrlDecode(segment: string): string {
  * Decodifica el payload sin verificar la firma (la firma ya fue validada por
  * el backend). Si el token no contiene el campo `exp` se considera no expirado.
  * Un token malformado se considera expirado.
+ *
+ * Se usa en el guard SSR de rutas (cookie `auth_token`) solo como control de
+ * UX; la fuente de verdad de la autenticación sigue siendo el backend.
  */
 export function tokenHaExpirado(token: string): boolean {
   try {
@@ -87,46 +50,4 @@ export function tokenHaExpirado(token: string): boolean {
   } catch {
     return true;
   }
-}
-
-/**
- * Comprueba si el token almacenado en localStorage es válido (no ha expirado).
- *
- * Realiza una decodificación básica del payload sin verificar la firma
- * (la firma ya fue validada por el backend). Si el token no contiene
- * el campo `exp`, se considera válido indefinidamente.
- *
- * @returns `true` si el token existe y no ha expirado, `false` en caso contrario.
- */
-export function esTokenValido(): boolean {
-  const token = obtenerToken();
-  if (!token) return false;
-  return !tokenHaExpirado(token);
-}
-
-/**
- * Decodifica el payload del token (sin verificar la firma).
- *
- * @returns Un objeto con los claims del token, o `null` si el token
- *          no existe o no se puede decodificar.
- */
-export function obtenerPayloadToken(): PayloadToken | null {
-  const token = obtenerToken();
-  if (!token) return null;
-
-  try {
-    return JSON.parse(base64UrlDecode(token.split(".")[1]));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Obtiene el nombre de usuario contenido en el token.
- *
- * @returns El valor del claim `username`, o `null` si no está disponible.
- */
-export function obtenerNombreUsuario(): string | null {
-  const payload = obtenerPayloadToken();
-  return payload?.username ?? null;
 }

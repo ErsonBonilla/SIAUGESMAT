@@ -140,8 +140,7 @@ class ServicioMoodle(ClienteMoodle):
             if "visible" in course:
                 params[f"courses[{idx}][visible]"] = course["visible"]
             self._adaptador.construir_parametros_matriculacion_curso(params, course, idx)
-        use_post = len(courses) > 10
-        return await self._solicitar("core_course_create_courses", params, use_post=use_post)
+        return await self._solicitar("core_course_create_courses", params)
 
     async def duplicar_curso(
         self,
@@ -201,7 +200,7 @@ class ServicioMoodle(ClienteMoodle):
             return None
         return await self._solicitar("core_course_update_courses", params)
 
-    async def eliminar_cursos(self, shortnames: list[str], use_post: bool = True) -> dict | None:
+    async def eliminar_cursos(self, shortnames: list[str]) -> dict | None:
         resueltos = await self.obtener_cursos_por_shortnames(shortnames)
         course_ids = [int(c["id"]) for c in resueltos if c.get("id")]
         if not course_ids:
@@ -209,8 +208,7 @@ class ServicioMoodle(ClienteMoodle):
         params = {}
         for i, cid in enumerate(course_ids):
             params[f"courseids[{i}]"] = cid
-        use_post = use_post or len(course_ids) > 25
-        return await self._solicitar("core_course_delete_courses", params, use_post=use_post)
+        return await self._solicitar("core_course_delete_courses", params)
 
     async def obtener_docentes_matriculados(
         self,
@@ -322,8 +320,7 @@ class ServicioMoodle(ClienteMoodle):
             idn = user.get("idnumber") or user.get("cedula")
             if idn:
                 params[f"users[{i}][idnumber]"] = str(idn)
-        use_post = len(users) > 10
-        return await self._solicitar("core_user_create_users", params, use_post=use_post)
+        return await self._solicitar("core_user_create_users", params)
 
     async def asignar_rol(self, user_id: int, role: object, context_id: int = 1) -> dict:
         role_id = role if isinstance(role, int) else rol_shortname_a_id(str(role))
@@ -362,11 +359,7 @@ class ServicioMoodle(ClienteMoodle):
                 params: dict[str, Any] = {"field": field}
                 for j, v in enumerate(chunk):
                     params[f"values[{j}]"] = v
-                results.extend(
-                    await self._solicitar(
-                        "core_user_get_users_by_field", params, use_post=len(chunk) > 50
-                    )
-                )
+                results.extend(await self._solicitar("core_user_get_users_by_field", params))
             except ErrorApiMoodle as e:
                 if getattr(e, "codigo_error", None) != "invalidparameter":
                     raise
@@ -544,8 +537,7 @@ class ServicioMoodle(ClienteMoodle):
                 "error_codes": [],
             }
 
-        use_post = idx > 50
-        result = await self._solicitar("enrol_manual_enrol_users", params, use_post=use_post)
+        result = await self._solicitar("enrol_manual_enrol_users", params)
         api_errors = []
         api_error_codes = []
         if isinstance(result, list):
@@ -581,6 +573,4 @@ class ServicioMoodle(ClienteMoodle):
             params[f"enrolments[{i}][userid]"] = uid
             params[f"enrolments[{i}][courseid]"] = course_id
             params[f"enrolments[{i}][roleid]"] = role_id
-        return await self._solicitar(
-            "enrol_manual_unenrol_users", params, use_post=len(user_ids) > 10
-        )
+        return await self._solicitar("enrol_manual_unenrol_users", params)

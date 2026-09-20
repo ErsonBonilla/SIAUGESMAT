@@ -232,17 +232,16 @@ Deno.test("api - getLatest retorna la última ejecución con semáforo", async (
   assertEquals(latest.semaphore, "green");
 });
 
-Deno.test("api - respuesta 401 borra token y redirige al login", async () => {
+Deno.test("api - respuesta 401 cierra sesión y lanza error de sesión expirada", async () => {
   setup();
-  localStorage.setItem("auth_token", "mi-token-jwt");
-
   mockFetch(401, { detail: "Token expirado" });
+
   await assertRejects(
     () => obtenerEjecucion(1),
     Error,
     "Sesión expirada. Vuelva a iniciar sesión.",
   );
-  assertEquals(localStorage.getItem("auth_token"), null);
+  assertEquals(lastFetchArgs.url?.includes("/auth/logout"), true);
 });
 
 Deno.test("api - error login sin mensaje detalle muestra fallback", async () => {

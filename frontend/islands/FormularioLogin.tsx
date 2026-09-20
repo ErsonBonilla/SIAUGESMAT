@@ -1,6 +1,5 @@
 import { useSignal } from "@preact/signals";
 import { iniciarSesion } from "../services/api.ts";
-import { guardarToken } from "../utils/autenticacion.ts";
 import {
   IconoCirculoExclamacion,
   IconoDispositivo,
@@ -42,8 +41,8 @@ export default function FormularioLogin(
         password.value.trim(),
         modalidad,
       );
-      guardarToken(data.access_token);
       if (typeof window !== "undefined") {
+        localStorage.setItem("modalidad", data.modalidad);
         window.location.href = "/panel";
       }
     } catch (err) {

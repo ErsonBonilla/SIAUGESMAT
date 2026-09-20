@@ -30,16 +30,28 @@ class TestMoodleClientInit:
 
 class TestRequest:
     @pytest.mark.asyncio
-    async def test_get_success(self, client):
+    async def test_post_default(self, client):
         c, mock_http, _ = client
         expected = {"courses": [{"id": 1, "shortname": "TEST"}]}
         fake_resp = MagicMock()
         fake_resp.json.return_value = expected
         fake_resp.raise_for_status.return_value = None
-        mock_http.get.return_value = fake_resp
+        mock_http.post.return_value = fake_resp
 
         result = await c._solicitar("core_course_get_courses", {})
         assert result == expected
+        mock_http.post.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_get_explicito(self, client):
+        c, mock_http, _ = client
+        fake_resp = MagicMock()
+        fake_resp.json.return_value = {"ok": True}
+        fake_resp.raise_for_status.return_value = None
+        mock_http.get.return_value = fake_resp
+
+        result = await c._solicitar("core_course_get_courses", {}, use_post=False)
+        assert result == {"ok": True}
         mock_http.get.assert_called_once()
 
     @pytest.mark.asyncio
@@ -60,7 +72,7 @@ class TestRequest:
         fake_resp = MagicMock()
         fake_resp.json.return_value = {"error": "Invalid param", "errorcode": "invalidparameter"}
         fake_resp.raise_for_status.return_value = None
-        mock_http.get.return_value = fake_resp
+        mock_http.post.return_value = fake_resp
 
         with pytest.raises(ErrorApiMoodle):
             await c._solicitar("core_course_get_courses", {})
@@ -71,7 +83,7 @@ class TestRequest:
         fake_resp = MagicMock()
         fake_resp.json.return_value = {"error": "Invalid record", "errorcode": "invalidrecord"}
         fake_resp.raise_for_status.return_value = None
-        mock_http.get.return_value = fake_resp
+        mock_http.post.return_value = fake_resp
 
         with pytest.raises(ErrorMoodleSobrecargado):
             await c._solicitar("core_course_get_courses", {})
@@ -79,7 +91,7 @@ class TestRequest:
     @pytest.mark.asyncio
     async def test_http_503_overloaded(self, client):
         c, mock_http, _ = client
-        mock_http.get.side_effect = httpx.HTTPStatusError(
+        mock_http.post.side_effect = httpx.HTTPStatusError(
             "503 Service Unavailable", request=MagicMock(), response=MagicMock(status_code=503)
         )
 
@@ -92,7 +104,7 @@ class TestRequest:
         fake_resp = MagicMock()
         fake_resp.json.return_value = "just a string"
         fake_resp.raise_for_status.return_value = None
-        mock_http.get.return_value = fake_resp
+        mock_http.post.return_value = fake_resp
 
         unwrapped = c._solicitar_con_reintento.__func__.__wrapped__
 
@@ -112,7 +124,7 @@ class TestRequest:
         fake_resp = MagicMock()
         fake_resp.json.return_value = {"ok": True}
         fake_resp.raise_for_status.return_value = None
-        mock_http.get.return_value = fake_resp
+        mock_http.post.return_value = fake_resp
 
         await c._solicitar("core_course_get_courses", {})
         mock_limiter.adquirir.assert_awaited_once()
@@ -129,10 +141,10 @@ class TestRequest:
         fake_resp = MagicMock()
         fake_resp.json.return_value = {"ok": True}
         fake_resp.raise_for_status.return_value = None
-        mock_http.get.return_value = fake_resp
+        mock_http.post.return_value = fake_resp
 
         await c._solicitar("test_ws", {}, timeout=120.0)
-        _, kwargs = mock_http.get.call_args
+        _, kwargs = mock_http.post.call_args
         assert kwargs.get("timeout") == 120.0
 
 

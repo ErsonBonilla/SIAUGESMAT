@@ -94,3 +94,14 @@ export function aplicarVariablesTema(
     root.style.setProperty(key, value);
   }
 }
+
+/**
+ * Normaliza el valor del tema a una lista cerrada (`light` | `dark`).
+ *
+ * El valor proviene de la cookie `theme` (controlada por el cliente) y se
+ * inyecta en un `<script>` durante el SSR; normalizarlo a una whitelist evita
+ * la inyección de contenido arbitrario (XSS) vía cookie.
+ */
+export function normalizarTema(valor: string | undefined | null): string {
+  return valor === "light" ? "light" : "dark";
+}

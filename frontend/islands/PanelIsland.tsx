@@ -14,7 +14,6 @@ import {
   obtenerReciente,
 } from "../services/api.ts";
 import { senalPerfil } from "../utils/perfil.ts";
-import { obtenerPayloadToken } from "../utils/autenticacion.ts";
 import { COLORES_SEMAFORO, ETIQUETAS_ESTADO } from "../utils/constantes.ts";
 import {
   IconoCheck,
@@ -34,7 +33,9 @@ export default function IslandPanel() {
   useEffect(() => {
     loading.value = true;
     error.value = "";
-    const rawModalidad = obtenerPayloadToken()?.modalidad;
+    const rawModalidad = typeof window !== "undefined"
+      ? window.localStorage.getItem("modalidad")
+      : null;
     const modalidad = typeof rawModalidad === "string"
       ? rawModalidad
       : undefined;

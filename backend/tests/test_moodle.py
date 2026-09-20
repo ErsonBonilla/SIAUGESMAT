@@ -44,11 +44,11 @@ async def test_solicitar_success(moodle_service):
     fake_response = MagicMock()
     fake_response.json.return_value = expected
     fake_response.raise_for_status.return_value = None
-    service._cliente.get.return_value = fake_response
+    service._cliente.post.return_value = fake_response
 
     result = await service._solicitar("core_course_get_courses", {"criteria[0][key]": "shortname"})
     assert result == expected
-    service._cliente.get.assert_called_once()
+    service._cliente.post.assert_called_once()
 
     # ---------------------------------------------------------------------------
     # Método _solicitar – error de Moodle
@@ -67,12 +67,12 @@ async def test_solicitar_moodle_error(moodle_service):
     fake_response = MagicMock()
     fake_response.json.return_value = {"error": "Curso no encontrado", "errorcode": "notfound"}
     fake_response.raise_for_status.return_value = None
-    service._cliente.get.return_value = fake_response
+    service._cliente.post.return_value = fake_response
 
     with pytest.raises(ErrorApiMoodle) as exc_info:
         await service._solicitar("core_course_get_courses", {})
     assert exc_info.value.codigo_error == "notfound"
-    assert service._cliente.get.call_count == settings.MOODLE_MAX_RETRIES
+    assert service._cliente.post.call_count == settings.MOODLE_MAX_RETRIES
 
     # ---------------------------------------------------------------------------
     # Reintentos ante error HTTP
@@ -87,7 +87,7 @@ async def test_solicitar_retry_on_http_error(moodle_service):
     fake_response_success.json.return_value = {"ok": True}
     fake_response_success.raise_for_status.return_value = None
 
-    service._cliente.get.side_effect = [
+    service._cliente.post.side_effect = [
         httpx.HTTPError("Timeout"),
         httpx.HTTPError("Timeout"),
         fake_response_success,
@@ -95,7 +95,7 @@ async def test_solicitar_retry_on_http_error(moodle_service):
 
     result = await service._solicitar("core_webservice_get_site_info", {})
     assert result == {"ok": True}
-    assert service._cliente.get.call_count == 3
+    assert service._cliente.post.call_count == 3
 
     # ---------------------------------------------------------------------------
     # Categorías
@@ -109,12 +109,12 @@ async def test_create_categories(moodle_service):
     fake_response = MagicMock()
     fake_response.json.return_value = [{"id": 5, "name": "IDEAD"}]
     fake_response.raise_for_status.return_value = None
-    service._cliente.get.return_value = fake_response
+    service._cliente.post.return_value = fake_response
 
     categories = [{"name": "IDEAD", "idnumber": "IDE", "parent": 0}]
     result = await service.crear_categorias(categories)
     assert result[0]["id"] == 5
-    call_args = service._cliente.get.call_args[1]["params"]
+    call_args = service._cliente.post.call_args[1]["data"]
     assert call_args["wsfunction"] == "core_course_create_categories"
     assert call_args["categories[0][name]"] == "IDEAD"
     assert call_args["categories[0][idnumber]"] == "IDE"
@@ -131,12 +131,12 @@ async def test_get_categories_by_idnumber(moodle_service):
         {"id": 2, "idnumber": "OTHER"},
     ]
     fake_response.raise_for_status.return_value = None
-    service._cliente.get.return_value = fake_response
+    service._cliente.post.return_value = fake_response
 
     result = await service.obtener_categorias(idnumber="IDE_0105")
     assert len(result) == 1
     assert result[0]["idnumber"] == "IDE_0105"
-    params = service._cliente.get.call_args[1]["params"]
+    params = service._cliente.post.call_args[1]["data"]
     assert params["wsfunction"] == "core_course_get_categories"
     assert "criteria" not in params
 
@@ -158,7 +158,7 @@ async def test_create_categories_invalidates_cache(moodle_service):
         # (2) get_categories() re-fetch tras invalidar -> ve el padre recién creado
         # (3) create hijo -> respuesta OK
 
-    service._cliente.get.side_effect = [
+    service._cliente.post.side_effect = [
         _resp([]),
         _resp([{"id": 5, "idnumber": "IBA_0992"}]),
         _resp([{"id": 5, "idnumber": "IBA_0992"}]),
@@ -185,7 +185,7 @@ async def test_create_categories_invalidates_cache(moodle_service):
         ]
     )
 
-    last_call = service._cliente.get.call_args_list[-1][1]["params"]
+    last_call = service._cliente.post.call_args_list[-1][1]["data"]
     assert last_call["categories[0][parent]"] == 5
 
     # ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ async def test_create_courses(moodle_service):
     fake_create = MagicMock()
     fake_create.json.return_value = [{"id": 10, "shortname": "CUR_01"}]
     fake_create.raise_for_status.return_value = None
-    service._cliente.get.side_effect = [fake_cat, fake_create]
+    service._cliente.post.side_effect = [fake_cat, fake_create]
 
     courses = [
         {
@@ -217,7 +217,7 @@ async def test_create_courses(moodle_service):
     result = await service.crear_cursos(courses)
     assert len(result) == 1
     mock_adapter.construir_parametros_matriculacion_curso.assert_called_once()
-    last_call = service._cliente.get.call_args_list[-1][1]["params"]
+    last_call = service._cliente.post.call_args_list[-1][1]["data"]
     assert last_call["courses[0][shortname]"] == "CUR_01"
     assert last_call["courses[0][categoryid]"] == 1
     assert last_call["courses[0][format]"] == "onetopic"
@@ -232,10 +232,10 @@ async def test_update_courses(moodle_service):
     fake_upd = MagicMock()
     fake_upd.json.return_value = None
     fake_upd.raise_for_status.return_value = None
-    service._cliente.get.return_value = fake_upd
+    service._cliente.post.return_value = fake_upd
 
     await service.actualizar_cursos([{"shortname": "OLD", "visible": 0}])
-    last_call = service._cliente.get.call_args_list[-1][1]["params"]
+    last_call = service._cliente.post.call_args_list[-1][1]["data"]
     assert last_call["courses[0][id]"] == 5
     assert last_call["courses[0][visible]"] == 0
 
@@ -268,7 +268,7 @@ async def test_create_users(moodle_service):
     fake_response = MagicMock()
     fake_response.json.return_value = [{"id": 100, "username": "juan"}]
     fake_response.raise_for_status.return_value = None
-    service._cliente.get.return_value = fake_response
+    service._cliente.post.return_value = fake_response
 
     users = [
         {
@@ -281,7 +281,7 @@ async def test_create_users(moodle_service):
     ]
     result = await service.crear_usuarios(users)
     assert result[0]["id"] == 100
-    params = service._cliente.get.call_args[1]["params"]
+    params = service._cliente.post.call_args[1]["data"]
     assert params["users[0][username]"] == "juan"
     assert params["users[0][email]"] == "juan@ut.edu.co"
 
@@ -296,10 +296,10 @@ async def test_delete_users_by_username(moodle_service):
     fake_del = MagicMock()
     fake_del.json.return_value = None
     fake_del.raise_for_status.return_value = None
-    service._cliente.get.side_effect = [fake_get, fake_del]
+    service._cliente.post.side_effect = [fake_get, fake_del]
 
     await service.eliminar_usuarios(["juan", "maria"])
-    last_call = service._cliente.get.call_args_list[-1][1]["params"]
+    last_call = service._cliente.post.call_args_list[-1][1]["data"]
     assert last_call["userids[0]"] == 10
     assert last_call["userids[1]"] == 20
 
@@ -311,12 +311,12 @@ async def test_get_users(moodle_service):
     fake_response = MagicMock()
     fake_response.json.return_value = [{"id": 1, "email": "a@b.com"}]
     fake_response.raise_for_status.return_value = None
-    service._cliente.get.return_value = fake_response
+    service._cliente.post.return_value = fake_response
 
     result = await service.obtener_usuarios("email", ["a@b.com"])
     assert len(result) == 1
     assert result[0]["email"] == "a@b.com"
-    params = service._cliente.get.call_args[1]["params"]
+    params = service._cliente.post.call_args[1]["data"]
     assert params["field"] == "email"
     assert params["values[0]"] == "a@b.com"
 
@@ -371,7 +371,7 @@ async def test_enrol_users(moodle_service):
     mock_adapter.obtener_cursos.return_value = [{"shortname": "CURSO1", "id": 200}]
 
     async def mock_get(*args, **kwargs):
-        params = kwargs.get("params", {})
+        params = kwargs.get("data", {})
         wsfunction = params.get("wsfunction")
         if wsfunction == "core_user_get_users_by_field":
             return MagicMock(
@@ -382,12 +382,12 @@ async def test_enrol_users(moodle_service):
             return MagicMock(json=lambda: None, raise_for_status=lambda: None)
         return MagicMock(json=dict, raise_for_status=lambda: None)
 
-    service._cliente.get.side_effect = mock_get
+    service._cliente.post.side_effect = mock_get
 
     enrolments = [{"username": "teacher1", "course_shortname": "CURSO1", "role": "editingteacher"}]
     await service.matricular_usuarios(enrolments)
 
-    last_call_params = service._cliente.get.call_args[1]["params"]
+    last_call_params = service._cliente.post.call_args[1]["data"]
     assert last_call_params["wsfunction"] == "enrol_manual_enrol_users"
     assert last_call_params["enrolments[0][userid]"] == 10
     assert last_call_params["enrolments[0][courseid]"] == 200
@@ -401,7 +401,7 @@ async def test_enrol_users_resolves_missing_username_by_email(moodle_service):
     mock_adapter.obtener_cursos.return_value = [{"shortname": "CURSO1", "id": 200}]
 
     async def mock_get(*args, **kwargs):
-        params = kwargs.get("params", {})
+        params = kwargs.get("data", {})
         wsfunction = params.get("wsfunction")
         if wsfunction == "core_user_get_users_by_field":
             if params.get("field") == "email":
@@ -414,7 +414,7 @@ async def test_enrol_users_resolves_missing_username_by_email(moodle_service):
             return MagicMock(json=lambda: None, raise_for_status=lambda: None)
         return MagicMock(json=dict, raise_for_status=lambda: None)
 
-    service._cliente.get.side_effect = mock_get
+    service._cliente.post.side_effect = mock_get
 
     result = await service.matricular_usuarios(
         [
@@ -427,7 +427,7 @@ async def test_enrol_users_resolves_missing_username_by_email(moodle_service):
         ]
     )
     assert result["success"] is True
-    params = service._cliente.get.call_args_list[-1][1]["params"]
+    params = service._cliente.post.call_args_list[-1][1]["data"]
     assert params["enrolments[0][userid]"] == 10
 
     # ---------------------------------------------------------------------------
@@ -481,7 +481,7 @@ async def test_rate_limiter_called(moodle_service):
     fake_response = MagicMock()
     fake_response.json.return_value = {}
     fake_response.raise_for_status.return_value = None
-    service._cliente.get.return_value = fake_response
+    service._cliente.post.return_value = fake_response
 
     await service._solicitar("core_webservice_get_site_info", {})
     mock_limiter.adquirir.assert_called_once()

@@ -1,5 +1,6 @@
 // routes/_middleware.ts
 import type { FreshContext } from "@fresh/core";
+import { normalizarTema } from "../utils/tema.ts";
 
 interface AppState {
   theme?: string;
@@ -14,7 +15,8 @@ export async function handler(ctx: FreshContext<AppState>) {
   const themeMatch = cookies.split(";").find((c) =>
     c.trim().startsWith("theme=")
   );
-  ctx.state.theme = themeMatch ? themeMatch.split("=")[1].trim() : "dark";
+  const crudo = themeMatch ? themeMatch.split("=")[1]?.trim() : "";
+  ctx.state.theme = normalizarTema(crudo);
 
   const res = await ctx.next();
   if (res instanceof Response) {
