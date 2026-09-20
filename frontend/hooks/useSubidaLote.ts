@@ -28,7 +28,7 @@ export function useSubidaLote({
   const pollingError = useSignal("");
   const batchId = useSignal("");
   const estadoLote = useSignal<EstadoLoteOperacion | null>(null);
-  const pollingId = useSignal<number | null>(null);
+  const pollingId = useSignal<ReturnType<typeof setInterval> | null>(null);
 
   const fnObtenerEstado = onFetchStatus ??
     ((id: string) => obtenerEstadoLote(id));

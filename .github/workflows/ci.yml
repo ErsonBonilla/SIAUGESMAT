@@ -47,7 +47,7 @@ jobs:
 
       - uses: denoland/setup-deno@v2
         with:
-          deno-version: v2.x
+          deno-version: 2.9.5
 
       - name: Deno check
         run: deno task check
@@ -63,7 +63,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres

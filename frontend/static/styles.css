@@ -72,7 +72,9 @@ body {
     sans-serif;
 }
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -155,11 +157,13 @@ body {
   animation-delay: 550ms;
 }
 
-html.dark, html.dark body {
+html.dark,
+html.dark body {
   background-color: var(--bg-secondary) !important;
   color: var(--text-primary) !important;
 }
-html.light, html.light body {
+html.light,
+html.light body {
   background-color: var(--bg-secondary) !important;
   color: var(--text-primary) !important;
 }

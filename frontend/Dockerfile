@@ -1,5 +1,5 @@
 # frontend/Dockerfile
-FROM denoland/deno:2.5.6
+FROM denoland/deno:2.9.5
 
 WORKDIR /app
 
