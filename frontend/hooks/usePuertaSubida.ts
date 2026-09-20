@@ -19,7 +19,7 @@ export function usePuertaSubida(modalidad: () => string) {
 
   useEffect(() => {
     let stopped = false;
-    let intervalId: number | null = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const check = async () => {
       try {

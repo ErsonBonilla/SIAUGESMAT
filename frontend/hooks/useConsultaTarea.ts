@@ -17,7 +17,7 @@ export function useConsultaTarea<T>(
   const error = useSignal("");
   const taskId = useSignal("");
   const taskStatus = useSignal<EstadoTareaConsulta | null>(null);
-  const pollingId = useSignal<number | null>(null);
+  const pollingId = useSignal<ReturnType<typeof setInterval> | null>(null);
 
   const detenerSondeo = () => {
     if (pollingId.value) {

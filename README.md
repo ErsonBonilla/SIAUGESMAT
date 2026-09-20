@@ -12,8 +12,8 @@ Aplicación full-stack para la Universidad del Tolima que automatiza la carga ma
 |---|---|
 | **Frontend** | Deno 2 + Fresh + Preact + Signals + Chart.js |
 | **Backend** | Python 3.12 + FastAPI + SQLAlchemy + Celery + Redis |
-| **Base de datos** | PostgreSQL 17 |
-| **Cola de tareas** | Redis 7 + Celery (+ Celery Beat para tareas periódicas) |
+| **Base de datos** | PostgreSQL 18 |
+| **Cola de tareas** | Redis 8 + Celery (+ Celery Beat para tareas periódicas) |
 | **Integración Moodle** | API REST (versiones 3.8 a 5.x) vía adapter pattern + rate limiting |
 | **Reportes** | CSV + gráficos (PNG, HTML, JSON) + ZIP |
 | **Calidad de código** | Backend: ruff + vulture; Frontend: `deno task check` (fmt + lint + typecheck) + CI en GitHub Actions |
@@ -303,9 +303,9 @@ SIAUGESMAT/
 | Herramienta | Versión |
 |---|---|
 | Python | 3.12+ |
-| Deno | 2.5+ |
-| PostgreSQL | 17 |
-| Redis | 7 |
+| Deno | 2.9+ |
+| PostgreSQL | 18 |
+| Redis | 8 |
 
 ---
 
@@ -336,7 +336,7 @@ pip install -r requirements-dev.txt
 docker compose up -d db redis
 ```
 
-> **Docker Desktop en Windows:** Si las imágenes grandes (`python:3.12.10-slim`, `denoland/deno:2.5.6`) fallan con `lookup production.cloudfront.docker.com: no such host`, agregá `"dns": ["8.8.8.8", "1.1.1.1"]` en Docker Desktop → Settings → Docker Engine → Apply & Restart.
+> **Docker Desktop en Windows:** Si las imágenes grandes (`python:3.12.10-slim`, `denoland/deno:2.9.5`) fallan con `lookup production.cloudfront.docker.com: no such host`, agregá `"dns": ["8.8.8.8", "1.1.1.1"]` en Docker Desktop → Settings → Docker Engine → Apply & Restart.
 
 ### 3. Migraciones
 
@@ -517,8 +517,8 @@ El `docker-compose.yml` incluye 8 servicios:
 
 | Servicio | Imagen | Puerto | Función |
 |---|---|---|---|
-| `db` | `postgres:17` | — | Base de datos (solo red interna) |
-| `redis` | `redis:7-alpine` | — | Cola de tareas (solo red interna) |
+| `db` | `postgres:18` | — | Base de datos (solo red interna) |
+| `redis` | `redis:8-alpine` | — | Cola de tareas (solo red interna) |
 | `migrate` | `siaugesmat-backend` | — | Aplica migraciones Alembic (`alembic upgrade head`) y termina |
 | `backend` | `siaugesmat-backend` | — | API FastAPI |
 | `worker` | `siaugesmat-backend` | — | Worker Celery (ETL + operaciones) |
