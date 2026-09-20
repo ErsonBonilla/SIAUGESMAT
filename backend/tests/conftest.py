@@ -44,7 +44,7 @@ if _is_sqlite:
 os.environ.setdefault("JWT_SECRET_KEY", "clave-secreta-de-prueba-suficientemente-larga")
 os.environ.setdefault("MOODLE_ADMIN_TOKEN", "token-de-prueba")
 # Defaults para validar_critico() del lifespan (CI/entornos sin .env).
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379/15")
+os.environ.setdefault("REDIS_URL", "redis://localhost:6380/15")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:8000")
 
 from unittest.mock import AsyncMock, patch

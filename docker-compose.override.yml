@@ -2,7 +2,8 @@ services:
   db:
     ports: ["5432:5432"]
   redis:
-    ports: ["6379:6379"]
+    # 6380 en el host (el 6379 suele estar ocupado por svchost en Windows)
+    ports: ["6380:6379"]
   backend:
     volumes:
       - ./backend/app:/app/app:ro
