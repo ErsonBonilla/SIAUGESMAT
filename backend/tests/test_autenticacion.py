@@ -5,7 +5,7 @@ Valida los flujos de inicio de sesión contra Moodle y la generación de
 tokens JWT locales, usando mocks para aislar la comunicación externa.
 """
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from fastapi import status
 from jose import jwt
@@ -151,3 +151,75 @@ def test_login_presencial_rejected(client, monkeypatch):
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
     assert "PRESENCIAL" in response.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting del login (H1)
+# ---------------------------------------------------------------------------
+
+
+def _anular_limitador(blocked: bool):
+    from app.core.dependencies import obtener_limitador_login
+    from app.main import app
+
+    async def override():
+        limitador = AsyncMock()
+        limitador.esta_bloqueado.return_value = blocked
+        limitador.registrar_exito.return_value = None
+        return limitador
+
+    app.dependency_overrides[obtener_limitador_login] = override
+    return app
+
+
+def test_login_bloqueado_retorna_429(client):
+    """Cuando el limitador bloquea, debe retornar 429 sin tocar Moodle."""
+    app = _anular_limitador(blocked=True)
+    try:
+        response = client.post(
+            "/api/v1/auth/login",
+            json={"username": "profesor", "password": "secreta", "modalidad": "DISTANCIA"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+
+
+def test_login_exito_limpia_contador(client):
+    """Un login exitoso debe limpiar el contador de intentos fallidos."""
+    from app.core.dependencies import obtener_limitador_login
+    from app.main import app
+
+    limitador = AsyncMock()
+    limitador.esta_bloqueado.return_value = False
+    limitador.registrar_exito.return_value = None
+
+    async def override():
+        return limitador
+
+    app.dependency_overrides[obtener_limitador_login] = override
+    try:
+        with (
+            patch("app.core.config.Configuracion.obtener_config_moodle") as mock_cfg,
+            patch("app.api.v1.endpoints.autenticacion._obtener_token_moodle") as mock_token,
+            patch("app.api.v1.endpoints.autenticacion._verificar_permisos_moodle") as mock_perm,
+        ):
+            mock_cfg.return_value = {
+                "url": "http://fake.moodle.com",
+                "token": "fake",
+                "version": "3.9",
+            }
+            mock_token.return_value = "fake_moodle_token"
+            mock_perm.return_value = 42
+
+            response = client.post(
+                "/api/v1/auth/login",
+                json={"username": "profesor", "password": "secreta", "modalidad": "DISTANCIA"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == status.HTTP_200_OK
+    limitador.esta_bloqueado.assert_awaited_once()
+    limitador.registrar_exito.assert_awaited_once()

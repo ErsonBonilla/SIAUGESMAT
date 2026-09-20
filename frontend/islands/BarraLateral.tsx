@@ -2,7 +2,6 @@ import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { JSX } from "preact";
 import { cerrarSesion } from "../services/api.ts";
-import { eliminarToken } from "../utils/autenticacion.ts";
 import { obtenerMiPerfil } from "../services/api.ts";
 import { garantizarPerfil, senalPerfil } from "../utils/perfil.ts";
 import { senalMenuMovilAbierto } from "../utils/disposicion.ts";
@@ -64,7 +63,6 @@ export default function BarraLateral() {
   const initial = displayName.charAt(0).toUpperCase();
 
   const handleLogout = () => {
-    eliminarToken();
     cerrarSesion();
     if (typeof window !== "undefined") {
       window.location.href = "/ingreso";

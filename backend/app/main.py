@@ -6,6 +6,7 @@ configura CORS y expone endpoints de health check.
 """
 
 import logging
+import secrets
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -90,6 +91,32 @@ async def manejador_excepciones_global(request: Request, exc: Exception):
             )
         },
     )
+
+
+@app.middleware("http")
+async def proteccion_csrf(request: Request, call_next):
+    """Protección CSRF (double-submit cookie) para métodos con efecto.
+
+    Solo aplica a peticiones autenticadas por cookie: exige que la cabecera
+    ``X-CSRF-Token`` coincida con la cookie ``csrf_token``. Se eximen:
+    - login/logout (aún no hay cookie CSRF al iniciar sesión);
+    - peticiones con ``Authorization: Bearer`` (no vulnerables a CSRF);
+    - peticiones sin cookie ``auth_token`` (serán rechazadas 401 por la
+      dependencia de autenticación, no por CSRF).
+    """
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        path = request.url.path
+        if not (path.endswith("/auth/login") or path.endswith("/auth/logout")):
+            auth = request.headers.get("authorization", "").lower()
+            if not auth.startswith("bearer ") and request.cookies.get("auth_token"):
+                cookie = request.cookies.get("csrf_token", "")
+                header = request.headers.get("x-csrf-token", "")
+                if not cookie or not secrets.compare_digest(cookie, header):
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": "CSRF inválido."},
+                    )
+    return await call_next(request)
 
 
 @app.get("/", tags=["health"])

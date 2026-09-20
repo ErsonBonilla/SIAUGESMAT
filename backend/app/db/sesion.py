@@ -7,6 +7,7 @@ de sesiones que se inyecta en los endpoints de FastAPI.
 
 import logging
 from collections.abc import Generator
+from typing import Any
 from urllib.parse import urlparse
 
 from sqlalchemy import create_engine
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Motor de base de datos (Parámetros comunes)
 # ---------------------------------------------------------------------------
 _is_sqlite = urlparse(settings.DATABASE_URL).scheme.startswith("sqlite")
-engine_kwargs = {
+engine_kwargs: dict[str, Any] = {
     "pool_pre_ping": True,  # verifica que la conexión siga viva antes de usarla
     "echo": settings.DEBUG,  # imprime las consultas SQL solo en modo DEBUG
 }

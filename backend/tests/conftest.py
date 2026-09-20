@@ -53,7 +53,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.core.dependencies import obtener_db
+from app.core.dependencies import obtener_db, obtener_limitador_login
 from app.core.seguridad import crear_token_acceso
 from app.db.base import Base
 from app.db.modelos import (  # noqa: F401  # asegura que los modelos se registren
@@ -108,7 +108,15 @@ def client(test_db):
         finally:
             pass
 
+    async def override_limitador_login():
+        # Limitador falso: nunca bloquea y no requiere Redis.
+        limitador = AsyncMock()
+        limitador.esta_bloqueado.return_value = False
+        limitador.registrar_exito.return_value = None
+        return limitador
+
     app.dependency_overrides[obtener_db] = override_get_db
+    app.dependency_overrides[obtener_limitador_login] = override_limitador_login
     with TestClient(app) as tc:
         yield tc
     app.dependency_overrides.clear()

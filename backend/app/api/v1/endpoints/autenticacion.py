@@ -7,13 +7,15 @@ Proporciona:
 """
 
 import logging
+import secrets
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app.core.config import settings
-from app.core.dependencies import obtener_usuario_actual
+from app.core.dependencies import obtener_limitador_login, obtener_usuario_actual
+from app.core.limitador_login import LimitadorLogin
 from app.core.seguridad import crear_token_acceso
 from app.schemas.usuario import UsuarioEnToken
 from app.services.errores_moodle import ErrorApiMoodle
@@ -147,7 +149,7 @@ async def _verificar_permisos_moodle(moodle_url: str, token: str) -> int:
         # 1. Obtener información del sitio y del usuario
         params = {**common_params, "wsfunction": "core_webservice_get_site_info"}
         try:
-            resp = await client.get(base_url, params=params)
+            resp = await client.post(base_url, data=params)
             resp.raise_for_status()
             site_info = resp.json()
         except httpx.HTTPError as exc:
@@ -183,7 +185,7 @@ async def _verificar_permisos_moodle(moodle_url: str, token: str) -> int:
         params["criteria[0][key]"] = "name"
         params["criteria[0][value]"] = ""  # Buscar cualquier categoría, solo para probar acceso
         try:
-            resp = await client.get(base_url, params=params)
+            resp = await client.post(base_url, data=params)
             resp.raise_for_status()
             categ_data = resp.json()
         except httpx.HTTPError as exc:
@@ -214,15 +216,29 @@ async def _verificar_permisos_moodle(moodle_url: str, token: str) -> int:
 
 
 @router.post("/login", response_model=RespuestaLogin, summary="Iniciar sesión")
-async def iniciar_sesion(request: SolicitudLogin, response: Response):
+async def iniciar_sesion(
+    request: SolicitudLogin,
+    response: Response,
+    req: Request,
+    limitador: LimitadorLogin = Depends(obtener_limitador_login),
+):
     """
     Autentica al usuario contra Moodle y devuelve un token JWT propio.
 
     Raises:
         HTTPException 401: Credenciales inválidas.
         HTTPException 403: El usuario no tiene los permisos necesarios.
+        HTTPException 429: Demasiados intentos fallidos (rate limit).
         HTTPException 502/503: Error de comunicación con Moodle.
     """
+    # 0. Rate limiting por IP + usuario (protección contra fuerza bruta)
+    ip = req.client.host if req.client else "desconocida"
+    if await limitador.esta_bloqueado(ip, request.username):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Demasiados intentos fallidos. Intente nuevamente en unos minutos.",
+        )
+
     # 1. Validar modalidad PRESENCIAL bloqueada
     if request.modalidad.upper() == "PRESENCIAL" and not settings.ALLOW_PRESENCIAL:
         raise HTTPException(
@@ -249,6 +265,9 @@ async def iniciar_sesion(request: SolicitudLogin, response: Response):
         }
     )
 
+    # 6. Limpiar el contador de intentos fallidos del usuario
+    await limitador.registrar_exito(ip, request.username)
+
     logger.info(
         f"Inicio de sesión exitoso para {request.username} "
         f"(userid={user_id}, modalidad={request.modalidad})"
@@ -266,6 +285,18 @@ async def iniciar_sesion(request: SolicitudLogin, response: Response):
         samesite="lax",
     )
 
+    # Cookie CSRF (no-HttpOnly) para el esquema double-submit: el frontend la
+    # lee y la devuelve en la cabecera X-CSRF-Token en cada mutación.
+    response.set_cookie(
+        key="csrf_token",
+        value=secrets.token_urlsafe(32),
+        max_age=settings.JWT_EXPIRE_MINUTES * 60,
+        path="/",
+        httponly=False,
+        secure=True,
+        samesite="lax",
+    )
+
     return RespuestaLogin(
         access_token=access_token,
         user_id=user_id,
@@ -276,8 +307,9 @@ async def iniciar_sesion(request: SolicitudLogin, response: Response):
 
 @router.post("/logout", summary="Cerrar sesión")
 async def cerrar_sesion(response: Response):
-    """Elimina la cookie de sesión (HttpOnly) del navegador."""
+    """Elimina las cookies de sesión y CSRF del navegador."""
     response.delete_cookie("auth_token", path="/")
+    response.delete_cookie("csrf_token", path="/")
     return {"status": "ok"}
 
 

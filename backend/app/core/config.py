@@ -150,6 +150,15 @@ class Configuracion(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 60
 
     # ------------------------------------------------------------------
+    # Rate limiting del login
+    # ------------------------------------------------------------------
+    # Máximo de intentos fallidos por IP+usuario antes de bloquear
+    # temporalmente el inicio de sesión (protección contra fuerza bruta).
+    LOGIN_MAX_ATTEMPTS: int = 5
+    # Ventana (segundos) durante la que se cuentan los intentos fallidos.
+    LOGIN_WINDOW_SECONDS: int = 300
+
+    # ------------------------------------------------------------------
     # CORS
     # ------------------------------------------------------------------
     CORS_ORIGINS: str = ""

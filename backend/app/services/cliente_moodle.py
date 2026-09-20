@@ -61,7 +61,7 @@ class ClienteMoodle:
         self,
         wsfunction: str,
         params: dict[str, Any],
-        use_post: bool = False,
+        use_post: bool = True,
         timeout: float | None = None,
     ) -> Any:
         _t0 = time.monotonic()
