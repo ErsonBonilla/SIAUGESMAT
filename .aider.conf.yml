@@ -1,0 +1,24 @@
+# .aider.conf.yml - Configuración para SIAUGESMAT
+# Más información: https://aider.chat/docs/config.html
+
+# --- Modelo y Comportamiento General ---
+# DeepSeek vía API oficial (deepseek-chat apunta al modelo actual).
+model: deepseek/deepseek-chat
+# Mismo modelo como "débil": evita que aider llame a OpenAI por defecto.
+weak-model: deepseek/deepseek-chat
+# Ediciones quirúrgicas por diff. NUNCA "whole" (reescribe archivos enteros).
+edit-format: udiff
+# Commits manuales revisados (el estilo de commit del proyecto es manual).
+auto-commits: false
+# Sin firma "Co-Authored-By" para mantener los commits limpios.
+attribute-author: false
+attribute-committer: false
+# DeepSeek tiene 64k de contexto; mapa del repo un poco más generoso.
+map-tokens: 2048
+
+# --- Clave de API ---
+# La clave se lee de la variable de entorno DEEPSEEK_API_KEY.
+# Este archivo carga el .env raíz del repo (gitignored), donde puedes añadir:
+#   DEEPSEEK_API_KEY=sk-...
+# NO pegues la clave en este archivo: quedaría en el repositorio.
+env-file: .env
