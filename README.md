@@ -336,6 +336,12 @@ pip install -r requirements-dev.txt
 docker compose up -d db redis
 ```
 
+> **Redis:** el contenedor expone `6380` en el host (`6380:6379`) para evitar
+> colisiones con servicios que ocupen el `6379` (p. ej. `svchost` en Windows).
+> El `REDIS_URL` local de `.env.example` ya apunta a `localhost:6380`. Los
+> servicios internos (`backend`, `worker`, `beat`) siguen usando la red interna
+> de Docker (`redis://redis:6379/0`).
+
 > **Docker Desktop en Windows:** Si las imágenes grandes (`python:3.12.10-slim`, `denoland/deno:2.9.5`) fallan con `lookup production.cloudfront.docker.com: no such host`, agregá `"dns": ["8.8.8.8", "1.1.1.1"]` en Docker Desktop → Settings → Docker Engine → Apply & Restart.
 
 ### 3. Migraciones
@@ -389,7 +395,7 @@ deno task start
 DATABASE_URL=postgresql://user:pass@localhost:5432/siaugesmat
 
 # Redis
-REDIS_URL=redis://localhost:6379/0
+REDIS_URL=redis://localhost:6380/0
 
 # JWT
 JWT_SECRET_KEY=genera-una-clave-segura-aqui
@@ -518,7 +524,7 @@ El `docker-compose.yml` incluye 8 servicios:
 | Servicio | Imagen | Puerto | Función |
 |---|---|---|---|
 | `db` | `postgres:18` | — | Base de datos (solo red interna) |
-| `redis` | `redis:8-alpine` | — | Cola de tareas (solo red interna) |
+| `redis` | `redis:8-alpine` | 6380 (host) | Cola de tareas (solo red interna) |
 | `migrate` | `siaugesmat-backend` | — | Aplica migraciones Alembic (`alembic upgrade head`) y termina |
 | `backend` | `siaugesmat-backend` | — | API FastAPI |
 | `worker` | `siaugesmat-backend` | — | Worker Celery (ETL + operaciones) |
