@@ -1,8 +1,8 @@
 // routes/_app.tsx
 import type { PageProps } from "@fresh/core";
-import ErrorBoundary from "../components/ErrorBoundary.tsx";
-import ToastContainer from "../islands/NotificacionIsland.tsx";
-import { DARK_THEME_VARS, LIGHT_THEME_VARS } from "../utils/theme.ts";
+import LimiteError from "../components/LimiteError.tsx";
+import ContenedorToast from "../islands/NotificacionIsland.tsx";
+import { VARIABLES_TEMA_CLARO, VARIABLES_TEMA_OSCURO } from "../utils/tema.ts";
 
 interface AppState {
   theme?: string;
@@ -17,8 +17,8 @@ function buildThemeLines(vars: Record<string, string>): string {
 export default function App({ Component, state }: PageProps<AppState>) {
   const theme = (state as AppState).theme || "dark";
 
-  const darkLines = buildThemeLines(DARK_THEME_VARS);
-  const lightLines = buildThemeLines(LIGHT_THEME_VARS);
+  const darkLines = buildThemeLines(VARIABLES_TEMA_OSCURO);
+  const lightLines = buildThemeLines(VARIABLES_TEMA_CLARO);
 
   const themeScript =
     `(function(){var c=document.cookie.match(/theme=([^;]+)/);var t=c?c[1]:null;if(!t&&typeof localStorage!=='undefined'){t=localStorage.getItem('theme')}var isDark=t!=='light';var r=document.documentElement;if(isDark){${darkLines};r.classList.add('dark');r.classList.remove('light')}else{${lightLines};r.classList.add('light');r.classList.remove('dark')}if(t&&typeof localStorage!=='undefined'){localStorage.setItem('theme',t)}})();`;
@@ -49,10 +49,10 @@ export default function App({ Component, state }: PageProps<AppState>) {
       </head>
       <body class="min-h-screen bg-[var(--bg-primary)]">
         <div class="page-enter">
-          <ErrorBoundary>
+          <LimiteError>
             <Component />
-          </ErrorBoundary>
-          <ToastContainer />
+          </LimiteError>
+          <ContenedorToast />
         </div>
       </body>
     </html>

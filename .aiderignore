@@ -1,0 +1,95 @@
+# ============================================================
+# .aiderignore - SIAUGESMAT
+# ============================================================
+# Nota: aider 0.86 lee UN solo .aiderignore, el de la raiz del repo
+# (o el pasado con --aiderignore). No combina con ~/.aiderignore.
+# Soporta la sintaxis de .gitignore (incluida la negacion !patron).
+#
+# Para AUDITAR codigo, lo importante (dependencias, migraciones, tests)
+# NO se ignora a proposito: el agente debe poder verlo.
+
+# ========================
+# ENTORNOS VIRTUALES Y CACHES
+# ========================
+/venv/
+/.venv/
+/backend/.venv/
+/frontend/.venv/
+/backend/__pycache__/
+/frontend/__pycache__/
+/backend/.pytest_cache/
+/frontend/.deno_cache/
+/backend/.ruff_cache/
+/backend/.mypy_cache/
+
+# ========================
+# CONFIGURACION SENSIBLE (secretos)
+# ========================
+/.env
+/.env.*
+/backend/.env
+/frontend/.env
+*.env
+*.env.local
+*.env.development
+*.env.production
+/certs/
+*.pem
+*.key
+*.crt
+
+# ========================
+# DATOS Y ARTEFACTOS GENERADOS (no son codigo fuente)
+# ========================
+/backend/uploads/
+/backend/media/
+/backend/data/
+/backend/reports/
+/frontend/reports/
+/frontend/public/uploads/
+/backend/e2e/fixtures/
+/backend/e2e/tmp_uploads/
+/backend/e2e/tmp_reports/
+/backend/tools/data/
+*.csv
+*.xlsx
+*.xls
+*.zip
+*.db
+*.sqlite3
+
+# ========================
+# DIRECTORIOS DE COMPILACION Y DISTRIBUCION
+# ========================
+/backend/dist/
+/backend/build/
+/backend/*.egg-info/
+/frontend/dist/
+/frontend/build/
+/frontend/out/
+/frontend/_fresh/
+
+# ========================
+# LOGS Y TEMPORALES
+# ========================
+*.log
+/backend/logs/
+/frontend/logs/
+*.tmp
+*.swp
+
+# ========================
+# IDE Y SISTEMA
+# ========================
+/.vscode/
+/.idea/
+/*.code-workspace
+/.git/
+
+# ========================
+# NOTA: NO se ignoran a proposito (se auditan):
+#   - backend/requirements*.txt, *.lock, frontend/deno.json, deno.lock
+#     (dependencias => superficie de ataque y versiones)
+#   - backend/alembic/versions/ (migraciones => contrato SQL en espanol)
+#   - backend/tests/ y frontend/tests/ (tests de contrato)
+# ========================

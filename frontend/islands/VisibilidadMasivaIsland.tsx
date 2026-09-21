@@ -1,42 +1,42 @@
 import { useSignal } from "@preact/signals";
-import { useBatchUpload } from "../hooks/useBatchUpload.ts";
-import { useUploadGate } from "../hooks/useUploadGate.ts";
+import { useSubidaLote } from "../hooks/useSubidaLote.ts";
+import { usePuertaSubida } from "../hooks/usePuertaSubida.ts";
 import {
-  cancelBatch,
-  getBatchStatus,
-  pauseBatch,
-  resumeBatch,
-  uploadVisibilityCsv,
+  cancelarLote,
+  obtenerEstadoLote,
+  pausarLote,
+  reanudarLote,
+  subirCsvVisibilidad,
 } from "../services/api.ts";
-import { SpinnerIcon } from "../utils/icons.tsx";
-import ErrorBox from "../components/ErrorBox.tsx";
-import ProcessInProgressBanner from "../components/ProcessInProgressBanner.tsx";
-import OperationHistorySection from "../components/OperationHistorySection.tsx";
-import BatchProgressTable from "../components/BatchProgressTable.tsx";
-import ExecutionButton from "../components/ExecutionButton.tsx";
-import QueryHelp from "../components/QueryHelp.tsx";
-import FilePicker from "../components/FilePicker.tsx";
+import { IconoSpinner } from "../utils/iconos.tsx";
+import CajaError from "../components/CajaError.tsx";
+import BannerProcesoEnCurso from "../components/BannerProcesoEnCurso.tsx";
+import SeccionHistorialOperaciones from "../components/SeccionHistorialOperaciones.tsx";
+import TablaProgresoLote from "../components/TablaProgresoLote.tsx";
+import BotonEjecucion from "../components/BotonEjecucion.tsx";
+import AyudaConsulta from "../components/AyudaConsulta.tsx";
+import SelectorArchivo from "../components/SelectorArchivo.tsx";
 
-export default function BulkVisibilityIsland() {
+export default function IslandVisibilidadMasiva() {
   const visibility = useSignal<"show" | "hide">("show");
   const refreshKey = useSignal(0);
   const detailOffset = useSignal(0);
   const PAGE_SIZE = 20;
-  const { allowed, status, error: gateError } = useUploadGate(() => "");
+  const { allowed, status, error: gateError } = usePuertaSubida(() => "");
 
   const {
     uploading,
     error,
     batchId,
-    batchStatus,
+    estadoLote,
     file,
-    handleFileChange,
-    handleSubmit,
-    startPolling,
-  } = useBatchUpload({
+    manejarCambioArchivo,
+    manejarEnviar,
+    iniciarSondeo,
+  } = useSubidaLote({
     storageKey: "batch_visibility",
-    doUpload: (f) => uploadVisibilityCsv(f, visibility.value),
-    onFetchStatus: (id) => getBatchStatus(id, detailOffset.value, PAGE_SIZE),
+    doUpload: (f) => subirCsvVisibilidad(f, visibility.value),
+    onFetchStatus: (id) => obtenerEstadoLote(id, detailOffset.value, PAGE_SIZE),
     onUploadSuccess: () => {
       refreshKey.value++;
       if (typeof window !== "undefined" && batchId.value) {
@@ -51,17 +51,17 @@ export default function BulkVisibilityIsland() {
   const handleSelectBatch = (id: string) => {
     batchId.value = id;
     detailOffset.value = 0;
-    startPolling(id);
+    iniciarSondeo(id);
   };
 
   const handleDetailPageChange = (newOffset: number) => {
     detailOffset.value = newOffset;
-    startPolling(batchId.value);
+    iniciarSondeo(batchId.value);
   };
 
   return (
     <div>
-      <QueryHelp
+      <AyudaConsulta
         sections={[
           {
             title: "Archivo CSV requerido",
@@ -84,7 +84,7 @@ export default function BulkVisibilityIsland() {
       />
 
       <form
-        onSubmit={handleSubmit}
+        onSubmit={manejarEnviar}
         class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 space-y-5"
       >
         <div>
@@ -127,12 +127,12 @@ export default function BulkVisibilityIsland() {
         </div>
 
         <div>
-          <FilePicker
+          <SelectorArchivo
             id="csv-file"
             label="Archivo CSV"
             accept=".csv"
             file={file}
-            onChange={handleFileChange}
+            onChange={manejarCambioArchivo}
             disabled={uploading.value || !allowed}
             onClear={() => {
               error.value = "";
@@ -140,9 +140,9 @@ export default function BulkVisibilityIsland() {
           />
         </div>
 
-        {!allowed && <ProcessInProgressBanner status={status.value} />}
-        {gateError.value && <ErrorBox message={gateError.value} />}
-        {error.value && <ErrorBox message={error.value} />}
+        {!allowed && <BannerProcesoEnCurso status={status.value} />}
+        {gateError.value && <CajaError message={gateError.value} />}
+        {error.value && <CajaError message={error.value} />}
 
         <button
           type="submit"
@@ -152,7 +152,7 @@ export default function BulkVisibilityIsland() {
           {uploading.value
             ? (
               <>
-                <SpinnerIcon class="animate-spin h-5 w-5 text-white" />
+                <IconoSpinner class="animate-spin h-5 w-5 text-white" />
                 <span>Subiendo y encolando...</span>
               </>
             )
@@ -162,34 +162,34 @@ export default function BulkVisibilityIsland() {
         </button>
       </form>
 
-      {batchStatus.value && (
-        <BatchProgressTable
-          batchStatus={batchStatus.value}
+      {estadoLote.value && (
+        <TablaProgresoLote
+          estadoLote={estadoLote.value}
           batchId={batchId.value}
-          labelSingular="Curso"
-          labelPlural="cursos"
-          onPause={() => pauseBatch(batchId.value!)}
-          onResume={() => resumeBatch(batchId.value!)}
-          onCancel={() => cancelBatch(batchId.value!)}
+          etiquetaSingular="Curso"
+          etiquetaPlural="cursos"
+          alPausar={() => pausarLote(batchId.value!)}
+          alReanudar={() => reanudarLote(batchId.value!)}
+          alCancelar={() => cancelarLote(batchId.value!)}
           pagination={{
             offset: detailOffset.value,
-            pageSize: PAGE_SIZE,
-            onPageChange: handleDetailPageChange,
+            tamanoPagina: PAGE_SIZE,
+            alCambiarPagina: handleDetailPageChange,
           }}
         />
       )}
 
       <div class="mt-6">
-        <OperationHistorySection
+        <SeccionHistorialOperaciones
           entityType="courses"
           action="visibility"
-          currentBatchId={batchId.value}
+          idLoteActual={batchId.value}
           onSelectBatch={handleSelectBatch}
-          refreshTrigger={refreshKey.value}
+          disparadorActualizacion={refreshKey.value}
         />
       </div>
 
-      <ExecutionButton tab="visibilidad_cursos" />
+      <BotonEjecucion tab="visibilidad_cursos" />
     </div>
   );
 }

@@ -1,17 +1,17 @@
 // islands/Reportes.tsx
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import Chart from "./GraficoIsland.tsx";
-import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
-import ErrorBox from "../components/ErrorBox.tsx";
-import ReportCard from "../components/ReportCard.tsx";
-import { useReports } from "../hooks/useReports.ts";
+import Grafico from "./GraficoIsland.tsx";
+import EsqueletoCarga from "../components/EsqueletoCarga.tsx";
+import CajaError from "../components/CajaError.tsx";
+import TarjetaReporte from "../components/TarjetaReporte.tsx";
+import { useReportes } from "../hooks/useReportes.ts";
 import {
-  type ChartsListResponse,
-  downloadReport,
-  getReportDownloadUrl,
-  getReportFileUrl,
-  listCharts,
+  descargarReporte,
+  listarGraficos,
+  obtenerUrlArchivoReporte,
+  obtenerUrlDescargaReporte,
+  type RespuestaListaGraficos,
 } from "../services/api.ts";
 import { toast } from "../utils/toast.ts";
 
@@ -28,7 +28,7 @@ interface Props {
 }
 
 export default function Reportes({ executionId }: Props) {
-  const meta = useSignal<ChartsListResponse | null>(null);
+  const meta = useSignal<RespuestaListaGraficos | null>(null);
   const downloading = useSignal<string | null>(null);
   const loading = useSignal(true);
   const error = useSignal("");
@@ -36,13 +36,13 @@ export default function Reportes({ executionId }: Props) {
   const {
     reports,
     loading: reportsLoading,
-  } = useReports({ executionId });
+  } = useReportes({ executionId });
 
   useEffect(() => {
     if (!executionId) return;
     (async () => {
       try {
-        const chartsData = await listCharts(executionId);
+        const chartsData = await listarGraficos(executionId);
         meta.value = chartsData;
       } catch (e) {
         error.value = e instanceof Error
@@ -57,7 +57,7 @@ export default function Reportes({ executionId }: Props) {
   async function handleDownload(url: string, filename: string) {
     downloading.value = filename;
     try {
-      await downloadReport(url, filename);
+      await descargarReporte(url, filename);
     } catch {
       toast("Error al descargar reporte", "error");
     } finally {
@@ -66,9 +66,9 @@ export default function Reportes({ executionId }: Props) {
   }
 
   if (loading.value || reportsLoading.value) {
-    return <LoadingSkeleton variant="chart" />;
+    return <EsqueletoCarga variant="chart" />;
   }
-  if (error.value) return <ErrorBox message={error.value} />;
+  if (error.value) return <CajaError message={error.value} />;
 
   const charts = Object.entries(CHART_NAMES).map(([id, title]) => ({
     id,
@@ -87,7 +87,7 @@ export default function Reportes({ executionId }: Props) {
               type="button"
               onClick={() =>
                 handleDownload(
-                  getReportDownloadUrl(executionId),
+                  obtenerUrlDescargaReporte(executionId),
                   `reportes_ejecucion_${executionId}.zip`,
                 )}
               disabled={downloading.value !== null}
@@ -104,14 +104,14 @@ export default function Reportes({ executionId }: Props) {
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {reports.value.map((r) => (
-              <ReportCard
+              <TarjetaReporte
                 key={r.name}
                 report={r}
                 downloading={downloading.value === r.filename}
                 disabled={downloading.value !== null}
                 onClick={(report) =>
                   handleDownload(
-                    getReportFileUrl(executionId, report.name),
+                    obtenerUrlArchivoReporte(executionId, report.name),
                     report.filename,
                   )}
               />
@@ -131,7 +131,7 @@ export default function Reportes({ executionId }: Props) {
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           {charts.map(({ id, title }) => (
-            <Chart
+            <Grafico
               key={id}
               executionId={executionId}
               chartName={id}

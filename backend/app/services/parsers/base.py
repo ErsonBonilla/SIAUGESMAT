@@ -3,10 +3,10 @@ from typing import Any, ClassVar
 
 import pandas as pd
 
-from app.services.category_utils import sort_categories
+from app.services.utilidades_categorias import ordenar_categorias
 
 
-class BaseExcelParser(ABC):
+class AnalizadorExcelBase(ABC):
     CANONICAL_MAP: ClassVar[dict[str, str]] = {}
     IGNORE_PREFIXES = ("total_", "horas_")
     IGNORE_EXACT: ClassVar[set[str]] = {
@@ -19,14 +19,14 @@ class BaseExcelParser(ABC):
 
     @classmethod
     @abstractmethod
-    def read_excel(cls, file_path: str) -> pd.DataFrame: ...
+    def leer_excel(cls, file_path: str) -> pd.DataFrame: ...
 
     @classmethod
     @abstractmethod
-    def parse(cls, df: pd.DataFrame, modalidad: str) -> dict[str, Any]: ...
+    def parsear(cls, df: pd.DataFrame, modalidad: str) -> dict[str, Any]: ...
 
     @staticmethod
-    def _normalize_column_name(name: str) -> str:
+    def _normalizar_nombre_columna(name: str) -> str:
         import re
 
         name = name.lower().strip()
@@ -49,11 +49,11 @@ class BaseExcelParser(ABC):
         return name.strip("_")
 
     @classmethod
-    def _normalize_columns(cls, df: pd.DataFrame) -> pd.DataFrame:
+    def _normalizar_columnas(cls, df: pd.DataFrame) -> pd.DataFrame:
         seen = set()
         rename = {}
         for col in df.columns:
-            normalized = cls._normalize_column_name(str(col))
+            normalized = cls._normalizar_nombre_columna(str(col))
             if not normalized or normalized in cls.IGNORE_EXACT:
                 continue
             if any(normalized.startswith(p) for p in cls.IGNORE_PREFIXES):
@@ -65,10 +65,10 @@ class BaseExcelParser(ABC):
         return df.rename(columns=rename)
 
     @classmethod
-    def _filter_confirmed_rows(cls, df: pd.DataFrame) -> pd.DataFrame:
+    def _filtrar_filas_confirmadas(cls, df: pd.DataFrame) -> pd.DataFrame:
         confirma_col = None
         for col in df.columns:
-            if cls._normalize_column_name(str(col)) == "confirma":
+            if cls._normalizar_nombre_columna(str(col)) == "confirma":
                 confirma_col = col
                 break
 
@@ -101,10 +101,10 @@ class BaseExcelParser(ABC):
         return df
 
     @classmethod
-    def _filter_virtual_rows(cls, df: pd.DataFrame) -> pd.DataFrame:
+    def _filtrar_filas_virtuales(cls, df: pd.DataFrame) -> pd.DataFrame:
         observaciones_col = None
         for col in df.columns:
-            if cls._normalize_column_name(str(col)) == "observaciones":
+            if cls._normalizar_nombre_columna(str(col)) == "observaciones":
                 observaciones_col = col
                 break
 
@@ -137,7 +137,7 @@ class BaseExcelParser(ABC):
         return df
 
     @classmethod
-    def _parse_program_name(cls, df: pd.DataFrame) -> pd.DataFrame:
+    def _parsear_nombre_programa(cls, df: pd.DataFrame) -> pd.DataFrame:
         if "cod_programa" not in df.columns and "nombre_programa" in df.columns:
             mask = df["nombre_programa"].str.contains(r"^\d+\s*-\s*", na=False)
             if mask.any():
@@ -151,7 +151,7 @@ class BaseExcelParser(ABC):
         return df
 
     @staticmethod
-    def _clean_data(df: pd.DataFrame) -> pd.DataFrame:
+    def _limpiar_datos(df: pd.DataFrame) -> pd.DataFrame:
         for col in [
             "nombre_cat",
             "cod_programa",
@@ -171,16 +171,17 @@ class BaseExcelParser(ABC):
         return df
 
     @staticmethod
-    def _clean_program_name(raw: str) -> str:
+    def _limpiar_nombre_programa(raw: str) -> str:
         import re
 
         cleaned = re.sub(r"[\d-]", "", raw)
         return re.sub(r"\s+", " ", cleaned).strip()
 
-    # ----------------------------------------------------------------
-    # Conjuntos para partición de nombres colombianos
-    # Convención: [APELLIDO(S)] [NOMBRE(S)]
-    # ----------------------------------------------------------------
+        # ----------------------------------------------------------------
+        # Conjuntos para partición de nombres colombianos
+        # Convención: [APELLIDO(S)] [NOMBRE(S)]
+        # ----------------------------------------------------------------
+
     _GIVEN_NAMES: ClassVar[set[str]] = {
         "ADIELA",
         "ADOLFO",
@@ -434,7 +435,7 @@ class BaseExcelParser(ABC):
     }
 
     @staticmethod
-    def _split_name(full_name: str) -> tuple[str, str]:
+    def _dividir_nombre(full_name: str) -> tuple[str, str]:
         import re
 
         cleaned = re.sub(r"\s+", " ", full_name).strip().upper()
@@ -448,9 +449,9 @@ class BaseExcelParser(ABC):
 
         boundary = None
         for i, token in enumerate(parts):
-            if token in BaseExcelParser._SURNAME_PARTICLES:
+            if token in AnalizadorExcelBase._SURNAME_PARTICLES:
                 continue
-            if token in BaseExcelParser._GIVEN_NAMES:
+            if token in AnalizadorExcelBase._GIVEN_NAMES:
                 boundary = i
                 break
 
@@ -473,7 +474,7 @@ class BaseExcelParser(ABC):
         return firstname.title(), lastname.title()
 
     @staticmethod
-    def _to_roman_numeral(value: str) -> str:
+    def _a_numeral_romano(value: str) -> str:
         import re
 
         value = value.strip().upper()
@@ -509,4 +510,4 @@ class BaseExcelParser(ABC):
 
         return value
 
-    _sort_categories = staticmethod(sort_categories)
+    _sort_categories = staticmethod(ordenar_categorias)

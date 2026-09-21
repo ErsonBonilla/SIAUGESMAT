@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
 
-class NovedadItem(BaseModel):
+class ItemNovedad(BaseModel):
     id: str
     base_key: str
     old_shortname: str
@@ -15,9 +15,9 @@ class NovedadItem(BaseModel):
     target_course_id: int | None = None
 
 
-class NovedadesResponse(BaseModel):
+class RespuestaNovedades(BaseModel):
     semester: str
     previous_execution_id: int
     previous_filename: str
     total_compared: int
-    novedades: list[NovedadItem]
+    novedades: list[ItemNovedad]

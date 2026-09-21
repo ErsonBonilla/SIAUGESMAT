@@ -1,19 +1,19 @@
-import { authHeaders, BASE_URL, handleResponse } from "./core.ts";
-import type { NovedadesResponse } from "./types.ts";
+import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
+import type { RespuestaNovedades } from "./tipos.ts";
 
-export async function compareNovedades(
+export async function compararNovedades(
   file: File,
   semester: string,
   modalidad: string,
-): Promise<NovedadesResponse> {
+): Promise<RespuestaNovedades> {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("semester", semester);
   formData.append("modalidad", modalidad);
   const response = await fetch(`${BASE_URL}/novedades/compare`, {
     method: "POST",
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
     body: formData,
   });
-  return handleResponse<NovedadesResponse>(response);
+  return manejarRespuesta<RespuestaNovedades>(response);
 }

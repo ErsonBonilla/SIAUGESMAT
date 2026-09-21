@@ -1,25 +1,29 @@
 // islands/ComparacionSemestre.tsx
 import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import type { SemesterMetrics } from "../services/api.ts";
-import { METRIC_KEYS, METRIC_LABELS, useChart } from "../utils/chart.ts";
-import SemesterPicker from "../components/SemesterPicker.tsx";
+import type { MetricasSemestre } from "../services/api.ts";
+import {
+  CLAVES_METRICAS,
+  ETIQUETAS_METRICAS,
+  usarGrafico,
+} from "../utils/grafico.ts";
+import SelectorSemestre from "../components/SelectorSemestre.tsx";
 
-interface SemesterComparisonProps {
-  allMetrics: SemesterMetrics[];
+interface PropsComparacionSemestre {
+  allMetrics: MetricasSemestre[];
 }
 
 const COLOR_A = "#ED3237";
 const COLOR_B = "#1E40AF";
 
-export default function SemesterComparison(
-  { allMetrics }: SemesterComparisonProps,
+export default function ComparacionSemestre(
+  { allMetrics }: PropsComparacionSemestre,
 ) {
   const semesterA = useSignal<string>("");
   const semesterB = useSignal<string>("");
-  const { canvasRef, createChart } = useChart();
+  const { canvasRef, crearGrafico } = usarGrafico();
 
-  const availableSemesters = useComputed(() => {
+  const semestresDisponibles = useComputed(() => {
     return allMetrics.map((m) => m.semester).sort();
   });
 
@@ -44,11 +48,15 @@ export default function SemesterComparison(
   useEffect(() => {
     if (!metricsA.value || !metricsB.value) return;
 
-    const labels = METRIC_KEYS.map((key) => METRIC_LABELS[key]);
-    const dataA = METRIC_KEYS.map((key) => metricsA.value![key] as number || 0);
-    const dataB = METRIC_KEYS.map((key) => metricsB.value![key] as number || 0);
+    const labels = CLAVES_METRICAS.map((key) => ETIQUETAS_METRICAS[key]);
+    const dataA = CLAVES_METRICAS.map((key) =>
+      metricsA.value![key] as number || 0
+    );
+    const dataB = CLAVES_METRICAS.map((key) =>
+      metricsB.value![key] as number || 0
+    );
 
-    createChart({
+    crearGrafico({
       type: "bar",
       data: {
         labels,
@@ -81,10 +89,10 @@ export default function SemesterComparison(
           <label class="block text-sm font-medium text-[var(--text-secondary)] mb-1">
             Semestre A
           </label>
-          <SemesterPicker
+          <SelectorSemestre
             value={semesterA.value}
             onChange={(s) => (semesterA.value = s)}
-            availableSemesters={availableSemesters.value.filter((s) =>
+            semestresDisponibles={semestresDisponibles.value.filter((s) =>
               s !== semesterB.value
             )}
           />
@@ -105,10 +113,10 @@ export default function SemesterComparison(
           <label class="block text-sm font-medium text-[var(--text-secondary)] mb-1">
             Semestre B
           </label>
-          <SemesterPicker
+          <SelectorSemestre
             value={semesterB.value}
             onChange={(s) => (semesterB.value = s)}
-            availableSemesters={availableSemesters.value.filter((s) =>
+            semestresDisponibles={semestresDisponibles.value.filter((s) =>
               s !== semesterA.value
             )}
           />

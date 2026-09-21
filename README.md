@@ -12,8 +12,8 @@ Aplicación full-stack para la Universidad del Tolima que automatiza la carga ma
 |---|---|
 | **Frontend** | Deno 2 + Fresh + Preact + Signals + Chart.js |
 | **Backend** | Python 3.12 + FastAPI + SQLAlchemy + Celery + Redis |
-| **Base de datos** | PostgreSQL 17 |
-| **Cola de tareas** | Redis 7 + Celery (+ Celery Beat para tareas periódicas) |
+| **Base de datos** | PostgreSQL 18 |
+| **Cola de tareas** | Redis 8 + Celery (+ Celery Beat para tareas periódicas) |
 | **Integración Moodle** | API REST (versiones 3.8 a 5.x) vía adapter pattern + rate limiting |
 | **Reportes** | CSV + gráficos (PNG, HTML, JSON) + ZIP |
 | **Calidad de código** | Backend: ruff + vulture; Frontend: `deno task check` (fmt + lint + typecheck) + CI en GitHub Actions |
@@ -27,7 +27,7 @@ Aplicación full-stack para la Universidad del Tolima que automatiza la carga ma
 | **Claro** | `#ED3237` (Rojo UT) | `#00A859` (Verde UT) | `#FFFFFF` | `#111827` | `#E5E7EB` |
 | **Oscuro** | `#00A859` (Verde) | `#ED3237` (Rojo) | `#1E1E2E` | `#CDD6F4` | `#313244` |
 
-Los colores de la marca se definen en `utils/theme.ts` como `DARK_THEME_VARS` y `LIGHT_THEME_VARS`. El tema oscuro usa la paleta Catppuccin Mocha. El toggle aplica los colores imperativamente vía `style.setProperty` sobre `:root`.
+Los colores de la marca se definen en `utils/tema.ts` como `DARK_THEME_VARS` y `LIGHT_THEME_VARS`. El tema oscuro usa la paleta Catppuccin Mocha. El toggle aplica los colores imperativamente vía `style.setProperty` sobre `:root`.
 
 ---
 
@@ -60,7 +60,7 @@ Los colores de la marca se definen en `utils/theme.ts` como `DARK_THEME_VARS` y 
 
 **Backend:** Endpoints → Repositories (datos) + Workers (Celery) → Phases (ETL) → MoodleService + MoodleIntegration. Las fases implementan el patrón Pipeline con Shared Context (`PhaseContext`). Los repositorios son funciones puras (no clases) que reciben `db` como primer parámetro.
 
-**Núcleo puro (`app/pipeline/`):** todas las transformaciones de negocio que no requieren I/O viven en `app/pipeline/` — un paquete 100 % puro (sin DB, HTTP, settings ni Celery), verificado por AST en `tests/test_pipeline_purity.py`. Incluye `shortnames.py` (parsing de códigos), `course_index.py`, `course_comparison/` (comparador de cursos con umbrales inyectables), `novedades.py`, `metrics.py`, `plan.py`, `progress.py`, `categories.py`, `users.py` y `enrolments.py`. Los workers y tests consumen el núcleo directamente (los antiguos *shims* de `app/services/` fueron eliminados).
+**Núcleo puro (`app/pipeline/`):** todas las transformaciones de negocio que no requieren I/O viven en `app/pipeline/` — un paquete 100 % puro (sin DB, HTTP, settings ni Celery), verificado por AST en `tests/test_pureza_pipeline.py`. Incluye `nombres_cortos.py` (parsing de códigos), `indice_cursos.py`, `comparacion_cursos/` (comparador de cursos con umbrales inyectables), `novedades.py`, `metricas.py`, `plan.py`, `progreso.py`, `categorias.py`, `usuarios.py` y `matriculaciones.py`. Los workers y tests consumen el núcleo directamente (los antiguos *shims* de `app/services/` fueron eliminados).
 
 **Frontend:** Islands Architecture sobre Preact + Signals. Las islas (`islands/`) manejan fetch y estado. Los componentes (`components/`) son presentacionales puros. Los utils (`utils/`) contienen señales globales (`darkSignal`, `profileSignal`), constantes compartidas (`STATUS_COLORS`, `DARK_VARS`) y helpers.
 
@@ -89,7 +89,7 @@ Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y m
 - **Consolidación de correos duplicados:** si un correo coincide con más de una cuenta en Moodle, la ejecución conserva la cuenta **más antigua**, usa su username tal cual (sin renombrar: **el username encontrado en Moodle nunca se renombra**, ni siquiera si difiere del prefijo del correo) y elimina automáticamente las cuentas **más recientes que no tengan cursos**. Salvaguarda: si el duplicado tiene cursos —o el webservice no expone `core_enrol_get_users_courses`— no se borra y queda en `pending_review` para revisión manual. Los usernames eliminados/pendientes se registran en el log `identity_by_email_duplicate` (criterio `oldest`).
 - **Compatibilidad Moodle 3.9:** adapter pattern para diferencias entre versiones (sin `enrolment_1`, `templatecourse` como `int`, `createpassword` en vez de `preferences[]`, `categoryid` con fallback multi-nivel).
 
-**Archivos clave:** `workers/tasks.py` (orquestador), `workers/utils.py` (runner async compartido `run_moodle_async`), `workers/phases/phase1_consult.py`, `phase2_analyze.py`, `phase3_structure.py`, `phase4_people.py`, `pipeline/` (núcleo puro), `repositories/` (DB), `integrations/moodle.py` (MoodleIntegration), `services/moodle_operations.py` (MoodleService), `services/moodle_adapter.py`, `services/parsers/distancia.py`, `services/reports.py`, `services/charts.py`, `services/metrics_service.py`, `services/orchestration.py` (puente API→Celery).
+**Archivos clave:** `workers/tareas.py` (orquestador), `workers/utilidades.py` (runner async compartido `ejecutar_moodle_async`), `workers/phases/fase1_consulta.py`, `fase2_analisis.py`, `fase3_estructura.py`, `fase4_personas.py`, `pipeline/` (núcleo puro), `repositories/` (DB), `integrations/integracion_moodle.py` (MoodleIntegration), `services/operaciones_moodle.py` (MoodleService), `services/adaptador_moodle.py`, `services/parsers/distancia.py`, `services/reportes.py`, `services/graficos.py`, `services/servicio_metricas.py`, `services/orquestacion.py` (puente API→Celery).
 
 ---
 
@@ -108,7 +108,7 @@ Sube archivos CSV para crear o eliminar entidades en lote.
 | **Eliminar usuarios** | `POST /operations/users/upload-csv` | `username` |
 | **Eliminar categorías** | `POST /operations/categories/upload-csv` | `idnumber` |
 
-Procesado por `operations_tasks.py` (Celery). El estado se consulta en `GET /operations/batch/{id}/status`.
+Procesado por `tareas_operaciones.py` (Celery). El estado se consulta en `GET /operations/batch/{id}/status`.
 
 ### Consultas asíncronas
 
@@ -124,7 +124,7 @@ Consulta cursos, categorías, usuarios y docentes inactivos en Moodle sin timeou
 - `courses` — filtros por shortname, estado (>6 meses sin uso; o sin docente/no matriculados), formato de código (5 o 6 segmentos)
 - `categories` — búsqueda por idnumber
 - `users` — búsqueda por username/email/nombre (coincidencia exacta; el webservice Moodle no expone búsqueda por substring ni listado completo de usuarios)
-- `duplicate_emails` — correos con más de un usuario registrado. Moodle 3.9 no permite listar todos los usuarios, por lo que combina dos fuentes semilla (usernames de `execution_logs` + matriculados en cursos SIAUGESMAT vía `core_enrol_get_enrolled_users`) y luego re-consulta cada correo candidato con `core_user_get_users_by_field` (field=email) para capturar TODAS las cuentas que lo comparten. Devuelve una fila por cuenta: email, username, nombres, apellidos, ID de Moodle y número de cuentas que comparten el correo. Sin filtro por dominio. Puede tardar 15–25 min.
+- `duplicate_emails` — correos con más de un usuario registrado. Moodle 3.9 no permite listar todos los usuarios, por lo que combina dos fuentes semilla (usernames de `registros_ejecucion` + matriculados en cursos SIAUGESMAT vía `core_enrol_get_enrolled_users`) y luego re-consulta cada correo candidato con `core_user_get_users_by_field` (field=email) para capturar TODAS las cuentas que lo comparten. Devuelve una fila por cuenta: email, username, nombres, apellidos, ID de Moodle y número de cuentas que comparten el correo. Sin filtro por dominio. Puede tardar 15–25 min.
 - `inactive_teachers` — docentes (**editingteacher**) que no han accedido a sus cursos desde un corte: **por días** (1–30, default 15), **por meses** (1–12, default 1), **por años** (≥ 1, default 1, sin tope superior) o **por semestre** (ej. `2026A`). Se requiere exactamente un corte por consulta. Consulta todos los cursos SIAUGESMAT en Moodle, obtiene los profesores matriculados con su `lastcourseaccess` y los filtra por la fecha de corte (el semestre usa la fecha de inicio). Devuelve: nombre del docente, username, correo, curso, programa académico (código de 4 dígitos), CAT (prefijo de 3 letras) y días sin acceso. Procesado en lotes paralelos (5 cursos simultáneos).
 - `inactive_courses` — cursos SIAUGESMAT **sin uso** desde un corte: **días** (1–30, default 15), **meses** (1–12, default 1), **años** (≥ 1, default 1) o **semestre** (ej. `2026A`); exactamente un corte por consulta. Usa el campo `timemodified` (última modificación) de cada curso y devuelve: shortname, nombre, categoría, programa, CAT, fechas de creación y última modificación, y días sin uso. Rápido: recorre `get_courses` una sola vez (sin consultar docentes por curso).
 
@@ -138,7 +138,7 @@ Consulta cursos, categorías, usuarios y docentes inactivos en Moodle sin timeou
 - `6segments` → `CAL_0852_sIV_5031216_G-1_29114506` (6 segmentos separados por `_`)
 - `5segments` → `CHA_0845_sVI_102131_G-1` (5 segmentos separados por `_`)
 
-Procesado por `query_tasks.py` (Celery).
+Procesado por `tareas_consultas.py` (Celery).
 
 ---
 
@@ -218,32 +218,32 @@ SIAUGESMAT/
 ├── .github/workflows/ci.yml     # GitHub Actions: backend (ruff/vulture/pytest) + frontend (deno check/test/build)
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/endpoints/   # auth, jobs, upload, analytics, reports, charts, operations, queries, batch_control, batch_listing, novedades
-│   │   ├── core/               # config.py, security.py, dependencies.py, entity_config.py
-│   │   ├── db/                 # models.py, session.py, base.py
-│   │   ├── integrations/       # moodle.py (MoodleIntegration — orquestación alto nivel)
-│   │   ├── pipeline/           # Núcleo puro (sin I/O): shortnames, course_index, course_comparison/,
-│   │   │                       #   novedades, metrics, plan, progress, categories, users, enrolments
-│   │   ├── repositories/       # execution_repo, log_repo, query_repo, operation_repo (CRUD puro)
-│   │   ├── schemas/            # Pydantic schemas (job, analytics, operations, upload, user, novedades)
-│   │   ├── services/            # moodle_operations.py (MoodleService), moodle_client.py, moodle_errors.py,
-│   │   │                       # moodle_error_handler.py, moodle_factory.py, moodle_adapter.py,
-│   │   │                       # metrics_service.py, etl.py, reports.py, report_utils.py, novedades_service.py,
-│   │   │                       # charts.py, csv_validator.py, roles.py, rate_limiter.py,
-│   │   │                       # batch_report_service.py, category_utils.py, error_messages.py,
-│   │   │                       # orchestration.py (puente API→Celery)
-│   │   │                       # parsers/ (DistanciaParser, factory, base)
-│   │   ├── workers/            # tasks.py (ETL), phases/ (phase1_consult, phase2_analyze, phase3_structure,
-│   │   │                       #   phase4_people, item_task, orchestrator, common, base)
-│   │   │                       # operations_tasks.py, query_tasks.py, cleanup_tasks.py, utils.py
+│   │   ├── api/v1/endpoints/   # autenticacion, trabajos, subida, analitica, reportes, graficos, operaciones, consultas, control_lotes, listado_lotes, novedades
+│   │   ├── core/               # config.py, seguridad.py, dependencies.py, configuracion_entidades.py
+│   │   ├── db/                 # modelos.py, sesion.py, base.py
+│   │   ├── integrations/       # integracion_moodle.py (MoodleIntegration — orquestación alto nivel)
+│   │   ├── pipeline/           # Núcleo puro (sin I/O): nombres_cortos, indice_cursos, comparacion_cursos/,
+│   │   │                       #   novedades, metricas, plan, progreso, categorias, usuarios, matriculaciones
+│   │   ├── repositories/       # repositorio_ejecuciones, repositorio_registros, repositorio_consultas, repositorio_operaciones (CRUD puro)
+│   │   ├── schemas/            # Pydantic schemas (trabajo, analitica, operaciones, subida, usuario, novedades, respuestas)
+│   │   ├── services/            # operaciones_moodle.py (MoodleService), cliente_moodle.py, errores_moodle.py,
+│   │   │                       # manejador_errores_moodle.py, fabrica_moodle.py, adaptador_moodle.py,
+│   │   │                       # servicio_metricas.py, proceso_etl.py, reportes.py, utilidades_reportes.py,
+│   │   │                       # servicio_novedades.py, graficos.py, validador_csv.py, roles.py, limitador_tasa.py,
+│   │   │                       # servicio_reportes_lote.py, utilidades_categorias.py, mensajes_error.py,
+│   │   │                       # orquestacion.py (puente API→Celery)
+│   │   │                       # parsers/ (DistanciaParser, base)
+│   │   ├── workers/            # tareas.py (ETL), phases/ (fase1_consulta, fase2_analisis, fase3_estructura,
+│   │   │                       #   fase4_personas, tarea_item, orquestador, comunes, base)
+│   │   │                       # tareas_operaciones.py, tareas_consultas.py, tareas_limpieza.py, utilidades.py
 │   │   ├── celery_app.py       # Config Celery + beat schedule
 │   │   └── main.py
 │   ├── tools/                  # CLI de mantenimiento manual (fuera del paquete app/):
-│   │                           #   bulk_course_visibility.py, diagnostic_sibate.py,
-│   │                           #   fix_duplicate_email_usernames.py (+ Corregir username.csv),
-│   │                           #   fix_external_auth_users.py, reset_moodle_password.py,
-│   │                           #   restore_original_usernames.py (+ data/renamed_usernames.tsv)
-│   ├── tests/                  # ~556 tests (ETL, repos, phases, pipeline, analytics, API, workers)
+│   │                           #   visibilidad_masiva_cursos.py, diagnosticar_cursos_ocultos.py, diagnostico_sibate.py,
+│   │                           #   corregir_usuarios_correo_duplicado.py (+ Corregir username.csv),
+│   │                           #   corregir_usuarios_auth_externa.py, restablecer_password_moodle.py,
+│   │                           #   restaurar_nombres_originales.py (+ data/renamed_usernames.tsv), rename_es.py
+│   ├── tests/                  # ~689 tests (ETL, repos, phases, pipeline, analytics, API, workers)
 │   ├── alembic/                # Migraciones de base de datos
 │   ├── reports/                # Reportes generados (CSV, ZIP)
 │   ├── uploads/                # Archivos Excel subidos
@@ -283,7 +283,7 @@ SIAUGESMAT/
 ├── docker-compose.override.yml  # Puertos expuestos + volume mount para desarrollo
 ├── backend/e2e/                 # Pruebas de integración contra Moodle real
 │   ├── fixtures/                #   .xlsx con datos reales
-│   ├── run_test.py              #   Script unificado
+│   ├── ejecutar_test.py         #   Script unificado
 │   └── README.md
 ├── .env.example                # Variables de entorno de ejemplo (único, copiar al .env raíz)
 ├── certs/                      # Certificados SSL para HTTPS
@@ -303,9 +303,9 @@ SIAUGESMAT/
 | Herramienta | Versión |
 |---|---|
 | Python | 3.12+ |
-| Deno | 2.5+ |
-| PostgreSQL | 17 |
-| Redis | 7 |
+| Deno | 2.9+ |
+| PostgreSQL | 18 |
+| Redis | 8 |
 
 ---
 
@@ -336,7 +336,13 @@ pip install -r requirements-dev.txt
 docker compose up -d db redis
 ```
 
-> **Docker Desktop en Windows:** Si las imágenes grandes (`python:3.12.10-slim`, `denoland/deno:2.5.6`) fallan con `lookup production.cloudfront.docker.com: no such host`, agregá `"dns": ["8.8.8.8", "1.1.1.1"]` en Docker Desktop → Settings → Docker Engine → Apply & Restart.
+> **Redis:** el contenedor expone `6380` en el host (`6380:6379`) para evitar
+> colisiones con servicios que ocupen el `6379` (p. ej. `svchost` en Windows).
+> El `REDIS_URL` local de `.env.example` ya apunta a `localhost:6380`. Los
+> servicios internos (`backend`, `worker`, `beat`) siguen usando la red interna
+> de Docker (`redis://redis:6379/0`).
+
+> **Docker Desktop en Windows:** Si las imágenes grandes (`python:3.12.10-slim`, `denoland/deno:2.9.5`) fallan con `lookup production.cloudfront.docker.com: no such host`, agregá `"dns": ["8.8.8.8", "1.1.1.1"]` en Docker Desktop → Settings → Docker Engine → Apply & Restart.
 
 ### 3. Migraciones
 
@@ -351,6 +357,10 @@ alembic stamp head     # init_db() ya crea las tablas. Usar stamp, no upgrade.
 > worker y beat. En entornos locales donde las tablas ya existen (creadas por
 > `init_db()` sin marcar), usá `alembic stamp head` para sincronizar la
 > versión sin recrear tablas.
+>
+> Validá que no haya drift entre modelos y BD con `alembic check` (la cadena
+> completa se valida en el job `migraciones` del CI). Ver `AGENTS.md` para las
+> convenciones de naming y los contratos que no deben renombrarse.
 
 ### 4. Servicios
 
@@ -385,7 +395,7 @@ deno task start
 DATABASE_URL=postgresql://user:pass@localhost:5432/siaugesmat
 
 # Redis
-REDIS_URL=redis://localhost:6379/0
+REDIS_URL=redis://localhost:6380/0
 
 # JWT
 JWT_SECRET_KEY=genera-una-clave-segura-aqui
@@ -431,16 +441,16 @@ El archivo `.env.example` en la raíz contiene todas las variables con valores d
 
 ## Tests y calidad de código
 
-### Backend (~556 tests)
+### Backend (~689 tests)
 
 ```bash
 cd backend
-pytest -v                          # suite completa
-pytest --deselect tests/test_moodle.py   # sin Redis local (los tests de cache de MoodleService)
+pytest -q                          # suite completa (SQLite temporal, sin .env)
 ```
 
-> Los tests de `tests/test_moodle.py` (cache de `MoodleService`) requieren un Redis alcanzable
-> (`REDIS_URL`). En CI se levanta un servicio Redis y corre la suite completa.
+> Los tests de integración real contra Moodle (`tests/test_integracion_real.py`) se
+> excluyen por defecto (`-m "not integration"`); para ejecutarlos:
+> `pytest -m integration` (requiere `.env` con credenciales de Moodle).
 
 Cubre: parser ETL, repositorios, fases del pipeline, núcleo puro, integración, endpoints API, analítica, workers, tareas Celery, cliente Moodle, adaptadores y más.
 
@@ -454,7 +464,7 @@ Cubre: parser ETL, repositorios, fases del pipeline, núcleo puro, integración,
 
 ```bash
 cd frontend
-deno task test           # 60 tests (utils, services, islands)
+deno task test           # 66 tests (utils, services, islands)
 ```
 
 ### Verificación estática
@@ -464,7 +474,7 @@ deno task test           # 60 tests (utils, services, islands)
 cd backend
 ruff check app tests
 vulture app --min-confidence 70
-pytest tests/test_pipeline_purity.py -v
+pytest tests/test_pureza_pipeline.py -v
 
 # Frontend — formato + lint + typecheck (equivalente a deno task check)
 cd frontend
@@ -477,10 +487,10 @@ deno task build
 ```bash
 cd backend
 # Modo seguro — solo usuarios (no toca cursos)
-python e2e/run_test.py e2e/fixtures/ibague.xlsx
+python e2e/ejecutar_test.py e2e/fixtures/ibague.xlsx
 
 # Modo completo con confirmación de delete masivo
-python e2e/run_test.py e2e/fixtures/uraba.xlsx --mode both --confirm
+python e2e/ejecutar_test.py e2e/fixtures/uraba.xlsx --mode both --confirm
 ```
 
 ---
@@ -491,8 +501,8 @@ El flujo de CI en `.github/workflows/ci.yml` corre en cada push a `main` y en ca
 
 | Job | Pasos |
 |---|---|
-| **backend** | Python 3.12 + servicio Redis → `ruff check app tests` → `ruff format --check app tests` → `vulture app --min-confidence 70` → `pytest` (suite completa, incl. tests de cache de Moodle) |
-| **frontend** | Deno 2.5.6 → `deno task check` (fmt + lint + typecheck) → `deno task test` → `deno task build` |
+| **backend** | Python 3.12 → `ruff check app tests alembic` → `ruff format --check app tests alembic` → `vulture app --min-confidence 70` → `pytest -q` |
+| **frontend** | Deno 2.x → `deno task check` (fmt + lint + typecheck) → `deno test -A tests/` → `deno task build` |
 
 ---
 
@@ -513,8 +523,8 @@ El `docker-compose.yml` incluye 8 servicios:
 
 | Servicio | Imagen | Puerto | Función |
 |---|---|---|---|
-| `db` | `postgres:17` | — | Base de datos (solo red interna) |
-| `redis` | `redis:7-alpine` | — | Cola de tareas (solo red interna) |
+| `db` | `postgres:18` | — | Base de datos (solo red interna) |
+| `redis` | `redis:8-alpine` | 6380 (host) | Cola de tareas (solo red interna) |
 | `migrate` | `siaugesmat-backend` | — | Aplica migraciones Alembic (`alembic upgrade head`) y termina |
 | `backend` | `siaugesmat-backend` | — | API FastAPI |
 | `worker` | `siaugesmat-backend` | — | Worker Celery (ETL + operaciones) |

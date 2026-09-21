@@ -1,29 +1,29 @@
-import { requireAuth } from "../../utils/auth-guard.ts";
-import HubPage from "../../components/HubPage.tsx";
-import { SearchIcon, TrashIcon, UploadIcon } from "../../utils/icons.tsx";
+import { requerirAutenticacion } from "../../utils/guarda-autenticacion.ts";
+import PaginaHub from "../../components/PaginaHub.tsx";
+import { IconoBuscar, IconoPapelera, IconoSubir } from "../../utils/iconos.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
 export default function UsuariosHub() {
-  return HubPage({
+  return PaginaHub({
     title: "Usuarios",
     cards: [
       {
-        icon: SearchIcon,
+        icon: IconoBuscar,
         title: "Consultar Usuarios",
         description:
           "Consulta los usuarios existentes en Moodle por username o email.",
         href: "/usuarios/consultar",
       },
       {
-        icon: UploadIcon,
+        icon: IconoSubir,
         title: "Crear Usuarios",
         description:
           "Crea nuevos usuarios en Moodle masivamente desde un archivo CSV.",
         href: "/usuarios/crear",
       },
       {
-        icon: TrashIcon,
+        icon: IconoPapelera,
         title: "Eliminar Usuarios",
         description:
           "Elimina usuarios de Moodle masivamente desde un archivo CSV.",

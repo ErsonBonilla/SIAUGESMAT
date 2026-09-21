@@ -1,17 +1,17 @@
 // routes/ejecuciones/[id].tsx
 import type { PageProps } from "@fresh/core";
-import { requireAuth } from "../../utils/auth-guard.ts";
-import Layout from "../../components/Layout.tsx";
+import { requerirAutenticacion } from "../../utils/guarda-autenticacion.ts";
+import Disposicion from "../../components/Disposicion.tsx";
 import DetalleEjecucionIsland from "../../islands/DetalleEjecucionIsland.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
-export default function JobDetailPage({ params }: PageProps) {
+export default function PaginaDetalleEjecucion({ params }: PageProps) {
   const executionId = parseInt(params.id);
 
   return (
-    <Layout title={`Ejecución #${executionId}`}>
+    <Disposicion title={`Ejecución #${executionId}`}>
       <DetalleEjecucionIsland executionId={executionId} />
-    </Layout>
+    </Disposicion>
   );
 }

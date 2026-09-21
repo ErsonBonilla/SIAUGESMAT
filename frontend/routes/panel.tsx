@@ -1,9 +1,9 @@
 // routes/panel.tsx
-import { requireAuth } from "../utils/auth-guard.ts";
+import { requerirAutenticacion } from "../utils/guarda-autenticacion.ts";
 import PanelIsland from "../islands/PanelIsland.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
-export default function DashboardPage() {
+export default function PaginaPanel() {
   return <PanelIsland />;
 }

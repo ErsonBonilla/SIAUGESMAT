@@ -1,8 +1,8 @@
 import { useSignal } from "@preact/signals";
-import CsvUploader from "./CsvUploader.tsx";
-import ExecutionButton from "../components/ExecutionButton.tsx";
+import SubirCsv from "./CsvUploader.tsx";
+import BotonEjecucion from "../components/BotonEjecucion.tsx";
 
-type UserRole = "student" | "editingteacher" | "all";
+type RolUsuario = "student" | "editingteacher" | "all";
 
 const ROLE_CONFIG = {
   student: {
@@ -27,14 +27,14 @@ const ROLE_CONFIG = {
 };
 
 export default function CrearUsuarios() {
-  const role = useSignal<UserRole>("student");
+  const role = useSignal<RolUsuario>("student");
 
   const config = ROLE_CONFIG[role.value];
 
   return (
     <div>
       <div class="flex flex-col sm:flex-row gap-2 mb-4">
-        {(Object.keys(ROLE_CONFIG) as UserRole[]).map((r) => (
+        {(Object.keys(ROLE_CONFIG) as RolUsuario[]).map((r) => (
           <label
             key={r}
             class={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition text-sm font-medium ${
@@ -56,11 +56,11 @@ export default function CrearUsuarios() {
         ))}
       </div>
 
-      <CsvUploader
+      <SubirCsv
         description={`Subí un archivo CSV con las columnas 'username', 'firstname', 'lastname' y 'email' ${config.help}`}
         uploadEndpoint={config.endpoint}
-        labelSingular="usuario"
-        labelPlural="usuarios"
+        etiquetaSingular="usuario"
+        etiquetaPlural="usuarios"
         action="create"
         help={[
           {
@@ -79,7 +79,7 @@ export default function CrearUsuarios() {
           },
         ]}
       />
-      <ExecutionButton tab="crear_usuarios" />
+      <BotonEjecucion tab="crear_usuarios" />
     </div>
   );
 }

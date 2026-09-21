@@ -10,7 +10,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class Settings(BaseSettings):
+class Configuracion(BaseSettings):
     """
     Configuración global de la aplicación.
 
@@ -150,6 +150,15 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 60
 
     # ------------------------------------------------------------------
+    # Rate limiting del login
+    # ------------------------------------------------------------------
+    # Máximo de intentos fallidos por IP+usuario antes de bloquear
+    # temporalmente el inicio de sesión (protección contra fuerza bruta).
+    LOGIN_MAX_ATTEMPTS: int = 5
+    # Ventana (segundos) durante la que se cuentan los intentos fallidos.
+    LOGIN_WINDOW_SECONDS: int = 300
+
+    # ------------------------------------------------------------------
     # CORS
     # ------------------------------------------------------------------
     CORS_ORIGINS: str = ""
@@ -168,7 +177,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    def get_moodle_config(self, modalidad: str) -> dict[str, str]:
+    def obtener_config_moodle(self, modalidad: str) -> dict[str, str]:
         suffix = modalidad.strip().upper()
 
         def _get(*keys: str) -> str:
@@ -189,7 +198,7 @@ class Settings(BaseSettings):
             "version": _get("MOODLE_VERSION"),
         }
 
-    def external_auth_excluded_keys(self) -> set[str]:
+    def claves_excluidas_auth_externa(self) -> set[str]:
         """Claves de exclusión para el cambio manual→externo (FASE 1).
 
         Incluye cada entrada de ``EXTERNAL_AUTH_EXCLUDED_USERS`` tal cual y su
@@ -207,7 +216,7 @@ class Settings(BaseSettings):
                 keys.add(item[: -len(domain)])
         return keys
 
-    def validate_critical(self):
+    def validar_critico(self):
         errors = []
         if not self.DATABASE_URL:
             errors.append("DATABASE_URL no está configurada")
@@ -215,11 +224,14 @@ class Settings(BaseSettings):
             errors.append("REDIS_URL no está configurada")
         if not self.JWT_SECRET_KEY:
             errors.append("JWT_SECRET_KEY no está configurada")
+        elif len(self.JWT_SECRET_KEY) < 32:
+            errors.append("JWT_SECRET_KEY es demasiado corta (mínimo 32 caracteres)")
         if not self.CORS_ORIGINS:
             errors.append("CORS_ORIGINS no está configurada")
         if errors:
             raise ValueError("Errores de configuración crítica:\n  - " + "\n  - ".join(errors))
 
+            # Instancia única de configuración para toda la aplicación
 
-# Instancia única de configuración para toda la aplicación
-settings = Settings()
+
+settings = Configuracion()

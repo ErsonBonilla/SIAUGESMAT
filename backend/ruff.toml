@@ -15,6 +15,7 @@ select = [
   "C4",     # flake8-comprehensions
   "RUF",    # reglas propias de ruff
   "DTZ",    # datetime con timezone
+  "S",      # flake8-bandit (seguridad)
 ]
 ignore = [
   "E501",   # longitud de línea: no priorizada (el formatter la normaliza)
@@ -24,6 +25,9 @@ ignore = [
   "RUF001", # unicode ambiguo en literales: falsos positivos con texto en español
   "RUF003", # unicode ambiguo en comentarios: ídem
   "TRY401", # logger.exception con f-string: el contexto se mantiene en el mensaje
+  "S105",   # "bearer" en token_type: falso positivo de contraseña hardcodeada
+  "S106",   # nombres de campos de config (JWT_SECRET_KEY, MOODLE_TOKEN): no son contraseñas
+  "S108",   # rutas /tmp literales en tests: aceptable
   "S110",   # except:pass controlado (degradación/cleanup)
   "S112",   # except:continue controlado (procesamiento por lotes)
 ]
@@ -44,3 +48,5 @@ extend-immutable-calls = [
 
 [lint.per-file-ignores]
 "tests/**" = ["S101"]   # assert como patrón de test
+"e2e/**" = ["S310", "S603", "S607"]   # subprocess/urllib propios del tooling e2e
+"tools/**" = ["S310", "S603", "S607"]   # CLIs de mantenimiento lanzan procesos

@@ -1,29 +1,32 @@
 // services/api/reportes.ts
-import { authHeaders, BASE_URL, handleResponse } from "./core.ts";
-import type { ReportsListResponse } from "./types.ts";
+import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
+import type { RespuestaListaReportes } from "./tipos.ts";
 
-export function getReportDownloadUrl(executionId: number): string {
+export function obtenerUrlDescargaReporte(executionId: number): string {
   return `${BASE_URL}/reports/${executionId}/reports/download`;
 }
 
-export function getReportFileUrl(executionId: number, name: string): string {
+export function obtenerUrlArchivoReporte(
+  executionId: number,
+  name: string,
+): string {
   return `${BASE_URL}/reports/${executionId}/reports/${name}.csv`;
 }
 
-export async function listReports(
+export async function listarReportes(
   executionId: number,
-): Promise<ReportsListResponse> {
+): Promise<RespuestaListaReportes> {
   const response = await fetch(`${BASE_URL}/reports/${executionId}/reports`, {
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  return handleResponse<ReportsListResponse>(response);
+  return manejarRespuesta<RespuestaListaReportes>(response);
 }
 
-export async function downloadReport(
+export async function descargarReporte(
   url: string,
   filename: string,
 ): Promise<void> {
-  const response = await fetch(url, { headers: { ...authHeaders() } });
+  const response = await fetch(url, { headers: { ...cabecerasAuth() } });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.detail || `Error al descargar (${response.status})`);

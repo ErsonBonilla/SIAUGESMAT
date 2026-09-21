@@ -1,11 +1,11 @@
 // islands/GraficoIsland.tsx
 import { useEffect } from "preact/hooks";
-import { getChartData } from "../services/api.ts";
-import { darkSignal } from "../utils/theme.ts";
-import { useChart } from "../utils/chart.ts";
-import { plotlyToChartConfig } from "../utils/plotlyToChart.ts";
+import { obtenerDatosGrafico } from "../services/api.ts";
+import { senalTemaOscuro } from "../utils/tema.ts";
+import { usarGrafico } from "../utils/grafico.ts";
+import { configGraficoDesdePlotly } from "../utils/plotly-a-grafico.ts";
 
-interface ChartProps {
+interface PropsGrafico {
   executionId: number;
   chartName: string;
   title?: string;
@@ -13,10 +13,10 @@ interface ChartProps {
   height?: string;
 }
 
-export default function Chart(
-  { executionId, chartName, title, width, height }: ChartProps,
+export default function Grafico(
+  { executionId, chartName, title, width, height }: PropsGrafico,
 ) {
-  const { canvasRef, createChart } = useChart();
+  const { canvasRef, crearGrafico } = usarGrafico();
   const chartId = `chart-${chartName}-${executionId}`;
 
   useEffect(() => {
@@ -24,10 +24,10 @@ export default function Chart(
 
     (async () => {
       try {
-        const theme = darkSignal.value ? "dark" : "light";
-        const data = await getChartData(executionId, chartName, theme);
+        const theme = senalTemaOscuro.value ? "dark" : "light";
+        const data = await obtenerDatosGrafico(executionId, chartName, theme);
         if (cancelled) return;
-        createChart(plotlyToChartConfig(data));
+        crearGrafico(configGraficoDesdePlotly(data));
       } catch (err) {
         if (!cancelled) {
           console.error("Error al cargar gráfico:", err);
@@ -38,7 +38,7 @@ export default function Chart(
     return () => {
       cancelled = true;
     };
-  }, [executionId, chartName, darkSignal.value]);
+  }, [executionId, chartName, senalTemaOscuro.value]);
 
   return (
     <div class="bg-[var(--bg-primary)] rounded-lg shadow p-4">

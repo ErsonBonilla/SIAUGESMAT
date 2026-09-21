@@ -1,22 +1,21 @@
 import { useSignal } from "@preact/signals";
-import { login } from "../services/api.ts";
-import { setToken } from "../utils/auth.ts";
+import { iniciarSesion } from "../services/api.ts";
 import {
-  BuildingIcon,
-  DeviceIcon,
-  ExclamationCircleIcon,
-} from "../utils/icons.tsx";
-import { MODALIDADES } from "../utils/constants.ts";
-import Button from "../components/Button.tsx";
-import Input from "../components/Input.tsx";
+  IconoCirculoExclamacion,
+  IconoDispositivo,
+  IconoEdificio,
+} from "../utils/iconos.tsx";
+import { MODALIDADES } from "../utils/constantes.ts";
+import Boton from "../components/Boton.tsx";
+import Entrada from "../components/Entrada.tsx";
 
-interface LoginFormProps {
+interface PropsFormularioLogin {
   modalidad: string;
   onModalidadChange: (m: string) => void;
 }
 
-export default function LoginForm(
-  { modalidad, onModalidadChange }: LoginFormProps,
+export default function FormularioLogin(
+  { modalidad, onModalidadChange }: PropsFormularioLogin,
 ) {
   const username = useSignal("");
   const password = useSignal("");
@@ -24,7 +23,7 @@ export default function LoginForm(
   const loading = useSignal(false);
   const transitioning = useSignal(false);
 
-  const handleSubmit = async (e: Event) => {
+  const manejarEnviar = async (e: Event) => {
     e.preventDefault();
     if (!MODALIDADES.includes(modalidad as typeof MODALIDADES[number])) {
       error.value = "Modalidad no disponible.";
@@ -37,13 +36,13 @@ export default function LoginForm(
     loading.value = true;
     error.value = "";
     try {
-      const data = await login(
+      const data = await iniciarSesion(
         username.value.trim(),
         password.value.trim(),
         modalidad,
       );
-      setToken(data.access_token);
       if (typeof window !== "undefined") {
+        localStorage.setItem("modalidad", data.modalidad);
         window.location.href = "/panel";
       }
     } catch (err) {
@@ -83,7 +82,7 @@ export default function LoginForm(
   const pillHover = "hover:border-[var(--accent)] hover:brightness-95";
 
   return (
-    <form onSubmit={handleSubmit} class="flex flex-col gap-4 w-full">
+    <form onSubmit={manejarEnviar} class="flex flex-col gap-4 w-full">
       {showPills && (
         <div class="login-fadeIn flex flex-col gap-3">
           <button
@@ -91,7 +90,7 @@ export default function LoginForm(
             onClick={() => selectModalidad("PRESENCIAL")}
             class={`${pillBase} ${pillHover}`}
           >
-            <BuildingIcon
+            <IconoEdificio
               class="w-5 h-5 shrink-0"
               style={{ color: "var(--brand-red)" }}
             />
@@ -105,7 +104,7 @@ export default function LoginForm(
             onClick={() => selectModalidad("DISTANCIA")}
             class={`${pillBase} ${pillHover}`}
           >
-            <DeviceIcon
+            <IconoDispositivo
               class="w-5 h-5 shrink-0"
               style={{ color: "var(--brand-red)" }}
             />
@@ -128,7 +127,7 @@ export default function LoginForm(
 
       {showLogin && (
         <div class="login-fadeIn flex flex-col gap-4">
-          <Input
+          <Entrada
             label="Usuario"
             type="text"
             placeholder="ej. juan.perez"
@@ -140,7 +139,7 @@ export default function LoginForm(
             ) => (username.value = (e.target as HTMLInputElement).value)}
           />
 
-          <Input
+          <Entrada
             label="Contraseña"
             type="password"
             placeholder="••••••••"
@@ -154,23 +153,23 @@ export default function LoginForm(
 
           {error.value && (
             <div class="error-msg error-msg--center">
-              <ExclamationCircleIcon />
+              <IconoCirculoExclamacion />
               <span>{error.value}</span>
             </div>
           )}
 
-          <Button
+          <Boton
             variant="gradient"
             type="submit"
             loading={loading.value}
             style={{ width: "100%" }}
           >
             Iniciar sesión
-          </Button>
+          </Boton>
 
-          <Button variant="ghost" type="button" onClick={goBack}>
+          <Boton variant="ghost" type="button" onClick={goBack}>
             ← Cambiar modalidad
-          </Button>
+          </Boton>
         </div>
       )}
     </form>

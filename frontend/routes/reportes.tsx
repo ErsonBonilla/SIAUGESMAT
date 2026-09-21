@@ -1,17 +1,17 @@
 // routes/reportes.tsx
 import type { PageProps } from "@fresh/core";
-import { requireAuth } from "../utils/auth-guard.ts";
-import Layout from "../components/Layout.tsx";
+import { requerirAutenticacion } from "../utils/guarda-autenticacion.ts";
+import Disposicion from "../components/Disposicion.tsx";
 import ReportesIsland from "../islands/Reportes.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
-export default function ReportesPage({ url }: PageProps) {
+export default function PaginaReportes({ url }: PageProps) {
   const executionId = parseInt(url.searchParams.get("execution_id") || "0");
 
   if (!executionId) {
     return (
-      <Layout title="Reportes">
+      <Disposicion title="Reportes">
         <p class="text-[var(--text-secondary)] text-sm">
           Seleccione una ejecución desde{" "}
           <a
@@ -22,13 +22,13 @@ export default function ReportesPage({ url }: PageProps) {
           </a>{" "}
           para ver sus gráficos y descargar reportes.
         </p>
-      </Layout>
+      </Disposicion>
     );
   }
 
   return (
-    <Layout title={`Reportes - Ejecución #${executionId}`}>
+    <Disposicion title={`Reportes - Ejecución #${executionId}`}>
       <ReportesIsland executionId={executionId} />
-    </Layout>
+    </Disposicion>
   );
 }

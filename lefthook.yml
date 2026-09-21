@@ -1,0 +1,65 @@
+# ============================================================================
+# lefthook.yml — Git hooks para SIAUGESMAT
+#
+# Instalación (una sola vez, desde la raíz del repo):
+#   lefthook install          # genera los hooks en .git/hooks
+#
+# Verificación manual sin commit:
+#   lefthook run pre-commit   # o: lefthook run pre-push
+#
+# Omitir hooks en un commit puntual (uso consciente):
+#   git commit --no-verify    # o: LEFTHOOK=0 git commit
+#
+# Notas:
+#   - alembic check NO está en los hooks: requiere PostgreSQL; lo valida el CI.
+#   - Los comandos Python apuntan al venv local (backend/.venv) creado con uv.
+#     Si regeneras el venv en otra ruta, ajusta los run: correspondientes.
+#   - Los hooks corren con el shell de git (sh). Deno debe estar en el PATH.
+# ============================================================================
+
+min_version: 1.3.0
+
+pre-commit:
+    parallel: true
+    commands:
+        ruff-check:
+            root: backend/
+            glob: "**/*.py"
+            run: .venv/Scripts/ruff check {staged_files}
+        ruff-format:
+            root: backend/
+            glob: "**/*.py"
+            run: .venv/Scripts/ruff format --check {staged_files}
+        pytest:
+            root: backend/
+            glob: "**/*.py"
+            run: .venv/Scripts/pytest -q
+        deno-check:
+            root: frontend/
+            glob: "**/*.{ts,tsx}"
+            run: deno task check
+        deno-test:
+            root: frontend/
+            glob: "**/*.{ts,tsx}"
+            run: deno test -A tests/
+
+pre-push:
+    commands:
+        ruff-check:
+            root: backend/
+            run: .venv/Scripts/ruff check app tests alembic
+        ruff-format:
+            root: backend/
+            run: .venv/Scripts/ruff format --check app tests alembic
+        vulture:
+            root: backend/
+            run: .venv/Scripts/vulture app --min-confidence 70
+        pytest:
+            root: backend/
+            run: .venv/Scripts/pytest -q
+        deno-check:
+            root: frontend/
+            run: deno task check
+        deno-test:
+            root: frontend/
+            run: deno test -A tests/

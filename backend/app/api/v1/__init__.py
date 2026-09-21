@@ -1,29 +1,29 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
-    analytics,
-    auth,
-    batch_control,
-    batch_listing,
-    charts,
-    jobs,
+    analitica,
+    autenticacion,
+    consultas,
+    control_lotes,
+    graficos,
+    listado_lotes,
     novedades,
-    operations,
-    queries,
-    reports,
-    upload,
+    operaciones,
+    reportes,
+    subida,
+    trabajos,
 )
 
 router = APIRouter()
 
-router.include_router(auth.router, prefix="/auth", tags=["autenticación"])
-router.include_router(jobs.router, prefix="/jobs", tags=["ejecuciones"])
-router.include_router(upload.router, prefix="/upload", tags=["subida de archivos"])
-router.include_router(analytics.router, prefix="/analytics", tags=["analítica y semáforo"])
-router.include_router(reports.router, prefix="/reports", tags=["reportes"])
-router.include_router(charts.router, prefix="/analytics", tags=["gráficos"])
-router.include_router(operations.router, prefix="/operations", tags=["operaciones masivas"])
-router.include_router(queries.router, prefix="/queries", tags=["consultas"])
-router.include_router(batch_control.router, prefix="/operations", tags=["operaciones masivas"])
-router.include_router(batch_listing.router, prefix="/operations", tags=["operaciones masivas"])
+router.include_router(autenticacion.router, prefix="/auth", tags=["autenticación"])
+router.include_router(trabajos.router, prefix="/jobs", tags=["ejecuciones"])
+router.include_router(subida.router, prefix="/upload", tags=["subida de archivos"])
+router.include_router(analitica.router, prefix="/analytics", tags=["analítica y semáforo"])
+router.include_router(reportes.router, prefix="/reports", tags=["reportes"])
+router.include_router(graficos.router, prefix="/analytics", tags=["gráficos"])
+router.include_router(operaciones.router, prefix="/operations", tags=["operaciones masivas"])
+router.include_router(consultas.router, prefix="/queries", tags=["consultas"])
+router.include_router(control_lotes.router, prefix="/operations", tags=["operaciones masivas"])
+router.include_router(listado_lotes.router, prefix="/operations", tags=["operaciones masivas"])
 router.include_router(novedades.router, prefix="/novedades", tags=["novedades"])

@@ -1,7 +1,7 @@
-import { dismissToast, toasts } from "../utils/toast.ts";
-import { CheckIcon, XMarkIcon } from "../utils/icons.tsx";
+import { descartarToast, toasts } from "../utils/toast.ts";
+import { IconoCheck, IconoX } from "../utils/iconos.tsx";
 
-export default function ToastContainer() {
+export default function ContenedorToast() {
   return (
     <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 min-w-[280px]">
       {toasts.value.map((t) => (
@@ -16,15 +16,15 @@ export default function ToastContainer() {
           }`}
         >
           {t.type === "success" &&
-            <CheckIcon class="w-4 h-4 shrink-0 mt-0.5" />}
-          {t.type === "error" && <XMarkIcon class="w-4 h-4 shrink-0 mt-0.5" />}
+            <IconoCheck class="w-4 h-4 shrink-0 mt-0.5" />}
+          {t.type === "error" && <IconoX class="w-4 h-4 shrink-0 mt-0.5" />}
           <span class="flex-1 text-xs leading-relaxed">{t.message}</span>
           <button
             type="button"
-            onClick={() => dismissToast(t.id)}
+            onClick={() => descartarToast(t.id)}
             class="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
           >
-            <XMarkIcon class="w-3.5 h-3.5" />
+            <IconoX class="w-3.5 h-3.5" />
           </button>
         </div>
       ))}
