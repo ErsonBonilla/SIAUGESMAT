@@ -1,43 +1,30 @@
 # ============================================================
-# .aiderignore - LOCAL para SIAUGESMAT
+# .aiderignore - SIAUGESMAT
 # ============================================================
-# Este archivo se COMBINA con el global (C:\Users\erson\.aiderignore).
-# Solo añade patrones específicos de este proyecto.
-# ============================================================
+# Nota: aider 0.86 lee UN solo .aiderignore, el de la raiz del repo
+# (o el pasado con --aiderignore). No combina con ~/.aiderignore.
+# Soporta la sintaxis de .gitignore (incluida la negacion !patron).
+#
+# Para AUDITAR codigo, lo importante (dependencias, migraciones, tests)
+# NO se ignora a proposito: el agente debe poder verlo.
 
 # ========================
-# ENTORNOS VIRTUALES Y CACHÉS DEL PROYECTO
+# ENTORNOS VIRTUALES Y CACHES
 # ========================
-# (Si tienes venv dentro del proyecto, aunque lo recomendable es tenerlo fuera)
 /venv/
 /.venv/
 /backend/.venv/
 /frontend/.venv/
-
-# Cachés específicos
 /backend/__pycache__/
 /frontend/__pycache__/
 /backend/.pytest_cache/
 /frontend/.deno_cache/
+/backend/.ruff_cache/
+/backend/.mypy_cache/
 
 # ========================
-# MIGRACIONES DE BASE DE DATOS (Alembic)
+# CONFIGURACION SENSIBLE (secretos)
 # ========================
-# Las migraciones son generadas automáticamente y no deben auditarse
-/backend/alembic/versions/
-/backend/migrations/
-
-# ========================
-# TESTS: NO se ignoran a propósito.
-# backend/tests/ y frontend/tests/ contienen los tests de contrato que
-# protegen la lógica (batch_id, task_id, SQL en español, pureza del
-# pipeline...). El modelo DEBE verlos para no romperlos.
-# ========================
-
-# ========================
-# ARCHIVOS DE CONFIGURACIÓN SENSIBLE
-# ========================
-# Estos archivos contienen secretos o configuraciones locales
 /.env
 /.env.*
 /backend/.env
@@ -46,20 +33,33 @@
 *.env.local
 *.env.development
 *.env.production
+/certs/
+*.pem
+*.key
+*.crt
 
 # ========================
-# ARCHIVOS DE DEPENDENCIAS (bloquean o son muy grandes)
+# DATOS Y ARTEFACTOS GENERADOS (no son codigo fuente)
 # ========================
-/backend/poetry.lock
-/backend/requirements.txt
-/backend/pyproject.toml   # Opcional: si quieres auditar, quítalo
-/frontend/deno.lock
-/frontend/package.json   # Opcional
-/frontend/package-lock.json
-/Cargo.lock               # Si usas Rust en algún módulo
+/backend/uploads/
+/backend/media/
+/backend/data/
+/backend/reports/
+/frontend/reports/
+/frontend/public/uploads/
+/backend/e2e/fixtures/
+/backend/e2e/tmp_uploads/
+/backend/e2e/tmp_reports/
+/backend/tools/data/
+*.csv
+*.xlsx
+*.xls
+*.zip
+*.db
+*.sqlite3
 
 # ========================
-# DIRECTORIOS DE COMPILACIÓN Y DISTRIBUCIÓN
+# DIRECTORIOS DE COMPILACION Y DISTRIBUCION
 # ========================
 /backend/dist/
 /backend/build/
@@ -67,9 +67,10 @@
 /frontend/dist/
 /frontend/build/
 /frontend/out/
+/frontend/_fresh/
 
 # ========================
-# ARCHIVOS DE LOGS Y TEMPORALES
+# LOGS Y TEMPORALES
 # ========================
 *.log
 /backend/logs/
@@ -78,40 +79,17 @@
 *.swp
 
 # ========================
-# ARCHIVOS DE DATOS O SUBIDOS (si los hay)
+# IDE Y SISTEMA
 # ========================
-/backend/uploads/
-/backend/media/
-/backend/data/
-/frontend/public/uploads/
-
-# ========================
-# ARCHIVOS DE DOCKER (locales)
-# ========================
-# Si tienes volúmenes montados o archivos de datos de contenedores
-/docker-data/
-/backend/.dockerignore
-/frontend/.dockerignore
-
-# ========================
-# OTROS ARCHIVOS GENERADOS POR EL PROYECTO
-# ========================
-# Archivos de reportes generados por el sistema
-/backend/reports/
-/frontend/reports/
-*.csv
-*.xlsx
-*.xls
-*.zip
-
-# Archivos de configuración de IDE (si no los ignoras globalmente)
 /.vscode/
 /.idea/
 /*.code-workspace
+/.git/
 
 # ========================
-# ARCHIVOS DEL SISTEMA DE CONTROL DE VERSIONES
+# NOTA: NO se ignoran a proposito (se auditan):
+#   - backend/requirements*.txt, *.lock, frontend/deno.json, deno.lock
+#     (dependencias => superficie de ataque y versiones)
+#   - backend/alembic/versions/ (migraciones => contrato SQL en espanol)
+#   - backend/tests/ y frontend/tests/ (tests de contrato)
 # ========================
-/.git/
-/.gitignore   # No es necesario, pero si quieres ignorarlo, puedes
-/.gitattributes

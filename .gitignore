@@ -69,3 +69,10 @@ build/
 # ---------------------------------------------------------------------------
 backend/e2e/tmp_uploads/
 backend/e2e/tmp_reports/
+
+# Aider: estado local (historial, caché de tags) NO se commitea,
+# pero la configuración sí (se versiona para compartir el agente).
+.aider*
+!.aider.conf.yml
+!.aider.model.settings.yml
+!.aiderignore

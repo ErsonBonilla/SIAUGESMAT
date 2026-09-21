@@ -2,6 +2,33 @@
 
 Guía para agentes y desarrolladores que trabajan en SIAUGESMAT.
 
+## Auditoría con Aider (DeepSeek)
+
+Aider está configurado para auditar y editar el código con la API de DeepSeek
+(`.aider.conf.yml` en la raíz). La clave se lee de `DEEPSEEK_API_KEY` en `.env`.
+
+```bash
+# Lanzar (el .exe global está bloqueado por App Control; usar uv):
+uv tool run aider
+
+# Auditoría de SOLO LECTURA (preguntas/análisis sin editar):
+uv tool run aider
+#   ...y dentro usar /ask "analiza X"
+#   o /add <archivo> para traer archivos solo-lectura
+```
+
+- `deepseek-flash` (DeepSeek V4.1-Flash): 1M de contexto, salida hasta 384K,
+  thinking mode nativo + function calling. Un solo modelo sirve para editar
+  (diffs) y para auditar (razonar con `/ask`).
+- Ajustes finos del modelo en `.aider.model.settings.yml` (fuerzan `diff` y
+  `use_repo_map`, que aider no trae por defecto para este modelo).
+- El thinking mode está activo por defecto; el esfuerzo se controla con
+  `reasoning_effort` (`low`/`high`/`max`).
+- Al arrancar se cargan como **solo-lectura**: `AGENTS.md` y los tests de
+  contrato (`test_contrato_*.py`, `test_pureza_pipeline.py`), así el agente
+  respeta los contratos externos sin poder romperlos.
+- Los commits son manuales (`auto-commits: false`).
+
 ## Comandos de verificación
 
 ```bash

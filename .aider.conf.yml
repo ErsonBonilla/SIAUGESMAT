@@ -1,24 +1,46 @@
-# .aider.conf.yml - Configuración para SIAUGESMAT
-# Más información: https://aider.chat/docs/config.html
+# .aider.conf.yml - Configuracion de Aider para SIAUGESMAT
+# Mas informacion: https://aider.chat/docs/config.html
+#
+# IMPORTANTE: mantener ASCII puro (sin acentos) para evitar errores de
+# codificacion (cp1252) al leer el archivo en Windows.
 
 # --- Modelo y Comportamiento General ---
-# DeepSeek vía API oficial (deepseek-chat apunta al modelo actual).
-model: deepseek/deepseek-chat
-# Mismo modelo como "débil": evita que aider llame a OpenAI por defecto.
-weak-model: deepseek/deepseek-chat
-# Ediciones quirúrgicas por diff. NUNCA "whole" (reescribe archivos enteros).
-edit-format: udiff
+# DeepSeek V4.1-Flash (el modelo actual: 1M de contexto, thinking nativo,
+# function calling, mas barato). Ajustes finos en .aider.model.settings.yml.
+model: deepseek/deepseek-flash
+# Mismo modelo como "debil": evita que aider llame a OpenAI por defecto.
+weak-model: deepseek/deepseek-flash
+# Ediciones quirurgicas por diff. NUNCA "whole" (reescribe archivos enteros).
+edit-format: diff
 # Commits manuales revisados (el estilo de commit del proyecto es manual).
 auto-commits: false
 # Sin firma "Co-Authored-By" para mantener los commits limpios.
 attribute-author: false
 attribute-committer: false
-# DeepSeek tiene 64k de contexto; mapa del repo un poco más generoso.
-map-tokens: 2048
+# DeepSeek V4.1-Flash soporta 1M de contexto; mapa del repo mas generoso que
+# el default (1024) para que el agente "vea" mejor la estructura al auditar.
+map-tokens: 4096
+
+# --- Idioma ---
+# El codigo y los commits estan en espanol.
+chat-language: Spanish
+commit-language: Spanish
 
 # --- Clave de API ---
 # La clave se lee de la variable de entorno DEEPSEEK_API_KEY.
-# Este archivo carga el .env raíz del repo (gitignored), donde puedes añadir:
+# Este archivo carga el .env raiz del repo (gitignored), donde puedes anadir:
 #   DEEPSEEK_API_KEY=sk-...
-# NO pegues la clave en este archivo: quedaría en el repositorio.
+# NO pegues la clave en este archivo: quedaria en el repositorio.
 env-file: .env
+
+# --- Contexto de auditoria (solo lectura) ---
+# AGENTS.md y los tests de contrato documentan los contratos externos y las
+# trampas conocidas. Cargarlos como solo-lectura garantiza que el agente los
+# respete al auditar o editar. El agente NO puede modificarlos.
+read:
+  - AGENTS.md
+  - backend/tests/test_contrato_wire.py
+  - backend/tests/test_contrato_celery.py
+  - backend/tests/test_contrato_sql_espanol.py
+  - backend/tests/test_contrato_lifespan.py
+  - backend/tests/test_pureza_pipeline.py
