@@ -203,7 +203,9 @@ class IntegracionMoodle:
         )
         verified = await self.servicio.obtener_cursos(shortname=new_shortname)
         if not verified:
-            self.ultimo_error = f"Rename {old_shortname} → {new_shortname} no se confirmó en Moodle"
+            self.ultimo_error = (
+                f"El renombrado {old_shortname} → {new_shortname} no se confirmó en Moodle"
+            )
             logger.error(self.ultimo_error)
             return False
         logger.info(f"Curso renombrado: {old_shortname} → {new_shortname}")

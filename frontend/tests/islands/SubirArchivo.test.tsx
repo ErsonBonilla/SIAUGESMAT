@@ -33,6 +33,7 @@ Deno.test("ProcessInProgressBanner - muestra aviso cuando hay proceso en curso",
 
   assertStringIncludes(html, "No se pueden subir archivos");
   assertStringIncludes(html, "carga.xlsx");
+  assertStringIncludes(html, "En ejecución");
 });
 
 Deno.test("ProcessInProgressBanner - no muestra nada si no hay proceso", () => {

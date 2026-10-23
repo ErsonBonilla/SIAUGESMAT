@@ -66,7 +66,7 @@ export default function ConsultaDocentesInactivos() {
         {
           title: "Cómo elegir el corte",
           body: [
-            "Por días (1-30, default 15), meses (1-12), años (≥ 1) o semestre (ej. 2026A).",
+            "Por días (1-30, por defecto 15), meses (1-12), años (≥ 1) o semestre (ej. 2026A).",
             "El corte define la fecha límite: se muestran docentes cuyo último acceso al curso es anterior a esa fecha.",
           ],
         },

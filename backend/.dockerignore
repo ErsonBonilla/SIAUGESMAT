@@ -17,6 +17,7 @@ venv/
 pytest.ini
 ruff.toml
 requirements-dev.txt
+requirements-dev.lock
 
 # --- Código de prueba ---
 tests/

@@ -114,7 +114,7 @@ export const CONFIG_CONSULTA_ENTIDADES: Record<string, ConfiguracionEntidad> = {
       { key: "lastname", label: "Apellidos" },
       {
         key: "lastlogin",
-        label: "Último login",
+        label: "Último acceso",
         renderKey: "lastlogin",
       },
     ],
@@ -130,7 +130,7 @@ export const CONFIG_CONSULTA_ENTIDADES: Record<string, ConfiguracionEntidad> = {
       {
         title: "Filtro adicional",
         body: [
-          "Nunca ingresaron: muestra solo los usuarios que nunca iniciaron sesión en Moodle (último login vacío).",
+          "Nunca ingresaron: muestra solo los usuarios que nunca iniciaron sesión en Moodle (último acceso vacío).",
         ],
       },
     ],

@@ -80,13 +80,13 @@ def procesar_lote_operacion(self, batch_id: str):
                     msg = _formatear_error_moodle(e, batch.tipo_entidad, item)
                     logger.exception(f"Error en {batch.tipo_entidad} '{item.identificador}': {msg}")
                     actualizar_item(db, item.id, "failed", msg)
-                    actualizar_conteos_lote(db, batch_id, failed=1)
+                    actualizar_conteos_lote(db, batch_id, fallidos=1)
                 except Exception as exc:
                     logger.exception(
                         f"Error en {batch.tipo_entidad} '{item.identificador}' (lote {batch_id})"
                     )
                     actualizar_item(db, item.id, "failed", traducir_error(exc))
-                    actualizar_conteos_lote(db, batch_id, failed=1)
+                    actualizar_conteos_lote(db, batch_id, fallidos=1)
             return detenido_por_control
 
         detenido = ejecutar_moodle_async(moodle, _procesar_todos())
@@ -225,7 +225,7 @@ async def _procesar_item_unico(item, batch, moodle, db):
             await moodle.actualizar_cursos([{"id": int(courses[0]["id"]), "visible": visible}])
 
     actualizar_item(db, item.id, "completed", note)
-    actualizar_conteos_lote(db, batch.id_lote, completed=1)
+    actualizar_conteos_lote(db, batch.id_lote, completados=1)
 
 
 async def _asegurar_categoria_raiz(moodle: ServicioMoodle):

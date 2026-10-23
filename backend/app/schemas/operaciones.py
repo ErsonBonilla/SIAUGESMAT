@@ -4,11 +4,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class RespuestaSubidaCsv(BaseModel):
-    batch_id: str
-    entity_type: str
-    action: str
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id_lote: str = Field(alias="batch_id")
+    tipo_entidad: str = Field(alias="entity_type")
+    accion: str = Field(alias="action")
     total: int
-    message: str
+    mensaje: str = Field(alias="message")
 
 
 class ItemOperacionSalida(BaseModel):
@@ -21,22 +23,24 @@ class ItemOperacionSalida(BaseModel):
 
 
 class RespuestaEstadoLote(BaseModel):
-    batch_id: str
-    entity_type: str
-    action: str
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id_lote: str = Field(alias="batch_id")
+    tipo_entidad: str = Field(alias="entity_type")
+    accion: str = Field(alias="action")
     total: int
-    pending: int
-    processing: int
-    paused: int = 0
-    completed: int
-    failed: int
-    cancelled: int = 0
+    pendientes: int = Field(alias="pending")
+    procesando: int = Field(alias="processing")
+    pausados: int = Field(default=0, alias="paused")
+    completados: int = Field(alias="completed")
+    fallidos: int = Field(alias="failed")
+    cancelados: int = Field(default=0, alias="cancelled")
     modalidad: str | None = None
-    created_at: datetime | None = None
-    completed_at: datetime | None = None
-    offset: int = 0
-    limit: int = 100
-    details: list[ItemOperacionSalida]
+    creado_en: datetime | None = Field(default=None, alias="created_at")
+    completado_en: datetime | None = Field(default=None, alias="completed_at")
+    desplazamiento: int = Field(default=0, alias="offset")
+    limite: int = Field(default=100, alias="limit")
+    detalles: list[ItemOperacionSalida] = Field(alias="details")
 
 
 class LoteSalidaLista(BaseModel):
@@ -55,24 +59,32 @@ class LoteSalidaLista(BaseModel):
 
 
 class RespuestaListaLotes(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     total: int
     items: list[LoteSalidaLista]
 
 
 class MetricasMensualesOperacion(BaseModel):
-    month: str
-    users_created: int = 0
-    users_deleted: int = 0
-    categories_created: int = 0
-    categories_deleted: int = 0
-    courses_deleted: int = 0
-    total_errors: int = 0
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    mes: str = Field(alias="month")
+    usuarios_creados: int = Field(default=0, alias="users_created")
+    usuarios_eliminados: int = Field(default=0, alias="users_deleted")
+    categorias_creadas: int = Field(default=0, alias="categories_created")
+    categorias_eliminadas: int = Field(default=0, alias="categories_deleted")
+    cursos_eliminados: int = Field(default=0, alias="courses_deleted")
+    total_errores: int = Field(default=0, alias="total_errors")
 
 
 class RespuestaAnaliticaOperaciones(BaseModel):
-    history: list[MetricasMensualesOperacion]
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    historial: list[MetricasMensualesOperacion] = Field(alias="history")
 
 
 class RespuestaEliminarLotesAntiguos(BaseModel):
-    deleted_batches: int
-    older_than_days: int
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    lotes_eliminados: int = Field(alias="deleted_batches")
+    mas_antiguos_que_dias: int = Field(alias="older_than_days")

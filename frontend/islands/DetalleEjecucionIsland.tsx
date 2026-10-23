@@ -499,7 +499,7 @@ export default function IslandDetalleEjecucion({ executionId }: Props) {
 
       <div class="mt-6 flex gap-4">
         <a href="/panel" class="gradient-text hover:underline text-sm">
-          ← Volver al dashboard
+          ← Volver al panel
         </a>
         <a
           href="/operaciones/ejecuciones"

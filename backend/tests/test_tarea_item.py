@@ -59,7 +59,9 @@ class TestProcessEtlItem:
             db = MagicMock()
             mock_sl.return_value = db
             procesar_item_etl(1)
-            mock_update.assert_called_once_with(db, item.id, "failed", "Falta 'action' en detail")
+            mock_update.assert_called_once_with(
+                db, item.id, "failed", "Falta 'action' en el detalle del ítem"
+            )
 
     def test_cancelled_execution(self):
         with (
@@ -404,7 +406,7 @@ class TestProcessEtlItem:
         ex_id = ex.id
         crear_lote(test_db, f"etl_4_enrol_{ex_id}", "enrolments", "enrol", 1, "DISTANCIA")
         agregar_item(
-            test_db, f"etl_4_enrol_{ex_id}", "docente2", {"action": "enrol"}, estado="pending"
+            test_db, f"etl_4_enrol_{ex_id}", "docente_etl", {"action": "enrol"}, estado="pending"
         )
         test_db.commit()
 
@@ -428,7 +430,7 @@ class TestProcessEtlItem:
             ):
                 mock_integ_cls.return_value = mock_integ
                 item = _make_item(accion="create_user", execution_id=ex_id)
-                item.identificador = "docente2"
+                item.identificador = "docente_etl"
                 mock_get.return_value = item
                 procesar_item_etl(1)
         finally:
@@ -448,7 +450,7 @@ class TestProcessEtlItem:
             check.close()
         assert log is not None
         assert log.identificador == "docente_real"
-        assert log.detalle["etl_username"] == "docente2"
+        assert log.detalle["etl_username"] == "docente_etl"
         assert log.detalle["enrolments_propagated"] is True
 
 

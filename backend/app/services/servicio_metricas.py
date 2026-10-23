@@ -100,14 +100,14 @@ def obtener_metricas_historial(
 
         results.append(
             MetricasSemestre(
-                semester=semester,
-                total_executions=row.total_executions,
-                total_courses_created=total_courses,
-                total_users_created=total_users,
-                total_enrollments=total_enrolments,
-                total_errors=row.total_errors or 0,
-                avg_duration_seconds=avg_duration,
-                last_completed=row.last_completed,
+                semestre=semester,
+                total_ejecuciones=row.total_executions,
+                total_cursos_creados=total_courses,
+                total_usuarios_creados=total_users,
+                total_matriculaciones=total_enrolments,
+                total_errores=row.total_errors or 0,
+                duracion_promedio_segundos=avg_duration,
+                ultima_completada=row.last_completed,
             )
         )
 
@@ -144,21 +144,21 @@ def obtener_estado_semaforo(
         if not execution:
             logger.warning(f"No se encontraron ejecuciones completadas para {semester}")
             return EstadoSemaforo(
-                semester=semester,
-                status="gray",
-                error_rate=0.0,
-                avg_duration=0.0,
-                message=f"No hay ejecuciones completadas para {semester}.",
+                semestre=semester,
+                estado="gray",
+                tasa_error=0.0,
+                duracion_promedio=0.0,
+                mensaje=f"No hay ejecuciones completadas para {semester}.",
             )
     else:
         execution = base_query.order_by(Ejecucion.completado_en.desc()).first()
         if not execution:
             return EstadoSemaforo(
-                semester="N/A",
-                status="gray",
-                error_rate=0.0,
-                avg_duration=0.0,
-                message="No hay ejecuciones completadas aún.",
+                semestre="N/A",
+                estado="gray",
+                tasa_error=0.0,
+                duracion_promedio=0.0,
+                mensaje="No hay ejecuciones completadas aún.",
             )
         semester = execution.semestre
 
@@ -169,11 +169,11 @@ def obtener_estado_semaforo(
     message = mensaje_semaforo(color)
 
     return EstadoSemaforo(
-        semester=semester,
-        status=color,
-        error_rate=round(error_rate, 2),
-        avg_duration=round(duration, 2),
-        message=message,
+        semestre=semester,
+        estado=color,
+        tasa_error=round(error_rate, 2),
+        duracion_promedio=round(duration, 2),
+        mensaje=message,
     )
 
 
@@ -212,16 +212,16 @@ def obtener_datos_ejecucion_reciente(
 
     return EjecucionReciente(
         id=execution.id,
-        semester=execution.semestre,
-        filename=execution.nombre_archivo,
-        status=execution.estado,
-        started_at=execution.iniciado_en,
-        completed_at=execution.completado_en,
-        duration_seconds=execution.duracion_segundos,
-        metrics=execution.metricas,
-        errors_count=execution.conteo_errores or 0,
-        error_rate=round(error_rate, 2),
-        semaphore=semaphore,
-        moodle_version=execution.version_moodle,
+        semestre=execution.semestre,
+        nombre_archivo=execution.nombre_archivo,
+        estado=execution.estado,
+        iniciado_en=execution.iniciado_en,
+        completado_en=execution.completado_en,
+        duracion_segundos=execution.duracion_segundos,
+        metricas=execution.metricas,
+        conteo_errores=execution.conteo_errores or 0,
+        tasa_error=round(error_rate, 2),
+        semaforo=semaphore,
+        version_moodle=execution.version_moodle,
         modalidad=execution.modalidad,
     )

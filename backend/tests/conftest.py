@@ -42,6 +42,7 @@ _test_db_path = os.path.join(tempfile.gettempdir(), f"test_siaugesmat_{os.urando
 if _is_sqlite:
     os.environ.setdefault("DATABASE_URL", f"sqlite:///{_test_db_path}")
 os.environ.setdefault("JWT_SECRET_KEY", "clave-secreta-de-prueba-suficientemente-larga")
+os.environ.setdefault("MOODLE_URL", "http://moodle.ejemplo")
 os.environ.setdefault("MOODLE_ADMIN_TOKEN", "token-de-prueba")
 # Defaults para validar_critico() del lifespan (CI/entornos sin .env).
 os.environ.setdefault("REDIS_URL", "redis://localhost:6380/15")
@@ -158,5 +159,4 @@ def mock_moodle_service():
         mock_instance.eliminar_usuarios.return_value = None
         mock_instance.obtener_usuarios.return_value = []
         mock_instance.matricular_usuarios.return_value = None
-        mock_instance.get_template_course.return_value = None
         yield mock_instance

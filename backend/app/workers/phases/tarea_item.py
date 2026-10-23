@@ -83,7 +83,7 @@ def procesar_item_etl(self, item_id: int):
         )
 
         if not action:
-            actualizar_item(db, item.id, "failed", "Falta 'action' en detail")
+            actualizar_item(db, item.id, "failed", "Falta 'action' en el detalle del ítem")
             return
 
         if execution_id and debe_cancelarse(db, execution_id):
