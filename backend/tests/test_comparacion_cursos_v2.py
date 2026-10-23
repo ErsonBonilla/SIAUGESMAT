@@ -250,22 +250,22 @@ class TestComparison:
                 sn,
                 timecreated=recent_time,
                 customfields=[
-                    {"shortname": "professor", "value": "nbuenaventurac"},
+                    {"shortname": "professor", "value": "docente_moodle"},
                 ],
             ),
         ]
 
         new_courses = [_make_new_course(sn)]
-        new_enrolments = [{"course_shortname": sn, "username": "nbuenaventurap"}]
+        new_enrolments = [{"course_shortname": sn, "username": "docente_etl"}]
 
         result = await ServicioComparacionCursos.comparar(
             existing_courses,
             new_courses,
             new_enrolments,
-            courses_with_teacher={sn: "nbuenaventurac"},
+            courses_with_teacher={sn: "docente_moodle"},
             username_emails={
-                "nbuenaventurap": "nbuenaventurap@ut.edu.co",
-                "nbuenaventurac": "nbuenaventurap@ut.edu.co",
+                "docente_etl": "docente1@ut.edu.co",
+                "docente_moodle": "docente1@ut.edu.co",
             },
         )
 
@@ -286,22 +286,22 @@ class TestComparison:
                 visible=0,
                 timecreated=recent_time,
                 customfields=[
-                    {"shortname": "professor", "value": "eamateusr"},
+                    {"shortname": "professor", "value": "docente2"},
                 ],
             ),
         ]
 
         new_courses = [_make_new_course(sn)]
-        new_enrolments = [{"course_shortname": sn, "username": "eamateusr2"}]
+        new_enrolments = [{"course_shortname": sn, "username": "docente2_dup"}]
 
         result = await ServicioComparacionCursos.comparar(
             existing_courses,
             new_courses,
             new_enrolments,
-            courses_with_teacher={sn: "eamateusr"},
+            courses_with_teacher={sn: "docente2"},
             username_emails={
-                "eamateusr": "eamateusr@ut.edu.co",
-                "eamateusr2": "eamateusr@ut.edu.co",
+                "docente2": "docente2@ut.edu.co",
+                "docente2_dup": "docente2@ut.edu.co",
             },
         )
 
@@ -520,12 +520,12 @@ class TestComplete:
     @pytest.mark.asyncio
     async def test_5_suffix_migration(self):
         old = "IBA_0854_sIV_2022481_G-1"
-        new = "IBA_0854_sIV_2022481_G-1_14398493"
+        new = "IBA_0854_sIV_2022481_G-1_10000001"
         r = await ServicioComparacionCursos.comparar(
-            [_mc(old, customfields=[{"shortname": "professor", "value": "fandrade"}])],
+            [_mc(old, customfields=[{"shortname": "professor", "value": "docente3"}])],
             [_nc(new)],
-            [{"course_shortname": new, "username": "fandrade"}],
-            courses_with_teacher={old: "fandrade"},
+            [{"course_shortname": new, "username": "docente3"}],
+            courses_with_teacher={old: "docente3"},
         )
         u = [x for x in r["to_update"] if x["shortname"] == new]
         assert len(u) == 1 and u[0]["old_shortname"] == old
@@ -533,7 +533,7 @@ class TestComplete:
     @pytest.mark.asyncio
     async def test_6_suffix_diff_prof(self):
         old = "IBA_0854_sIV_2022481_G-1"
-        new = "IBA_0854_sIV_2022481_G-1_14398493"
+        new = "IBA_0854_sIV_2022481_G-1_10000001"
         r = await ServicioComparacionCursos.comparar(
             [_mc(old, customfields=[{"shortname": "professor", "value": "old_p"}])],
             [_nc(new)],
@@ -545,16 +545,16 @@ class TestComplete:
     @pytest.mark.asyncio
     async def test_6b_suffix_migration_resolved_username(self):
         # El username Moodle resuelto puede diferir del prefijo del correo
-        # institucional (fandrade@ut.edu.co → fandrade_pes). Como la matrícula
+        # institucional (docente3@ut.edu.co → docente3_alt). Como la matrícula
         # ya usa el username real resuelto, el rename por agregar cédula sigue
         # disparándose al coincidir con el editingteacher del curso.
         old = "IBA_0854_sIV_2022481_G-1"
-        new = "IBA_0854_sIV_2022481_G-1_14398493"
+        new = "IBA_0854_sIV_2022481_G-1_10000001"
         r = await ServicioComparacionCursos.comparar(
-            [_mc(old, customfields=[{"shortname": "professor", "value": "fandrade_pes"}])],
+            [_mc(old, customfields=[{"shortname": "professor", "value": "docente3_alt"}])],
             [_nc(new)],
-            [{"course_shortname": new, "username": "fandrade_pes"}],
-            courses_with_teacher={old: "fandrade_pes"},
+            [{"course_shortname": new, "username": "docente3_alt"}],
+            courses_with_teacher={old: "docente3_alt"},
         )
         u = [x for x in r["to_update"] if x["shortname"] == new]
         assert len(u) == 1 and u[0]["old_shortname"] == old

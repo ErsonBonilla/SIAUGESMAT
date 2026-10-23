@@ -3,12 +3,12 @@ login real interactivo (form POST a /login/index.php).
 
 Uso:
   # Solo reset de contraseña sin verificación de login
-  python tools/reset_moodle_password.py --modalidad DISTANCIA \
-    --username etiqueg --password '@Tique#997'
+  python tools/restablecer_password_moodle.py --modalidad DISTANCIA \
+    --username usuario.ejemplo --password 'ClaveSegura#123'
 
   # Con verificación de login real (requiere manejo de logintoken CSRF)
-  python tools/reset_moodle_password.py --modalidad DISTANCIA \
-    --username etiqueg --password '@Tique#997' --verify-login
+  python tools/restablecer_password_moodle.py --modalidad DISTANCIA \
+    --username usuario.ejemplo --password 'ClaveSegura#123' --verify-login
 """
 
 import argparse

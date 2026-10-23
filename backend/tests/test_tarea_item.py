@@ -406,7 +406,7 @@ class TestProcessEtlItem:
         ex_id = ex.id
         crear_lote(test_db, f"etl_4_enrol_{ex_id}", "enrolments", "enrol", 1, "DISTANCIA")
         agregar_item(
-            test_db, f"etl_4_enrol_{ex_id}", "eamateusr", {"action": "enrol"}, estado="pending"
+            test_db, f"etl_4_enrol_{ex_id}", "docente_etl", {"action": "enrol"}, estado="pending"
         )
         test_db.commit()
 
@@ -417,7 +417,7 @@ class TestProcessEtlItem:
         worker_db = Session()
         try:
             mock_integ = AsyncMock()
-            mock_integ.crear_usuario_si_no_existe.return_value = ("eamateusr_real", False)
+            mock_integ.crear_usuario_si_no_existe.return_value = ("docente_real", False)
             with (
                 patch("app.workers.phases.tarea_item.SessionLocal", return_value=worker_db),
                 patch("app.workers.phases.tarea_item.obtener_item") as mock_get,
@@ -430,7 +430,7 @@ class TestProcessEtlItem:
             ):
                 mock_integ_cls.return_value = mock_integ
                 item = _make_item(accion="create_user", execution_id=ex_id)
-                item.identificador = "eamateusr"
+                item.identificador = "docente_etl"
                 mock_get.return_value = item
                 procesar_item_etl(1)
         finally:
@@ -449,8 +449,8 @@ class TestProcessEtlItem:
         finally:
             check.close()
         assert log is not None
-        assert log.identificador == "eamateusr_real"
-        assert log.detalle["etl_username"] == "eamateusr"
+        assert log.identificador == "docente_real"
+        assert log.detalle["etl_username"] == "docente_etl"
         assert log.detalle["enrolments_propagated"] is True
 
 

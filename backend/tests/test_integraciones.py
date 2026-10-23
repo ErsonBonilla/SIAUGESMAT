@@ -287,25 +287,25 @@ class TestExternalAuthSwitch:
 
     @pytest.mark.asyncio
     async def test_admin_excluido_por_email_queda_en_manual(self, integration, monkeypatch):
-        monkeypatch.setattr(settings, "EXTERNAL_AUTH_EXCLUDED_USERS", "hdmendieta@ut.edu.co")
+        monkeypatch.setattr(settings, "EXTERNAL_AUTH_EXCLUDED_USERS", "admin1@ut.edu.co")
         integration.servicio.obtener_usuarios.return_value = [
             {
                 "id": "2",
                 "username": "nuevo",
-                "email": "hdmendieta@ut.edu.co",
+                "email": "admin1@ut.edu.co",
                 "timecreated": "200",
                 "auth": "manual",
             },
             {
                 "id": "1",
                 "username": "viejo",
-                "email": "hdmendieta@ut.edu.co",
+                "email": "admin1@ut.edu.co",
                 "timecreated": "100",
                 "auth": "manual",
             },
         ]
         integration.servicio._solicitar.return_value = []
-        await integration.encontrar_usuarios_por_correos(["hdmendieta@ut.edu.co"])
+        await integration.encontrar_usuarios_por_correos(["admin1@ut.edu.co"])
         assert self._auth_calls(integration.servicio.actualizar_usuarios.await_args_list) == []
         c = integration.ultimos_conflictos_correo[0]
         assert c["auth_switched"] is False
@@ -313,26 +313,26 @@ class TestExternalAuthSwitch:
 
     @pytest.mark.asyncio
     async def test_admin_excluido_por_username_queda_en_manual(self, integration, monkeypatch):
-        monkeypatch.setattr(settings, "EXTERNAL_AUTH_EXCLUDED_USERS", "ogt@ut.edu.co")
-        # La reciente tiene cursos: no hay rename, el username 'ogt' es la llave de exclusión.
+        monkeypatch.setattr(settings, "EXTERNAL_AUTH_EXCLUDED_USERS", "admin2@ut.edu.co")
+        # La reciente tiene cursos: no hay rename, el username 'admin2' es la llave de exclusión.
         integration.servicio.obtener_usuarios.return_value = [
             {
                 "id": "2",
-                "username": "ogt",
-                "email": "ogt@ut.edu.co",
+                "username": "admin2",
+                "email": "admin2@ut.edu.co",
                 "timecreated": "200",
                 "auth": "manual",
             },
             {
                 "id": "1",
                 "username": "viejo",
-                "email": "ogt@ut.edu.co",
+                "email": "admin2@ut.edu.co",
                 "timecreated": "100",
                 "auth": "manual",
             },
         ]
         integration.servicio._solicitar.return_value = [{"id": 111}]
-        await integration.encontrar_usuarios_por_correos(["ogt@ut.edu.co"])
+        await integration.encontrar_usuarios_por_correos(["admin2@ut.edu.co"])
         assert self._auth_calls(integration.servicio.actualizar_usuarios.await_args_list) == []
         c = integration.ultimos_conflictos_correo[0]
         assert c["auth_switched"] is False

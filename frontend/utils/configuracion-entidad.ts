@@ -123,7 +123,7 @@ export const CONFIG_CONSULTA_ENTIDADES: Record<string, ConfiguracionEntidad> = {
         title: "Qué valor buscar",
         body: [
           "Podés buscar por username, email, nombre (firstname) o apellido (lastname).",
-          'La búsqueda es de coincidencia exacta: escribí el valor completo de uno de esos campos. Por ejemplo "jtorrespr", "jtorrespr@ut.edu.co", "Jamer" o "Torres".',
+          'La búsqueda es de coincidencia exacta: escribí el valor completo de uno de esos campos. Por ejemplo "jperez", "jperez@ut.edu.co", "Juan" o "Pérez".',
           "El webservice de Moodle 3.9 no permite búsquedas parciales ni listar todos los usuarios, por lo que no se admiten fragmentos.",
         ],
       },

@@ -60,18 +60,18 @@ def test_crear_usuarios_y_consultar_por_username(servidor):
         servidor,
         "core_user_create_users",
         **{
-            "users[0][username]": "laparamom",
+            "users[0][username]": "docente_demo",
             "users[0][firstname]": "Luis",
-            "users[0][email]": "laparamom@ut.edu.co",
+            "users[0][email]": "docente_demo@ut.edu.co",
         },
     )
     out = _ws(
         servidor,
         "core_user_get_users_by_field",
         field="username",
-        **{"values[0]": "laparamom"},
+        **{"values[0]": "docente_demo"},
     )
-    assert [u["username"] for u in out] == ["laparamom"]
+    assert [u["username"] for u in out] == ["docente_demo"]
     assert out[0]["id"] > 0
 
 
