@@ -97,8 +97,9 @@ class Configuracion(BaseSettings):
     # ------------------------------------------------------------------
     # Comparación de cursos (FASE 2)
     # ------------------------------------------------------------------
-    COURSE_MAX_AGE_SECONDS: int = 24 * 30 * 24 * 3600  # 24 meses
-    COURSE_DISAPPEARED_AGE_SECONDS: int = 18 * 30 * 24 * 3600  # 18 meses
+    # Umbral único para considerar un curso como "viejo" y eliminarlo
+    # (ya sea porque reaparece en la carga o porque desapareció).
+    COURSE_MAX_AGE_SECONDS: int = (24 * 30 + 1) * 24 * 3600  # 24 meses y 1 día
 
     # ------------------------------------------------------------------
     # Archivos subidos

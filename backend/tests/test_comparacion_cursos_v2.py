@@ -152,9 +152,9 @@ class TestComparison:
 
     @pytest.mark.asyncio
     async def test_case_1b_same_professor_old_course(self):
-        """Caso 1b: Mismo profesor pero curso ≥18 meses → recreate."""
+        """Caso 1b: Mismo profesor pero curso ≥24 meses y 1 día → recreate."""
         sn = "IDE_0105_sI_202_G-01"
-        old_time = 100000  # más de 18 meses
+        old_time = 100000  # más de 24 meses y 1 día
         existing_courses = [
             _make_moodle_course(
                 sn,

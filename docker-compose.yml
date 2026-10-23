@@ -137,9 +137,8 @@ services:
       MOODLE_REQUEST_TIMEOUT: ${MOODLE_REQUEST_TIMEOUT:-60.0}
       MOODLE_MAX_RETRIES: ${MOODLE_MAX_RETRIES:-3}
 
-      # Umbrales de comparación de cursos (segundos)
-      COURSE_MAX_AGE_SECONDS: ${COURSE_MAX_AGE_SECONDS:-62208000}
-      COURSE_DISAPPEARED_AGE_SECONDS: ${COURSE_DISAPPEARED_AGE_SECONDS:-46656000}
+      # Umbral único de antigüedad máxima de cursos para eliminación (segundos — 24 meses y 1 día)
+      COURSE_MAX_AGE_SECONDS: ${COURSE_MAX_AGE_SECONDS:-62294400}
 
       # Plantilla de curso para ETL
       DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE:-}
@@ -215,9 +214,8 @@ services:
       MOODLE_REQUEST_TIMEOUT: ${MOODLE_REQUEST_TIMEOUT:-60.0}
       MOODLE_MAX_RETRIES: ${MOODLE_MAX_RETRIES:-3}
 
-      # Umbrales de comparación de cursos (segundos)
-      COURSE_MAX_AGE_SECONDS: ${COURSE_MAX_AGE_SECONDS:-62208000}
-      COURSE_DISAPPEARED_AGE_SECONDS: ${COURSE_DISAPPEARED_AGE_SECONDS:-46656000}
+      # Umbral único de antigüedad máxima de cursos para eliminación (segundos — 24 meses y 1 día)
+      COURSE_MAX_AGE_SECONDS: ${COURSE_MAX_AGE_SECONDS:-62294400}
 
       DEFAULT_COURSE_TEMPLATE: ${DEFAULT_COURSE_TEMPLATE:-}
 

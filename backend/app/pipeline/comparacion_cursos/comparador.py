@@ -14,7 +14,6 @@ from app.pipeline.comparacion_cursos.manejador_acciones import (
     manejar_mismo_nucleo_grupo_diferente,
 )
 from app.pipeline.comparacion_cursos.umbrales import (
-    EDAD_DESAPARICION_CURSO_SEGUNDOS,
     EDAD_MAXIMA_CURSO_SEGUNDOS,
 )
 from app.pipeline.comparacion_cursos.utilidades import (
@@ -65,7 +64,6 @@ class ServicioComparacionCursos:
         *,
         username_emails: dict[str, str] = None,
         max_age_seconds: int = EDAD_MAXIMA_CURSO_SEGUNDOS,
-        disappeared_age_seconds: int = EDAD_DESAPARICION_CURSO_SEGUNDOS,
     ) -> dict[str, Any]:
         if courses_with_teacher is None:
             courses_with_teacher = {}
@@ -280,7 +278,7 @@ class ServicioComparacionCursos:
             to_hide,
             alerts,
             logs,
-            disappeared_age_seconds=disappeared_age_seconds,
+            max_age_seconds=max_age_seconds,
         )
 
         return {
