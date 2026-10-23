@@ -11,5 +11,8 @@ services:
   worker:
     volumes:
       - ./backend/app:/app/app:ro
+  beat:
+    volumes:
+      - ./backend/app:/app/app:ro
   frontend:
     ports: ["3000:3000"]
