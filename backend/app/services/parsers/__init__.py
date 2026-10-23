@@ -3,4 +3,4 @@ from app.services.parsers.fabrica import FabricaAnalizadores
 
 FabricaAnalizadores.register("DISTANCIA", AnalizadorDistancia)
 
-__all__ = ["DistanciaParser", "ParserFactory"]
+__all__ = ["AnalizadorDistancia", "FabricaAnalizadores"]

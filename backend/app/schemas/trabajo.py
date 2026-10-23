@@ -86,7 +86,9 @@ class ListaEjecuciones(BaseModel):
 class RespuestaProceso(BaseModel):
     """Respuesta al encolar un proceso ETL."""
 
-    execution_id: int
-    job_id: str
-    status: str
-    message: str
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    ejecucion_id: int = Field(alias="execution_id")
+    id_trabajo: str = Field(alias="job_id")
+    estado: str = Field(alias="status")
+    mensaje: str = Field(alias="message")

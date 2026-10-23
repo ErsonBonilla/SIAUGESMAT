@@ -29,6 +29,7 @@ def moodle_service():
     )
     mock_client = AsyncMock(spec=httpx.AsyncClient)
     service._cliente = mock_client
+    service._limitador_tasa = AsyncMock()
     return service, mock_adapter
 
     # ---------------------------------------------------------------------------

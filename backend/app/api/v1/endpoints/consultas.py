@@ -37,7 +37,7 @@ ENTITY_LABELS = {
 ENTITY_CSV_HEADERS = {
     "courses": ["ID", "Shortname", "Nombre", "Categoría", "Visible", "Creado"],
     "categories": ["ID", "Nombre", "ID Number", "Padre", "Cursos", "Descripción"],
-    "users": ["Username", "Email", "Nombres", "Apellidos", "Último login"],
+    "users": ["Username", "Email", "Nombres", "Apellidos", "Último acceso"],
     "inactive_teachers": [
         "Docente",
         "Username",

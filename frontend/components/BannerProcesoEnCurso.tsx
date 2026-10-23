@@ -1,5 +1,10 @@
 // components/BannerProcesoEnCurso.tsx
 import type { EstadoSubida } from "../services/api.ts";
+import { ETIQUETAS_ESTADO } from "../utils/constantes.ts";
+import {
+  etiquetaAccionLote,
+  etiquetaEntidadLote,
+} from "../utils/etiquetas-lote.ts";
 
 interface Props {
   status: EstadoSubida | null;
@@ -13,9 +18,13 @@ export default function BannerProcesoEnCurso({ status }: Props) {
   if (!status || status.allowed) return null;
 
   const what = status.execution
-    ? `la ejecución "${status.execution.filename}" (${status.execution.status})`
+    ? `la ejecución "${status.execution.filename}" (${
+      ETIQUETAS_ESTADO[status.execution.status] ?? status.execution.status
+    })`
     : status.batch
-    ? `el lote de ${status.batch.entity_type} (${status.batch.action})`
+    ? `el lote de ${
+      etiquetaEntidadLote(status.batch.entity_type).toLowerCase()
+    } (${etiquetaAccionLote(status.batch.action).toLowerCase()})`
     : "un proceso";
 
   return (

@@ -11,13 +11,17 @@ import secrets
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from pydantic import BaseModel, Field
 
 from app.core.config import settings
 from app.core.dependencies import obtener_limitador_login, obtener_usuario_actual
 from app.core.limitador_login import LimitadorLogin
 from app.core.seguridad import crear_token_acceso
-from app.schemas.usuario import UsuarioEnToken
+from app.schemas.usuario import (
+    RespuestaLogin,
+    RespuestaPerfilUsuario,
+    SolicitudLogin,
+    UsuarioEnToken,
+)
 from app.services.errores_moodle import ErrorApiMoodle
 from app.services.fabrica_moodle import obtener_servicio_moodle
 
@@ -27,39 +31,8 @@ router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
-# Modelos de solicitud y respuesta
+# Lógica de validación contra Moodle
 # ---------------------------------------------------------------------------
-
-
-class SolicitudLogin(BaseModel):
-    """Credenciales de inicio de sesión."""
-
-    username: str = Field(..., description="Nombre de usuario en Moodle")
-    password: str = Field(..., min_length=1, description="Contraseña del usuario")
-    modalidad: str = Field(..., description="Modalidad: PRESENCIAL o DISTANCIA")
-
-
-class RespuestaLogin(BaseModel):
-    """Respuesta exitosa con token de acceso."""
-
-    access_token: str
-    token_type: str = "bearer"
-    user_id: int
-    username: str
-    modalidad: str
-
-
-class RespuestaPerfilUsuario(BaseModel):
-    """Perfil público del usuario autenticado."""
-
-    username: str
-    firstname: str
-    lastname: str
-    profileimageurl: str  # URL de la imagen de perfil en Moodle
-
-    # ---------------------------------------------------------------------------
-    # Lógica de validación contra Moodle
-    # ---------------------------------------------------------------------------
 
 
 async def _obtener_token_moodle(moodle_url: str, username: str, password: str) -> str:
@@ -233,7 +206,7 @@ async def iniciar_sesion(
     """
     # 0. Rate limiting por IP + usuario (protección contra fuerza bruta)
     ip = req.client.host if req.client else "desconocida"
-    if await limitador.esta_bloqueado(ip, request.username):
+    if await limitador.esta_bloqueado(ip, request.nombre_usuario):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Demasiados intentos fallidos. Intente nuevamente en unos minutos.",
@@ -251,7 +224,9 @@ async def iniciar_sesion(
     moodle_url = moodle_config["url"]
 
     # 3. Obtener token de Moodle
-    moodle_token = await _obtener_token_moodle(moodle_url, request.username, request.password)
+    moodle_token = await _obtener_token_moodle(
+        moodle_url, request.nombre_usuario, request.contrasena
+    )
 
     # 4. Verificar permisos y obtener userid
     user_id = await _verificar_permisos_moodle(moodle_url, moodle_token)
@@ -260,16 +235,16 @@ async def iniciar_sesion(
     access_token = crear_token_acceso(
         data={
             "sub": str(user_id),
-            "username": request.username,
+            "username": request.nombre_usuario,
             "modalidad": request.modalidad,
         }
     )
 
     # 6. Limpiar el contador de intentos fallidos del usuario
-    await limitador.registrar_exito(ip, request.username)
+    await limitador.registrar_exito(ip, request.nombre_usuario)
 
     logger.info(
-        f"Inicio de sesión exitoso para {request.username} "
+        f"Inicio de sesión exitoso para {request.nombre_usuario} "
         f"(userid={user_id}, modalidad={request.modalidad})"
     )
 
@@ -298,9 +273,9 @@ async def iniciar_sesion(
     )
 
     return RespuestaLogin(
-        access_token=access_token,
-        user_id=user_id,
-        username=request.username,
+        token_acceso=access_token,
+        usuario_id=user_id,
+        nombre_usuario=request.nombre_usuario,
         modalidad=request.modalidad,
     )
 

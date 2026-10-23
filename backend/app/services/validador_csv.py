@@ -43,7 +43,7 @@ def validar_csv_usuarios(content: str, default_role: str = None) -> list[dict]:
 
     has_role_column = "role1" in {n.strip().lower() for n in reader.fieldnames}
     if not default_role and not has_role_column:
-        raise ValueError("Debe incluir la columna 'role1' o especificar un default_role")
+        raise ValueError("Debe incluir la columna 'role1' o especificar un rol por defecto")
 
     users = []
     for row_num, row in enumerate(reader, start=2):

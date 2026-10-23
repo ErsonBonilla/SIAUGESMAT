@@ -59,7 +59,9 @@ class TestProcessEtlItem:
             db = MagicMock()
             mock_sl.return_value = db
             procesar_item_etl(1)
-            mock_update.assert_called_once_with(db, item.id, "failed", "Falta 'action' en detail")
+            mock_update.assert_called_once_with(
+                db, item.id, "failed", "Falta 'action' en el detalle del ítem"
+            )
 
     def test_cancelled_execution(self):
         with (

@@ -85,7 +85,7 @@ def _build_rows(batch: LoteOperacion, items: list[ItemOperacion]) -> dict[str, l
         {"campo": "Total", "valor": str(total)},
         {"campo": "Completados", "valor": str(completed)},
         {"campo": "Fallidos", "valor": str(failed)},
-        {"campo": "Batch ID", "valor": batch.id_lote},
+        {"campo": "ID de lote", "valor": batch.id_lote},
         {"campo": "Creado", "valor": batch.creado_en.isoformat() if batch.creado_en else ""},
         {
             "campo": "Completado",

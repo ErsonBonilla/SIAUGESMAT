@@ -39,7 +39,7 @@ class FaseConsulta(FaseBase):
             all_courses = await moodle_service.obtener_cursos()
             if not isinstance(all_courses, list):
                 raise ValueError(
-                    f"get_courses() devolvió {type(all_courses).__name__} "
+                    f"obtener_cursos() devolvió {type(all_courses).__name__} "
                     f"en vez de list: {str(all_courses)[:200]}"
                 )
             ctx.cursos_existentes = [
