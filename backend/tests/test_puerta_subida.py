@@ -231,11 +231,14 @@ class TestCsvUploadGate:
         assert response.status_code == status.HTTP_409_CONFLICT
 
     def test_csv_allowed_without_active(self, client, encabezados_auth):
-        response = client.post(
-            "/api/v1/operations/courses/upload-csv",
-            files={"file": ("cursos.csv", b"shortname\nXYZ", "text/csv")},
-            headers=encabezados_auth,
-        )
+        from unittest.mock import patch
+
+        with patch("app.api.v1.helpers.manejador_subida.encolar_lote_operacion"):
+            response = client.post(
+                "/api/v1/operations/courses/upload-csv",
+                files={"file": ("cursos.csv", b"shortname\nXYZ", "text/csv")},
+                headers=encabezados_auth,
+            )
         assert response.status_code == status.HTTP_200_OK
 
 

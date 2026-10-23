@@ -27,7 +27,7 @@ Aplicación full-stack para la Universidad del Tolima que automatiza la carga ma
 | **Claro** | `#ED3237` (Rojo UT) | `#00A859` (Verde UT) | `#FFFFFF` | `#111827` | `#E5E7EB` |
 | **Oscuro** | `#00A859` (Verde) | `#ED3237` (Rojo) | `#1E1E2E` | `#CDD6F4` | `#313244` |
 
-Los colores de la marca se definen en `utils/tema.ts` como `DARK_THEME_VARS` y `LIGHT_THEME_VARS`. El tema oscuro usa la paleta Catppuccin Mocha. El toggle aplica los colores imperativamente vía `style.setProperty` sobre `:root`.
+Los colores de la marca se definen en `utils/tema.ts` como `VARIABLES_TEMA_OSCURO` y `VARIABLES_TEMA_CLARO`. El tema oscuro usa la paleta Catppuccin Mocha. El toggle aplica los colores imperativamente vía `style.setProperty` sobre `:root`.
 
 ---
 
@@ -38,7 +38,7 @@ Los colores de la marca se definen en `utils/tema.ts` como `DARK_THEME_VARS` y `
 │   Frontend       │  Deno Fresh + Preact + Signals
 │   Islands Arch.  │  Islands (fetch + estado), Components (presentación), Utils (helpers)
 └────────┬─────────┘
-         │ HTTP (JWT)
+         │ HTTP (Cookie HttpOnly JWT + X-CSRF-Token)
 ┌────────▼─────────┐     ┌──────────────┐     ┌──────────────────┐     ┌──────────────┐
 │   Backend        │────▶│  Repositories │────▶│   PostgreSQL     │     │    Moodle    │
 │   FastAPI         │     │  (CRUD puro)  │     │                  │     │  API REST    │
@@ -47,22 +47,22 @@ Los colores de la marca se definen en `utils/tema.ts` como `DARK_THEME_VARS` y `
          │ Redis                                                              │
 ┌────────▼─────────┐     ┌──────────────┐                                    │
 │  Celery Worker   │────▶│  Phases      │  Pipeline ETL:                     │
-│  (tasks.py)      │     │  (Consult,   │  ConsultPhase → AnalyzePhase →     │
-│                  │     │   Analyze,   │  Phase3 → Phase4                 │
-│                  │     │   Execute)   │                                    │
+│  (tareas.py)     │     │  (Consulta,  │  FaseConsulta → FaseAnalisis →     │
+│                  │     │   Análisis,  │  Fase 3 → Fase 4                   │
+│                  │     │   Ejecución) │                                    │
 └────────┬─────────┘     └──────┬───────┘                                    │
          │                      │                                            │
 ┌────────▼─────────┐            │                                            │
 │  Celery Beat     │            │                                            │
-│  (cleanup)       │            │                                            │
+│  (limpieza)      │            │                                            │
 └──────────────────┘            └────────────────────────────────────────────┘
 ```
 
-**Backend:** Endpoints → Repositories (datos) + Workers (Celery) → Phases (ETL) → MoodleService + MoodleIntegration. Las fases implementan el patrón Pipeline con Shared Context (`PhaseContext`). Los repositorios son funciones puras (no clases) que reciben `db` como primer parámetro.
+**Backend:** Endpoints → Repositories (datos) + Workers (Celery) → Phases (ETL) → ServicioMoodle + IntegracionMoodle. Las fases implementan el patrón Pipeline con Shared Context (`ContextoFase`). Los repositorios son funciones puras (no clases) que reciben `db` como primer parámetro.
 
 **Núcleo puro (`app/pipeline/`):** todas las transformaciones de negocio que no requieren I/O viven en `app/pipeline/` — un paquete 100 % puro (sin DB, HTTP, settings ni Celery), verificado por AST en `tests/test_pureza_pipeline.py`. Incluye `nombres_cortos.py` (parsing de códigos), `indice_cursos.py`, `comparacion_cursos/` (comparador de cursos con umbrales inyectables), `novedades.py`, `metricas.py`, `plan.py`, `progreso.py`, `categorias.py`, `usuarios.py` y `matriculaciones.py`. Los workers y tests consumen el núcleo directamente (los antiguos *shims* de `app/services/` fueron eliminados).
 
-**Frontend:** Islands Architecture sobre Preact + Signals. Las islas (`islands/`) manejan fetch y estado. Los componentes (`components/`) son presentacionales puros. Los utils (`utils/`) contienen señales globales (`darkSignal`, `profileSignal`), constantes compartidas (`STATUS_COLORS`, `DARK_VARS`) y helpers.
+**Frontend:** Islands Architecture sobre Preact + Signals. Las islas (`islands/`) manejan fetch y estado. Los componentes (`components/`) son presentacionales puros. Los utils (`utils/`) contienen señales globales (`senalTemaOscuro`, `senalPerfil`), constantes compartidas (`COLORES_SEMAFORO`, `VARIABLES_TEMA_OSCURO`) y helpers.
 
 ---
 
@@ -70,15 +70,15 @@ Los colores de la marca se definen en `utils/tema.ts` como `DARK_THEME_VARS` y `
 
 Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y matrículas con Moodle.
 
-> Además del pipeline ETL, el sistema incluye una herramienta de **Gestión de Novedades** en `/cursos/novedades` que permite comparar dos cargas académicas del mismo semestre (la ejecución anterior vs una nueva), detectar cambios de profesores en cursos existentes y aplicar acciones correctivas: ocultar curso viejo, crear curso nuevo para el nuevo profesor, o rehabilitar un curso oculto si el nuevo profesor ya lo tenía asignado. Usa el endpoint `POST /api/v1/novedades/compare` y `POST /api/v1/novedades/apply`.
+> Además del pipeline ETL, el sistema incluye una herramienta de **Gestión de Novedades** en `/cursos/novedades` que permite comparar dos cargas académicas del mismo semestre (la ejecución anterior vs una nueva) y detectar cambios de profesores en cursos existentes (oculta curso viejo, crea curso nuevo para el nuevo profesor, o rehabilita un curso oculto si el nuevo profesor ya lo tenía asignado). Usa el endpoint `POST /api/v1/novedades/compare`.
 
-| Fase | Clase | Descripción | Progreso |
+| Fase | Clase / Función | Descripción | Progreso |
 |---|---|---|---|
-| **FASE 1** | `ConsultPhase` | Parsear Excel + consultar Moodle (categorías, cursos, usuarios). Resuelve docentes por email en batch. | 0% → 20% |
-| **FASE 2** | `AnalyzePhase` | Comparar cursos contra Moodle con matching en 3 niveles (exacto → base key → core key). Determina crear, eliminar, activar, ocultar o renombrar. | 20% → 34% |
-| **FASE 3** | `process_etl_phase` | Ejecutar cambios estructurales vía Celery chords en 2 oleadas: (1) delete, (2) activate, hide, rename, create cursos. | 34% → 62% |
-| **FASE 4** | `process_etl_phase` | Crear usuarios nuevos en Moodle + matricular docentes como editingteacher en sus cursos vía Celery chord. | 65% → 85% |
-| **FASE 5** | `ReportService` | Generar 16 CSVs + 5 gráficos + ZIP con todo. | 85% → 100% |
+| **FASE 1** | `FaseConsulta` | Parsear Excel + consultar Moodle (categorías, cursos, usuarios). Resuelve docentes por email en batch. | 0% → 20% |
+| **FASE 2** | `FaseAnalisis` | Comparar cursos contra Moodle con matching en 3 niveles (exacto → base key → core key). Determina crear, eliminar, activar, ocultar o renombrar. | 20% → 34% |
+| **FASE 3** | `procesar_fase_etl` | Ejecutar cambios estructurales vía Celery chords en 2 oleadas: (1) delete, (2) activate, hide, rename, create cursos. | 34% → 62% |
+| **FASE 4** | `procesar_fase_etl` | Crear usuarios nuevos en Moodle + matricular docentes como editingteacher en sus cursos vía Celery chord. | 65% → 85% |
+| **FASE 5** | `ServicioReportes` | Generar 16 CSVs + 5 gráficos + ZIP con todo. | 85% → 100% |
 
 ### Destacados
 
@@ -89,7 +89,7 @@ Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y m
 - **Consolidación de correos duplicados:** si un correo coincide con más de una cuenta en Moodle, la ejecución conserva la cuenta **más antigua**, usa su username tal cual (sin renombrar: **el username encontrado en Moodle nunca se renombra**, ni siquiera si difiere del prefijo del correo) y elimina automáticamente las cuentas **más recientes que no tengan cursos**. Salvaguarda: si el duplicado tiene cursos —o el webservice no expone `core_enrol_get_users_courses`— no se borra y queda en `pending_review` para revisión manual. Los usernames eliminados/pendientes se registran en el log `identity_by_email_duplicate` (criterio `oldest`).
 - **Compatibilidad Moodle 3.9:** adapter pattern para diferencias entre versiones (sin `enrolment_1`, `templatecourse` como `int`, `createpassword` en vez de `preferences[]`, `categoryid` con fallback multi-nivel).
 
-**Archivos clave:** `workers/tareas.py` (orquestador), `workers/utilidades.py` (runner async compartido `ejecutar_moodle_async`), `workers/phases/fase1_consulta.py`, `fase2_analisis.py`, `fase3_estructura.py`, `fase4_personas.py`, `pipeline/` (núcleo puro), `repositories/` (DB), `integrations/integracion_moodle.py` (MoodleIntegration), `services/operaciones_moodle.py` (MoodleService), `services/adaptador_moodle.py`, `services/parsers/distancia.py`, `services/reportes.py`, `services/graficos.py`, `services/servicio_metricas.py`, `services/orquestacion.py` (puente API→Celery).
+**Archivos clave:** `workers/tareas.py` (orquestador), `workers/utilidades.py` (runner async compartido `ejecutar_moodle_async`), `workers/phases/fase1_consulta.py`, `fase2_analisis.py`, `fase3_estructura.py`, `fase4_personas.py`, `pipeline/` (núcleo puro), `repositories/` (DB), `integrations/integracion_moodle.py` (`IntegracionMoodle`), `services/operaciones_moodle.py` (`ServicioMoodle`), `services/adaptador_moodle.py`, `services/parsers/distancia.py` (`ParserDistancia`), `services/reportes.py`, `services/graficos.py`, `services/servicio_metricas.py`, `services/orquestacion.py` (puente API→Celery).
 
 ---
 
@@ -194,20 +194,20 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | `CursosConsultas` | Tabs **Consulta normal**/**Cursos sin uso** para la página `/cursos/consultar` |
 | `Historico` | Evolución semestral y comparación con Chart.js |
 | `HistoricoOperaciones` | Gráfico Chart.js theme-aware con métricas adaptativas por operación |
-| `Sidebar` | (→ `BarraLateral`) Navegación con 4 tarjetas (Usuarios, Cursos, Categorías, Operaciones), avatar, ThemeToggle |
-| `JobDetailIsland` | (→ `DetalleEjecucionIsland`) Progreso en vivo con polling, métricas, errores paginados |
+| `BarraLateral` | Navegación con 4 tarjetas (Usuarios, Cursos, Categorías, Operaciones), avatar, `AlternadorTema` |
+| `DetalleEjecucionIsland` | Progreso en vivo con polling, métricas, errores paginados |
 
 ### Componentes compartidos
 
 | Componente | Dónde se usa |
 |---|---|
-| `HubCard` | 4 hub pages (usuarios, cursos, categorias, operaciones) — tarjeta con icono, título, descripción |
-| `ErrorBox` | 8+ islas — mensaje de error con icono |
-| `Pagination` | ListaEjecucionesIsland, ListaOperacionesIsland — anterior/siguiente |
-| `LoadingSkeleton` | 6+ islas — variantes `table`, `chart`, `kpi` |
-| `KpiCard`, `MiniBarChart` | PanelIsland |
-| `YearNav`, `SemesterPicker`, `SemesterMultiPicker` | Historico, ComparacionSemestre |
-| `Layout`, `ProgressBar`, `Card`, `Button`, `Input`, `Toast` | Varios |
+| `TarjetaHub`, `PaginaHub` | 4 hub pages (`usuarios`, `cursos`, `categorias`, `operaciones`) — tarjeta con icono, título y descripción |
+| `CajaError` | 8+ islas — mensaje de error con icono |
+| `Paginacion` | `ListaEjecucionesIsland`, `ListaOperacionesIsland` — anterior/siguiente |
+| `EsqueletoCarga` | 6+ islas — variantes `table`, `chart`, `kpi` |
+| `TarjetaKpi`, `MiniGraficoBarras` | `PanelIsland` |
+| `NavegacionAnios`, `SelectorSemestre`, `SelectorMultiplesSemestres` | `Historico`, `ComparacionSemestre` |
+| `Disposicion`, `BarraProgreso`, `Tarjeta`, `Boton`, `Entrada`, `LimiteError` | Varios |
 
 ---
 
@@ -215,24 +215,23 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 
 ```
 SIAUGESMAT/
-├── .github/workflows/ci.yml     # GitHub Actions: backend (ruff/vulture/pytest) + frontend (deno check/test/build)
+├── .github/workflows/ci.yml     # GitHub Actions: backend + frontend + migraciones (PostgreSQL)
 ├── backend/
 │   ├── app/
 │   │   ├── api/v1/endpoints/   # autenticacion, trabajos, subida, analitica, reportes, graficos, operaciones, consultas, control_lotes, listado_lotes, novedades
-│   │   ├── core/               # config.py, seguridad.py, dependencies.py, configuracion_entidades.py
+│   │   ├── core/               # config.py, seguridad.py, dependencies.py, limitador_login.py, configuracion_entidades.py, configuracion_logging.py
 │   │   ├── db/                 # modelos.py, sesion.py, base.py
-│   │   ├── integrations/       # integracion_moodle.py (MoodleIntegration — orquestación alto nivel)
+│   │   ├── integrations/       # integracion_moodle.py (IntegracionMoodle — orquestación alto nivel)
 │   │   ├── pipeline/           # Núcleo puro (sin I/O): nombres_cortos, indice_cursos, comparacion_cursos/,
 │   │   │                       #   novedades, metricas, plan, progreso, categorias, usuarios, matriculaciones
 │   │   ├── repositories/       # repositorio_ejecuciones, repositorio_registros, repositorio_consultas, repositorio_operaciones (CRUD puro)
 │   │   ├── schemas/            # Pydantic schemas (trabajo, analitica, operaciones, subida, usuario, novedades, respuestas)
-│   │   ├── services/            # operaciones_moodle.py (MoodleService), cliente_moodle.py, errores_moodle.py,
+│   │   ├── services/           # operaciones_moodle.py (ServicioMoodle), cliente_moodle.py, errores_moodle.py,
 │   │   │                       # manejador_errores_moodle.py, fabrica_moodle.py, adaptador_moodle.py,
 │   │   │                       # servicio_metricas.py, proceso_etl.py, reportes.py, utilidades_reportes.py,
-│   │   │                       # servicio_novedades.py, graficos.py, validador_csv.py, roles.py, limitador_tasa.py,
-│   │   │                       # servicio_reportes_lote.py, utilidades_categorias.py, mensajes_error.py,
-│   │   │                       # orquestacion.py (puente API→Celery)
-│   │   │                       # parsers/ (DistanciaParser, base)
+│   │   │                       # servicio_novedades.py, graficos.py, validador_csv.py, validacion_excel.py, roles.py,
+│   │   │                       # limitador_tasa.py, servicio_reportes_lote.py, utilidades_categorias.py, mensajes_error.py,
+│   │   │                       # orquestacion.py (puente API→Celery), parsers/ (distancia.py, fabrica.py, base.py)
 │   │   ├── workers/            # tareas.py (ETL), phases/ (fase1_consulta, fase2_analisis, fase3_estructura,
 │   │   │                       #   fase4_personas, tarea_item, orquestador, comunes, base)
 │   │   │                       # tareas_operaciones.py, tareas_consultas.py, tareas_limpieza.py, utilidades.py
@@ -240,10 +239,9 @@ SIAUGESMAT/
 │   │   └── main.py
 │   ├── tools/                  # CLI de mantenimiento manual (fuera del paquete app/):
 │   │                           #   visibilidad_masiva_cursos.py, diagnosticar_cursos_ocultos.py, diagnostico_sibate.py,
-│   │                           #   corregir_usuarios_correo_duplicado.py (+ Corregir username.csv),
-│   │                           #   corregir_usuarios_auth_externa.py, restablecer_password_moodle.py,
-│   │                           #   restaurar_nombres_originales.py (+ data/renamed_usernames.tsv), rename_es.py
-│   ├── tests/                  # ~689 tests (ETL, repos, phases, pipeline, analytics, API, workers)
+│   │                           #   corregir_usuarios_correo_duplicado.py, corregir_usuarios_auth_externa.py,
+│   │                           #   restablecer_password_moodle.py, restaurar_nombres_originales.py
+│   ├── tests/                  # 707 tests (ETL, repos, fases, pipeline, analítica, API, workers, contratos)
 │   ├── alembic/                # Migraciones de base de datos
 │   ├── reports/                # Reportes generados (CSV, ZIP)
 │   ├── uploads/                # Archivos Excel subidos
@@ -252,30 +250,32 @@ SIAUGESMAT/
 │   ├── ruff.toml               # Configuración de ruff (py312, reglas seleccionadas/ignoradas)
 │   └── Dockerfile
 ├── frontend/
-│   ├── components/             # Button, Input, Card, Layout, ProgressBar, Toast, ErrorBox, Pagination,
-│   │                           # LoadingSkeleton, KpiCard, MiniBarChart, YearNav, SemesterPicker,
-│   │                           # SemesterMultiPicker, ReportsSection, ReportCard, HubCard, HubPage,
-│   │                           # TabbedPage, ConsultPage, CsvActionPage, PeriodButton,
-│   │                           # OperationHistorySection, ProcessInProgressBanner
+│   ├── components/             # Boton, Entrada, Tarjeta, Disposicion, BarraProgreso, CajaError, Paginacion,
+│   │                           # EsqueletoCarga, TarjetaKpi, MiniGraficoBarras, NavegacionAnios, SelectorSemestre,
+│   │                           # SelectorMultiplesSemestres, SeccionReportes, SeccionReportesLote, TarjetaReporte,
+│   │                           # TarjetaHub, PaginaHub, PaginaConsulta, PaginaAccionCsv, BotonPeriodo,
+│   │                           # BotonEjecucion, SelectorArchivo, AyudaConsulta, TablaProgresoLote,
+│   │                           # SeccionHistorialOperaciones, BannerProcesoEnCurso, LimiteError
 │   ├── islands/                # BarraLateral, AlternadorTema, PanelIsland, ListaEjecucionesIsland,
-│   │                           # ListaOperacionesIsland, Historico, HistoricoOperaciones,
-│   │                           # SubirArchivoIsland, CsvUploader, TablaConsultaIsland,
+│   │                           # ListaOperacionesIsland, Historico, HistoricoOperaciones, HistoricoTabs,
+│   │                           # EjecucionesTabs, SubirArchivoIsland, CsvUploader, TablaConsultaIsland,
 │   │                           # CrearUsuarios, DetalleEjecucionIsland, Reportes, GraficoIsland,
-│   │   # GraficoMetricasIsland, ComparacionSemestre, FormularioLogin, PaginaLoginIsland, CargaIsland,
-│   │   # NovedadesIsland, ConsultaDocentesSinAcceso, ConsultaCursosSinUso, VisibilidadMasivaIsland,
-│   │   # DetalleLoteIsland, NotificacionIsland, BotonMenuMovil
+│   │                           # GraficoMetricasIsland, ComparacionSemestre, FormularioLogin, PaginaLoginIsland,
+│   │                           # CargaIsland, NovedadesIsland, ConsultaDocentesSinAcceso, ConsultaCursosSinUso,
+│   │                           # ConsultaCorreosDuplicados, ConsultaInactivos, CursosConsultas, UsuariosConsultas,
+│   │                           # VisibilidadMasivaIsland, DetalleLoteIsland, NotificacionIsland, BotonMenuMovil
 │   ├── routes/                 # _app.tsx, _middleware.ts, index.tsx, ingreso.tsx, panel.tsx
 │   │   ├── usuarios/           # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
 │   │   ├── cursos/             # index.tsx (hub), consultar.tsx, crear.tsx, novedades.tsx, eliminar.tsx, visibilidad.tsx
 │   │   ├── categorias/         # index.tsx (hub), consultar.tsx, crear.tsx, eliminar.tsx
-│   │   ├── operaciones/        # index.tsx (hub), ejecuciones.tsx, historico.tsx
+│   │   ├── operaciones/        # index.tsx (hub), ejecuciones.tsx, historico.tsx, lotes/[batchId].tsx
 │   │   ├── ejecuciones/        # [id].tsx
 │   │   └── reportes.tsx
-│   ├── services/api.ts         # Barrel re-export → api/ (types, core, auth, trabajos, analytics, reportes, operaciones, consultas, mantenimiento, novedades)
-│   ├── hooks/                  # useBatchUpload.ts, useUploadGate.ts, useReports.ts
-│   ├── utils/                  # theme.ts, chart.ts, plotlyToChart.ts, profile.ts, operations-tabs.ts,
-│   │                           # constants.ts, auth.ts, auth-guard.ts, date.ts, icons.tsx, toast.ts,
-│   │                           # reports.ts, entity-configs.ts, batch-labels.ts
+│   ├── services/api.ts         # Barrel re-export → api/ (tipos, nucleo, autenticacion, trabajos, analitica, reportes, operaciones, consultas, mantenimiento, novedades)
+│   ├── hooks/                  # useSubidaLote.ts, usePuertaSubida.ts, useReportes.ts, useConsultaTarea.ts
+│   ├── utils/                  # tema.ts, grafico.ts, plotly-a-grafico.ts, perfil.ts, pestanas-operaciones.ts,
+│   │                           # constantes.ts, autenticacion.ts, guarda-autenticacion.ts, csrf.ts, fechas.ts,
+│   │                           # iconos.tsx, toast.ts, reportes.ts, configuracion-entidad.ts, etiquetas-lote.ts, disposicion.ts
 │   ├── static/                 # styles.css, main.css, SIAUGESMAT.ico
 │   ├── deno.json               # Configuración Fresh + tareas (check, test, build) + lint rules + lib DOM
 │   └── deno.lock               # Lock de dependencias Deno
@@ -348,14 +348,14 @@ docker compose up -d db redis
 
 ```bash
 cd backend
-alembic stamp head     # init_db() ya crea las tablas. Usar stamp, no upgrade.
+alembic stamp head     # inicializar_db() ya crea las tablas. Usar stamp, no upgrade.
 ```
 
-> **Nota:** `init_db()` crea las tablas automáticamente solo en desarrollo
+> **Nota:** `inicializar_db()` crea las tablas automáticamente solo en desarrollo
 > (`DEBUG=true`). En el despliegue Docker el servicio `migrate` ejecuta
 > `alembic upgrade head` automáticamente antes de que arranquen backend,
 > worker y beat. En entornos locales donde las tablas ya existen (creadas por
-> `init_db()` sin marcar), usá `alembic stamp head` para sincronizar la
+> `inicializar_db()` sin marcar), usá `alembic stamp head` para sincronizar la
 > versión sin recrear tablas.
 >
 > Validá que no haya drift entre modelos y BD con `alembic check` (la cadena
@@ -397,8 +397,11 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/siaugesmat
 # Redis
 REDIS_URL=redis://localhost:6380/0
 
-# JWT
+# JWT y rate limiting del login
 JWT_SECRET_KEY=genera-una-clave-segura-aqui
+JWT_EXPIRE_MINUTES=60
+LOGIN_MAX_ATTEMPTS=5
+LOGIN_WINDOW_SECONDS=300
 
 # Moodle por modalidad
 MOODLE_URL__PRESENCIAL=https://...
@@ -441,7 +444,7 @@ El archivo `.env.example` en la raíz contiene todas las variables con valores d
 
 ## Tests y calidad de código
 
-### Backend (~689 tests)
+### Backend (707 tests)
 
 ```bash
 cd backend
@@ -464,15 +467,16 @@ Cubre: parser ETL, repositorios, fases del pipeline, núcleo puro, integración,
 
 ```bash
 cd frontend
-deno task test           # 66 tests (utils, services, islands)
+deno task test           # 65 tests (utils, services, islands)
 ```
 
 ### Verificación estática
 
 ```bash
-# Backend — lint + código muerto + pureza del núcleo pipeline
+# Backend — lint + formato + código muerto + pureza del núcleo pipeline
 cd backend
-ruff check app tests
+ruff check app tests alembic
+ruff format --check app tests alembic
 vulture app --min-confidence 70
 pytest tests/test_pureza_pipeline.py -v
 
@@ -502,7 +506,8 @@ El flujo de CI en `.github/workflows/ci.yml` corre en cada push a `main` y en ca
 | Job | Pasos |
 |---|---|
 | **backend** | Python 3.12 → `ruff check app tests alembic` → `ruff format --check app tests alembic` → `vulture app --min-confidence 70` → `pytest -q` |
-| **frontend** | Deno 2.x → `deno task check` (fmt + lint + typecheck) → `deno test -A tests/` → `deno task build` |
+| **frontend** | Deno 2.9.5 → `deno task check` (fmt + lint + typecheck) → `deno test -A tests/` → `deno task build` |
+| **migraciones** | PostgreSQL 18 → `alembic upgrade head` → `alembic check` (sin drift) → smoke de esquema y contratos |
 
 ---
 
@@ -523,14 +528,14 @@ El `docker-compose.yml` incluye 8 servicios:
 
 | Servicio | Imagen | Puerto | Función |
 |---|---|---|---|
-| `db` | `postgres:18` | — | Base de datos (solo red interna) |
-| `redis` | `redis:8-alpine` | 6380 (host) | Cola de tareas (solo red interna) |
+| `db` | `postgres:18.6` | — | Base de datos (solo red interna) |
+| `redis` | `redis:8.10.1-alpine` | 6380 (host, vía override) | Cola de tareas (solo red interna) |
 | `migrate` | `siaugesmat-backend` | — | Aplica migraciones Alembic (`alembic upgrade head`) y termina |
 | `backend` | `siaugesmat-backend` | — | API FastAPI |
 | `worker` | `siaugesmat-backend` | — | Worker Celery (ETL + operaciones) |
-| `beat` | `siaugesmat-backend` | — | Celery Beat (limpieza cada 6h) |
+| `beat` | `siaugesmat-backend` | — | Celery Beat (limpieza periódica) |
 | `frontend` | `siaugesmat-frontend` | — | Servidor Fresh con Deno |
-| `nginx` | `nginx:alpine` | 80, 443 | Reverse proxy HTTPS — único punto de entrada público |
+| `nginx` | `nginx:1.27-alpine` | 80, 443 | Reverse proxy HTTPS — único punto de entrada público |
 
 > `migrate` corre una sola vez (`restart: "no"`) y `backend`, `worker` y
 > `beat` esperan su finalización (`depends_on: migrate: condition:
@@ -547,30 +552,33 @@ mkdir certs
 #   certs/privkey.pem   — clave privada
 ```
 
-Para pruebas con certificados autofirmados:
+Para pruebas con certificados autofirmados (incluye SANs para `localhost`, `127.0.0.1` e IPs locales):
 
 ```bash
-mkdir certs
-docker run --rm -v "${PWD}/certs:/certs" alpine/openssl req -x509 -nodes -days 365 \
-  -newkey rsa:2048 -keyout /certs/privkey.pem -out /certs/fullchain.pem \
-  -subj "/CN=localhost"
+bash certs/generate-dev-certs.sh
 ```
 
-> En Windows PowerShell, usar `${PWD}` en vez de `$(pwd)`.
+> Ver `certs/README.md` para opciones adicionales (dominio público o generación vía contenedor Docker en Windows).
 
 ### Desarrollo local vs producción
 
-Para desarrollo local (puertos expuestos), crear un override:
+Para desarrollo local (puertos expuestos y montaje en caliente), `docker-compose.override.yml` expone:
 
-```bash
+```yaml
 # docker-compose.override.yml
 services:
   db:
     ports: ["5432:5432"]
   redis:
-    ports: ["6379:6379"]
+    # 6380 en el host (el 6379 suele estar ocupado por svchost en Windows)
+    ports: ["6380:6379"]
   backend:
+    volumes:
+      - ./backend/app:/app/app:ro
     ports: ["8100:8000"]
+  worker:
+    volumes:
+      - ./backend/app:/app/app:ro
   frontend:
     ports: ["3000:3000"]
 ```

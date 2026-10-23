@@ -87,7 +87,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item"),
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="courses", accion="delete")
             mock_get_batch.return_value = batch
@@ -121,7 +121,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ),
             patch("app.workers.tareas_operaciones.actualizar_item"),
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="courses", accion="delete")
             mock_get_batch.return_value = batch
@@ -157,7 +157,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item") as mock_update,
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="courses", accion="delete")
             mock_get_batch.return_value = batch
@@ -185,7 +185,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item") as mock_update,
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="users", accion="delete")
             mock_get_batch.return_value = batch
@@ -214,7 +214,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item") as mock_update,
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="users", accion="delete")
             mock_get_batch.return_value = batch
@@ -243,7 +243,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item") as mock_update,
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="users", accion="delete")
             mock_get_batch.return_value = batch
@@ -271,7 +271,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item") as mock_update,
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="users", accion="delete")
             mock_get_batch.return_value = batch
@@ -302,7 +302,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item") as mock_update,
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="users", accion="delete")
             mock_get_batch.return_value = batch
@@ -334,7 +334,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item"),
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="categories", accion="delete")
             mock_get_batch.return_value = batch
@@ -359,7 +359,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item"),
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="users", accion="delete")
             mock_get_batch.return_value = batch
@@ -383,7 +383,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item"),
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="users", accion="create")
             mock_get_batch.return_value = batch
@@ -408,7 +408,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item"),
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="users", accion="create")
             mock_get_batch.return_value = batch
@@ -434,7 +434,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item"),
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="categories", accion="create")
             mock_get_batch.return_value = batch
@@ -459,7 +459,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item"),
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="courses", accion="visibility")
             mock_get_batch.return_value = batch
@@ -484,7 +484,7 @@ class TestProcessOperationBatch:
                 return_value=_make_moodle(),
             ) as mock_get_ms,
             patch("app.workers.tareas_operaciones.actualizar_item") as mock_update,
-            patch("app.workers.tareas_operaciones.actualizar_conteos_lote"),
+            patch("app.workers.tareas_operaciones.actualizar_conteos_lote", autospec=True),
         ):
             batch = _make_batch(tipo_entidad="courses", accion="delete")
             mock_get_batch.return_value = batch

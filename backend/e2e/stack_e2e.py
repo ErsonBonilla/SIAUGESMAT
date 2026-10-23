@@ -20,7 +20,7 @@ from pathlib import Path
 RAIZ = Path(__file__).resolve().parent.parent
 
 DATABASE_URL_DEFAULT = "postgresql://postgres:admin@localhost:5432/siaugesmat_e2e"
-REDIS_URL_DEFAULT = "redis://localhost:6379/5"
+REDIS_URL_DEFAULT = "redis://localhost:6380/5"
 
 UPLOAD_DIR_DEFAULT = RAIZ / "e2e" / "tmp_uploads"
 REPORT_DIR_DEFAULT = RAIZ / "e2e" / "tmp_reports"

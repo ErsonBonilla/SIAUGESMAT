@@ -148,7 +148,7 @@ export default function IslandPanel() {
         <div class="text-center py-12 text-[var(--text-secondary)]">
           <p class="text-lg mb-2">Aún no hay datos</p>
           <p class="text-sm mb-4">
-            Subí tu primer archivo para ver las métricas del dashboard.
+            Sube tu primer archivo para ver las métricas del panel.
           </p>
           <a
             href="/cursos/crear"

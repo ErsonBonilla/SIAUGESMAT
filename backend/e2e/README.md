@@ -58,7 +58,7 @@ python e2e/moodle_simulado.py --port 8800
 
 # 3) Worker aislado (env: BD e2e + Redis índice 5 + fake Moodle)
 $env:DATABASE_URL="postgresql+psycopg2://postgres:postgres@localhost:5432/siaugesmat_e2e"
-$env:REDIS_URL="redis://localhost:6379/5"
+$env:REDIS_URL="redis://localhost:6380/5"
 $env:MOODLE_URL__DISTANCIA="http://localhost:8800"
 $env:MOODLE_TOKEN__DISTANCIA="tokendemo"
 $env:MOODLE_VERSION__DISTANCIA="3.9"

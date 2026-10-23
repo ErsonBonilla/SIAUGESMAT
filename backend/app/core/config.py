@@ -203,7 +203,7 @@ class Configuracion(BaseSettings):
 
         Incluye cada entrada de ``EXTERNAL_AUTH_EXCLUDED_USERS`` tal cual y su
         variante sin el dominio institucional (para casar también por username
-        pelado, p. ej. ``admin2@ut.edu.co`` → ``admin2``). Todo en minúsculas.
+        pelado, p. ej. ``admin1@ut.edu.co`` → ``admin1``). Todo en minúsculas.
         """
         domain = (self.INSTITUTIONAL_EMAIL_DOMAIN or "").strip().lower()
         keys: set[str] = set()

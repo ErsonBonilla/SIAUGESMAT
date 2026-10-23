@@ -65,8 +65,8 @@ class AdaptadorMoodle3(AdaptadorMoodle):
         existing = [e for e in enrols if e.get("type") == "self"]
         if not existing:
             raise ValueError(
-                f"Enrolment 'self' no encontrado para curso {course_id} "
-                "(Moodle 3.x no permite crearla vía WS)"
+                f"Método de matriculación 'self' no encontrado para el curso {course_id} "
+                "(Moodle 3.x no permite crearlo vía WS)"
             )
         return existing[0]
 
@@ -127,7 +127,7 @@ class FabricaAdaptadorMoodle:
             normalized = match.group(1) if match else version
             adapter_cls = cls._adapters.get(normalized)
             if adapter_cls is None:
-                raise ValueError(f"Unsupported Moodle version: {version}")
+                raise ValueError(f"Versión de Moodle no soportada: {version}")
             logger.debug("Normalized version '%s' -> '%s'", version, normalized)
         logger.debug("Using adapter %s for Moodle %s", adapter_cls.__name__, version)
         return adapter_cls()

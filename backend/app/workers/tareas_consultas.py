@@ -90,24 +90,24 @@ def _parsear_corte(params: dict) -> int:
         try:
             days = int(days)
         except (TypeError, ValueError):
-            raise ValueError("'days' debe ser un número entero.") from None
+            raise ValueError("El número de días debe ser un número entero.") from None
         if days < 1 or days > MAX_INACTIVE_DAYS:
-            raise ValueError(f"'days' debe estar entre 1 y {MAX_INACTIVE_DAYS}.")
+            raise ValueError(f"El número de días debe estar entre 1 y {MAX_INACTIVE_DAYS}.")
         return _dias_hasta_corte(days)
     if months is not None:
         try:
             months = int(months)
         except (TypeError, ValueError):
-            raise ValueError("'months' debe ser un número entero.") from None
+            raise ValueError("El número de meses debe ser un número entero.") from None
         if months < 1 or months > MAX_INACTIVE_MONTHS:
-            raise ValueError(f"'months' debe estar entre 1 y {MAX_INACTIVE_MONTHS}.")
+            raise ValueError(f"El número de meses debe estar entre 1 y {MAX_INACTIVE_MONTHS}.")
         return _meses_hasta_corte(months)
     try:
         years = int(years)
     except (TypeError, ValueError):
-        raise ValueError("'years' debe ser un número entero.") from None
+        raise ValueError("El número de años debe ser un número entero.") from None
     if years < 1:
-        raise ValueError("'years' debe ser al menos 1.")
+        raise ValueError("El número de años debe ser al menos 1.")
     return _anios_hasta_corte(years)
 
 

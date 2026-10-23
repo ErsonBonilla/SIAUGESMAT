@@ -75,7 +75,7 @@ class TestMoodle3Adapter:
                 ],
             }
         )
-        with pytest.raises(ValueError, match="Enrolment 'self' no encontrado"):
+        with pytest.raises(ValueError, match="Método de matriculación 'self' no encontrado"):
             await adapter.habilitar_automatriculacion(500, llamar_ws)
 
     @pytest.mark.asyncio
@@ -133,9 +133,9 @@ class TestMoodleAdapterFactory:
         assert isinstance(adapter, AdaptadorMoodle3)
 
     def test_unsupported_version_raises(self):
-        with pytest.raises(ValueError, match="Unsupported"):
+        with pytest.raises(ValueError, match="no soportada"):
             FabricaAdaptadorMoodle.crear("2.7")
 
     def test_unsupported_5x_raises(self):
-        with pytest.raises(ValueError, match="Unsupported"):
+        with pytest.raises(ValueError, match="no soportada"):
             FabricaAdaptadorMoodle.crear("5.2")

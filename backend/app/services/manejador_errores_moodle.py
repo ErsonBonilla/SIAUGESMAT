@@ -9,14 +9,14 @@ logger = logging.getLogger(__name__)
 
 
 def extraer_error(e: Exception) -> str:
-    if hasattr(e, "spanish_message"):
+    if hasattr(e, "mensaje_espanol"):
         return e.mensaje_espanol
-    if e.__cause__ and hasattr(e.__cause__, "spanish_message"):
+    if e.__cause__ and hasattr(e.__cause__, "mensaje_espanol"):
         return e.__cause__.mensaje_espanol
     if hasattr(e, "last_attempt"):
         try:
             inner = e.last_attempt.exception()
-            if hasattr(inner, "spanish_message"):
+            if hasattr(inner, "mensaje_espanol"):
                 return inner.mensaje_espanol
             msg = str(inner)[:300]
             return msg if msg.strip() else "Error sin mensaje específico del servidor"
