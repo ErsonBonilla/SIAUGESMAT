@@ -94,7 +94,6 @@ class FaseAnalisis(FaseBase):
                 courses_with_teacher=ctx.cursos_con_docente,
                 username_emails=ctx.correos_usuarios,
                 max_age_seconds=settings.COURSE_MAX_AGE_SECONDS,
-                disappeared_age_seconds=settings.COURSE_DISAPPEARED_AGE_SECONDS,
             )
 
             persistir_logs_plan(

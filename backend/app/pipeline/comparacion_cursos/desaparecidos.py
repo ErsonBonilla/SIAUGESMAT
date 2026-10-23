@@ -1,5 +1,5 @@
 from app.pipeline.comparacion_cursos.umbrales import (
-    EDAD_DESAPARICION_CURSO_SEGUNDOS,
+    EDAD_MAXIMA_CURSO_SEGUNDOS,
 )
 from app.pipeline.comparacion_cursos.utilidades import (
     construir_clave_base,
@@ -20,7 +20,7 @@ def encontrar_cursos_desaparecidos(
     alerts: list[dict],
     logs: list[dict],
     *,
-    disappeared_age_seconds: int = EDAD_DESAPARICION_CURSO_SEGUNDOS,
+    max_age_seconds: int = EDAD_MAXIMA_CURSO_SEGUNDOS,
 ):
     for sn, existing in existing_by_shortname.items():
         if sn in new_shortnames:
@@ -35,7 +35,7 @@ def encontrar_cursos_desaparecidos(
                 continue
 
         age = obtener_edad_curso_segundos(existing)
-        if age >= disappeared_age_seconds:
+        if age >= max_age_seconds:
             to_delete.append(
                 {
                     "shortname": sn,
