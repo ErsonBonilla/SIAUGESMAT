@@ -1,0 +1,3 @@
+# Normalizar saltos de linea a LF en todos los sistemas operativos (incluido Windows)
+# para evitar conflictos con `deno fmt --check`, `ruff format --check` y scripts .sh.
+* text=auto eol=lf
