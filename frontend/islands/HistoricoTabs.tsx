@@ -2,7 +2,10 @@
 import { useSignal } from "@preact/signals";
 import HistoricoIsland from "./Historico.tsx";
 import OperationHistorico from "./HistoricoOperaciones.tsx";
-import { OPERATIONS_TABS, type TabKey } from "../utils/operations-tabs.ts";
+import {
+  type ClavePestana,
+  PESTANAS_OPERACIONES,
+} from "../utils/pestanas-operaciones.ts";
 
 const ACTIVE = "bg-[var(--accent)] text-white";
 const INACTIVE =
@@ -10,13 +13,13 @@ const INACTIVE =
   "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]";
 
 export default function HistoricoTabs() {
-  const tab = useSignal<TabKey>(OPERATIONS_TABS[0].key);
-  const current = OPERATIONS_TABS.find((t) => t.key === tab.value)!;
+  const tab = useSignal<ClavePestana>(PESTANAS_OPERACIONES[0].key);
+  const current = PESTANAS_OPERACIONES.find((t) => t.key === tab.value)!;
 
   return (
     <>
       <div class="flex flex-wrap gap-2 mb-6">
-        {OPERATIONS_TABS.map((t) => (
+        {PESTANAS_OPERACIONES.map((t) => (
           <button
             type="button"
             key={t.key}

@@ -1,80 +1,84 @@
-// services/api.ts — barrel (split: types, core, auth, trabajos, analytics, reportes, operaciones, consultas)
-export { getMyProfile, login, logout } from "./api/auth.ts";
+// services/api.ts — barrel (split: tipos, nucleo, autenticacion, trabajos, analitica, reportes, operaciones, consultas)
+export {
+  cerrarSesion,
+  iniciarSesion,
+  obtenerMiPerfil,
+} from "./api/autenticacion.ts";
 
 export {
-  cancelExecution,
-  confirmExecution,
-  deleteExecution,
-  getCurrentSemester,
-  getExecution,
-  getExecutionErrors,
-  getUploadStatus,
-  listExecutions,
-  pauseExecution,
-  resumeExecution,
-  startProcess,
-  uploadFile,
-  type UploadStatus,
+  cancelarEjecucion,
+  confirmarEjecucion,
+  eliminarEjecucion,
+  type EstadoSubida,
+  iniciarProceso,
+  listarEjecuciones,
+  obtenerEjecucion,
+  obtenerErroresEjecucion,
+  obtenerEstadoSubida,
+  obtenerSemestreActual,
+  pausarEjecucion,
+  reanudarEjecucion,
+  subirArchivo,
 } from "./api/trabajos.ts";
 
 export {
-  getChartData,
-  getHistory,
-  getLatest,
-  getSemaphore,
-  listCharts,
-} from "./api/analytics.ts";
+  listarGraficos,
+  obtenerDatosGrafico,
+  obtenerHistorial,
+  obtenerReciente,
+  obtenerSemaforo,
+} from "./api/analitica.ts";
 
 export {
-  downloadReport,
-  getReportDownloadUrl,
-  getReportFileUrl,
-  listReports,
+  descargarReporte,
+  listarReportes,
+  obtenerUrlArchivoReporte,
+  obtenerUrlDescargaReporte,
 } from "./api/reportes.ts";
 
 export {
-  cancelBatch,
-  deleteBatch,
-  getBatchReportFileUrl,
-  getBatchReportUrl,
-  getBatchStatus,
-  getOperationsAnalytics,
-  listBatches,
-  pauseBatch,
-  resumeBatch,
-  uploadCsvFile,
+  cancelarLote,
+  eliminarLote,
+  listarLotes,
+  obtenerAnaliticaOperaciones,
+  obtenerEstadoLote,
+  obtenerUrlArchivoReporteLote,
+  obtenerUrlDescargaReporteLote,
+  pausarLote,
+  reanudarLote,
+  subirArchivoCsv,
 } from "./api/operaciones.ts";
 
-export { uploadVisibilityCsv } from "./api/mantenimiento.ts";
+export { subirCsvVisibilidad } from "./api/mantenimiento.ts";
 
 export {
-  getQueryExportUrl,
-  getQueryTaskStatus,
-  queryEntities,
+  consultarEntidades,
+  obtenerEstadoTareaConsulta,
+  obtenerUrlExportarConsulta,
 } from "./api/consultas.ts";
 
-export { compareNovedades } from "./api/novedades.ts";
+export { compararNovedades } from "./api/novedades.ts";
 
 export type {
-  ChartInfo,
-  ChartsListResponse,
-  ChartTracesLayout,
-  CsvUploadResponse,
-  ErrorLog,
-  Execution,
-  InactiveCourseRow,
-  InactiveTeacherRow,
-  LatestExecution,
-  NovedadesResponse,
-  NovedadItem,
-  OperationBatchOut,
-  OperationBatchStatus,
-  OperationItemOut,
-  OperationsHistoryItem,
-  QueryTaskStatus,
-  ReportInfo,
-  ReportsListResponse,
-  SemaphoreStatus,
-  SemesterMetrics,
-  UserProfile,
-} from "./api/types.ts";
+  DisposicionTrazasGrafico,
+  Ejecucion,
+  EjecucionReciente,
+  EstadoLoteOperacion,
+  EstadoSemaforo,
+  EstadoTareaConsulta,
+  FilaCursoInactivo,
+  FilaDocenteInactivo,
+  InfoGrafico,
+  InfoReporte,
+  ItemHistorialOperaciones,
+  ItemNovedad,
+  ItemOperacionSalida,
+  LoteOperacionSalida,
+  MetricasSemestre,
+  PerfilUsuario,
+  RegistroError,
+  RespuestaListaGraficos,
+  RespuestaListaReportes,
+  RespuestaNovedades,
+  RespuestaSubidaCsv,
+} from "./api/tipos.ts";

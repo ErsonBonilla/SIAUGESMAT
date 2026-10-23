@@ -1,58 +1,59 @@
 import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import Layout from "../components/Layout.tsx";
-import Card from "../components/Card.tsx";
-import KpiCard from "../components/KpiCard.tsx";
-import MiniBarChart from "../components/MiniBarChart.tsx";
-import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
+import Disposicion from "../components/Disposicion.tsx";
+import Tarjeta from "../components/Tarjeta.tsx";
+import TarjetaKpi from "../components/TarjetaKpi.tsx";
+import MiniGraficoBarras from "../components/MiniGraficoBarras.tsx";
+import EsqueletoCarga from "../components/EsqueletoCarga.tsx";
 import {
-  type Execution,
-  getHistory,
-  getLatest,
-  type LatestExecution,
-  listExecutions,
-  type SemesterMetrics,
+  type Ejecucion,
+  type EjecucionReciente,
+  listarEjecuciones,
+  type MetricasSemestre,
+  obtenerHistorial,
+  obtenerReciente,
 } from "../services/api.ts";
-import { profileSignal } from "../utils/profile.ts";
-import { getTokenPayload } from "../utils/auth.ts";
-import { SEMAPHORE_COLORS, STATUS_LABELS } from "../utils/constants.ts";
+import { senalPerfil } from "../utils/perfil.ts";
+import { COLORES_SEMAFORO, ETIQUETAS_ESTADO } from "../utils/constantes.ts";
 import {
-  CheckIcon,
-  ClockIcon,
-  ExclamationIcon,
-  MinusIcon,
-  XMarkIcon,
-} from "../utils/icons.tsx";
+  IconoCheck,
+  IconoExclamacion,
+  IconoMenos,
+  IconoReloj,
+  IconoX,
+} from "../utils/iconos.tsx";
 
-export default function DashboardIsland() {
-  const historyData = useSignal<SemesterMetrics[]>([]);
-  const latestExec = useSignal<LatestExecution | null>(null);
-  const recentExecs = useSignal<Execution[]>([]);
+export default function IslandPanel() {
+  const historyData = useSignal<MetricasSemestre[]>([]);
+  const latestExec = useSignal<EjecucionReciente | null>(null);
+  const recentExecs = useSignal<Ejecucion[]>([]);
   const loading = useSignal(true);
   const error = useSignal("");
 
   useEffect(() => {
     loading.value = true;
     error.value = "";
-    const rawModalidad = getTokenPayload()?.modalidad;
+    const rawModalidad = typeof window !== "undefined"
+      ? window.localStorage.getItem("modalidad")
+      : null;
     const modalidad = typeof rawModalidad === "string"
       ? rawModalidad
       : undefined;
     const errors: string[] = [];
     Promise.all([
-      getHistory(10, modalidad).catch((e) => {
+      obtenerHistorial(10, modalidad).catch((e) => {
         errors.push("Historial: " + (e instanceof Error ? e.message : "error"));
-        return [] as SemesterMetrics[];
+        return [] as MetricasSemestre[];
       }),
-      getLatest(modalidad).catch((e) => {
+      obtenerReciente(modalidad).catch((e) => {
         errors.push("Semáforo: " + (e instanceof Error ? e.message : "error"));
         return null;
       }),
-      listExecutions({ limit: 5, modalidad }).catch((e) => {
+      listarEjecuciones({ limit: 5, modalidad }).catch((e) => {
         errors.push(
           "Ejecuciones: " + (e instanceof Error ? e.message : "error"),
         );
-        return { total: 0, items: [] as Execution[] };
+        return { total: 0, items: [] as Ejecucion[] };
       }),
     ])
       .then(([history, latest, execs]) => {
@@ -69,7 +70,7 @@ export default function DashboardIsland() {
       });
   }, []);
 
-  const displayName = profileSignal.value?.firstname || "Usuario";
+  const displayName = senalPerfil.value?.firstname || "Usuario";
 
   const kpis = useComputed(() => {
     const data = historyData.value;
@@ -111,13 +112,13 @@ export default function DashboardIsland() {
   const SemaphoreIcon = (s: string) => {
     switch (s) {
       case "green":
-        return CheckIcon;
+        return IconoCheck;
       case "yellow":
-        return ExclamationIcon;
+        return IconoExclamacion;
       case "red":
-        return XMarkIcon;
+        return IconoX;
       default:
-        return MinusIcon;
+        return IconoMenos;
     }
   };
 
@@ -125,8 +126,8 @@ export default function DashboardIsland() {
     if (loading.value) {
       return (
         <div class="space-y-6">
-          <LoadingSkeleton variant="kpi" />
-          <LoadingSkeleton variant="chart" />
+          <EsqueletoCarga variant="kpi" />
+          <EsqueletoCarga variant="chart" />
         </div>
       );
     }
@@ -147,7 +148,7 @@ export default function DashboardIsland() {
         <div class="text-center py-12 text-[var(--text-secondary)]">
           <p class="text-lg mb-2">Aún no hay datos</p>
           <p class="text-sm mb-4">
-            Subí tu primer archivo para ver las métricas del dashboard.
+            Sube tu primer archivo para ver las métricas del panel.
           </p>
           <a
             href="/cursos/crear"
@@ -170,17 +171,17 @@ export default function DashboardIsland() {
             class="grid gap-5"
             style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))"
           >
-            <KpiCard value={kpis.value.ejecuciones} label="Ejecuciones" />
-            <KpiCard
+            <TarjetaKpi value={kpis.value.ejecuciones} label="Ejecuciones" />
+            <TarjetaKpi
               value={kpis.value.cursos.toLocaleString()}
               label="Cursos creados"
             />
-            <KpiCard
+            <TarjetaKpi
               value={kpis.value.matriculas.toLocaleString()}
               label="Matrículas"
             />
-            <KpiCard value={kpis.value.exito} label="Tasa éxito" />
-            <KpiCard value={kpis.value.duracion} label="Duración prom." />
+            <TarjetaKpi value={kpis.value.exito} label="Tasa éxito" />
+            <TarjetaKpi value={kpis.value.duracion} label="Duración prom." />
           </div>
         )}
 
@@ -189,20 +190,20 @@ export default function DashboardIsland() {
           Actividad
         </p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card padding="md">
+          <Tarjeta padding="md">
             <p class="text-[0.8125rem] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.04em] mb-3">
               Ejecuciones por semestre
             </p>
             {chartData.value.length > 0
-              ? <MiniBarChart data={chartData.value} />
+              ? <MiniGraficoBarras data={chartData.value} />
               : (
                 <p class="text-sm text-[var(--text-secondary)]">
                   Sin datos históricos.
                 </p>
               )}
-          </Card>
+          </Tarjeta>
 
-          <Card padding="md">
+          <Tarjeta padding="md">
             <p class="text-[0.8125rem] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.04em] mb-3">
               Última ejecución
             </p>
@@ -216,7 +217,7 @@ export default function DashboardIsland() {
                         width: "2.5rem",
                         height: "2.5rem",
                         backgroundColor:
-                          SEMAPHORE_COLORS[latestExec.value.semaphore] ||
+                          COLORES_SEMAFORO[latestExec.value.semaphore] ||
                           "var(--text-muted)",
                       }}
                     >
@@ -243,7 +244,7 @@ export default function DashboardIsland() {
                             : latestExec.value.semaphore === "red"
                             ? "Errores"
                             : "Sin datos")
-                          : STATUS_LABELS[latestExec.value.status] ||
+                          : ETIQUETAS_ESTADO[latestExec.value.status] ||
                             latestExec.value.status}
                       </p>
                       <p class="text-xs text-[var(--text-secondary)]">
@@ -255,7 +256,7 @@ export default function DashboardIsland() {
                   </div>
                   <div class="flex items-center gap-3 text-xs text-[var(--text-secondary)] mb-3">
                     <span class="flex items-center gap-1">
-                      <ClockIcon
+                      <IconoReloj
                         style={{ width: "0.75rem", height: "0.75rem" }}
                       />
                       {latestExec.value.duration_seconds
@@ -279,7 +280,7 @@ export default function DashboardIsland() {
                   No hay ejecuciones recientes.
                 </p>
               )}
-          </Card>
+          </Tarjeta>
         </div>
 
         <div>
@@ -288,7 +289,7 @@ export default function DashboardIsland() {
           </p>
           {recentExecs.value.length > 0
             ? (
-              <Card padding="sm">
+              <Tarjeta padding="sm">
                 <table class="w-full border-collapse text-sm">
                   <thead>
                     <tr>
@@ -358,7 +359,7 @@ export default function DashboardIsland() {
                     })}
                   </tbody>
                 </table>
-              </Card>
+              </Tarjeta>
             )
             : (
               <p class="text-sm text-[var(--text-secondary)]">
@@ -371,8 +372,8 @@ export default function DashboardIsland() {
   };
 
   return (
-    <Layout title={`Bienvenido, ${displayName}`}>
+    <Disposicion title={`Bienvenido, ${displayName}`}>
       {renderBody()}
-    </Layout>
+    </Disposicion>
   );
 }

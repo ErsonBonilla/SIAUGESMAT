@@ -1,17 +1,17 @@
 import { signal } from "@preact/signals-core";
 
-export type ToastType = "success" | "error" | "info";
+export type TipoToast = "success" | "error" | "info";
 
-export interface ToastItem {
+export interface ItemToast {
   id: number;
   message: string;
-  type: ToastType;
+  type: TipoToast;
 }
 
-const toasts = signal<ToastItem[]>([]);
+const toasts = signal<ItemToast[]>([]);
 let nextId = 1;
 
-export function toast(message: string, type: ToastType = "info") {
+export function toast(message: string, type: TipoToast = "info") {
   const id = nextId++;
   toasts.value = [...toasts.value, { id, message, type }];
   setTimeout(() => {
@@ -19,7 +19,7 @@ export function toast(message: string, type: ToastType = "info") {
   }, 4000);
 }
 
-export function dismissToast(id: number) {
+export function descartarToast(id: number) {
   toasts.value = toasts.value.filter((t) => t.id !== id);
 }
 

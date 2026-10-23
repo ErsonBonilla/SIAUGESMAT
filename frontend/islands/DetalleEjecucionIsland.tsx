@@ -1,24 +1,24 @@
 // islands/DetalleEjecucionIsland.tsx
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import Pagination from "../components/Pagination.tsx";
-import ProgressBar from "../components/ProgressBar.tsx";
-import ReportsSection from "../components/ReportsSection.tsx";
-import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
-import ErrorBox from "../components/ErrorBox.tsx";
+import Paginacion from "../components/Paginacion.tsx";
+import BarraProgreso from "../components/BarraProgreso.tsx";
+import SeccionReportes from "../components/SeccionReportes.tsx";
+import EsqueletoCarga from "../components/EsqueletoCarga.tsx";
+import CajaError from "../components/CajaError.tsx";
 import {
-  cancelExecution,
-  confirmExecution,
-  type ErrorLog,
-  type Execution,
-  getExecution,
-  getExecutionErrors,
-  pauseExecution,
-  resumeExecution,
+  cancelarEjecucion,
+  confirmarEjecucion,
+  type Ejecucion,
+  obtenerEjecucion,
+  obtenerErroresEjecucion,
+  pausarEjecucion,
+  reanudarEjecucion,
+  type RegistroError,
 } from "../services/api.ts";
-import { formatDateTime, formatDuration } from "../utils/date.ts";
+import { formatearDuracion, formatearFechaHora } from "../utils/fechas.ts";
 import { toast } from "../utils/toast.ts";
-import { MODE_LABELS, STATUS_LABELS } from "../utils/constants.ts";
+import { ETIQUETAS_ESTADO, ETIQUETAS_MODO } from "../utils/constantes.ts";
 
 const ERROR_TYPE_LABELS: Record<string, string> = {
   "1": "FASE 1 — Consulta",
@@ -33,8 +33,12 @@ const ERRORS_PAGE_SIZE = 20;
 const THRESHOLD_YELLOW = 1.0;
 const THRESHOLD_RED = 5.0;
 
+function metricaNumerica(valor: unknown): number | undefined {
+  return typeof valor === "number" ? valor : undefined;
+}
+
 function computeSemaphore(
-  execution: Execution,
+  execution: Ejecucion,
 ): { color: string; text: string } {
   if (execution.status === "failed") return { color: "red", text: "Fallido" };
   if (execution.status === "cancelled") {
@@ -43,10 +47,11 @@ function computeSemaphore(
   if (execution.status !== "completed") {
     return { color: "gray", text: "Sin finalizar" };
   }
-  const total = execution.metrics?.total_operations ??
-    ((execution.metrics?.courses_created || 0) +
-      (execution.metrics?.users_created || 0) +
-      (execution.metrics?.enrolments || 0));
+  const metrics = execution.metrics ?? {};
+  const total = metricaNumerica(metrics.total_operations) ??
+    ((metricaNumerica(metrics.courses_created) ?? 0) +
+      (metricaNumerica(metrics.users_created) ?? 0) +
+      (metricaNumerica(metrics.enrolments) ?? 0));
   if (!total) return { color: "gray", text: "Sin datos" };
   const errorRate = ((execution.errors_count || 0) / total) * 100;
   if (errorRate >= THRESHOLD_RED || (execution.duration_seconds || 0) >= 7200) {
@@ -62,9 +67,9 @@ interface Props {
   executionId: number;
 }
 
-export default function JobDetailIsland({ executionId }: Props) {
-  const execution = useSignal<Execution | null>(null);
-  const errors = useSignal<ErrorLog[]>([]);
+export default function IslandDetalleEjecucion({ executionId }: Props) {
+  const execution = useSignal<Ejecucion | null>(null);
+  const errors = useSignal<RegistroError[]>([]);
   const loading = useSignal(true);
   const errorMsg = useSignal("");
   const errorOffset = useSignal(0);
@@ -77,8 +82,8 @@ export default function JobDetailIsland({ executionId }: Props) {
     (async () => {
       try {
         const [exec, errorList] = await Promise.all([
-          getExecution(executionId),
-          getExecutionErrors(executionId, ERRORS_PAGE_SIZE, 0),
+          obtenerEjecucion(executionId),
+          obtenerErroresEjecucion(executionId, ERRORS_PAGE_SIZE, 0),
         ]);
         execution.value = exec;
         errors.value = errorList;
@@ -97,13 +102,13 @@ export default function JobDetailIsland({ executionId }: Props) {
     }
     const interval = setInterval(async () => {
       try {
-        const exec = await getExecution(executionId);
+        const exec = await obtenerEjecucion(executionId);
         execution.value = exec;
         if (!runningStatuses.includes(exec.status)) clearInterval(interval);
         if (
           exec.errors_count > errors.value.length && errorOffset.value === 0
         ) {
-          const fresh = await getExecutionErrors(
+          const fresh = await obtenerErroresEjecucion(
             executionId,
             ERRORS_PAGE_SIZE,
             0,
@@ -119,7 +124,7 @@ export default function JobDetailIsland({ executionId }: Props) {
 
   const fetchErrorsPage = async (offset: number) => {
     try {
-      const page = await getExecutionErrors(
+      const page = await obtenerErroresEjecucion(
         executionId,
         ERRORS_PAGE_SIZE,
         offset,
@@ -137,8 +142,8 @@ export default function JobDetailIsland({ executionId }: Props) {
     fetchErrorsPage(offset);
   };
 
-  if (loading.value) return <LoadingSkeleton variant="chart" />;
-  if (errorMsg.value) return <ErrorBox message={errorMsg.value} />;
+  if (loading.value) return <EsqueletoCarga variant="chart" />;
+  if (errorMsg.value) return <CajaError message={errorMsg.value} />;
 
   const exec = execution.value!;
   if (!exec) {
@@ -160,7 +165,7 @@ export default function JobDetailIsland({ executionId }: Props) {
             </h2>
             <p class="text-sm text-[var(--text-secondary)]">
               Semestre {exec.semester} · Modo{" "}
-              {MODE_LABELS[exec.mode] || exec.mode}
+              {ETIQUETAS_MODO[exec.mode] || exec.mode}
             </p>
           </div>
           <div class="flex items-center gap-3">
@@ -185,20 +190,20 @@ export default function JobDetailIsland({ executionId }: Props) {
               {(exec.status === "running" || exec.status === "queued") &&
                   (exec.current_phase || "").includes("reintento")
                 ? "Reintentando..."
-                : STATUS_LABELS[exec.status] || exec.status}
+                : ETIQUETAS_ESTADO[exec.status] || exec.status}
             </p>
           </div>
           <div>
             <span class="text-[var(--text-secondary)]">Inicio</span>
-            <p>{formatDateTime(exec.started_at)}</p>
+            <p>{formatearFechaHora(exec.started_at)}</p>
           </div>
           <div>
             <span class="text-[var(--text-secondary)]">Fin</span>
-            <p>{formatDateTime(exec.completed_at)}</p>
+            <p>{formatearFechaHora(exec.completed_at)}</p>
           </div>
           <div>
             <span class="text-[var(--text-secondary)]">Duración</span>
-            <p>{formatDuration(exec.duration_seconds)}</p>
+            <p>{formatearDuracion(exec.duration_seconds)}</p>
           </div>
         </div>
       </div>
@@ -231,7 +236,8 @@ export default function JobDetailIsland({ executionId }: Props) {
               <p class="text-sm text-orange-700">
                 El plan incluye la eliminación de{" "}
                 <strong>
-                  {exec.metrics?.pending_delete_count ?? "varios"}
+                  {metricaNumerica(exec.metrics?.pending_delete_count) ??
+                    "varios"}
                 </strong>{" "}
                 cursos. Esta acción requiere confirmación explícita antes de
                 continuar.
@@ -248,7 +254,7 @@ export default function JobDetailIsland({ executionId }: Props) {
               ) return;
               confirming.value = true;
               try {
-                await confirmExecution(exec.id);
+                await confirmarEjecucion(exec.id);
                 toast("Procesamiento reanudado", "success");
                 setTimeout(() => globalThis.location.reload(), 1500);
               } catch (e) {
@@ -270,11 +276,11 @@ export default function JobDetailIsland({ executionId }: Props) {
 
       {["queued", "running", "paused"].includes(exec.status) && (
         <>
-          <ProgressBar
-            currentPhase={exec.current_phase ?? null}
-            currentStep={exec.current_step ?? null}
-            progressPct={exec.progress_pct ?? 0}
-            etaSeconds={exec.eta_seconds ?? undefined}
+          <BarraProgreso
+            faseActual={exec.current_phase ?? null}
+            pasoActual={exec.current_step ?? null}
+            porcentajeProgreso={exec.progress_pct ?? 0}
+            segundosRestantes={exec.eta_seconds ?? undefined}
             status={exec.status}
           />
           {exec.status === "running" && (
@@ -284,7 +290,7 @@ export default function JobDetailIsland({ executionId }: Props) {
                 onClick={async () => {
                   pausing.value = true;
                   try {
-                    await pauseExecution(exec.id);
+                    await pausarEjecucion(exec.id);
                     toast("Ejecución pausada", "success");
                     setTimeout(() => globalThis.location.reload(), 1000);
                   } catch (e) {
@@ -310,7 +316,7 @@ export default function JobDetailIsland({ executionId }: Props) {
                 onClick={async () => {
                   resuming.value = true;
                   try {
-                    await resumeExecution(exec.id);
+                    await reanudarEjecucion(exec.id);
                     toast("Ejecución reanudada", "success");
                     setTimeout(() => globalThis.location.reload(), 1000);
                   } catch (e) {
@@ -341,7 +347,7 @@ export default function JobDetailIsland({ executionId }: Props) {
                   ) return;
                   cancelling.value = true;
                   try {
-                    await cancelExecution(exec.id);
+                    await cancelarEjecucion(exec.id);
                     toast("Ejecución cancelada", "success");
                     setTimeout(() => globalThis.location.reload(), 1000);
                   } catch (e) {
@@ -363,61 +369,73 @@ export default function JobDetailIsland({ executionId }: Props) {
         </>
       )}
 
-      {exec.status === "completed" && (
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          {[
-            {
-              label: "Cursos creados",
-              value: exec.metrics?.courses_created,
-              color: "text-[var(--brand-green)]",
-            },
-            {
-              label: "Cursos actualizados",
-              value: exec.metrics?.courses_updated,
-              color: "text-[var(--accent)]",
-            },
-            {
-              label: "Cursos eliminados",
-              value: exec.metrics?.courses_deleted,
-              color: "text-[var(--brand-red)]",
-            },
-            {
-              label: "Usuarios creados",
-              value: exec.metrics?.users_created,
-              color: "text-[var(--accent)]",
-            },
-            {
-              label: "Matrículas",
-              value: exec.metrics?.enrollments,
-              color: "text-[#F59E0B]",
-            },
-            {
-              label: "Errores",
-              value: exec.errors_count,
-              color: "text-[var(--brand-red)]",
-            },
-            {
-              label: "Categorías creadas",
-              value: exec.metrics?.categories_created,
-              color: "text-[var(--text-secondary)]",
-            },
-          ].map((m) => (
-            <div
-              key={m.label}
-              class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-4 text-center"
-            >
-              <div class={`text-2xl font-bold ${m.color}`}>
-                {m.value ?? "—"}
+      {exec.status === "completed" && (() => {
+        const metrics = exec.metrics ?? {};
+        const cursosActualizados = [
+            metricaNumerica(metrics.courses_activated),
+            metricaNumerica(metrics.courses_hidden),
+            metricaNumerica(metrics.courses_renamed),
+          ].some((v) => v !== undefined)
+          ? (metricaNumerica(metrics.courses_activated) ?? 0) +
+            (metricaNumerica(metrics.courses_hidden) ?? 0) +
+            (metricaNumerica(metrics.courses_renamed) ?? 0)
+          : undefined;
+        return (
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            {[
+              {
+                label: "Cursos creados",
+                value: metricaNumerica(metrics.courses_created),
+                color: "text-[var(--brand-green)]",
+              },
+              {
+                label: "Cursos actualizados",
+                value: cursosActualizados,
+                color: "text-[var(--accent)]",
+              },
+              {
+                label: "Cursos eliminados",
+                value: metricaNumerica(metrics.courses_deleted),
+                color: "text-[var(--brand-red)]",
+              },
+              {
+                label: "Usuarios creados",
+                value: metricaNumerica(metrics.users_created),
+                color: "text-[var(--accent)]",
+              },
+              {
+                label: "Matrículas",
+                value: metricaNumerica(metrics.enrolments),
+                color: "text-[#F59E0B]",
+              },
+              {
+                label: "Errores",
+                value: exec.errors_count,
+                color: "text-[var(--brand-red)]",
+              },
+              {
+                label: "Categorías creadas",
+                value: metricaNumerica(metrics.categories_created),
+                color: "text-[var(--text-secondary)]",
+              },
+            ].map((m) => (
+              <div
+                key={m.label}
+                class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-4 text-center"
+              >
+                <div class={`text-2xl font-bold ${m.color}`}>
+                  {m.value ?? "—"}
+                </div>
+                <div class="text-xs text-[var(--text-secondary)] mt-1">
+                  {m.label}
+                </div>
               </div>
-              <div class="text-xs text-[var(--text-secondary)] mt-1">
-                {m.label}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        );
+      })()}
 
-      {exec.status === "completed" && <ReportsSection executionId={exec.id} />}
+      {exec.status === "completed" && <SeccionReportes executionId={exec.id} />}
 
       {errors.value.length > 0 && (
         <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6 mb-6">
@@ -462,26 +480,26 @@ export default function JobDetailIsland({ executionId }: Props) {
                       {err.message || "—"}
                     </td>
                     <td class="py-2 px-2 text-xs text-[var(--text-muted)] whitespace-nowrap">
-                      {formatDateTime(err.created_at)}
+                      {formatearFechaHora(err.created_at)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <Pagination
+          <Paginacion
             offset={errorOffset.value}
-            pageSize={ERRORS_PAGE_SIZE}
+            tamanoPagina={ERRORS_PAGE_SIZE}
             total={exec.errors_count ?? 0}
             label="errores"
-            onPageChange={handleErrorPageChange}
+            alCambiarPagina={handleErrorPageChange}
           />
         </div>
       )}
 
       <div class="mt-6 flex gap-4">
         <a href="/panel" class="gradient-text hover:underline text-sm">
-          ← Volver al dashboard
+          ← Volver al panel
         </a>
         <a
           href="/operaciones/ejecuciones"

@@ -1,25 +1,25 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import MetricsChart from "./GraficoMetricasIsland.tsx";
-import SemesterComparison from "./ComparacionSemestre.tsx";
-import SemesterMultiPicker from "../components/SemesterMultiPicker.tsx";
-import { getHistory, type SemesterMetrics } from "../services/api.ts";
-import { darkSignal } from "../utils/theme.ts";
-import ErrorBox from "../components/ErrorBox.tsx";
-import LoadingSkeleton from "../components/LoadingSkeleton.tsx";
+import GraficoMetricas from "./GraficoMetricasIsland.tsx";
+import ComparacionSemestre from "./ComparacionSemestre.tsx";
+import SelectorMultiplesSemestres from "../components/SelectorMultiplesSemestres.tsx";
+import { type MetricasSemestre, obtenerHistorial } from "../services/api.ts";
+import { senalTemaOscuro } from "../utils/tema.ts";
+import CajaError from "../components/CajaError.tsx";
+import EsqueletoCarga from "../components/EsqueletoCarga.tsx";
 
 export default function Historico() {
   const view = useSignal<"history" | "comparison">("history");
-  const historyData = useSignal<SemesterMetrics[]>([]);
+  const historyData = useSignal<MetricasSemestre[]>([]);
   const loading = useSignal(true);
   const error = useSignal("");
-  const selectedSemesters = useSignal<string[]>([]);
+  const semestresSeleccionados = useSignal<string[]>([]);
 
   useEffect(() => {
     async function loadHistory() {
       loading.value = true;
       try {
-        const data = await getHistory();
+        const data = await obtenerHistorial();
         historyData.value = data;
       } catch (e) {
         error.value = e instanceof Error
@@ -51,7 +51,7 @@ export default function Historico() {
               view.value === v
                 ? activeBtn
                 : `${inactiveBase} ${
-                  darkSignal.value ? inactiveDark : inactiveLight
+                  senalTemaOscuro.value ? inactiveDark : inactiveLight
                 }`
             }`}
           >
@@ -62,29 +62,29 @@ export default function Historico() {
 
       <div class="bg-[var(--bg-primary)] rounded-xl shadow-sm border border-[var(--border-primary)] p-6">
         {loading.value
-          ? <LoadingSkeleton variant="chart" />
+          ? <EsqueletoCarga variant="chart" />
           : error.value
-          ? <ErrorBox message={error.value} />
+          ? <CajaError message={error.value} />
           : (
             view.value === "history"
               ? (
                 <>
                   <div class="mb-4 flex justify-center">
-                    <SemesterMultiPicker
-                      selected={selectedSemesters.value}
-                      onChange={(s) => (selectedSemesters.value = s)}
-                      availableSemesters={historyData.value.map((d) =>
+                    <SelectorMultiplesSemestres
+                      selected={semestresSeleccionados.value}
+                      onChange={(s) => (semestresSeleccionados.value = s)}
+                      semestresDisponibles={historyData.value.map((d) =>
                         d.semester
                       )}
                     />
                   </div>
-                  <MetricsChart
+                  <GraficoMetricas
                     data={historyData.value}
-                    selectedSemesters={selectedSemesters.value}
+                    semestresSeleccionados={semestresSeleccionados.value}
                   />
                 </>
               )
-              : <SemesterComparison allMetrics={historyData.value} />
+              : <ComparacionSemestre allMetrics={historyData.value} />
           )}
       </div>
     </div>

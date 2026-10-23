@@ -1,20 +1,19 @@
 import { useComputed, useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
 import {
-  downloadReport,
-  getQueryExportUrl,
-  getQueryTaskStatus,
-  queryEntities,
-  type QueryTaskStatus,
+  descargarReporte,
+  obtenerUrlExportarConsulta,
 } from "../services/api.ts";
-import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
-import ErrorBox from "../components/ErrorBox.tsx";
-import Pagination from "../components/Pagination.tsx";
-import QueryHelp, { type QueryHelpSection } from "../components/QueryHelp.tsx";
+import { useConsultaTarea } from "../hooks/useConsultaTarea.ts";
+import { IconoDescargar, IconoSpinner } from "../utils/iconos.tsx";
+import CajaError from "../components/CajaError.tsx";
+import Paginacion from "../components/Paginacion.tsx";
+import AyudaConsulta, {
+  type SeccionAyudaConsulta,
+} from "../components/AyudaConsulta.tsx";
 
 const PAGE_SIZE = 20;
 
-export interface Column {
+export interface Columna {
   key: string;
   label: string;
   renderKey?: string;
@@ -31,23 +30,23 @@ const RENDERERS: Record<
       : "Nunca",
 };
 
-export interface Filter {
+export interface Filtro {
   key: string;
   label: string;
   type: "select" | "checkbox";
   options?: { value: string; label: string }[];
 }
 
-interface QueryTableProps {
+interface PropsTablaConsulta {
   entity: string;
-  columns: Column[];
-  filters?: Filter[];
+  columns: Columna[];
+  filters?: Filtro[];
   searchPlaceholder?: string;
   searchKey?: string;
-  help?: QueryHelpSection[];
+  help?: SeccionAyudaConsulta[];
 }
 
-export default function QueryTable(
+export default function TablaConsulta(
   {
     entity,
     columns,
@@ -55,82 +54,31 @@ export default function QueryTable(
     searchPlaceholder,
     searchKey = "search",
     help,
-  }: QueryTableProps,
+  }: PropsTablaConsulta,
 ) {
-  const data = useSignal<Record<string, unknown>[]>([]);
-  const loading = useSignal(false);
-  const error = useSignal("");
-  const taskId = useSignal("");
-  const taskStatus = useSignal<QueryTaskStatus | null>(null);
-  const pollingId = useSignal<number | null>(null);
+  const { data, loading, error, taskId, taskStatus, iniciarConsulta } =
+    useConsultaTarea<Record<string, unknown>>();
   const search = useSignal("");
   const filterValues = useSignal<Record<string, string>>({});
   const pageOffset = useSignal(0);
-  const totalItems = useSignal(0);
+  const totalItems = useComputed(() => data.value.length);
   const pageData = useComputed(() =>
     data.value.slice(pageOffset.value, pageOffset.value + PAGE_SIZE)
   );
 
   const startQuery = async () => {
-    loading.value = true;
-    error.value = "";
-    data.value = [];
-    taskStatus.value = null;
-    try {
-      const params: Record<string, string> = {};
-      for (const [k, v] of Object.entries(filterValues.value)) {
-        if (v && v !== "false") {
-          params[k] = v;
-        }
+    pageOffset.value = 0;
+    const params: Record<string, string> = {};
+    for (const [k, v] of Object.entries(filterValues.value)) {
+      if (v && v !== "false") {
+        params[k] = v;
       }
-      if (search.value.trim()) {
-        params[searchKey] = search.value.trim();
-      }
-      const result = await queryEntities(entity, params);
-      taskId.value = result.task_id;
-      startPolling(result.task_id);
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Error al consultar.";
-      loading.value = false;
     }
+    if (search.value.trim()) {
+      params[searchKey] = search.value.trim();
+    }
+    await iniciarConsulta(entity, params);
   };
-
-  const startPolling = (id: string) => {
-    if (pollingId.value) clearInterval(pollingId.value);
-    const fetchStatus = async () => {
-      try {
-        const status = await getQueryTaskStatus(id);
-        taskStatus.value = status;
-        if (status.status === "completed") {
-          data.value = status.result || [];
-          totalItems.value = data.value.length;
-          pageOffset.value = 0;
-          loading.value = false;
-          if (pollingId.value) {
-            clearInterval(pollingId.value);
-            pollingId.value = null;
-          }
-        } else if (status.status === "failed") {
-          error.value = status.error || "Error desconocido al consultar.";
-          loading.value = false;
-          if (pollingId.value) {
-            clearInterval(pollingId.value);
-            pollingId.value = null;
-          }
-        }
-      } catch {
-        //
-      }
-    };
-    fetchStatus();
-    pollingId.value = setInterval(fetchStatus, 2000);
-  };
-
-  useEffect(() => {
-    return () => {
-      if (pollingId.value) clearInterval(pollingId.value);
-    };
-  }, []);
 
   const handleSearch = (e: Event) => {
     e.preventDefault();
@@ -145,11 +93,13 @@ export default function QueryTable(
     pageOffset.value = offset;
   };
 
-  const exportUrl = taskId.value ? getQueryExportUrl(taskId.value) : "";
+  const exportUrl = taskId.value
+    ? obtenerUrlExportarConsulta(taskId.value)
+    : "";
 
   return (
     <div>
-      {help && help.length > 0 && <QueryHelp sections={help} />}
+      {help && help.length > 0 && <AyudaConsulta sections={help} />}
       <div class="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
         {filters?.map((f) =>
           f.type === "checkbox"
@@ -218,7 +168,7 @@ export default function QueryTable(
           {loading.value
             ? (
               <span class="flex items-center gap-1.5">
-                <SpinnerIcon class="animate-spin h-4 w-4" />
+                <IconoSpinner class="animate-spin h-4 w-4" />
                 Consultando...
               </span>
             )
@@ -229,11 +179,11 @@ export default function QueryTable(
           <button
             type="button"
             onClick={() => {
-              downloadReport(exportUrl, "consulta.csv").catch(() => {});
+              descargarReporte(exportUrl, "consulta.csv").catch(() => {});
             }}
             class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded text-sm font-medium no-underline hover:bg-[var(--border-secondary)] transition ml-auto cursor-pointer"
           >
-            <DownloadIcon class="w-4 h-4" />
+            <IconoDescargar class="w-4 h-4" />
             CSV
           </button>
         )}
@@ -242,7 +192,7 @@ export default function QueryTable(
       {loading.value && taskStatus.value?.status === "running" && (
         <div class="flex flex-col gap-2 mb-4">
           <div class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-            <SpinnerIcon class="animate-spin h-4 w-4" />
+            <IconoSpinner class="animate-spin h-4 w-4" />
             <span>Consultando Moodle... (puede tardar hasta 5 minutos)</span>
           </div>
           {taskStatus.value?.total_count > 0 && (
@@ -256,7 +206,7 @@ export default function QueryTable(
 
       {error.value && (
         <div class="mb-4">
-          <ErrorBox message={error.value} />
+          <CajaError message={error.value} />
         </div>
       )}
 
@@ -319,12 +269,12 @@ export default function QueryTable(
       )}
 
       {!loading.value && !error.value && data.value.length > PAGE_SIZE && (
-        <Pagination
+        <Paginacion
           offset={pageOffset.value}
-          pageSize={PAGE_SIZE}
+          tamanoPagina={PAGE_SIZE}
           total={totalItems.value}
           label="resultados"
-          onPageChange={handlePageChange}
+          alCambiarPagina={handlePageChange}
         />
       )}
 

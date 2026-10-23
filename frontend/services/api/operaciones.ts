@@ -1,56 +1,56 @@
 // services/api/operaciones.ts
-import { authHeaders, BASE_URL, handleResponse } from "./core.ts";
+import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
 import type {
-  CsvUploadResponse,
-  OperationBatchOut,
-  OperationBatchStatus,
-  OperationsHistoryItem,
-} from "./types.ts";
+  EstadoLoteOperacion,
+  ItemHistorialOperaciones,
+  LoteOperacionSalida,
+  RespuestaSubidaCsv,
+} from "./tipos.ts";
 
-export async function uploadCsvFile(
+export async function subirArchivoCsv(
   endpoint: string,
   file: File,
-): Promise<CsvUploadResponse> {
+): Promise<RespuestaSubidaCsv> {
   const formData = new FormData();
   formData.append("file", file);
   const response = await fetch(`${BASE_URL}/operations/${endpoint}`, {
     method: "POST",
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
     body: formData,
   });
-  return handleResponse<CsvUploadResponse>(response);
+  return manejarRespuesta<RespuestaSubidaCsv>(response);
 }
 
-export async function getBatchStatus(
+export async function obtenerEstadoLote(
   batchId: string,
   offset = 0,
   limit = 100,
-): Promise<OperationBatchStatus> {
+): Promise<EstadoLoteOperacion> {
   const response = await fetch(
     `${BASE_URL}/operations/batch/${batchId}/status?offset=${offset}&limit=${limit}`,
-    { headers: { ...authHeaders() } },
+    { headers: { ...cabecerasAuth() } },
   );
-  return handleResponse<OperationBatchStatus>(response);
+  return manejarRespuesta<EstadoLoteOperacion>(response);
 }
 
-export function getBatchReportUrl(batchId: string): string {
+export function obtenerUrlDescargaReporteLote(batchId: string): string {
   return `${BASE_URL}/operations/batch/${batchId}/reports/download`;
 }
 
-export function getBatchReportFileUrl(
+export function obtenerUrlArchivoReporteLote(
   batchId: string,
   reportName: string,
 ): string {
   return `${BASE_URL}/operations/batch/${batchId}/reports/${reportName}`;
 }
 
-export async function listBatches(params: {
+export async function listarLotes(params: {
   entity_type?: string;
   action?: string;
   modalidad?: string;
   limit?: number;
   offset?: number;
-} = {}): Promise<{ total: number; items: OperationBatchOut[] }> {
+} = {}): Promise<{ total: number; items: LoteOperacionSalida[] }> {
   const sp = new URLSearchParams();
   if (params.entity_type) sp.set("entity_type", params.entity_type);
   if (params.action) sp.set("action", params.action);
@@ -58,77 +58,81 @@ export async function listBatches(params: {
   if (params.limit) sp.set("limit", String(params.limit));
   if (params.offset) sp.set("offset", String(params.offset));
   const response = await fetch(`${BASE_URL}/operations/batches?${sp}`, {
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  return handleResponse<{ total: number; items: OperationBatchOut[] }>(
+  return manejarRespuesta<{ total: number; items: LoteOperacionSalida[] }>(
     response,
   );
 }
 
-export async function getOperationsAnalytics(
+export async function obtenerAnaliticaOperaciones(
   modalidad?: string,
   months = 12,
   entityType?: string,
   action?: string,
-): Promise<OperationsHistoryItem[]> {
+): Promise<ItemHistorialOperaciones[]> {
   const params = new URLSearchParams({ months: String(months) });
   if (modalidad) params.set("modalidad", modalidad);
   if (entityType) params.set("entity_type", entityType);
   if (action) params.set("action", action);
   const response = await fetch(`${BASE_URL}/operations/analytics?${params}`, {
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  const data = await handleResponse<{ history: OperationsHistoryItem[] }>(
+  const data = await manejarRespuesta<{ history: ItemHistorialOperaciones[] }>(
     response,
   );
   return data.history;
 }
 
-export async function pauseBatch(batchId: string) {
+export async function pausarLote(batchId: string) {
   const response = await fetch(
     `${BASE_URL}/operations/batch/${batchId}/pause`,
     {
       method: "POST",
-      headers: { ...authHeaders() },
+      headers: { ...cabecerasAuth() },
     },
   );
-  return handleResponse<{ batch_id: string; paused: number; message: string }>(
+  return manejarRespuesta<
+    { batch_id: string; paused: number; message: string }
+  >(
     response,
   );
 }
 
-export async function resumeBatch(batchId: string) {
+export async function reanudarLote(batchId: string) {
   const response = await fetch(
     `${BASE_URL}/operations/batch/${batchId}/resume`,
     {
       method: "POST",
-      headers: { ...authHeaders() },
+      headers: { ...cabecerasAuth() },
     },
   );
-  return handleResponse<{ batch_id: string; resumed: number; message: string }>(
+  return manejarRespuesta<
+    { batch_id: string; resumed: number; message: string }
+  >(
     response,
   );
 }
 
-export async function cancelBatch(batchId: string) {
+export async function cancelarLote(batchId: string) {
   const response = await fetch(
     `${BASE_URL}/operations/batch/${batchId}/cancel`,
     {
       method: "POST",
-      headers: { ...authHeaders() },
+      headers: { ...cabecerasAuth() },
     },
   );
-  return handleResponse<
+  return manejarRespuesta<
     { batch_id: string; cancelled: number; message: string }
   >(
     response,
   );
 }
 
-export async function deleteBatch(batchId: string) {
+export async function eliminarLote(batchId: string) {
   const response = await fetch(`${BASE_URL}/operations/batch/${batchId}`, {
     method: "DELETE",
-    headers: { ...authHeaders() },
+    headers: { ...cabecerasAuth() },
   });
-  if (!response.ok) await handleResponse<unknown>(response);
+  if (!response.ok) await manejarRespuesta<unknown>(response);
 }

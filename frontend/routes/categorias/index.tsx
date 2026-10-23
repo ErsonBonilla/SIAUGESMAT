@@ -1,29 +1,29 @@
-import { requireAuth } from "../../utils/auth-guard.ts";
-import HubPage from "../../components/HubPage.tsx";
-import { SearchIcon, TrashIcon, UploadIcon } from "../../utils/icons.tsx";
+import { requerirAutenticacion } from "../../utils/guarda-autenticacion.ts";
+import PaginaHub from "../../components/PaginaHub.tsx";
+import { IconoBuscar, IconoPapelera, IconoSubir } from "../../utils/iconos.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
 export default function CategoriasHub() {
-  return HubPage({
+  return PaginaHub({
     title: "Categorías",
     cards: [
       {
-        icon: SearchIcon,
+        icon: IconoBuscar,
         title: "Consultar Categorías",
         description:
           "Consulta las categorías existentes en Moodle por idnumber.",
         href: "/categorias/consultar",
       },
       {
-        icon: UploadIcon,
+        icon: IconoSubir,
         title: "Crear Categorías",
         description:
           "Crea nuevas categorías en Moodle masivamente desde un archivo CSV.",
         href: "/categorias/crear",
       },
       {
-        icon: TrashIcon,
+        icon: IconoPapelera,
         title: "Eliminar Categorías",
         description:
           "Elimina categorías de Moodle masivamente desde un archivo CSV.",

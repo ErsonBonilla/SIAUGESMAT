@@ -1,0 +1,374 @@
+import logging
+import os
+from collections import defaultdict
+from typing import Any, ClassVar
+
+import plotly.graph_objects as go
+
+from app.db.modelos import Ejecucion, RegistroEjecucion
+from app.pipeline.nombres_cortos import SHORTNAME_PATTERN
+
+logger = logging.getLogger(__name__)
+
+PALETTE_LIGHT = {
+    "rojo": "#ED3237",
+    "verde": "#00A859",
+    "blanco": "#FFFFFF",
+    "negro": "#1A1A1A",
+    "grid": "#E0E0E0",
+}
+
+PALETTE_DARK = {
+    "rojo": "#F87171",
+    "verde": "#34D399",
+    "blanco": "#1e1e2e",
+    "negro": "#cdd6f4",
+    "grid": "#45475a",
+}
+
+PALETTE_CATEGORICAL_LIGHT = [
+    "#ED3237",
+    "#00A859",
+    "#1A1A1A",
+    "#E63946",
+    "#2D6A4F",
+    "#404040",
+    "#FF6B6B",
+    "#40916C",
+]
+
+PALETTE_CATEGORICAL_DARK = [
+    "#F87171",
+    "#34D399",
+    "#cdd6f4",
+    "#FCA5A5",
+    "#6EE7B7",
+    "#a6adc8",
+    "#FCA5A5",
+    "#A7F3D0",
+]
+
+
+def _obtener_paleta(theme: str = "light") -> dict:
+    return PALETTE_DARK if theme == "dark" else PALETTE_LIGHT
+
+
+def _obtener_categorico(theme: str = "light") -> list:
+    return PALETTE_CATEGORICAL_DARK if theme == "dark" else PALETTE_CATEGORICAL_LIGHT
+
+
+def _prefijo_cat_desde_shortname(shortname: str) -> str | None:
+    m = SHORTNAME_PATTERN.match(shortname)
+    return m.group("cat_prefix") if m else None
+
+
+def _figura_por_defecto(title: str, theme: str = "light") -> go.Figure:
+    palette = _obtener_paleta(theme)
+    fig = go.Figure()
+    fig.update_layout(
+        title={"text": title, "font": {"size": 16, "color": palette["negro"]}},
+        font={"color": palette["negro"]},
+        plot_bgcolor=palette["blanco"],
+        paper_bgcolor=palette["blanco"],
+        margin={"l": 60, "r": 40, "t": 60, "b": 60},
+        legend={"font": {"color": palette["negro"]}},
+    )
+    fig.update_xaxes(gridcolor=palette["grid"], tickfont={"color": palette["negro"]})
+    fig.update_yaxes(gridcolor=palette["grid"], tickfont={"color": palette["negro"]})
+    return fig
+
+
+class ServicioGraficos:
+    CHART_NAMES: ClassVar[dict[str, str]] = {
+        "resumen_ejecutivo": "1_resumen_ejecutivo",
+        "tasa_exito": "2_tasa_exito",
+        "top_programas": "3_top_programas",
+        "distribucion_usuarios": "4_distribucion_usuarios",
+        "top_incidencias": "5_top_incidencias",
+    }
+
+    @classmethod
+    def generar_todos(cls, execution: Ejecucion, logs: list[RegistroEjecucion], report_dir: str):
+        for key, prefix in cls.CHART_NAMES.items():
+            method = getattr(cls, key, None)
+            if not method:
+                continue
+            try:
+                fig = method(execution, logs, theme="light")
+                if fig is None:
+                    continue
+                png_path = os.path.join(report_dir, f"{prefix}.png")
+                html_path = os.path.join(report_dir, f"{prefix}.html")
+                fig.write_html(html_path, include_plotlyjs="cdn")
+                try:
+                    fig.write_image(png_path, width=800, height=450, scale=2)
+                except Exception:
+                    logger.warning(f"Gráfico {prefix}: solo HTML (PNG requiere Chrome)")
+                logger.info(f"Gráfico generado: {prefix}")
+            except Exception as e:
+                logger.exception(f"Error generando gráfico {key}: {e}")
+
+    @classmethod
+    def _figura_a_dict(cls, fig: go.Figure) -> dict[str, Any]:
+        return {
+            "traces": [t.to_plotly_json() for t in fig.data],
+            "layout": fig.layout.to_plotly_json(),
+        }
+
+        # ------------------------------------------------------------------
+        # 1. Resumen ejecutivo — 4 KPIs en barras horizontales
+        # ------------------------------------------------------------------
+
+    @classmethod
+    def resumen_ejecutivo(
+        cls, execution: Ejecucion, logs: list[RegistroEjecucion], theme: str = "light"
+    ) -> go.Figure:
+        palette = _obtener_paleta(theme)
+        m = execution.metricas or {}
+        labels = ["Cursos creados", "Usuarios nuevos", "Matrículas exitosas", "Errores totales"]
+        values = [
+            m.get("courses_created", 0),
+            m.get("users_created", 0),
+            m.get("enrolments", 0),
+            m.get("total_errors", 0),
+        ]
+        colors = [palette["verde"], palette["verde"], palette["verde"], palette["rojo"]]
+        fig = _figura_por_defecto("", theme)
+        fig.add_trace(
+            go.Bar(
+                y=labels,
+                x=values,
+                orientation="h",
+                marker_color=colors,
+                text=values,
+                textposition="outside",
+                textfont={"color": palette["negro"]},
+            )
+        )
+        fig.update_layout(
+            title={"text": "Resumen ejecutivo", "font": {"size": 16, "color": palette["negro"]}},
+            xaxis={"title": "Cantidad", "dtick": 1, "gridcolor": palette["grid"]},
+            yaxis={"gridcolor": palette["grid"]},
+            showlegend=False,
+            margin={"l": 150, "r": 80, "t": 50, "b": 30},
+        )
+        return fig
+
+    @classmethod
+    def resumen_ejecutivo_json(cls, execution, logs, theme="light"):
+        return cls._figura_a_dict(cls.resumen_ejecutivo(execution, logs, theme))
+
+        # ------------------------------------------------------------------
+        # 2. Tasa de éxito de matrícula — donut con % grande al centro
+        # ------------------------------------------------------------------
+
+    @classmethod
+    def tasa_exito(
+        cls, execution: Ejecucion, logs: list[RegistroEjecucion], theme: str = "light"
+    ) -> go.Figure:
+        palette = _obtener_paleta(theme)
+        m = execution.metricas or {}
+        ok = m.get("enrolments", 0)
+        fail = m.get("enrolment_errors", 0)
+        total = ok + fail
+        rate = round(ok / total * 100, 1) if total > 0 else 0
+        color = palette["verde"] if rate >= 95 else ("#F59E0B" if rate >= 85 else palette["rojo"])
+
+        fig = _figura_por_defecto("", theme)
+        fig.add_trace(
+            go.Pie(
+                labels=["Exitosas", "Fallidas"],
+                values=[ok, fail],
+                hole=0.7,
+                marker={"colors": [color, "#E5E7EB"]},
+                textinfo="none",
+                sort=False,
+            )
+        )
+        fig.add_annotation(
+            text=f"<b>{rate}%</b>",
+            font={"size": 36, "color": color},
+            showarrow=False,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+        )
+        fig.update_layout(
+            title={
+                "text": "Tasa de éxito de matrícula",
+                "font": {"size": 16, "color": palette["negro"]},
+            },
+            showlegend=True,
+            legend={"orientation": "h", "y": -0.1, "font": {"color": palette["negro"]}},
+            margin={"l": 30, "r": 30, "t": 50, "b": 50},
+        )
+        return fig
+
+    @classmethod
+    def tasa_exito_json(cls, execution, logs, theme="light"):
+        return cls._figura_a_dict(cls.tasa_exito(execution, logs, theme))
+
+        # ------------------------------------------------------------------
+        # 3. Top 10 programas — barras horizontales por cantidad de cursos
+        # ------------------------------------------------------------------
+
+    @classmethod
+    def top_programas(
+        cls, execution: Ejecucion, logs: list[RegistroEjecucion], theme: str = "light"
+    ) -> go.Figure:
+        palette = _obtener_paleta(theme)
+        counts: dict[str, int] = defaultdict(int)
+        for log_entry in logs:
+            sn = log_entry.identificador or ""
+            prefix = _prefijo_cat_desde_shortname(sn)
+            if prefix and log_entry.accion in (
+                "course_created",
+                "course_created_with_template",
+                "course_recreated",
+            ):
+                counts[prefix] += 1
+        program_names = {"IDE": "IDEAD", "URA": "Urabá", "FAC": "Facultad"}
+        sorted_items = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        labels = [program_names.get(k, k) for k, _ in sorted_items]
+        values = [v for _, v in sorted_items]
+        fig = _figura_por_defecto("", theme)
+        fig.add_trace(
+            go.Bar(
+                y=labels,
+                x=values,
+                orientation="h",
+                marker_color=palette["verde"],
+                text=values,
+                textposition="outside",
+                textfont={"color": palette["negro"]},
+            )
+        )
+        fig.update_layout(
+            title={"text": "Top programas", "font": {"size": 16, "color": palette["negro"]}},
+            xaxis={"title": "Cursos", "dtick": 1, "gridcolor": palette["grid"]},
+            yaxis={"gridcolor": palette["grid"]},
+            showlegend=False,
+            margin={"l": 120, "r": 60, "t": 50, "b": 30},
+        )
+        fig.update_yaxes(autorange="reversed")
+        return fig
+
+    @classmethod
+    def top_programas_json(cls, execution, logs, theme="light"):
+        return cls._figura_a_dict(cls.top_programas(execution, logs, theme))
+
+        # ------------------------------------------------------------------
+        # 4. Distribución de usuarios — donut nuevos vs existentes
+        # ------------------------------------------------------------------
+
+    @classmethod
+    def distribucion_usuarios(
+        cls, execution: Ejecucion, logs: list[RegistroEjecucion], theme: str = "light"
+    ) -> go.Figure:
+        palette = _obtener_paleta(theme)
+        nuevos = sum(1 for log in logs if log.accion == "user_created_createpassword")
+        resueltos = sum(1 for log in logs if log.accion == "user_resolved")
+        total = nuevos + resueltos
+        if total == 0:
+            fig = _figura_por_defecto("", theme)
+            fig.update_layout(
+                title={"text": "Usuarios", "font": {"size": 16, "color": palette["negro"]}}
+            )
+            fig.add_annotation(text="Sin datos", showarrow=False, font={"color": palette["negro"]})
+            return fig
+        fig = _figura_por_defecto("", theme)
+        pct_nuevos = round(nuevos / total * 100)
+        fig.add_trace(
+            go.Pie(
+                labels=["Nuevos", "Existentes"],
+                values=[nuevos, resueltos],
+                hole=0.6,
+                marker={"colors": [palette["verde"], palette["negro"]]},
+                textinfo="label+percent",
+                sort=False,
+            )
+        )
+        fig.add_annotation(
+            text=f"<b>{pct_nuevos}%</b><br><span style='font-size:12px'>nuevos</span>",
+            font={"size": 28, "color": palette["verde"]},
+            showarrow=False,
+            x=0.5,
+            y=0.5,
+            xref="paper",
+            yref="paper",
+        )
+        fig.update_layout(
+            title={
+                "text": "Distribución de usuarios",
+                "font": {"size": 16, "color": palette["negro"]},
+            },
+            showlegend=False,
+            margin={"l": 30, "r": 30, "t": 50, "b": 30},
+        )
+        return fig
+
+    @classmethod
+    def distribucion_usuarios_json(cls, execution, logs, theme="light"):
+        return cls._figura_a_dict(cls.distribucion_usuarios(execution, logs, theme))
+
+        # ------------------------------------------------------------------
+        # 5. Top 5 incidencias — barras horizontales por frecuencia
+        # ------------------------------------------------------------------
+
+    @classmethod
+    def top_incidencias(
+        cls, execution: Ejecucion, logs: list[RegistroEjecucion], theme: str = "light"
+    ) -> go.Figure:
+        palette = _obtener_paleta(theme)
+        incidencia_labels = {
+            "enrolment_failed": "Matrícula fallida",
+            "alert_disappeared_recent": "Curso desaparecido reciente",
+            "alert_teacher_change_recent": "Cambio de profesor reciente",
+            "duplicate_email": "Correo duplicado",
+            "template_not_found": "Plantilla no encontrada",
+        }
+        counts: dict[str, int] = defaultdict(int)
+        for log_entry in logs:
+            label = incidencia_labels.get(log_entry.accion)
+            if label:
+                counts[label] += 1
+        if not counts:
+            fig = _figura_por_defecto("", theme)
+            fig.update_layout(
+                title={"text": "Incidencias", "font": {"size": 16, "color": palette["negro"]}}
+            )
+            fig.add_annotation(
+                text="Sin incidencias ✓",
+                showarrow=False,
+                font={"color": palette["verde"], "size": 18},
+            )
+            return fig
+        sorted_items = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:5]
+        labels = [k for k, _ in sorted_items]
+        values = [v for _, v in sorted_items]
+        fig = _figura_por_defecto("", theme)
+        fig.add_trace(
+            go.Bar(
+                y=labels,
+                x=values,
+                orientation="h",
+                marker_color=palette["rojo"],
+                text=values,
+                textposition="outside",
+                textfont={"color": palette["negro"]},
+            )
+        )
+        fig.update_layout(
+            title={"text": "Top incidencias", "font": {"size": 16, "color": palette["negro"]}},
+            xaxis={"title": "Ocurrencias", "dtick": 1, "gridcolor": palette["grid"]},
+            yaxis={"gridcolor": palette["grid"]},
+            showlegend=False,
+            margin={"l": 200, "r": 60, "t": 50, "b": 30},
+        )
+        fig.update_yaxes(autorange="reversed")
+        return fig
+
+    @classmethod
+    def top_incidencias_json(cls, execution, logs, theme="light"):
+        return cls._figura_a_dict(cls.top_incidencias(execution, logs, theme))

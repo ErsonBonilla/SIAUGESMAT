@@ -1,13 +1,13 @@
-import { requireAuth } from "../../utils/auth-guard.ts";
-import Layout from "../../components/Layout.tsx";
+import { requerirAutenticacion } from "../../utils/guarda-autenticacion.ts";
+import Disposicion from "../../components/Disposicion.tsx";
 import VisibilidadMasivaIsland from "../../islands/VisibilidadMasivaIsland.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
-export default function BulkVisibilityPage() {
+export default function PaginaVisibilidadMasiva() {
   return (
-    <Layout title="Visibilidad de cursos">
+    <Disposicion title="Visibilidad de cursos">
       <VisibilidadMasivaIsland />
-    </Layout>
+    </Disposicion>
   );
 }

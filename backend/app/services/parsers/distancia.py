@@ -4,12 +4,12 @@ from typing import Any, ClassVar
 
 import pandas as pd
 
-from app.services.parsers.base import BaseExcelParser
+from app.services.parsers.base import AnalizadorExcelBase
 
 logger = logging.getLogger(__name__)
 
 
-class DistanciaParser(BaseExcelParser):
+class AnalizadorDistancia(AnalizadorExcelBase):
     CANONICAL_MAP: ClassVar[dict[str, str]] = {
         "cat": "nombre_cat",
         "programa": "nombre_programa",
@@ -36,13 +36,13 @@ class DistanciaParser(BaseExcelParser):
         return None
 
     @classmethod
-    def read_excel(cls, file_path: str) -> pd.DataFrame:
+    def leer_excel(cls, file_path: str) -> pd.DataFrame:
         engine = cls._excel_engine(file_path)
         raw = pd.read_excel(file_path, header=None, dtype=str, engine=engine)
         expected_keys = set(cls.CANONICAL_MAP.keys())
 
         for i, row in raw.iterrows():
-            normalized = {cls._normalize_column_name(str(v)) for v in row if pd.notna(v)}
+            normalized = {cls._normalizar_nombre_columna(str(v)) for v in row if pd.notna(v)}
             matches = len(expected_keys & normalized)
             if matches >= 5:
                 return pd.read_excel(file_path, header=i, dtype=str, engine=engine)
@@ -54,14 +54,14 @@ class DistanciaParser(BaseExcelParser):
         return pd.read_excel(file_path, dtype=str, engine=engine)
 
     @classmethod
-    def parse(cls, df: pd.DataFrame, modalidad: str) -> dict[str, Any]:
-        df = cls._normalize_columns(df)
-        df = cls._filter_confirmed_rows(df)
-        df = cls._filter_virtual_rows(df)
-        df = cls._parse_program_name(df)
-        df = cls._clean_data(df)
+    def parsear(cls, df: pd.DataFrame, modalidad: str) -> dict[str, Any]:
+        df = cls._normalizar_columnas(df)
+        df = cls._filtrar_filas_confirmadas(df)
+        df = cls._filtrar_filas_virtuales(df)
+        df = cls._parsear_nombre_programa(df)
+        df = cls._limpiar_datos(df)
 
-        categories_map, courses, users, enrolments, duplicates = cls._process_rows(df, modalidad)
+        categories_map, courses, users, enrolments, duplicates = cls._procesar_filas(df, modalidad)
         users_list = list(users.values())
         categories_list = cls._sort_categories(list(categories_map.values()))
 
@@ -74,7 +74,9 @@ class DistanciaParser(BaseExcelParser):
         }
 
     @classmethod
-    def _process_rows(cls, df: pd.DataFrame, modalidad: str) -> tuple[dict, list, dict, list, list]:
+    def _procesar_filas(
+        cls, df: pd.DataFrame, modalidad: str
+    ) -> tuple[dict, list, dict, list, list]:
         categories_map: dict = {}
         courses: list = []
         users: dict = {}
@@ -89,13 +91,13 @@ class DistanciaParser(BaseExcelParser):
 
         for _, row in df.iterrows():
             nombre_cat = str(row.get("nombre_cat", "")).strip().upper()
-            cat_prefix = cls._build_cat_prefix(nombre_cat)
+            cat_prefix = cls._construir_prefijo_cat(nombre_cat)
             cod_prog = cls._build_cod_prog(row)
-            semestre_romano = cls._parse_semestre(row)
-            grupo = cls._sanitize_group(str(row.get("grupo", "")).strip())
+            semestre_romano = cls._parsear_semestre(row)
+            grupo = cls._sanear_grupo(str(row.get("grupo", "")).strip())
             cedula = str(row.get("doc_docente", "")).strip()
 
-            course_data = cls._build_course_data(
+            course_data = cls._construir_datos_curso(
                 row,
                 cat_prefix,
                 cod_prog,
@@ -115,7 +117,7 @@ class DistanciaParser(BaseExcelParser):
                 row,
             )
 
-            cls._process_teacher(
+            cls._procesar_docente(
                 row,
                 course_data["shortname"],
                 cedula,
@@ -128,7 +130,7 @@ class DistanciaParser(BaseExcelParser):
         return categories_map, courses, users, enrolments, duplicates
 
     @staticmethod
-    def _sanitize_group(grupo: str) -> str:
+    def _sanear_grupo(grupo: str) -> str:
         """Reemplaza caracteres que rompen el patrón SIAUGESMAT (ej. '_' → '-')."""
         import re
 
@@ -137,7 +139,7 @@ class DistanciaParser(BaseExcelParser):
         return re.sub(r"_+", "-", grupo)
 
     @staticmethod
-    def _build_cat_prefix(nombre_cat: str) -> str:
+    def _construir_prefijo_cat(nombre_cat: str) -> str:
         if not nombre_cat:
             return "SIN"
         return (
@@ -157,14 +159,14 @@ class DistanciaParser(BaseExcelParser):
         return cod_prog
 
     @classmethod
-    def _parse_semestre(cls, row) -> str:
+    def _parsear_semestre(cls, row) -> str:
         semestre = str(row.get("semestre", "")).strip().upper()
         if not semestre:
             semestre = "1"
-        return cls._to_roman_numeral(semestre)
+        return cls._a_numeral_romano(semestre)
 
     @staticmethod
-    def _build_course_data(
+    def _construir_datos_curso(
         row,
         cat_prefix: str,
         cod_prog: str,
@@ -218,7 +220,7 @@ class DistanciaParser(BaseExcelParser):
                 "parent": modalidad,
             }
 
-        nombre_prog = cls._clean_program_name(str(row.get("nombre_programa", ""))).upper()
+        nombre_prog = cls._limpiar_nombre_programa(str(row.get("nombre_programa", ""))).upper()
         if not nombre_prog:
             nombre_prog = cod_prog
         cat2_idnumber = f"{cat_prefix}_{cod_prog}"
@@ -238,7 +240,7 @@ class DistanciaParser(BaseExcelParser):
             }
 
     @classmethod
-    def _process_teacher(
+    def _procesar_docente(
         cls,
         row,
         shortname: str,
@@ -254,7 +256,7 @@ class DistanciaParser(BaseExcelParser):
             username = email.split("@")[0]
             if not username:
                 return
-            firstname, lastname = cls._split_name(nombre_docente)
+            firstname, lastname = cls._dividir_nombre(nombre_docente)
             if not firstname or not lastname:
                 logger.warning("Nombre docente no válido para %s: '%s'", email, nombre_docente)
                 return

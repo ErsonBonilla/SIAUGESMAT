@@ -1,17 +1,17 @@
 // routes/operaciones/lotes/[batchId].tsx
 import type { PageProps } from "@fresh/core";
-import { requireAuth } from "../../../utils/auth-guard.ts";
-import Layout from "../../../components/Layout.tsx";
+import { requerirAutenticacion } from "../../../utils/guarda-autenticacion.ts";
+import Disposicion from "../../../components/Disposicion.tsx";
 import DetalleLoteIsland from "../../../islands/DetalleLoteIsland.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
-export default function BatchDetailPage({ params }: PageProps) {
+export default function PaginaDetalleLote({ params }: PageProps) {
   const batchId = decodeURIComponent(params.batchId);
 
   return (
-    <Layout title={`Lote ${batchId.slice(0, 8)}...`}>
+    <Disposicion title={`Lote ${batchId.slice(0, 8)}...`}>
       <DetalleLoteIsland batchId={batchId} />
-    </Layout>
+    </Disposicion>
   );
 }

@@ -1,0 +1,21 @@
+# .aider.model.settings.yml - Ajustes finos de modelos para aider
+# Mas informacion: https://aider.chat/docs/config/model-settings.html
+#
+# deepseek-flash (DeepSeek V4.1-Flash) NO viene tuneado en aider 0.86:
+# sin esta entrada caeria a edit_format=whole y use_repo_map=False,
+# lo que rompe la convencion del proyecto (editar por diff, nunca whole)
+# y desactiva el mapa del repo (esencial para auditar).
+#
+# Los valores replican los que aider ya usa para deepseek-chat.
+
+- name: deepseek/deepseek-flash
+  edit_format: diff
+  use_repo_map: true
+  weak_model_name: deepseek/deepseek-flash
+  examples_as_sys_msg: true
+  reminder: sys
+  caches_by_default: true
+  accepts_settings:
+    - reasoning_effort
+  extra_params:
+    max_tokens: 8192

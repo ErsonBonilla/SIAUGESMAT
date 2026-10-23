@@ -1,16 +1,13 @@
 import { useComputed, useSignal } from "@preact/signals";
-import { useEffect } from "preact/hooks";
 import {
-  downloadReport,
-  getQueryExportUrl,
-  getQueryTaskStatus,
-  queryEntities,
-  type QueryTaskStatus,
+  descargarReporte,
+  obtenerUrlExportarConsulta,
 } from "../services/api.ts";
-import { DownloadIcon, SpinnerIcon } from "../utils/icons.tsx";
-import ErrorBox from "../components/ErrorBox.tsx";
-import Pagination from "../components/Pagination.tsx";
-import QueryHelp from "../components/QueryHelp.tsx";
+import { useConsultaTarea } from "../hooks/useConsultaTarea.ts";
+import { IconoDescargar, IconoSpinner } from "../utils/iconos.tsx";
+import CajaError from "../components/CajaError.tsx";
+import Paginacion from "../components/Paginacion.tsx";
+import AyudaConsulta from "../components/AyudaConsulta.tsx";
 
 const PAGE_SIZE = 20;
 
@@ -23,7 +20,7 @@ const COLUMNS = [
   { key: "duplicate_count", label: "Nº de cuentas" },
 ];
 
-interface DuplicateEmailRow {
+interface FilaCorreoDuplicado {
   email: string;
   username: string;
   firstname: string;
@@ -32,80 +29,27 @@ interface DuplicateEmailRow {
   duplicate_count: number;
 }
 
-export default function CorreosDuplicadosQuery() {
-  const data = useSignal<DuplicateEmailRow[]>([]);
-  const loading = useSignal(false);
-  const error = useSignal("");
-  const taskId = useSignal("");
-  const taskStatus = useSignal<QueryTaskStatus | null>(null);
-  const pollingId = useSignal<number | null>(null);
-  const started = useSignal(false);
+export default function ConsultaCorreosDuplicados() {
+  const { data, loading, error, taskId, taskStatus, iniciarConsulta } =
+    useConsultaTarea<FilaCorreoDuplicado>();
   const pageOffset = useSignal(0);
-  const totalItems = useSignal(0);
+  const totalItems = useComputed(() => data.value.length);
   const pageData = useComputed(() =>
     data.value.slice(pageOffset.value, pageOffset.value + PAGE_SIZE)
   );
 
-  useEffect(() => {
-    return () => {
-      if (pollingId.value) clearInterval(pollingId.value);
-    };
-  }, []);
-
   const startQuery = async () => {
-    loading.value = true;
-    error.value = "";
-    data.value = [];
-    taskStatus.value = null;
-    started.value = false;
-    try {
-      const result = await queryEntities("duplicate_emails", {});
-      taskId.value = result.task_id;
-      startPolling(result.task_id);
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Error al consultar.";
-      loading.value = false;
-    }
+    pageOffset.value = 0;
+    await iniciarConsulta("duplicate_emails", {});
   };
 
-  const startPolling = (id: string) => {
-    if (pollingId.value) clearInterval(pollingId.value);
-    const fetchStatus = async () => {
-      try {
-        const status = await getQueryTaskStatus(id);
-        taskStatus.value = status;
-        if (status.status === "running") {
-          started.value = true;
-        } else if (status.status === "completed") {
-          data.value = (status.result || []) as unknown as DuplicateEmailRow[];
-          totalItems.value = data.value.length;
-          pageOffset.value = 0;
-          loading.value = false;
-          if (pollingId.value) {
-            clearInterval(pollingId.value);
-            pollingId.value = null;
-          }
-        } else if (status.status === "failed") {
-          error.value = status.error || "Error desconocido.";
-          loading.value = false;
-          if (pollingId.value) {
-            clearInterval(pollingId.value);
-            pollingId.value = null;
-          }
-        }
-      } catch {
-        //
-      }
-    };
-    fetchStatus();
-    pollingId.value = setInterval(fetchStatus, 2000);
-  };
-
-  const exportUrl = taskId.value ? getQueryExportUrl(taskId.value) : "";
+  const exportUrl = taskId.value
+    ? obtenerUrlExportarConsulta(taskId.value)
+    : "";
 
   return (
     <div class="space-y-4">
-      <QueryHelp
+      <AyudaConsulta
         sections={[
           {
             title: "Qué consulta",
@@ -138,16 +82,16 @@ export default function CorreosDuplicadosQuery() {
         {loading.value
           ? (
             <span class="flex items-center gap-1.5">
-              <SpinnerIcon class="animate-spin h-4 w-4" />
+              <IconoSpinner class="animate-spin h-4 w-4" />
               Consultando...
             </span>
           )
           : "Consultar"}
       </button>
 
-      {loading.value && started.value && (
+      {loading.value && taskStatus.value?.status === "running" && (
         <div class="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <SpinnerIcon class="animate-spin h-4 w-4" />
+          <IconoSpinner class="animate-spin h-4 w-4" />
           <span>
             Consultando Moodle (procesando {taskStatus.value?.total_count || 0}
             {" "}
@@ -156,7 +100,7 @@ export default function CorreosDuplicadosQuery() {
         </div>
       )}
 
-      {error.value && <ErrorBox message={error.value} />}
+      {error.value && <CajaError message={error.value} />}
 
       {!loading.value && !error.value && data.value.length > 0 && (
         <div class="flex items-center justify-between">
@@ -171,12 +115,12 @@ export default function CorreosDuplicadosQuery() {
             <button
               type="button"
               onClick={() =>
-                downloadReport(exportUrl, "correos_duplicados.csv").catch(
+                descargarReporte(exportUrl, "correos_duplicados.csv").catch(
                   () => {},
                 )}
               class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded text-sm font-medium no-underline hover:bg-[var(--border-secondary)] transition cursor-pointer"
             >
-              <DownloadIcon class="w-4 h-4" />
+              <IconoDescargar class="w-4 h-4" />
               CSV
             </button>
           )}
@@ -206,7 +150,7 @@ export default function CorreosDuplicadosQuery() {
                       colSpan={COLUMNS.length}
                       class="py-12 text-center text-[var(--text-muted)]"
                     >
-                      {started.value
+                      {taskStatus.value !== null
                         ? "No se encontraron correos duplicados."
                         : 'Presione "Consultar" para buscar correos con más de un usuario.'}
                     </td>
@@ -245,12 +189,12 @@ export default function CorreosDuplicadosQuery() {
       )}
 
       {!loading.value && !error.value && data.value.length > PAGE_SIZE && (
-        <Pagination
+        <Paginacion
           offset={pageOffset.value}
-          pageSize={PAGE_SIZE}
+          tamanoPagina={PAGE_SIZE}
           total={totalItems.value}
           label="resultados"
-          onPageChange={(o) => {
+          alCambiarPagina={(o) => {
             pageOffset.value = o;
           }}
         />

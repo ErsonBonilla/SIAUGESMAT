@@ -1,18 +1,18 @@
 import { useEffect } from "preact/hooks";
 import { useComputed } from "@preact/signals";
-import type { SemesterMetrics } from "../services/api.ts";
+import type { MetricasSemestre } from "../services/api.ts";
 import {
-  createGradient,
-  METRIC_COLORS,
-  METRIC_LABELS,
-  useChart,
-} from "../utils/chart.ts";
-import { darkSignal } from "../utils/theme.ts";
+  COLORES_METRICAS,
+  crearGradiente,
+  ETIQUETAS_METRICAS,
+  usarGrafico,
+} from "../utils/grafico.ts";
+import { senalTemaOscuro } from "../utils/tema.ts";
 
-interface MetricsChartProps {
-  data: SemesterMetrics[];
-  metrics?: Array<keyof Omit<SemesterMetrics, "semester">>;
-  selectedSemesters?: string[];
+interface PropsGraficoMetricas {
+  data: MetricasSemestre[];
+  metrics?: Array<keyof Omit<MetricasSemestre, "semester">>;
+  semestresSeleccionados?: string[];
 }
 
 const STACK_ORDER: Record<string, number> = {
@@ -38,31 +38,33 @@ function gradientPlugin(
     ) {
       for (const ds of chart.data.datasets) {
         const label = ds.label || "";
-        const entry = Object.entries(METRIC_LABELS).find(([, v]) =>
+        const entry = Object.entries(ETIQUETAS_METRICAS).find(([, v]) =>
           v === label
         );
         const key = entry?.[0];
-        const color = key ? METRIC_COLORS[key] : METRIC_COLORS.total_errors;
+        const color = key
+          ? COLORES_METRICAS[key]
+          : COLORES_METRICAS.total_errors;
         if (color) {
-          ds.backgroundColor = createGradient(ctx, color, dark, height);
+          ds.backgroundColor = crearGradiente(ctx, color, dark, height);
         }
       }
     },
   };
 }
 
-export default function MetricsChart(
-  { data, metrics, selectedSemesters }: MetricsChartProps,
+export default function GraficoMetricas(
+  { data, metrics, semestresSeleccionados }: PropsGraficoMetricas,
 ) {
-  const dark = useComputed(() => darkSignal.value);
-  const { canvasRef, createChart } = useChart();
+  const dark = useComputed(() => senalTemaOscuro.value);
+  const { canvasRef, crearGrafico } = usarGrafico();
 
   useEffect(() => {
     if (!data || data.length === 0) return;
 
-    const filtered = !selectedSemesters?.length
+    const filtered = !semestresSeleccionados?.length
       ? data
-      : data.filter((d) => selectedSemesters.includes(d.semester));
+      : data.filter((d) => semestresSeleccionados.includes(d.semester));
     if (filtered.length === 0) return;
 
     const selectedMetrics = metrics || [
@@ -78,14 +80,14 @@ export default function MetricsChart(
 
     const labels = filtered.map((d) => d.semester).reverse();
     const datasets = sorted.map((metric) => ({
-      label: METRIC_LABELS[metric] || metric,
+      label: ETIQUETAS_METRICAS[metric] || metric,
       data: filtered.map((d) => (d[metric] as number) || 0).reverse(),
       backgroundColor: "rgba(0,0,0,0.1)",
-      borderColor: METRIC_COLORS[metric]?.base || "#999",
+      borderColor: COLORES_METRICAS[metric]?.base || "#999",
       borderWidth: 0.5,
       borderRadius: { topLeft: 4, topRight: 4 },
       borderSkipped: false,
-      hoverBackgroundColor: METRIC_COLORS[metric]?.light || "#ccc",
+      hoverBackgroundColor: COLORES_METRICAS[metric]?.light || "#ccc",
       hoverBorderWidth: 1.5,
       barPercentage: 0.65,
       categoryPercentage: 0.8,
@@ -96,7 +98,7 @@ export default function MetricsChart(
     if (!ctx) return;
     const plugin = gradientPlugin(ctx, height, dark.value);
 
-    createChart({
+    crearGrafico({
       type: "bar",
       data: { labels, datasets },
       options: {
@@ -107,10 +109,10 @@ export default function MetricsChart(
       },
       plugins: [plugin],
     } as never);
-  }, [data, metrics, selectedSemesters, dark.value]);
+  }, [data, metrics, semestresSeleccionados, dark.value]);
 
-  const noSelection = selectedSemesters !== undefined &&
-    selectedSemesters.length === 0;
+  const noSelection = semestresSeleccionados !== undefined &&
+    semestresSeleccionados.length === 0;
 
   if (noSelection) {
     return (

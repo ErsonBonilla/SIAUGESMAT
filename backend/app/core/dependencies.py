@@ -2,43 +2,53 @@
 Dependencias inyectables para los endpoints de SIAUGESMAT.
 
 Centraliza:
-- La sesión de base de datos (importada de app.db.session).
+- La sesión de base de datos (importada de app.db.sesion).
 - La validación del usuario actual mediante JWT.
 """
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 
-from app.core.security import decode_access_token
-from app.db.session import get_db as get_db
-from app.schemas.user import UserInToken
+from app.core.seguridad import decodificar_token_acceso
+from app.db.sesion import obtener_db as obtener_db
+from app.schemas.usuario import UsuarioEnToken
 
-__all__ = ["get_current_user", "get_db"]
+__all__ = ["obtener_db", "obtener_limitador_login", "obtener_usuario_actual"]
 
-# Esquema de autenticación HTTP Bearer para Swagger y dependencias
-bearer_scheme = HTTPBearer()
+# Esquema de autenticación HTTP Bearer para Swagger y dependencias.
+# auto_error=False: la cookie HttpOnly `auth_token` es la vía principal de
+# autenticación; el Bearer se acepta como fallback (e2e, CLI) sin forzar error.
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-) -> UserInToken:
+async def obtener_usuario_actual(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+) -> UsuarioEnToken:
     """
-    Valida el token JWT de la cabecera Authorization y devuelve los
-    datos del usuario autenticado.
+    Valida el JWT de la cookie HttpOnly ``auth_token`` (o, como fallback,
+    de la cabecera ``Authorization: Bearer``) y devuelve los datos del
+    usuario autenticado.
 
     Args:
-        credentials: Credenciales extraídas del header Authorization.
+        request: Petición HTTP (para leer la cookie).
+        credentials: Credenciales Bearer opcionales (fallback).
 
     Returns:
-        UserInToken con los campos user_id y username.
+        UserInToken con los campos user_id, username y modalidad.
 
     Raises:
-        HTTPException 401: Token inválido, expirado o con datos insuficientes.
+        HTTPException 401: Sin credenciales, o token inválido/expirado.
     """
-    token = credentials.credentials
+    token = request.cookies.get("auth_token") or (credentials.credentials if credentials else None)
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No autenticado.",
+        )
     try:
-        payload = decode_access_token(token)
+        payload = decodificar_token_acceso(token)
         user_id = payload.get("sub")
         username = payload.get("username")
         modalidad = payload.get("modalidad")
@@ -55,7 +65,7 @@ async def get_current_user(
                 detail="Token inválido: modalidad no especificada. Inicie sesión nuevamente.",
             )
 
-        # El ID de usuario se guardó como string en el JWT; lo convertimos.
+            # El ID de usuario se guardó como string en el JWT; lo convertimos.
         user_id_int = int(user_id)
 
     except JWTError:
@@ -69,4 +79,15 @@ async def get_current_user(
             detail="Token inválido: ID de usuario no numérico.",
         ) from None
 
-    return UserInToken(user_id=user_id_int, username=username, modalidad=modalidad)
+    return UsuarioEnToken(user_id=user_id_int, username=username, modalidad=modalidad)
+
+
+async def obtener_limitador_login():
+    """Provee el limitador de intentos de login (Redis, fail-open).
+
+    Se expone como dependencia para poder sobreescribirlo en tests con una
+    implementación falsa que no requiera Redis.
+    """
+    from app.core.limitador_login import LimitadorLogin
+
+    return LimitadorLogin()

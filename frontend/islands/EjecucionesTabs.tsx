@@ -2,30 +2,33 @@
 import { useSignal } from "@preact/signals";
 import ListaEjecucionesIsland from "./ListaEjecucionesIsland.tsx";
 import ListaOperacionesIsland from "./ListaOperacionesIsland.tsx";
-import { OPERATIONS_TABS, type TabKey } from "../utils/operations-tabs.ts";
+import {
+  type ClavePestana,
+  PESTANAS_OPERACIONES,
+} from "../utils/pestanas-operaciones.ts";
 
 const ACTIVE = "bg-[var(--accent)] text-white";
 const INACTIVE =
   "border bg-[var(--bg-primary)] border-[var(--border-secondary)] " +
   "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]";
 
-function initialTab(): TabKey {
+function initialTab(): ClavePestana {
   if (typeof window !== "undefined") {
     const fromUrl = new URLSearchParams(window.location.search).get("tab");
-    const match = OPERATIONS_TABS.find((t) => t.key === fromUrl);
-    if (match) return match.key as TabKey;
+    const match = PESTANAS_OPERACIONES.find((t) => t.key === fromUrl);
+    if (match) return match.key as ClavePestana;
   }
-  return OPERATIONS_TABS[0].key;
+  return PESTANAS_OPERACIONES[0].key;
 }
 
 export default function EjecucionesTabs() {
-  const tab = useSignal<TabKey>(initialTab());
-  const current = OPERATIONS_TABS.find((t) => t.key === tab.value)!;
+  const tab = useSignal<ClavePestana>(initialTab());
+  const current = PESTANAS_OPERACIONES.find((t) => t.key === tab.value)!;
 
   return (
     <>
       <div class="flex flex-wrap gap-2 mb-6">
-        {OPERATIONS_TABS.map((t) => (
+        {PESTANAS_OPERACIONES.map((t) => (
           <button
             type="button"
             key={t.key}
@@ -44,8 +47,8 @@ export default function EjecucionesTabs() {
           : (
             <ListaOperacionesIsland
               key={current.key}
-              defaultEntity={current.entity!}
-              defaultAction={current.action!}
+              entidadPredeterminada={current.entity!}
+              accionPredeterminada={current.action!}
             />
           )}
       </div>

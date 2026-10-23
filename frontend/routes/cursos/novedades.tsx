@@ -1,13 +1,13 @@
-import { requireAuth } from "../../utils/auth-guard.ts";
-import Layout from "../../components/Layout.tsx";
+import { requerirAutenticacion } from "../../utils/guarda-autenticacion.ts";
+import Disposicion from "../../components/Disposicion.tsx";
 import NovedadesIsland from "../../islands/NovedadesIsland.tsx";
 
-export const handler = requireAuth();
+export const handler = requerirAutenticacion();
 
 export default function NovedadesPage() {
   return (
-    <Layout title="Gestionar novedades">
+    <Disposicion title="Gestionar novedades">
       <NovedadesIsland />
-    </Layout>
+    </Disposicion>
   );
 }

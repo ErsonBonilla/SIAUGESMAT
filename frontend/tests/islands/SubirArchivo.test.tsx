@@ -1,0 +1,47 @@
+import { render } from "preact-render-to-string";
+import { assert, assertStringIncludes } from "@std/assert";
+
+import SubirArchivoIsland from "../../islands/SubirArchivoIsland.tsx";
+import BannerProcesoEnCurso from "../../components/BannerProcesoEnCurso.tsx";
+import { senalTemaOscuro } from "../../utils/tema.ts";
+
+Deno.test("SubirArchivoIsland - muestra el formulario de subida con todos los elementos", () => {
+  senalTemaOscuro.value = false;
+  const html = render(<SubirArchivoIsland />);
+
+  assertStringIncludes(html, "Archivo Excel");
+  assertStringIncludes(html, "Subir y procesar archivo");
+  assertStringIncludes(html, "Semestre");
+  assertStringIncludes(html, "DISTANCIA");
+
+  assert(!html.includes("Ambos"), "selector de modo eliminado");
+  assert(!html.includes("Solo cursos"), "selector de modo eliminado");
+  assert(!html.includes("Solo usuarios"), "selector de modo eliminado");
+});
+
+Deno.test("ProcessInProgressBanner - muestra aviso cuando hay proceso en curso", () => {
+  senalTemaOscuro.value = false;
+  const html = render(
+    <BannerProcesoEnCurso
+      status={{
+        allowed: false,
+        execution: { id: 3, status: "running", filename: "carga.xlsx" },
+        batch: null,
+      }}
+    />,
+  );
+
+  assertStringIncludes(html, "No se pueden subir archivos");
+  assertStringIncludes(html, "carga.xlsx");
+  assertStringIncludes(html, "En ejecución");
+});
+
+Deno.test("ProcessInProgressBanner - no muestra nada si no hay proceso", () => {
+  senalTemaOscuro.value = false;
+  const html = render(
+    <BannerProcesoEnCurso
+      status={{ allowed: true, execution: null, batch: null }}
+    />,
+  );
+  assert(!html.includes("No se pueden subir archivos"));
+});

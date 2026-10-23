@@ -14,7 +14,7 @@ ALERT_ACTION_BY_REASON = {
 Entry = tuple[str, str, dict[str, object] | None]
 
 
-def plan_log_entries(
+def entradas_log_plan(
     comparison: dict,
     fullname_map: dict[str, str] | None = None,
 ) -> list[Entry]:
