@@ -248,15 +248,20 @@ async def iniciar_sesion(
         f"(userid={user_id}, modalidad={request.modalidad})"
     )
 
-    # Cookie HttpOnly+Secure para que el SSR del frontend autorice rutas
+    es_https = (
+        req.url.scheme == "https" or req.headers.get("x-forwarded-proto", "").lower() == "https"
+    )
+
+    # Cookie HttpOnly para que el SSR del frontend y la API autoricen rutas
     # protegidas. La misma expiración que el JWT (JWT_EXPIRE_MINUTES).
+    # `secure` se activa bajo HTTPS (p. ej. tras Nginx) y se desactiva en HTTP local.
     response.set_cookie(
         key="auth_token",
         value=access_token,
         max_age=settings.JWT_EXPIRE_MINUTES * 60,
         path="/",
         httponly=True,
-        secure=True,
+        secure=es_https,
         samesite="lax",
     )
 
@@ -268,7 +273,7 @@ async def iniciar_sesion(
         max_age=settings.JWT_EXPIRE_MINUTES * 60,
         path="/",
         httponly=False,
-        secure=True,
+        secure=es_https,
         samesite="lax",
     )
 

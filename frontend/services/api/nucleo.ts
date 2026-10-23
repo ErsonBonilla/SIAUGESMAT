@@ -2,7 +2,7 @@
 import { leerTokenCsrf } from "../../utils/csrf.ts";
 
 export const BASE_URL = typeof Deno !== "undefined"
-  ? Deno.env.get("BACKEND_URL")
+  ? (Deno.env.get("BACKEND_URL") || "http://localhost:8000/api/v1")
   : "/api/v1";
 
 export function cabecerasAuth(): Record<string, string> {
