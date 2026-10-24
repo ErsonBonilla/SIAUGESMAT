@@ -83,100 +83,63 @@ class TestConsultPhase:
     @pytest.mark.asyncio
     async def test_happy_path(self, test_db, mock_moodle_service):
         mock_moodle_service.obtener_categorias.return_value = [
-            {"id": 1, "idnumber": "IDE", "name": "TestCat"},
+            {"id": 1, "idnumber": "Distancia", "name": "IDEAD", "parent": 0},
+            {"id": 2, "idnumber": "IDE", "name": "TestCat", "parent": 1},
+            {"id": 99, "idnumber": "OTRA", "name": "OtraModalidad", "parent": 0},
         ]
         mock_moodle_service.obtener_cursos.return_value = [
-            {"id": 10, "shortname": "IDE_0001_sI_101_G-01", "fullname": "CURSO"},
+            {"id": 10, "shortname": "IDE_0001_sI_101_G-01", "fullname": "CURSO", "categoryid": 2},
+            {
+                "id": 20,
+                "shortname": "OTR_0001_sI_101_G-01",
+                "fullname": "EXTERNO",
+                "categoryid": 99,
+            },
         ]
         mock_find = AsyncMock()
         with patch.object(IntegracionMoodle, "encontrar_usuarios_por_correos", new=mock_find):
             mock_find.return_value = {
-                "doc1@ut.edu.co": {"username": "doc1", "email": "doc1@ut.edu.co"}
+                "doc1@ut.edu.co": {"username": "doc1_moodle", "email": "doc1@ut.edu.co"}
             }
 
             ctx = _make_ctx(test_db, mock_moodle_service)
             phase = FaseConsulta()
             await phase.ejecutar(ctx)
 
-        assert len(ctx.idnumeros_categorias_existentes) == 1
-        assert "IDE" in ctx.idnumeros_categorias_existentes
+        assert ctx.idnumeros_categorias_existentes == {"Distancia", "IDE"}
+        assert "OTRA" not in ctx.idnumeros_categorias_existentes
         assert len(ctx.cursos_existentes) == 1
-        assert ctx.mapa_usuarios == {"doc1": "doc1"}
+        assert ctx.cursos_existentes[0]["shortname"] == "IDE_0001_sI_101_G-01"
+        assert ctx.mapa_usuarios == {"doc1": "doc1_moodle"}
 
     @pytest.mark.asyncio
     async def test_raises_on_failure(self, test_db, mock_moodle_service):
-        mock_moodle_service.obtener_categorias.side_effect = Exception("Moodle caÃ­do")
+        mock_moodle_service.obtener_categorias.side_effect = Exception("Moodle caído")
         ctx = _make_ctx(test_db, mock_moodle_service)
         phase = FaseConsulta()
-        with pytest.raises(Exception, match="Moodle caÃ­do"):
+        with pytest.raises(Exception, match="Moodle caído"):
             await phase.ejecutar(ctx)
         assert ctx.metricas["total_errors"] >= 1
 
     @pytest.mark.asyncio
-    async def test_resolves_user_by_username_when_email_missing(self, test_db, mock_moodle_service):
-        mock_moodle_service.obtener_categorias.return_value = []
-        mock_moodle_service.obtener_cursos.return_value = []
-        with (
-            patch.object(
-                IntegracionMoodle, "encontrar_usuarios_por_correos", new=AsyncMock(return_value={})
-            ),
-            patch.object(
-                IntegracionMoodle,
-                "encontrar_usuarios_por_usernames",
-                new=AsyncMock(
-                    return_value={
-                        "doc1": {"username": "doc1", "firstname": "Docente", "lastname": "Uno"},
-                    }
-                ),
-            ),
-            patch.object(
-                IntegracionMoodle,
-                "encontrar_usuarios_por_idnumbers",
-                new=AsyncMock(return_value={}),
-            ),
-        ):
-            ctx = _make_ctx(test_db, mock_moodle_service)
-            phase = FaseConsulta()
-            await phase.ejecutar(ctx)
-
-        assert ctx.mapa_usuarios == {"doc1": "doc1"}
-
-    @pytest.mark.asyncio
-    async def test_username_match_with_different_name_is_flagged(
+    async def test_does_not_resolve_user_when_institutional_email_not_found(
         self, test_db, mock_moodle_service
     ):
         mock_moodle_service.obtener_categorias.return_value = []
         mock_moodle_service.obtener_cursos.return_value = []
-        with (
-            patch.object(
-                IntegracionMoodle, "encontrar_usuarios_por_correos", new=AsyncMock(return_value={})
-            ),
-            patch.object(
-                IntegracionMoodle,
-                "encontrar_usuarios_por_usernames",
-                new=AsyncMock(
-                    return_value={
-                        "doc1": {"username": "doc1", "firstname": "Carlos", "lastname": "Andres"},
-                    }
-                ),
-            ),
-            patch.object(
-                IntegracionMoodle,
-                "encontrar_usuarios_por_idnumbers",
-                new=AsyncMock(return_value={}),
-            ),
+        with patch.object(
+            IntegracionMoodle, "encontrar_usuarios_por_correos", new=AsyncMock(return_value={})
         ):
             ctx = _make_ctx(test_db, mock_moodle_service)
             phase = FaseConsulta()
             await phase.ejecutar(ctx)
 
-            # Nombre ETL "Docente Uno" != Moodle "Carlos Andres" â†’ no se mapea
         assert ctx.mapa_usuarios == {}
 
 
 class TestAnalyzePhase:
     @pytest.mark.asyncio
-    async def test_detects_missing_categories_and_users_to_create(
+    async def test_omits_course_and_logs_incidence_when_teacher_missing(
         self, test_db, mock_moodle_service
     ):
         ctx = _make_ctx(test_db, mock_moodle_service)
@@ -192,14 +155,33 @@ class TestAnalyzePhase:
 
         assert len(ctx.categorias_faltantes) == 1
         assert ctx.categorias_faltantes[0]["idnumber"] == "IDE"
-        assert len(ctx.usuarios_a_crear) == 1
-        assert ctx.usuarios_a_crear[0]["username"] == "doc1"
+        assert ctx.usuarios_a_crear == []
+        assert ctx.comparacion["to_create"] == []
+        assert ctx.matriculas_resueltas == []
+
+        logs = (
+            test_db.query(RegistroEjecucion)
+            .filter(
+                RegistroEjecucion.ejecucion_id == ctx.ejecucion_id,
+                RegistroEjecucion.accion == "course_creation_failed_user_missing",
+            )
+            .all()
+        )
+        assert len(logs) == 1
+        assert logs[0].identificador == "doc1@ut.edu.co"
+        assert logs[0].detalle["shortname"] == "IDE_0001_sI_101_G-01"
+        assert logs[0].detalle["firstname"] == "Docente"
+        assert logs[0].detalle["lastname"] == "Uno"
+        assert logs[0].detalle["cat"] == "IDE"
+        assert logs[0].detalle["programa"] == "0001"
+        assert logs[0].detalle["semestre"] == "I"
+        assert logs[0].detalle["grupo"] == "01"
 
     @pytest.mark.asyncio
-    async def test_no_users_to_create_when_resolved(self, test_db, mock_moodle_service):
+    async def test_creates_course_when_teacher_resolved(self, test_db, mock_moodle_service):
         ctx = _make_ctx(test_db, mock_moodle_service)
         ctx.idnumeros_categorias_existentes = {"IDE"}
-        ctx.mapa_usuarios = {"doc1": "doc1"}
+        ctx.mapa_usuarios = {"doc1": "doc1_moodle"}
         ctx.cursos_existentes = []
         ctx.cursos_con_docente = set()
 
@@ -209,6 +191,8 @@ class TestAnalyzePhase:
         await phase.ejecutar(ctx)
 
         assert len(ctx.usuarios_a_crear) == 0
+        assert len(ctx.comparacion["to_create"]) == 1
+        assert ctx.matriculas_resueltas[0]["username"] == "doc1_moodle"
 
     @pytest.mark.asyncio
     async def test_raises_on_failure(self, test_db, mock_moodle_service):

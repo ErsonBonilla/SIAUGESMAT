@@ -79,8 +79,8 @@ class TestFindUserByEmail:
         integration.servicio._solicitar.return_value = []
         user = await integration.encontrar_usuario_por_correo("a@ut.edu.co")
         assert user is not None
-        # La cuenta vieja (id=1) queda renombrada con el username de la nueva.
-        assert user["username"] == "teacher2"
+        # La cuenta vieja (id=1) se conserva sin renombrar su username.
+        assert user["username"] == "teacher1"
         assert user["id"] == "1"
 
         # ---------------------------------------------------------------------------
@@ -106,28 +106,25 @@ class TestConsolidateDuplicates:
         ]
 
     @pytest.mark.asyncio
-    async def test_duplicate_sin_cursos_renombra_vieja_y_elimina_nueva(self, integration):
+    async def test_duplicate_sin_cursos_conserva_vieja_sin_renombrar_y_elimina_nueva(
+        self, integration
+    ):
         integration.servicio.obtener_usuarios.return_value = [
             {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
             {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
         ]
         integration.servicio._solicitar.return_value = []
         result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
-        # La cuenta vieja queda renombrada con el username de la nueva.
-        assert result["a@ut.edu.co"]["username"] == "nuevo"
+        assert result["a@ut.edu.co"]["username"] == "viejo"
         assert result["a@ut.edu.co"]["id"] == "1"
-        # 1) nueva -> temp libera el username, 2) vieja -> nueva
         renames = self._rename_calls(integration.servicio.actualizar_usuarios.await_args_list)
-        assert renames == [
-            [{"id": "2", "username": "zzdel_nuevo"}],
-            [{"id": "1", "username": "nuevo"}],
-        ]
-        integration.servicio.eliminar_usuarios.assert_awaited_with(["zzdel_nuevo"])
+        assert renames == []
+        integration.servicio.eliminar_usuarios.assert_awaited_with(["nuevo"])
         c = integration.ultimos_conflictos_correo[0]
-        assert c["renamed"] == "nuevo"
-        assert c["selected"] == "nuevo"
+        assert c["renamed"] == ""
+        assert c["selected"] == "viejo"
         assert set(c["usernames"]) == {"viejo", "nuevo"}
-        assert c["deleted"] == ["zzdel_nuevo"]
+        assert c["deleted"] == ["nuevo"]
         assert c["pending_review"] == []
 
     @pytest.mark.asyncio
@@ -170,54 +167,30 @@ class TestConsolidateDuplicates:
         ]
         integration.servicio._solicitar.return_value = []
         result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
-        assert result["a@ut.edu.co"]["username"] == "nueva"
+        assert result["a@ut.edu.co"]["username"] == "vieja"
         assert result["a@ut.edu.co"]["id"] == "1"
         integration.servicio.eliminar_usuarios.assert_awaited()
         args = integration.servicio.eliminar_usuarios.await_args.args[0]
-        assert set(args) == {"media", "zzdel_nueva"}
+        assert set(args) == {"media", "nueva"}
         c = integration.ultimos_conflictos_correo[0]
-        assert c["renamed"] == "nueva"
-        assert set(c["deleted"]) == {"media", "zzdel_nueva"}
+        assert c["renamed"] == ""
+        assert set(c["deleted"]) == {"media", "nueva"}
 
     @pytest.mark.asyncio
-    async def test_no_se_puede_liberar_username_se_omite_rename(self, integration):
+    async def test_no_renombra_usuarios_al_consolidar(self, integration):
         integration.servicio.obtener_usuarios.return_value = [
             {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
             {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
         ]
         integration.servicio._solicitar.return_value = []
-        integration.servicio.actualizar_usuarios.side_effect = Exception("API caída")
         result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
         assert result["a@ut.edu.co"]["username"] == "viejo"
+        renames = self._rename_calls(integration.servicio.actualizar_usuarios.await_args_list)
+        assert renames == []
         integration.servicio.eliminar_usuarios.assert_awaited_with(["nuevo"])
         c = integration.ultimos_conflictos_correo[0]
         assert c["renamed"] == ""
         assert c["deleted"] == ["nuevo"]
-
-    @pytest.mark.asyncio
-    async def test_fallo_rename_antigua_hace_rollback(self, integration):
-        integration.servicio.obtener_usuarios.return_value = [
-            {"id": "2", "username": "nuevo", "email": "a@ut.edu.co", "timecreated": "200"},
-            {"id": "1", "username": "viejo", "email": "a@ut.edu.co", "timecreated": "100"},
-        ]
-        integration.servicio._solicitar.return_value = []
-        # 1) nueva->temp OK, 2) vieja->nueva falla, 3) rollback nueva->nueva
-        integration.servicio.actualizar_usuarios.side_effect = [
-            {"id": 2},
-            Exception("rename falló"),
-            {"id": 2},
-        ]
-        result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
-        assert result["a@ut.edu.co"]["username"] == "viejo"
-        renames = self._rename_calls(integration.servicio.actualizar_usuarios.await_args_list)
-        assert renames == [
-            [{"id": "2", "username": "zzdel_nuevo"}],
-            [{"id": "1", "username": "nuevo"}],
-            [{"id": "2", "username": "nuevo"}],
-        ]
-        integration.servicio.eliminar_usuarios.assert_awaited_with(["nuevo"])
-        c = integration.ultimos_conflictos_correo[0]
-        assert c["renamed"] == ""
 
         # ---------------------------------------------------------------------------
         # Paso a base de datos externa (auth manual -> db)
@@ -253,7 +226,7 @@ class TestExternalAuthSwitch:
         ]
         integration.servicio._solicitar.return_value = []
         result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co"])
-        assert result["a@ut.edu.co"]["username"] == "nuevo"
+        assert result["a@ut.edu.co"]["username"] == "viejo"
         auth_calls = self._auth_calls(integration.servicio.actualizar_usuarios.await_args_list)
         assert auth_calls == [[{"id": "1", "auth": "db"}]]
         c = integration.ultimos_conflictos_correo[0]
@@ -379,7 +352,7 @@ class TestFindUsersByFieldOldest:
         assert result == {
             "a@ut.edu.co": {
                 "id": "1",
-                "username": "nuevo",
+                "username": "viejo",
                 "email": "a@ut.edu.co",
                 "timecreated": "100",
             }
@@ -387,8 +360,8 @@ class TestFindUsersByFieldOldest:
         assert len(integration.ultimos_conflictos_correo) == 1
         c = integration.ultimos_conflictos_correo[0]
         assert c["email"] == "a@ut.edu.co"
-        assert c["selected"] == "nuevo"
-        assert c["renamed"] == "nuevo"
+        assert c["selected"] == "viejo"
+        assert c["renamed"] == ""
         assert set(c["usernames"]) == {"viejo", "nuevo"}
 
     @pytest.mark.asyncio
@@ -407,8 +380,8 @@ class TestFindUsersByFieldOldest:
             {"id": "3", "username": "viejo", "email": "c@ut.edu.co"},
         ]
         result = await integration.encontrar_usuarios_por_correos(["c@ut.edu.co"])
-        # Se conserva la antigua (id=3) renombrada al username de la nueva.
-        assert result["c@ut.edu.co"]["username"] == "nuevo"
+        # Se conserva la antigua (id=3) sin renombrar su username.
+        assert result["c@ut.edu.co"]["username"] == "viejo"
         assert result["c@ut.edu.co"]["id"] == "3"
 
     @pytest.mark.asyncio
@@ -419,7 +392,7 @@ class TestFindUsersByFieldOldest:
             {"id": "3", "username": "b1", "email": "b@ut.edu.co"},
         ]
         result = await integration.encontrar_usuarios_por_correos(["a@ut.edu.co", "b@ut.edu.co"])
-        assert result["a@ut.edu.co"]["username"] == "a2"
+        assert result["a@ut.edu.co"]["username"] == "a1"
         assert result["b@ut.edu.co"]["username"] == "b1"
 
     @pytest.mark.asyncio
@@ -628,3 +601,59 @@ class TestEnrolTeacher:
         result = await integration.matricular_docente("teacher1", "CURSO1")
         assert result["success"] is False
         assert result["reason"] is not None
+
+
+class TestRecycleCourseByDuplication:
+    @pytest.mark.asyncio
+    async def test_recicla_duplicando_y_eliminando_antiguo(self, integration):
+        old_sn = "IBA_0854_sI_5011065_G-3_10000001"
+        new_sn = "IBA_0854_sI_5011065_G-1_10000001"
+        integration.servicio.obtener_cursos.side_effect = [
+            [],  # target no existe aún
+            [{"id": "55", "shortname": old_sn, "categoryid": 12}],  # curso antiguo
+            [{"id": "99", "shortname": new_sn}],  # verificación del duplicado
+        ]
+        integration.servicio.obtener_categorias.return_value = [
+            {"id": 12, "idnumber": "IBA_0854_sI"}
+        ]
+        integration.servicio.duplicar_curso.return_value = {"id": 99, "shortname": new_sn}
+
+        ok = await integration.reciclar_curso_por_duplicacion(
+            old_shortname=old_sn,
+            new_shortname=new_sn,
+            new_fullname="CALCULO I - GRUPO 1",
+            category_idnumber="IBA_0854_sI",
+        )
+
+        assert ok is True
+        integration.servicio.actualizar_cursos.assert_awaited_once_with(
+            [{"id": 55, "shortname": f"zz_temp_{old_sn}"}]
+        )
+        integration.servicio.duplicar_curso.assert_awaited_once_with(
+            from_id=55,
+            fullname="CALCULO I - GRUPO 1",
+            shortname=new_sn,
+            categoryid=12,
+            visible=1,
+        )
+        integration.servicio.eliminar_cursos.assert_awaited_once_with([f"zz_temp_{old_sn}"])
+
+    @pytest.mark.asyncio
+    async def test_revierte_rename_temporal_si_falla_duplicacion(self, integration):
+        old_sn = "IBA_0854_sI_5011065_G-3_10000001"
+        new_sn = "IBA_0854_sI_5011065_G-1_10000001"
+        integration.servicio.obtener_cursos.side_effect = [
+            [],
+            [{"id": "55", "shortname": old_sn, "categoryid": 12}],
+        ]
+        integration.servicio.duplicar_curso.side_effect = ErrorApiMoodle("fallo duplicate")
+
+        ok = await integration.reciclar_curso_por_duplicacion(
+            old_shortname=old_sn,
+            new_shortname=new_sn,
+            new_fullname="CALCULO I - GRUPO 1",
+        )
+
+        assert ok is False
+        assert integration.servicio.actualizar_cursos.await_count == 2
+        integration.servicio.eliminar_cursos.assert_not_awaited()

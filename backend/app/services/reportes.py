@@ -41,6 +41,7 @@ class ServicioReportes:
         "audit_plan_acciones": "15_audit_plan_acciones.csv",
         "audit_errores": "16_audit_errores.csv",
         "usuarios_creados_manual": "17_usuarios_creados_manual.csv",
+        "inc_usuarios_no_encontrados": "18_inc_usuarios_no_encontrados.csv",
     }
 
     @classmethod
@@ -183,6 +184,32 @@ class ServicioReportes:
                 log.detalle.get("usernames", ""),
                 log.detalle.get("course", ""),
                 log.detalle.get("fullname", ""),
+            ],
+        },
+        {
+            "key": "inc_usuarios_no_encontrados",
+            "headers": [
+                "Correo",
+                "Shortname",
+                "Nombre Docente",
+                "Apellido Docente",
+                "CAT",
+                "Programa",
+                "Semestre",
+                "Grupo",
+            ],
+            "match": lambda log: (
+                log.accion == "course_creation_failed_user_missing" and log.detalle is not None
+            ),
+            "extract": lambda log: [
+                log.detalle.get("email") or log.identificador or "",
+                log.detalle.get("shortname", ""),
+                log.detalle.get("firstname", ""),
+                log.detalle.get("lastname", ""),
+                log.detalle.get("cat", ""),
+                log.detalle.get("programa", ""),
+                log.detalle.get("semestre", ""),
+                log.detalle.get("grupo", ""),
             ],
         },
         # AUDITORÍA — 10 reportes
@@ -408,6 +435,10 @@ class ServicioReportes:
             ("Cursos activados", "course_activated"),
             ("Usuarios nuevos (Base manual)", "user_created_createpassword"),
             ("Usuarios existentes (resueltos)", "user_resolved"),
+            (
+                "Cursos no creados (docente no encontrado)",
+                "course_creation_failed_user_missing",
+            ),
             ("Matriculaciones exitosas", "enrolment_ok"),
             ("Matriculaciones fallidas", "enrolment_failed"),
             ("Plantillas no encontradas", "template_not_found"),

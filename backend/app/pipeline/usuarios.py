@@ -89,66 +89,37 @@ def nombres_difieren(etl_name: str, moodle_name: str) -> bool:
 def resolver_usuarios(
     etl_users: list[User],
     institutional_map: dict[str, User],
-    personal_map: dict[str, User],
-    username_index: dict[str, User],
-    idnumber_index: dict[str, User],
+    _personal_map: dict[str, User] | None = None,
+    _username_index: dict[str, User] | None = None,
+    _idnumber_index: dict[str, User] | None = None,
 ) -> tuple[dict[str, str], list[Event]]:
-    """Resuelve cada usuario ETL a un username de Moodle.
+    """Resuelve cada usuario ETL a su username real en Moodle usando su correo @ut.edu.co.
 
-    Prioridad de matching: email institucional → email personal → username →
-    cédula. Un match por username/cédula cuyo nombre difiere del de Moodle se
-    marca como conflicto de identidad y no se mapea.
+    El username de Moodle puede diferir del prefijo antes de ``@ut.edu.co``;
+    se respeta tal cual el username devuelto por Moodle para poder matricular
+    al docente en sus cursos sin renombrar su cuenta.
 
     Retorna (username_map, eventos):
       username_map: {username_etl: username_moodle_resuelto}
-      eventos: lista de (tipo, identifier, detail), con tipo ∈
-        {"user_identity_conflict", "user_resolved"}.
+      eventos: lista de (tipo, identifier, detail), con tipo == "user_resolved".
     """
     username_map: dict[str, str] = {}
     events: list[Event] = []
 
     for user in etl_users:
-        email_lookup = user.get("email", "").strip().lower()
-        personal_lookup = (user.get("email_personal") or "").strip().lower()
-        uname = user.get("username", "")
-        cedula = user.get("cedula", "")
+        email_lookup = str(user.get("email") or "").strip().lower()
+        if not email_lookup.endswith("@ut.edu.co"):
+            continue
 
         moodle_user = institutional_map.get(email_lookup)
-        matched_by = "email"
-        if not moodle_user:
-            moodle_user = personal_map.get(personal_lookup)
-            matched_by = "email_personal"
-        if not moodle_user:
-            moodle_user = username_index.get(uname)
-            matched_by = "username"
-        if not moodle_user:
-            moodle_user = idnumber_index.get(str(cedula))
-            matched_by = "cedula"
         if not moodle_user:
             continue
 
-        resolved_username = moodle_user.get("username", "")
-        if matched_by in ("username", "cedula"):
-            etl_name = f"{user.get('firstname') or ''} {user.get('lastname') or ''}".strip()
-            moodle_name = (
-                f"{moodle_user.get('firstname') or ''} {moodle_user.get('lastname') or ''}"
-            ).strip()
-            if nombres_difieren(etl_name, moodle_name):
-                events.append(
-                    (
-                        "user_identity_conflict",
-                        uname,
-                        {
-                            "email": email_lookup,
-                            "etl_fullname": etl_name,
-                            "moodle_fullname": moodle_name,
-                            "matched_by": matched_by,
-                        },
-                    )
-                )
-                continue
+        resolved_username = str(moodle_user.get("username") or "")
+        if not resolved_username:
+            continue
 
-        username_map[user["username"]] = resolved_username
+        username_map[str(user["username"])] = resolved_username
         events.append(
             (
                 "user_resolved",

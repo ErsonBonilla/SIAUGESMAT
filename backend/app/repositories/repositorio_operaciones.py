@@ -78,8 +78,23 @@ def resolver_items_huerfanos(db: Session) -> list[ItemOperacion]:
 
 
 def crear_lote(
-    db: Session, id_lote: str, tipo_entidad: str, accion: str, total: int, modalidad: str
+    db: Session,
+    id_lote: str,
+    tipo_entidad: str,
+    accion: str,
+    total: int,
+    modalidad: str,
+    *,
+    commit: bool = True,
 ) -> LoteOperacion:
+    existente = db.query(LoteOperacion).filter_by(id_lote=id_lote).first()
+    if existente is not None:
+        existente.total = total
+        db.flush()
+        if commit:
+            db.commit()
+        return existente
+
     lote = LoteOperacion(
         id_lote=id_lote,
         tipo_entidad=tipo_entidad,
@@ -89,7 +104,8 @@ def crear_lote(
     )
     db.add(lote)
     db.flush()
-    db.commit()
+    if commit:
+        db.commit()
     return lote
 
 

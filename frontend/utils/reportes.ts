@@ -4,6 +4,8 @@ export const ETIQUETAS_REPORTES: Record<string, string> = {
   inc_cursos_recientes: "Incidencias: Cursos recientes",
   inc_plantilla_no_encontrada: "Incidencias: Plantillas no encontradas",
   inc_correos_duplicados: "Incidencias: Correos duplicados",
+  inc_usuarios_no_encontrados:
+    "Incidencias: Usuarios no encontrados y cursos no creados",
   audit_categorias_creadas: "Auditoría: Categorías creadas",
   audit_cursos_creados: "Auditoría: Cursos creados",
   audit_cursos_eliminados: "Auditoría: Cursos eliminados",

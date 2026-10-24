@@ -106,11 +106,19 @@ def procesar_item_etl(self, item_id: int):
             elif action == "hide":
                 success = await integration.ocultar_curso(identifier)
             elif action == "rename":
-                success = await integration.renombrar_curso(
-                    old_shortname=detail.get("old_shortname", identifier),
-                    new_shortname=identifier,
-                    new_fullname=detail.get("fullname", ""),
-                )
+                if detail.get("reason") == "same_professor_group_changed":
+                    success = await integration.reciclar_curso_por_duplicacion(
+                        old_shortname=detail.get("old_shortname", identifier),
+                        new_shortname=identifier,
+                        new_fullname=detail.get("fullname", ""),
+                        category_idnumber=detail.get("category_idnumber", ""),
+                    )
+                else:
+                    success = await integration.renombrar_curso(
+                        old_shortname=detail.get("old_shortname", identifier),
+                        new_shortname=identifier,
+                        new_fullname=detail.get("fullname", ""),
+                    )
             elif action == "create":
                 success = await integration.crear_curso(
                     shortname=identifier,
@@ -407,6 +415,8 @@ def _log_enrol_failure(db, execution_id, identifier, detail, error_msg):
         {
             "course": detail.get("course_shortname", ""),
             "fullname": detail.get("fullname", ""),
+            "firstname": detail.get("firstname", ""),
+            "lastname": detail.get("lastname", ""),
             "reason": _normalizar_motivo_matriculacion(error_msg),
         },
     )

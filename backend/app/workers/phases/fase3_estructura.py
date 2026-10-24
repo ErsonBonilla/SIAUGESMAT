@@ -49,7 +49,15 @@ def _crear_items_fase3(db, execution_id, ctx_data, comparison, modalidad) -> dic
     counts: dict[str, int] = {}
     courses = {c["shortname"]: c for c in ctx_data.get("courses", [])}
     existing_by_sn = {c["shortname"]: c for c in ctx_data.get("existing_courses", [])}
-    users_by_username = {u["username"]: u for u in ctx_data.get("users", [])}
+    username_map = ctx_data.get("username_map", {})
+    users_by_username = {}
+    for u in ctx_data.get("users", []):
+        uname = u.get("username")
+        if uname:
+            users_by_username[uname] = u
+            resolved_uname = username_map.get(uname)
+            if resolved_uname:
+                users_by_username[resolved_uname] = u
 
     def _id_lote(suffix):
         return f"etl_3_{suffix}_{execution_id}"
@@ -59,7 +67,13 @@ def _crear_items_fase3(db, execution_id, ctx_data, comparison, modalidad) -> dic
             return
         batch_suffix = batch_suffix or action
         batch = crear_lote(
-            db, _id_lote(batch_suffix), "courses", action, len(identifiers), modalidad
+            db,
+            _id_lote(batch_suffix),
+            "courses",
+            action,
+            len(identifiers),
+            modalidad,
+            commit=False,
         )
         count = 0
         for identifier in identifiers:
@@ -69,6 +83,10 @@ def _crear_items_fase3(db, execution_id, ctx_data, comparison, modalidad) -> dic
                 identifier = identifier.get(
                     "shortname", identifier.get("identifier", str(identifier))
                 )
+            prof = users_by_username.get(detail.get("professor", ""), {})
+            if prof:
+                detail.setdefault("firstname", prof.get("firstname", ""))
+                detail.setdefault("lastname", prof.get("lastname", ""))
             agregar_item(db, batch.id_lote, str(identifier), detail)
             count += 1
         counts[action] = count
@@ -80,7 +98,13 @@ def _crear_items_fase3(db, execution_id, ctx_data, comparison, modalidad) -> dic
     rename_items = comparison.get("to_update", [])
     if rename_items:
         batch = crear_lote(
-            db, _id_lote("rename"), "courses", "rename", len(rename_items), modalidad
+            db,
+            _id_lote("rename"),
+            "courses",
+            "rename",
+            len(rename_items),
+            modalidad,
+            commit=False,
         )
         count = 0
         for item in rename_items:
@@ -95,6 +119,7 @@ def _crear_items_fase3(db, execution_id, ctx_data, comparison, modalidad) -> dic
                     "fullname", ""
                 ),
                 "fullname": course_data.get("fullname", sn),
+                "category_idnumber": course_data.get("category_idnumber", ""),
                 "reason": item.get("reason", ""),
                 "professor": item.get("professor", ""),
                 "reactivate": item.get("reactivate", False),
@@ -187,7 +212,13 @@ def _crear_items_fase3(db, execution_id, ctx_data, comparison, modalidad) -> dic
             )
 
         batch = crear_lote(
-            db, _id_lote("create"), "courses", "create", len(create_items), modalidad
+            db,
+            _id_lote("create"),
+            "courses",
+            "create",
+            len(create_items),
+            modalidad,
+            commit=False,
         )
         count = 0
         for sn, course_data, template_id, item in resolved:

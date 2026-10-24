@@ -202,8 +202,8 @@ def al_terminar_items_fase(self, results, execution_id, phase):
             if pending:
                 logger.warning(f"FASE 4: {len(pending)} items pendientes tras chord, relanzando")
                 task_ids = [procesar_item_etl.si(item.id) for item in pending]
-                chord(task_ids)(al_terminar_items_fase.s(execution_id=execution_id, phase="4"))
                 _marcar_chord_activo(execution_id)
+                chord(task_ids)(al_terminar_items_fase.s(execution_id=execution_id, phase="4"))
                 return
 
         _sincronizar_metricas_desde_items(db, execution_id)
@@ -315,8 +315,8 @@ def al_terminar_usuarios(self, results, execution_id):
         if enrol_items:
             logger.info(f"on_users_done: enrolando {len(enrol_items)} profesor(es)")
             task_ids = [procesar_item_etl.si(item.id) for item in enrol_items]
-            chord(task_ids)(al_terminar_items_fase.s(execution_id=execution_id, phase="4"))
             _marcar_chord_activo(execution_id)
+            chord(task_ids)(al_terminar_items_fase.s(execution_id=execution_id, phase="4"))
         else:
             logger.info("on_users_done: sin enrolamientos pendientes")
             al_terminar_items_fase.delay([], execution_id, "4")
@@ -367,9 +367,19 @@ def _sincronizar_metricas_desde_items(db, execution_id):
 
     ex = obtener_ejecucion(db, execution_id)
     if ex:
+        from app.db.modelos import RegistroError
+
+        errores_db = (
+            db.query(func.count(RegistroError.id))
+            .filter(RegistroError.ejecucion_id == execution_id)
+            .scalar()
+            or 0
+        )
         existing = ex.metricas or {}
+        errores_previos = int(existing.get("total_errors") or 0)
         for key in metrics:
             existing[key] = metrics[key]
+        existing["total_errors"] = max(metrics["total_errors"], errores_previos, errores_db)
         existing["total_operations"] = sum(
             metrics.get(k, 0)
             for k in (
