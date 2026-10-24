@@ -12,7 +12,7 @@ import logging
 from typing import Any
 
 from app.core.config import settings
-from app.pipeline.usuarios import elegir_usuario_mas_antiguo, elegir_usuario_mas_reciente
+from app.pipeline.usuarios import elegir_usuario_mas_antiguo
 from app.services.errores_moodle import ErrorMoodleSobrecargado, es_moodle_sobrecargado
 from app.services.manejador_errores_moodle import extraer_error, manejar_errores_moodle
 from app.services.operaciones_moodle import ServicioMoodle
@@ -211,6 +211,93 @@ class IntegracionMoodle:
         logger.info(f"Curso renombrado: {old_shortname} → {new_shortname}")
         return True
 
+    @manejar_errores_moodle(mensaje_log="Error al reciclar curso por duplicación")
+    async def reciclar_curso_por_duplicacion(
+        self,
+        old_shortname: str,
+        new_shortname: str,
+        new_fullname: str,
+        category_idnumber: str = "",
+    ) -> bool:
+        """Recicla y reinicia un curso al cambiar de grupo: duplica sin datos de usuarios y elimina el antiguo.
+
+        1. Renombra temporalmente el curso antiguo a ``zz_temp_<old_shortname>``.
+        2. Duplica el curso hacia ``new_shortname`` / ``new_fullname`` (conserva
+           actividades y bloques del docente, sin matrículas ni entregas pasadas).
+        3. Elimina definitivamente el curso antiguo (temporal).
+        """
+        temp_shortname = f"zz_temp_{old_shortname}"[:100]
+        target = await self.servicio.obtener_cursos(shortname=new_shortname)
+        if target:
+            temp_huerfano = await self.servicio.obtener_cursos(shortname=temp_shortname)
+            if temp_huerfano:
+                await self.servicio.eliminar_cursos([temp_shortname])
+            logger.warning(
+                f"No se recicla {old_shortname} → {new_shortname}: "
+                f"el destino ya existe como curso ID {target[0]['id']}"
+            )
+            return True
+
+        ya_en_temporal = False
+        existing = await self.servicio.obtener_cursos(shortname=old_shortname)
+        if not existing:
+            existing = await self.servicio.obtener_cursos(shortname=temp_shortname)
+            if existing:
+                ya_en_temporal = True
+            else:
+                self.ultimo_error = f"Curso a reciclar no encontrado: {old_shortname}"
+                logger.warning(self.ultimo_error)
+                return False
+
+        course_id = int(existing[0]["id"])
+        category_id = int(existing[0].get("categoryid") or existing[0].get("category") or 0)
+        if category_idnumber:
+            cats = await self.servicio.obtener_categorias(idnumber=category_idnumber)
+            if not cats and "_" in category_idnumber:
+                cats = await self.servicio.obtener_categorias(
+                    idnumber=category_idnumber.rsplit("_", 1)[0]
+                )
+            if cats and cats[0].get("id"):
+                category_id = int(cats[0]["id"])
+
+        if not ya_en_temporal:
+            await self.servicio.actualizar_cursos([{"id": course_id, "shortname": temp_shortname}])
+
+        try:
+            await self.servicio.duplicar_curso(
+                from_id=course_id,
+                fullname=new_fullname,
+                shortname=new_shortname,
+                categoryid=category_id,
+                visible=1,
+            )
+        except Exception:
+            try:
+                await self.servicio.actualizar_cursos(
+                    [{"id": course_id, "shortname": old_shortname}]
+                )
+            except Exception:
+                logger.warning(
+                    f"No se pudo revertir shortname temporal {temp_shortname} → {old_shortname}"
+                )
+            raise
+
+        verified = await self.servicio.obtener_cursos(shortname=new_shortname)
+        if not verified:
+            await self.servicio.actualizar_cursos([{"id": course_id, "shortname": old_shortname}])
+            self.ultimo_error = (
+                f"La duplicación {old_shortname} → {new_shortname} no se confirmó en Moodle"
+            )
+            logger.error(self.ultimo_error)
+            return False
+
+        await self.servicio.eliminar_cursos([temp_shortname])
+        logger.info(
+            f"Curso reciclado y reiniciado por duplicación: {old_shortname} → {new_shortname} "
+            f"(antiguo eliminado)"
+        )
+        return True
+
         # ------------------------------------------------------------------
         # Usuarios (FASE 3)
         # ------------------------------------------------------------------
@@ -228,22 +315,6 @@ class IntegracionMoodle:
         except Exception as e:
             logger.warning(f"No se pudieron obtener cursos del usuario {user_id}: {e}")
             return None
-
-    PREFIJO_TEMP = "zzdel_"
-    LONGITUD_MAX_USUARIO = 100
-
-    def _username_temporal(self, target: str) -> str:
-        """Username temporal que libera el deseado antes de eliminar el duplicado."""
-        return f"{self.PREFIJO_TEMP}{target}"[: self.LONGITUD_MAX_USUARIO]
-
-    async def _renombrar_usuario(self, user_id, username: str) -> bool:
-        """Renombra (username) una cuenta de Moodle por id."""
-        try:
-            await self.servicio.actualizar_usuarios([{"id": user_id, "username": username}])
-            return True
-        except Exception:
-            logger.exception(f"Fallo al renombrar id={user_id} -> {username}")
-            return False
 
     async def _quizas_cambiar_auth_externa(self, user: dict) -> tuple[bool, str]:
         """Pasa la cuenta conservada de base manual a la base de datos externa.
@@ -282,25 +353,21 @@ class IntegracionMoodle:
             return False, "manual (fallo al cambiar auth)"
 
     async def _consolidar_duplicados(self, email: str, matches: list[dict]) -> dict | None:
-        """Consolida cuentas que comparten email conservando la más antigua.
+        """Consolida cuentas que comparten email conservando la más antigua sin renombrar.
 
-        1. Se conserva la cuenta MÁS ANTIGUA (la que tiene historial).
-        2. Si la cuenta MÁS RECIENTE no tiene cursos, se toma su username (el
-           deseado —el username real del usuario, que puede NO ser el prefijo
-           del correo—), se renombra la cuenta antigua conservada a ese
-           username (''la cuenta vieja queda renombrada'') y se elimina la
-           cuenta reciente.
-        3. Salvaguarda: si la reciente tiene cursos (o no se puede verificar
+        1. Se conserva la cuenta MÁS ANTIGUA (la que tiene historial) manteniendo
+           su username tal cual en Moodle.
+        2. Las cuentas duplicadas más recientes que no tengan cursos se eliminan.
+        3. Salvaguarda: si una cuenta reciente tiene cursos (o no se puede verificar
            porque el webservice no expone ``core_enrol_get_users_courses``),
-           NO se elimina ni se renombra: queda en ``pending_review``.
+           NO se elimina: queda en ``pending_review``.
         4. Si la cuenta conservada está en base manual (auth=manual) con correo
            institucional y no es admin, se pasa a la base de datos externa
            (auth=``MOODLE_EXTERNAL_AUTH``). Las no institucionales y los admins
            se dejan en base manual.
 
-        Registra el resultado en ``last_email_conflicts`` y retorna la cuenta
-        conservada (con su username actualizado si hubo rename), o None si no
-        hay matches válidos.
+        Registra el resultado en ``ultimos_conflictos_correo`` y retorna la cuenta
+        conservada, o None si no hay matches válidos.
         """
         mas_antiguo = elegir_usuario_mas_antiguo(matches)
         if mas_antiguo is None:
@@ -321,25 +388,6 @@ class IntegracionMoodle:
                 deleted.append(user.get("username", ""))
 
         renamed = ""
-        mas_reciente = elegir_usuario_mas_reciente(duplicated)
-        if (
-            mas_reciente
-            and mas_reciente.get("username") in deleted
-            and mas_reciente.get("username") != mas_antiguo.get("username")
-        ):
-            target = mas_reciente.get("username")
-            temp = self._username_temporal(target)
-            newest_id = mas_reciente.get("id")
-            # 1. Libera el username deseado renombrando la reciente a temp.
-            if await self._renombrar_usuario(newest_id, temp):
-                # 2. Renombra la cuenta antigua al username deseado.
-                if await self._renombrar_usuario(mas_antiguo.get("id"), target):
-                    renamed = target
-                    mas_antiguo["username"] = target
-                    deleted = [temp if u == target else u for u in deleted]
-                else:
-                    # Rollback: devuelve el username a la cuenta reciente.
-                    await self._renombrar_usuario(newest_id, target)
 
         if deleted:
             try:

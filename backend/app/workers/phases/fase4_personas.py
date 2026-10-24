@@ -110,7 +110,13 @@ async def _crear_items_fase4_async(db, execution_id, ctx_data, modalidad) -> dic
 
     if usuarios_a_crear:
         batch = crear_lote(
-            db, _id_lote("users"), "users", "create", len(usuarios_a_crear), modalidad
+            db,
+            _id_lote("users"),
+            "users",
+            "create",
+            len(usuarios_a_crear),
+            modalidad,
+            commit=False,
         )
         count = 0
         for user in usuarios_a_crear:
@@ -140,11 +146,25 @@ async def _crear_items_fase4_async(db, execution_id, ctx_data, modalidad) -> dic
 
     if resolved_enrolments:
         batch = crear_lote(
-            db, _id_lote("enrol"), "enrolments", "enrol", len(resolved_enrolments), modalidad
+            db,
+            _id_lote("enrol"),
+            "enrolments",
+            "enrol",
+            len(resolved_enrolments),
+            modalidad,
+            commit=False,
         )
         count = 0
 
-        users_by_username = {u["username"]: u for u in ctx_data.get("users", [])}
+        username_map = ctx_data.get("username_map", {})
+        users_by_username = {}
+        for u in ctx_data.get("users", []):
+            uname = u.get("username")
+            if uname:
+                users_by_username[uname] = u
+                resolved_uname = username_map.get(uname)
+                if resolved_uname:
+                    users_by_username[resolved_uname] = u
 
         all_sns = list(
             {

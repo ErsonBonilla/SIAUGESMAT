@@ -104,6 +104,47 @@ class TestReportGeneration:
         assert data is not None
         assert len(data) == 3  # header + 2 rows
 
+    def test_inc_usuarios_no_encontrados(self):
+        logs = [
+            _make_log(
+                "course_creation_failed_user_missing",
+                identificador="docente@ut.edu.co",
+                detalle={
+                    "email": "docente@ut.edu.co",
+                    "shortname": "IBA_0992_sI_101_G-01",
+                    "firstname": "Juan",
+                    "lastname": "Pérez",
+                    "cat": "IBA",
+                    "programa": "0992",
+                    "semestre": "I",
+                    "grupo": "01",
+                },
+            )
+        ]
+        _process_report_config(self.tmpdir, "inc_usuarios_no_encontrados", logs)
+        data = self._read_csv("18_inc_usuarios_no_encontrados.csv")
+        assert data is not None
+        assert data[0] == [
+            "Correo",
+            "Shortname",
+            "Nombre Docente",
+            "Apellido Docente",
+            "CAT",
+            "Programa",
+            "Semestre",
+            "Grupo",
+        ]
+        assert data[1] == [
+            "docente@ut.edu.co",
+            "IBA_0992_sI_101_G-01",
+            "Juan",
+            "Pérez",
+            "IBA",
+            "0992",
+            "I",
+            "01",
+        ]
+
     def test_audit_cursos_creados(self):
         logs = [
             _make_log(

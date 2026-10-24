@@ -1,5 +1,6 @@
 import logging
 
+from app.pipeline.categorias import obtener_ids_subarbol_idead
 from app.pipeline.nombres_cortos import SIAUGESMAT_PATTERN
 from app.pipeline.usuarios import (
     buscar_candidatos_docente,
@@ -29,8 +30,10 @@ class FaseConsulta(FaseBase):
             actualizar_progreso(db, eid, 2, "Consultando categorías…", paso=1)
 
             all_moodle_cats = await moodle_service.obtener_categorias()
+            ids_idead = obtener_ids_subarbol_idead(all_moodle_cats)
+            cats_idead = [c for c in all_moodle_cats if int(c.get("id") or 0) in ids_idead]
             ctx.mapa_todas_categorias = {
-                c.get("idnumber", ""): c for c in all_moodle_cats if c.get("idnumber")
+                c.get("idnumber", ""): c for c in cats_idead if c.get("idnumber")
             }
             ctx.idnumeros_categorias_existentes = set(ctx.mapa_todas_categorias.keys())
 
@@ -43,15 +46,21 @@ class FaseConsulta(FaseBase):
                     f"en vez de list: {str(all_courses)[:200]}"
                 )
             ctx.cursos_existentes = [
-                c for c in all_courses if SIAUGESMAT_PATTERN.match(c.get("shortname", ""))
+                c
+                for c in all_courses
+                if int(c.get("categoryid") or c.get("category") or 0) in ids_idead
+                and SIAUGESMAT_PATTERN.match(c.get("shortname", ""))
             ]
 
             actualizar_progreso(db, eid, 10, "Consultando usuarios…")
 
             etl_users = etl_data["users"]
 
-            all_institutional = {u["email"] for u in etl_users if u.get("email")}
-            all_personal = {u["email_personal"] for u in etl_users if u.get("email_personal")}
+            all_institutional = {
+                u["email"]
+                for u in etl_users
+                if u.get("email") and str(u["email"]).strip().lower().endswith("@ut.edu.co")
+            }
 
             def _persistir_conflictos_correo(integration=None):
                 conflicts = getattr(integration, "ultimos_conflictos_correo", [])
@@ -81,39 +90,21 @@ class FaseConsulta(FaseBase):
                 else {}
             )
             _persistir_conflictos_correo(integration)
-            personal_map = (
-                await integration.encontrar_usuarios_por_correos(
-                    list(all_personal - all_institutional)
-                )
-                if all_personal
-                else {}
-            )
-            _persistir_conflictos_correo(integration)
-            username_index = await integration.encontrar_usuarios_por_usernames(
-                [u.get("username", "") for u in etl_users if u.get("username")]
-            )
-            idnumber_index = await integration.encontrar_usuarios_por_idnumbers(
-                [u.get("cedula", "") for u in etl_users if u.get("cedula")]
-            )
 
             username_emails: dict[str, str] = {}
             for u in etl_users:
                 if u.get("username") and u.get("email"):
                     username_emails[u["username"]] = u["email"]
-            for user_map in (institutional_map, personal_map, username_index, idnumber_index):
-                for user in user_map.values():
-                    uname = user.get("username", "")
-                    email = user.get("email", "")
-                    if uname and email:
-                        username_emails[uname] = email
+            for user in institutional_map.values():
+                uname = user.get("username", "")
+                email = user.get("email", "")
+                if uname and email:
+                    username_emails[uname] = email
             ctx.correos_usuarios = username_emails
 
             username_map, user_events = resolver_usuarios(
                 etl_users,
                 institutional_map,
-                personal_map,
-                username_index,
-                idnumber_index,
             )
             for tipo, identifier, detail in user_events:
                 if tipo == "user_resolved" and mode not in ("users", "both"):

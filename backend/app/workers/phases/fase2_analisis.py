@@ -3,7 +3,10 @@ import logging
 from app.core.config import settings
 from app.pipeline.categorias import clasificar_categorias
 from app.pipeline.comparacion_cursos import ServicioComparacionCursos
-from app.pipeline.matriculaciones import resolver_matriculaciones, usuarios_a_crear
+from app.pipeline.matriculaciones import (
+    filtrar_cursos_y_matriculas_sin_docente,
+    resolver_matriculaciones,
+)
 from app.pipeline.plan import entradas_log_plan
 from app.repositories import repositorio_registros
 from app.repositories.repositorio_ejecuciones import actualizar_progreso, es_re_subida
@@ -38,7 +41,6 @@ class FaseAnalisis(FaseBase):
     async def ejecutar(self, ctx: ContextoFase) -> None:
         db = ctx.db
         eid = ctx.ejecucion_id
-        mode = ctx.modo
         etl_data = ctx.datos_etl
 
         actualizar_progreso(db, eid, 16, "Analizando datos…", paso=2)
@@ -96,15 +98,37 @@ class FaseAnalisis(FaseBase):
                 max_age_seconds=settings.COURSE_MAX_AGE_SECONDS,
             )
 
+            cursos_filtrados, matriculas_filtradas, incidencias_sin_docente = (
+                filtrar_cursos_y_matriculas_sin_docente(
+                    ctx.comparacion.get("to_create", []),
+                    etl_data["enrolments"],
+                    etl_data["users"],
+                    etl_data["courses"],
+                    ctx.mapa_usuarios,
+                    to_update=ctx.comparacion.get("to_update"),
+                    to_activate=ctx.comparacion.get("to_activate"),
+                )
+            )
+            ctx.comparacion["to_create"] = cursos_filtrados
+            ctx.matriculas_resueltas = matriculas_filtradas
+            ctx.usuarios_a_crear = []
+
+            for inc in incidencias_sin_docente:
+                repositorio_registros.guardar_log(
+                    db,
+                    eid,
+                    "2",
+                    "course_creation_failed_user_missing",
+                    inc.get("email") or inc.get("username", ""),
+                    inc,
+                )
+
             persistir_logs_plan(
                 db,
                 eid,
                 ctx.comparacion,
                 {c.get("shortname", ""): c.get("fullname", "") for c in ctx.cursos_existentes},
             )
-
-            if mode in ("users", "both"):
-                ctx.usuarios_a_crear = usuarios_a_crear(etl_data["users"], ctx.mapa_usuarios)
 
             ctx.metricas["alerts"] = len(ctx.comparacion.get("alerts", []))
 

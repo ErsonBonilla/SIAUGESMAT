@@ -59,38 +59,41 @@ class TestResolveUsers:
         assert username_map == {"doc1": "m_doc1"}
         assert any(t == "user_resolved" for t, _, _ in events)
 
-    def test_resolves_by_personal_email(self):
+    def test_ignores_personal_email_when_institutional_missing(self):
         user = _user(email="", personal="doc1@gmail.com")
-        username_map, _ = resolver_usuarios(
+        username_map, events = resolver_usuarios(
             [user],
             {},
             {"doc1@gmail.com": {"username": "m_doc1"}},
             {},
             {},
         )
-        assert username_map == {"doc1": "m_doc1"}
+        assert username_map == {}
+        assert events == []
 
-    def test_resolves_by_username(self):
+    def test_ignores_username_when_institutional_email_not_found(self):
         user = _user()
-        username_map, _ = resolver_usuarios(
+        username_map, events = resolver_usuarios(
             [user],
             {},
             {},
             {"doc1": {"username": "m_doc1"}},
             {},
         )
-        assert username_map == {"doc1": "m_doc1"}
+        assert username_map == {}
+        assert events == []
 
-    def test_resolves_by_cedula(self):
+    def test_ignores_cedula_when_institutional_email_not_found(self):
         user = _user()
-        username_map, _ = resolver_usuarios(
+        username_map, events = resolver_usuarios(
             [user],
             {},
             {},
             {},
             {"12345": {"username": "m_doc1"}},
         )
-        assert username_map == {"doc1": "m_doc1"}
+        assert username_map == {}
+        assert events == []
 
     def test_unmatched_user_skipped(self):
         user = _user()
@@ -98,30 +101,27 @@ class TestResolveUsers:
         assert username_map == {}
         assert events == []
 
-    def test_username_match_with_conflicting_name_is_not_mapped(self):
-        user = _user()
+    def test_non_institutional_domain_is_not_mapped(self):
+        user = _user(email="doc1@gmail.com")
         username_map, events = resolver_usuarios(
             [user],
+            {"doc1@gmail.com": {"username": "m_doc1"}},
             {},
             {},
-            {"doc1": {"username": "m_doc1", "firstname": "Carlos", "lastname": "Andres"}},
             {},
         )
         assert username_map == {}
-        assert events[0][0] == "user_identity_conflict"
-        assert events[0][1] == "doc1"
-        assert events[0][2]["matched_by"] == "username"
+        assert events == []
 
-    def test_cedula_match_with_same_name_is_mapped(self):
-        user = _user()
-        username_map, _ = resolver_usuarios(
+    def test_resolves_real_moodle_username_different_from_email_prefix(self):
+        user = _user(username="doc1", email="doc1@ut.edu.co")
+        username_map, events = resolver_usuarios(
             [user],
-            {},
-            {},
-            {},
-            {"12345": {"username": "m_doc1", "firstname": "Docente", "lastname": "Uno"}},
+            {"doc1@ut.edu.co": {"username": "docente_real_moodle"}},
         )
-        assert username_map == {"doc1": "m_doc1"}
+        assert username_map == {"doc1": "docente_real_moodle"}
+        assert events[0][0] == "user_resolved"
+        assert events[0][1] == "docente_real_moodle"
 
     def test_email_match_never_checks_names(self):
         # Un match por email no debe emitir conflicto aunque el nombre difiera.
