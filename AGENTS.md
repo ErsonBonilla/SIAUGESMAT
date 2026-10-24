@@ -8,13 +8,13 @@ Aider está configurado para auditar y editar el código con la API de DeepSeek
 (`.aider.conf.yml` en la raíz). La clave se lee de `DEEPSEEK_API_KEY` en `.env`.
 
 ```bash
-# Lanzar (el .exe global está bloqueado por App Control; usar uv):
-uv tool run aider
+# Lanzar (el .exe global está bloqueado por App Control; usar uv con Python 3.12):
+uv tool run --from aider-chat --python 3.12 aider
 
 # Auditoría de SOLO LECTURA (preguntas/análisis sin editar):
-uv tool run aider
-#   ...y dentro usar /ask "analiza X"
-#   o /add <archivo> para traer archivos solo-lectura
+uv tool run --from aider-chat --python 3.12 aider --chat-mode ask
+#   ...o desde CLI en una sola llamada:
+#   uv tool run --from aider-chat --python 3.12 aider --chat-mode ask -m "analiza X" --read <archivo>
 ```
 
 - `deepseek-flash` (DeepSeek V4.1-Flash): 1M de contexto, salida hasta 384K,

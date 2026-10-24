@@ -65,7 +65,21 @@ class ServicioMoodle(ClienteMoodle):
         if self._cache_categorias is None:
             self._cache_categorias = await self._solicitar("core_course_get_categories", {})
         if idnumber:
-            return [c for c in self._cache_categorias if c.get("idnumber") == idnumber]
+            target = idnumber.strip().lower()
+            exact = [
+                c
+                for c in self._cache_categorias
+                if str(c.get("idnumber") or "").strip().lower() == target
+            ]
+            if exact:
+                return exact
+            if target == "distancia":
+                return [
+                    c
+                    for c in self._cache_categorias
+                    if str(c.get("name") or "").strip().upper() == "IDEAD"
+                ]
+            return []
         return self._cache_categorias
 
     async def eliminar_categoria(self, category_id: int, recursive: bool = True) -> dict:

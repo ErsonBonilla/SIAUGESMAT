@@ -173,6 +173,39 @@ class TestProcessEtlItem:
                 old_shortname="OLD_001", new_shortname="IDENTIFIER_001", new_fullname="New Fullname"
             )
 
+    def test_rename_group_changed_uses_reciclar_por_duplicacion(self):
+        with (
+            patch("app.workers.phases.tarea_item.SessionLocal") as mock_sl,
+            patch("app.workers.phases.tarea_item.obtener_item") as mock_get,
+            patch(
+                "app.workers.phases.tarea_item.obtener_servicio_moodle", return_value=_make_moodle()
+            ),
+            patch("app.workers.phases.tarea_item.IntegracionMoodle") as mock_integ_cls,
+            patch("app.workers.phases.tarea_item.actualizar_item"),
+            patch("app.workers.phases.tarea_item._refrescar_progreso_fase"),
+            patch("app.workers.phases.tarea_item.reclamar_item", return_value=True),
+        ):
+            mock_integ = AsyncMock()
+            mock_integ.reciclar_curso_por_duplicacion.return_value = True
+            mock_integ_cls.return_value = mock_integ
+            item = _make_item(
+                accion="rename",
+                old_shortname="IBA_0854_sI_5011065_G-3_10000001",
+                fullname="CALCULO - GRUPO 1",
+                category_idnumber="IBA_0854_sI",
+                reason="same_professor_group_changed",
+            )
+            mock_get.return_value = item
+            mock_sl.return_value = MagicMock()
+            procesar_item_etl(1)
+            mock_integ.reciclar_curso_por_duplicacion.assert_called_once_with(
+                old_shortname="IBA_0854_sI_5011065_G-3_10000001",
+                new_shortname="IDENTIFIER_001",
+                new_fullname="CALCULO - GRUPO 1",
+                category_idnumber="IBA_0854_sI",
+            )
+            mock_integ.renombrar_curso.assert_not_called()
+
     def test_create_course_success(self):
         with (
             patch("app.workers.phases.tarea_item.SessionLocal") as mock_sl,
