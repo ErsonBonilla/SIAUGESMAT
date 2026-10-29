@@ -25,15 +25,15 @@ pre-commit:
         ruff-check:
             root: backend/
             glob: "**/*.py"
-            run: .venv/Scripts/ruff check {staged_files}
+            run: if [ -x .venv/Scripts/ruff ]; then .venv/Scripts/ruff check {staged_files}; else .venv/bin/ruff check {staged_files}; fi
         ruff-format:
             root: backend/
             glob: "**/*.py"
-            run: .venv/Scripts/ruff format --check {staged_files}
+            run: if [ -x .venv/Scripts/ruff ]; then .venv/Scripts/ruff format --check {staged_files}; else .venv/bin/ruff format --check {staged_files}; fi
         pytest:
             root: backend/
             glob: "**/*.py"
-            run: .venv/Scripts/pytest -q
+            run: if [ -x .venv/Scripts/pytest ]; then .venv/Scripts/pytest -q; else .venv/bin/pytest -q; fi
         deno-check:
             root: frontend/
             glob: "**/*.{ts,tsx}"
@@ -47,16 +47,16 @@ pre-push:
     commands:
         ruff-check:
             root: backend/
-            run: .venv/Scripts/ruff check app tests alembic
+            run: if [ -x .venv/Scripts/ruff ]; then .venv/Scripts/ruff check app tests alembic; else .venv/bin/ruff check app tests alembic; fi
         ruff-format:
             root: backend/
-            run: .venv/Scripts/ruff format --check app tests alembic
+            run: if [ -x .venv/Scripts/ruff ]; then .venv/Scripts/ruff format --check app tests alembic; else .venv/bin/ruff format --check app tests alembic; fi
         vulture:
             root: backend/
-            run: .venv/Scripts/vulture app --min-confidence 70
+            run: if [ -x .venv/Scripts/vulture ]; then .venv/Scripts/vulture app --min-confidence 70; else .venv/bin/vulture app --min-confidence 70; fi
         pytest:
             root: backend/
-            run: .venv/Scripts/pytest -q
+            run: if [ -x .venv/Scripts/pytest ]; then .venv/Scripts/pytest -q; else .venv/bin/pytest -q; fi
         deno-check:
             root: frontend/
             run: deno task check

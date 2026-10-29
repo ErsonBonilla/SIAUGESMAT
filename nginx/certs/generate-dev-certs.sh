@@ -6,7 +6,7 @@ set -euo pipefail
 # de modo que el navegador no falle por CN mismatch al acceder por IP.
 #
 # Uso:
-#   bash certs/generate-dev-certs.sh [DOMAIN]
+#   bash nginx/certs/generate-dev-certs.sh [DOMAIN]
 #
 # Variables de entorno:
 #   DOMAIN   Hostname público adicional a incluir como SAN (opcional).

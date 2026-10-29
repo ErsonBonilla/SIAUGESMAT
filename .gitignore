@@ -33,9 +33,9 @@ reports/
 backend/tools/data/
 
 # Certificados y llaves (no se comitean)
-certs/*
-!certs/README.md
-!certs/generate-dev-certs.sh
+nginx/certs/*
+!nginx/certs/README.md
+!nginx/certs/generate-dev-certs.sh
 *.pem
 *.key
 
@@ -55,6 +55,7 @@ _fresh/
 # Herramientas de coverage, linting y build
 .mypy_cache/
 .pytest_cache/
+.ruff_cache/
 htmlcov/
 .coverage
 dist/
