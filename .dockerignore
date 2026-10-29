@@ -1,6 +1,29 @@
+# Control de versiones, CI y agentes locales
+.git/
+.github/
+.aider*
+.ruff_cache/
+
 # e2e — fixtures con datos reales de docentes (protegidos por .gitignore)
 # No deben enviarse al contexto de build de Docker
 backend/e2e/fixtures/
+backend/e2e/tmp_uploads/
+backend/e2e/tmp_reports/
 
-# Archivos de entorno (dev) — la config llega por env de docker-compose, no por archivos
+# Archivos de entorno y certificados — la config llega por env/volumes de docker-compose
 **/.env
+**/.env.*
+nginx/certs/
+*.pem
+*.key
+
+# Datos locales y artefactos generados
+**/uploads/
+**/reports/
+*.db
+*.sqlite3
+*.xlsx
+*.xls
+*.csv
+*.zip
+

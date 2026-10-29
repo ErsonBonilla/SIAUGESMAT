@@ -5,6 +5,13 @@ on:
     branches: ["main"]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
     name: Backend (ruff + pytest)
@@ -14,6 +21,12 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validar Docker Compose
+        working-directory: .
+        run: |
+          docker compose --env-file .env.example -f docker-compose.yml config -q
+          docker compose --env-file .env.example -f docker-compose.yml -f docker-compose.override.yml config -q
 
       - uses: actions/setup-python@v5
         with:

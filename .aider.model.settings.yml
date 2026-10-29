@@ -1,21 +1,42 @@
 # .aider.model.settings.yml - Ajustes finos de modelos para aider
 # Mas informacion: https://aider.chat/docs/config/model-settings.html
 #
-# deepseek-flash (DeepSeek V4.1-Flash) NO viene tuneado en aider 0.86:
-# sin esta entrada caeria a edit_format=whole y use_repo_map=False,
-# lo que rompe la convencion del proyecto (editar por diff, nunca whole)
-# y desactiva el mapa del repo (esencial para auditar).
+# IMPORTANTE: mantener ASCII puro (sin acentos) para evitar errores de
+# codificacion (cp1252) al leer el archivo en Windows.
 #
-# Los valores replican los que aider ya usa para deepseek-chat.
+# deepseek-flash (DeepSeek V4.1-Flash) y deepseek-v4-pro (DeepSeek V4-Pro)
+# NO vienen tuneados en aider 0.86: sin esta entrada caerian a
+# edit_format=whole y use_repo_map=False, lo que rompe la convencion del
+# proyecto (editar por diff, nunca whole) y desactiva el mapa del repo.
+#
+# max_tokens se fija en 64000 porque el modo thinking contabiliza
+# reasoning_tokens + respuesta final dentro de max_tokens.
 
 - name: deepseek/deepseek-flash
   edit_format: diff
   use_repo_map: true
   weak_model_name: deepseek/deepseek-flash
+  editor_model_name: deepseek/deepseek-flash
+  editor_edit_format: editor-diff
   examples_as_sys_msg: true
   reminder: sys
   caches_by_default: true
   accepts_settings:
     - reasoning_effort
   extra_params:
-    max_tokens: 8192
+    max_tokens: 64000
+
+- name: deepseek/deepseek-v4-pro
+  edit_format: diff
+  use_repo_map: true
+  weak_model_name: deepseek/deepseek-flash
+  editor_model_name: deepseek/deepseek-flash
+  editor_edit_format: editor-diff
+  examples_as_sys_msg: true
+  reminder: sys
+  caches_by_default: true
+  accepts_settings:
+    - reasoning_effort
+  extra_params:
+    max_tokens: 64000
+

@@ -33,7 +33,7 @@
 *.env.local
 *.env.development
 *.env.production
-/certs/
+/nginx/certs/
 *.pem
 *.key
 *.crt

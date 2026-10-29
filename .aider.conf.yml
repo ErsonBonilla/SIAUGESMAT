@@ -5,8 +5,9 @@
 # codificacion (cp1252) al leer el archivo en Windows.
 
 # --- Modelo y Comportamiento General ---
-# DeepSeek V4.1-Flash (el modelo actual: 1M de contexto, thinking nativo,
-# function calling, mas barato). Ajustes finos en .aider.model.settings.yml.
+# DeepSeek V4.1-Flash (1M de contexto, salida hasta 384K, thinking nativo,
+# function calling, rapido y economico). Ajustes en .aider.model.settings.yml.
+# Para cambiar a V4-Pro en una sesion: --model deepseek/deepseek-v4-pro o /model
 model: deepseek/deepseek-flash
 # Mismo modelo como "debil": evita que aider llame a OpenAI por defecto.
 weak-model: deepseek/deepseek-flash
@@ -20,6 +21,12 @@ attribute-committer: false
 # DeepSeek V4.1-Flash soporta 1M de contexto; mapa del repo mas generoso que
 # el default (1024) para que el agente "vea" mejor la estructura al auditar.
 map-tokens: 4096
+# Cache de prompts y timeout amplio para auditorias con thinking activo.
+cache-prompts: true
+timeout: 300
+# Guardar historiales en .aider/ para no ensuciar la raiz del repositorio.
+input-history-file: .aider/input.history
+chat-history-file: .aider/chat.history.md
 
 # --- Idioma ---
 # El codigo y los commits estan en espanol.
@@ -44,3 +51,4 @@ read:
   - backend/tests/test_contrato_sql_espanol.py
   - backend/tests/test_contrato_lifespan.py
   - backend/tests/test_pureza_pipeline.py
+

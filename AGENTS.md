@@ -7,21 +7,27 @@ Guía para agentes y desarrolladores que trabajan en SIAUGESMAT.
 Aider está configurado para auditar y editar el código con la API de DeepSeek
 (`.aider.conf.yml` en la raíz). La clave se lee de `DEEPSEEK_API_KEY` en `.env`.
 
-```bash
-# Lanzar (el .exe global está bloqueado por App Control; usar uv con Python 3.12):
-uv tool run --from aider-chat --python 3.12 aider
+```powershell
+# Lanzar en Windows PowerShell (aider.exe está bloqueado por App Control / error 4551;
+# invocar python.exe del entorno uv con -m aider):
+& "$env:APPDATA\uv\tools\aider-chat\Scripts\python.exe" -m aider
 
 # Auditoría de SOLO LECTURA (preguntas/análisis sin editar):
-uv tool run --from aider-chat --python 3.12 aider --chat-mode ask
+& "$env:APPDATA\uv\tools\aider-chat\Scripts\python.exe" -m aider --chat-mode ask
 #   ...o desde CLI en una sola llamada:
-#   uv tool run --from aider-chat --python 3.12 aider --chat-mode ask -m "analiza X" --read <archivo>
+#   & "$env:APPDATA\uv\tools\aider-chat\Scripts\python.exe" -m aider --chat-mode ask -m "analiza X" --read <archivo>
 ```
 
-- `deepseek-flash` (DeepSeek V4.1-Flash): 1M de contexto, salida hasta 384K,
-  thinking mode nativo + function calling. Un solo modelo sirve para editar
-  (diffs) y para auditar (razonar con `/ask`).
-- Ajustes finos del modelo en `.aider.model.settings.yml` (fuerzan `diff` y
-  `use_repo_map`, que aider no trae por defecto para este modelo).
+- `deepseek/deepseek-flash` (DeepSeek V4.1-Flash, por defecto para `model` y
+  `weak-model`): 1M de contexto, salida hasta 384K (`max_tokens: 64000`),
+  thinking mode nativo + function calling. Sirve tanto para editar (`diff`)
+  como para auditar (`/ask`).
+- `deepseek/deepseek-v4-pro` (DeepSeek V4-Pro): también configurado en
+  `.aider.model.settings.yml`; se puede activar bajo demanda con
+  `--model deepseek/deepseek-v4-pro` o `/model deepseek/deepseek-v4-pro`.
+- Ajustes finos en `.aider.model.settings.yml` (fuerzan `edit_format: diff`,
+  `editor_edit_format: editor-diff`, `use_repo_map: true` y `max_tokens: 64000`,
+  que aider 0.86 no trae por defecto para estos modelos).
 - El thinking mode está activo por defecto; el esfuerzo se controla con
   `reasoning_effort` (`low`/`high`/`max`).
 - Al arrancar se cargan como **solo-lectura**: `AGENTS.md` y los tests de

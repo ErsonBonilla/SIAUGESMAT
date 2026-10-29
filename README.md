@@ -2,7 +2,7 @@
 
 **Sistema de Integración y Automatización para la Gestión de Matrículas en Moodle**
 
-Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle 3.9)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 5 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 16 reportes CSV con información detallada, 5 gráficos profesionales, dashboard de analítica y semáforos de estado en tiempo real.
+Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle 3.9)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 5 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 18 reportes CSV con información detallada, 5 gráficos profesionales, dashboard de analítica y semáforos de estado en tiempo real.
 
 ---
 
@@ -78,7 +78,7 @@ Sube un Excel de carga académica y sincroniza cursos, categorías, usuarios y m
 | **FASE 2** | `FaseAnalisis` | Comparar cursos contra Moodle con matching en 3 niveles (exacto → base key → core key). Determina crear, eliminar, activar, ocultar o renombrar. | 20% → 34% |
 | **FASE 3** | `procesar_fase_etl` | Ejecutar cambios estructurales vía Celery chords en 2 oleadas: (1) delete, (2) activate, hide, rename, create cursos. | 34% → 62% |
 | **FASE 4** | `procesar_fase_etl` | Crear usuarios nuevos en Moodle + matricular docentes como editingteacher en sus cursos vía Celery chord. | 65% → 85% |
-| **FASE 5** | `ServicioReportes` | Generar 16 CSVs + 5 gráficos + ZIP con todo. | 85% → 100% |
+| **FASE 5** | `ServicioReportes` | Generar 18 CSVs + 5 gráficos + ZIP con todo. | 85% → 100% |
 
 ### Destacados
 
@@ -174,7 +174,7 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | `/operaciones/ejecuciones` | Tabs (Crear/Eliminar Cursos/Usuarios/Categorías) con ListaEjecucionesIsland (ExecutionList) + ListaOperacionesIsland (OperationList) |
 | `/operaciones/historico` | Tabs con gráficos Chart.js theme-aware + tabla de datos |
 | `/ejecuciones/{id}` | Detalle de ejecución con progreso en vivo, métricas, errores paginados |
-| `/reportes?execution_id={id}` | Descarga de 16 CSVs + 5 gráficos |
+| `/reportes?execution_id={id}` | Descarga de 18 CSVs + 5 gráficos |
 | `/ingreso` | Página de inicio de sesión (LoginForm) |
 
 ### Islas principales
@@ -286,7 +286,7 @@ SIAUGESMAT/
 │   ├── ejecutar_test.py         #   Script unificado
 │   └── README.md
 ├── .env.example                # Variables de entorno de ejemplo (único, copiar al .env raíz)
-├── certs/                      # Certificados SSL para HTTPS
+├── nginx/                      # Reverse proxy HTTPS (nginx.conf + certs/)
 └── README.md
 ```
 
@@ -514,7 +514,10 @@ El flujo de CI en `.github/workflows/ci.yml` corre en cada push a `main` y en ca
 ## Despliegue con Docker
 
 ```bash
-# Construir e iniciar todos los servicios
+# Producción (sin exponer puertos de desarrollo del override)
+docker compose -f docker-compose.yml up --build -d
+
+# Desarrollo local (carga automáticamente docker-compose.override.yml)
 docker compose up --build -d
 
 # Ver logs
@@ -543,44 +546,47 @@ El `docker-compose.yml` incluye 8 servicios:
 
 ### SSL / HTTPS
 
-Colocar los certificados en `certs/` (no se comitean):
+Colocar los certificados en `nginx/certs/` (no se comitean):
 
 ```bash
-mkdir certs
+mkdir -p nginx/certs
 # Copiar archivos:
-#   certs/fullchain.pem — certificado completo
-#   certs/privkey.pem   — clave privada
+#   nginx/certs/fullchain.pem — certificado completo
+#   nginx/certs/privkey.pem   — clave privada
 ```
 
 Para pruebas con certificados autofirmados (incluye SANs para `localhost`, `127.0.0.1` e IPs locales):
 
 ```bash
-bash certs/generate-dev-certs.sh
+bash nginx/certs/generate-dev-certs.sh
 ```
 
-> Ver `certs/README.md` para opciones adicionales (dominio público o generación vía contenedor Docker en Windows).
+> Ver `nginx/certs/README.md` para opciones adicionales (dominio público o generación vía contenedor Docker en Windows).
 
 ### Desarrollo local vs producción
 
-Para desarrollo local (puertos expuestos y montaje en caliente), `docker-compose.override.yml` expone:
+Para desarrollo local (puertos expuestos en `127.0.0.1` y montaje en caliente), `docker-compose.override.yml` expone:
 
 ```yaml
 # docker-compose.override.yml
 services:
   db:
-    ports: ["5432:5432"]
+    ports: ["127.0.0.1:5432:5432"]
   redis:
     # 6380 en el host (el 6379 suele estar ocupado por svchost en Windows)
-    ports: ["6380:6379"]
+    ports: ["127.0.0.1:6380:6379"]
   backend:
     volumes:
       - ./backend/app:/app/app:ro
-    ports: ["8100:8000"]
+    ports: ["127.0.0.1:8100:8000"]
   worker:
     volumes:
       - ./backend/app:/app/app:ro
+  beat:
+    volumes:
+      - ./backend/app:/app/app:ro
   frontend:
-    ports: ["3000:3000"]
+    ports: ["127.0.0.1:3000:3000"]
 ```
 
 `docker compose up` leerá automáticamente el override y expondrá los puertos
