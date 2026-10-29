@@ -57,7 +57,7 @@ async def eliminar_usuarios_csv(
 )
 async def visibilidad_masiva_cursos(
     archivo: UploadFile = File(..., alias="file"),
-    visibilidad: str = Query("show", alias="visibility", regex="^(show|hide)$"),
+    visibilidad: str = Query("show", alias="visibility", pattern="^(show|hide)$"),
     db: Session = Depends(obtener_db),
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):

@@ -153,7 +153,7 @@ def _descargar_csv(qr):
 )
 async def encolar_consulta(
     entidad: str,
-    body: dict = Body(default={}),
+    body: dict | None = Body(default=None),
     db: Session = Depends(obtener_db),
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
@@ -161,7 +161,7 @@ async def encolar_consulta(
         raise HTTPException(400, f"Entidad desconocida: {entidad}")
 
     id_tarea = str(uuid.uuid4())
-    crear_consulta(db, id_tarea, entidad, body, usuario_actual.modalidad)
+    crear_consulta(db, id_tarea, entidad, body or {}, usuario_actual.modalidad)
     encolar_consulta_async(id_tarea)
 
     label = ENTITY_LABELS[entidad].lower()

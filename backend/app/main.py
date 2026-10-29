@@ -105,7 +105,7 @@ async def proteccion_csrf(request: Request, call_next):
       dependencia de autenticación, no por CSRF).
     """
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
-        path = request.url.path
+        path = request.url.path.rstrip("/")
         if not (path.endswith("/auth/login") or path.endswith("/auth/logout")):
             auth = request.headers.get("authorization", "").lower()
             if not auth.startswith("bearer ") and request.cookies.get("auth_token"):

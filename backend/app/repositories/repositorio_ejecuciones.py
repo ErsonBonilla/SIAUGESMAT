@@ -116,10 +116,12 @@ def marcar_completado(
 ) -> Ejecucion | None:
     ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
     if ejecucion:
+        now = datetime.now(UTC)
         ejecucion.estado = "completed"
         ejecucion.metricas = metricas
         ejecucion.conteo_errores = conteo_errores
-        ejecucion.completado_en = datetime.now(UTC)
+        ejecucion.completado_en = now
+        ejecucion.progreso_actualizado_en = now
         ejecucion.duracion_segundos = round(duracion_segundos, 2)
         ejecucion.fase_actual = "Procesamiento completado"
         ejecucion.porcentaje_progreso = 100
@@ -130,8 +132,10 @@ def marcar_completado(
 def marcar_fallido(db: Session, ejecucion_id: int, duracion_segundos: float) -> Ejecucion | None:
     ejecucion = db.query(Ejecucion).filter(Ejecucion.id == ejecucion_id).first()
     if ejecucion:
+        now = datetime.now(UTC)
         ejecucion.estado = "failed"
-        ejecucion.completado_en = datetime.now(UTC)
+        ejecucion.completado_en = now
+        ejecucion.progreso_actualizado_en = now
         ejecucion.duracion_segundos = round(duracion_segundos, 2)
         db.commit()
     return ejecucion
@@ -312,12 +316,12 @@ def cancelar_ejecucion(db: Session, ejecucion_id: int) -> tuple[bool, str]:
     task_id = ejecucion.id_tarea_celery or ""
     ejecucion.estado = "cancelled"
     ejecucion.fase_actual = f"{ejecucion.fase_actual or ''} (cancelado)"
-    ejecucion.completado_en = datetime.now(UTC)
-    ejecucion.duracion_segundos = (
-        round((datetime.now(UTC) - ejecucion.iniciado_en).total_seconds())
-        if ejecucion.iniciado_en
-        else 0
-    )
+    now = datetime.now(UTC)
+    iniciado = ejecucion.iniciado_en
+    if iniciado and iniciado.tzinfo is None:
+        iniciado = iniciado.replace(tzinfo=UTC)
+    ejecucion.completado_en = now
+    ejecucion.duracion_segundos = round((now - iniciado).total_seconds()) if iniciado else 0
     db.commit()
     return True, task_id
 

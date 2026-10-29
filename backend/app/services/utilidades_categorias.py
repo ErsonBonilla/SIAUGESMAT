@@ -14,6 +14,7 @@ def ordenar_categorias(categories: list[dict]) -> list[dict]:
                 h2_id = h2.get("idnumber") or h2["name"]
                 hijos_n3 = [c for c in categories if c.get("parent") == h2_id]
                 sorted_cats.extend(hijos_n3)
-    orphans = [c for c in categories if c not in sorted_cats]
+    seen_ids = {id(c) for c in sorted_cats}
+    orphans = [c for c in categories if id(c) not in seen_ids]
     sorted_cats.extend(orphans)
     return sorted_cats

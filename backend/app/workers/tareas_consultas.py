@@ -222,7 +222,14 @@ def _construir_filas_correos_duplicados(by_email: dict[str, list[dict]]) -> list
                     "duplicate_count": len(account_list),
                 }
             )
-    rows.sort(key=lambda r: (r["email"], str(r["user_id"])))
+
+    def _id_sort_key(val) -> int:
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return 0
+
+    rows.sort(key=lambda r: (r["email"], _id_sort_key(r["user_id"])))
     return rows
 
 

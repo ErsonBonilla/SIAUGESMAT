@@ -24,6 +24,7 @@ def obtener_lote_activo(db: Session, modalidad: str) -> LoteOperacion | None:
             LoteOperacion.modalidad == modalidad,
             ItemOperacion.estado.in_(["pending", "processing"]),
         )
+        .order_by(LoteOperacion.creado_en.asc())
         .first()
     )
 
@@ -49,26 +50,41 @@ def resolver_items_huerfanos(db: Session) -> list[ItemOperacion]:
         db.query(ItemOperacion).filter(ItemOperacion.estado.in_(["pending", "processing"])).all()
     )
     by_execution: dict[int, list[ItemOperacion]] = {}
+    orphaned: list[ItemOperacion] = []
+    now = datetime.now(UTC)
+
     for item in items:
         eid = (item.detalle or {}).get("execution_id")
-        if eid:
-            by_execution.setdefault(int(eid), []).append(item)
-
-    if not by_execution:
-        return []
-
-    ejecuciones = db.query(Ejecucion).filter(Ejecucion.id.in_(by_execution)).all()
-    active_ids = {ex.id for ex in ejecuciones if ex.estado in ESTADOS_EJECUCION_ACTIVA}
-
-    orphaned: list[ItemOperacion] = []
-    for eid, exec_items in by_execution.items():
-        if eid in active_ids:
-            continue
-        for item in exec_items:
+        if eid is None and item.id_lote and item.id_lote.startswith("etl_"):
+            parts = item.id_lote.rsplit("_", 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                eid = parts[1]
+        if eid is not None and str(eid).strip() != "":
+            try:
+                by_execution.setdefault(int(eid), []).append(item)
+            except (TypeError, ValueError):
+                item.estado = "failed"
+                item.mensaje_error = "ID de ejecución inválido en item huérfano"
+                item.actualizado_en = now
+                orphaned.append(item)
+        elif item.id_lote and item.id_lote.startswith("etl_"):
             item.estado = "failed"
-            item.mensaje_error = "Ejecución finalizada, item huérfano"
-            item.actualizado_en = datetime.now(UTC)
+            item.mensaje_error = "Item ETL sin execution_id, huérfano"
+            item.actualizado_en = now
             orphaned.append(item)
+
+    if by_execution:
+        ejecuciones = db.query(Ejecucion).filter(Ejecucion.id.in_(by_execution)).all()
+        active_ids = {ex.id for ex in ejecuciones if ex.estado in ESTADOS_EJECUCION_ACTIVA}
+
+        for eid, exec_items in by_execution.items():
+            if eid in active_ids:
+                continue
+            for item in exec_items:
+                item.estado = "failed"
+                item.mensaje_error = "Ejecución finalizada, item huérfano"
+                item.actualizado_en = now
+                orphaned.append(item)
 
     if orphaned:
         db.commit()

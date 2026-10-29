@@ -108,7 +108,7 @@ class ServicioReportes:
         return zip_path if os.path.exists(zip_path) else None
 
     @classmethod
-    def listar_reportes(cls, report_dir: str) -> list[dict[str, str]]:
+    def listar_reportes(cls, report_dir: str) -> list[dict[str, str | int]]:
         reports = []
         for name, filename in cls.REPORT_NAMES.items():
             path = os.path.join(report_dir, filename)
@@ -216,7 +216,7 @@ class ServicioReportes:
         {
             "key": "audit_categorias_creadas",
             "headers": ["ID Number", "Nombre", "Padre"],
-            "match": lambda log: log.accion == "category_created",
+            "match": lambda log: log.accion == "category_created" and log.detalle is not None,
             "extract": lambda log: [
                 log.identificador or "",
                 log.detalle.get("name", ""),
@@ -257,7 +257,7 @@ class ServicioReportes:
         {
             "key": "audit_cursos_eliminados",
             "headers": ["Shortname", "Curso", "Motivo", "Antigüedad (días)"],
-            "match": lambda log: log.accion == "course_deleted",
+            "match": lambda log: log.accion == "course_deleted" and log.detalle is not None,
             "extract": lambda log: [
                 log.identificador or "",
                 log.detalle.get("fullname", ""),
@@ -268,7 +268,7 @@ class ServicioReportes:
         {
             "key": "audit_cursos_ocultados",
             "headers": ["Shortname", "Curso", "Profesor (username)", "Profesor (nombre)"],
-            "match": lambda log: log.accion == "course_hidden",
+            "match": lambda log: log.accion == "course_hidden" and log.detalle is not None,
             "extract": lambda log: [
                 log.identificador or "",
                 log.detalle.get("fullname", ""),
@@ -290,7 +290,7 @@ class ServicioReportes:
         {
             "key": "audit_cursos_activados",
             "headers": ["Shortname", "Curso", "Profesor (username)", "Profesor (nombre)"],
-            "match": lambda log: log.accion == "course_activated",
+            "match": lambda log: log.accion == "course_activated" and log.detalle is not None,
             "extract": lambda log: [
                 log.identificador or "",
                 log.detalle.get("fullname", ""),
@@ -301,7 +301,10 @@ class ServicioReportes:
         {
             "key": "audit_usuarios",
             "headers": ["Username", "Nombre", "Apellido", "Email", "Estado"],
-            "match": lambda log: log.accion in ("user_created_createpassword", "user_resolved"),
+            "match": lambda log: (
+                log.accion in ("user_created_createpassword", "user_resolved")
+                and log.detalle is not None
+            ),
             "extract": lambda log: [
                 log.identificador or "",
                 log.detalle.get("firstname", ""),
@@ -320,7 +323,9 @@ class ServicioReportes:
                 "Resultado",
                 "Motivo",
             ],
-            "match": lambda log: log.accion in ("enrolment_ok", "enrolment_failed"),
+            "match": lambda log: (
+                log.accion in ("enrolment_ok", "enrolment_failed") and log.detalle is not None
+            ),
             "extract": lambda log: [
                 log.detalle.get("course", ""),
                 log.detalle.get("fullname", ""),
@@ -398,6 +403,14 @@ class ServicioReportes:
                 zip_path = path + ".zip"
                 if os.path.exists(zip_path):
                     os.remove(zip_path)
+            elif (
+                entry.startswith("exec_")
+                and entry.endswith(".zip")
+                and os.path.isfile(path)
+                and os.path.getmtime(path) < cutoff
+            ):
+                os.remove(path)
+                logger.info("ZIP de reporte antiguo eliminado: %s", path)
 
     @classmethod
     def _escribir_resumen_ejecutivo(

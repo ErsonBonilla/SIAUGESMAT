@@ -133,6 +133,7 @@ async def _crear_items_fase4_async(db, execution_id, ctx_data, modalidad) -> dic
                 "firstname": user.get("firstname", ""),
                 "lastname": user.get("lastname", ""),
                 "email": user.get("email", ""),
+                "password": user.get("password", ""),
                 "has_password": bool(user.get("password")),
                 "cedula": user.get("cedula", ""),
                 "city": user.get("city", ""),

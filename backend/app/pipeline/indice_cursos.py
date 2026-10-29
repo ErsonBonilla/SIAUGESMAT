@@ -37,7 +37,7 @@ def indexar_cursos(courses: list[dict]) -> dict[str, list[dict]]:
 
 def construir_mapa_matriculaciones(enrolments: list[dict]) -> dict[str, str]:
     return {
-        e["course_shortname"]: e.get("username", "")
+        str(e.get("course_shortname")): e.get("username", "")
         for e in enrolments
         if e.get("course_shortname")
     }

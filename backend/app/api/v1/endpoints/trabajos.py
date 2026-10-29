@@ -235,6 +235,15 @@ async def confirmar_eliminacion_masiva(
             detail="No se puede procesar una ejecución de modalidad PRESENCIAL.",
         )
 
+    if obtener_ejecucion_activa(
+        db, execution.modalidad, exclude_id=ejecucion_id
+    ) or obtener_lote_activo(db, execution.modalidad):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe un proceso en ejecución en esta modalidad. "
+            "Espere a que finalice antes de iniciar otro.",
+        )
+
         # 1. Validar archivo PRIMERO
     file_path = os.path.join(settings.UPLOAD_DIR, execution.nombre_archivo)
     if not os.path.isfile(file_path):
@@ -253,16 +262,34 @@ async def confirmar_eliminacion_masiva(
             detail="No se pudo encolar la tarea de procesamiento.",
         ) from None
 
-        # 3. Actualizar DB en un solo commit atómico
+        # 3. Actualizar DB verificando transición atómica desde review_required
+    from app.db.modelos import Ejecucion
+
+    updated = (
+        db.query(Ejecucion)
+        .filter(Ejecucion.id == ejecucion_id, Ejecucion.estado == "review_required")
+        .update(
+            {
+                Ejecucion.estado: "pending",
+                Ejecucion.fase_actual: "Eliminación masiva confirmada",
+                Ejecucion.porcentaje_progreso: 30,
+                Ejecucion.id_tarea_celery: job.id,
+                Ejecucion.iniciado_en: datetime.now(UTC),
+            },
+            synchronize_session=False,
+        )
+    )
+    if not updated:
+        revocar_tarea(job.id)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="La ejecución ya fue confirmada por otra solicitud concurrente.",
+        )
+    db.expire(execution)
     if execution.checkpoint_fase is None:
         execution.checkpoint_fase = {}
     execution.checkpoint_fase["delete_confirmed"] = True
     flag_modified(execution, "checkpoint_fase")
-    execution.estado = "pending"
-    execution.fase_actual = "Eliminación masiva confirmada"
-    execution.porcentaje_progreso = 30
-    execution.id_tarea_celery = job.id
-    execution.iniciado_en = datetime.now(UTC)
     db.commit()
 
     logger.info(

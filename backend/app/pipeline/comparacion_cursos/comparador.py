@@ -60,9 +60,9 @@ class ServicioComparacionCursos:
         new_courses: list[dict],
         new_enrolments: list[dict],
         re_upload: bool = False,
-        courses_with_teacher: dict[str, str] = None,
+        courses_with_teacher: dict[str, str] | None = None,
         *,
-        username_emails: dict[str, str] = None,
+        username_emails: dict[str, str] | None = None,
         max_age_seconds: int = EDAD_MAXIMA_CURSO_SEGUNDOS,
     ) -> dict[str, Any]:
         if courses_with_teacher is None:
@@ -183,6 +183,7 @@ class ServicioComparacionCursos:
                                 sn,
                                 professor,
                                 existing_prof,
+                                should_hide_existing=True,
                                 re_upload=re_upload,
                                 max_age_seconds=max_age_seconds,
                             )
