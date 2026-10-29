@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Any
 
@@ -154,7 +155,9 @@ class ServicioMoodle(ClienteMoodle):
             if "visible" in course:
                 params[f"courses[{idx}][visible]"] = course["visible"]
             self._adaptador.construir_parametros_matriculacion_curso(params, course, idx)
-        return await self._solicitar("core_course_create_courses", params)
+        result = await self._solicitar("core_course_create_courses", params)
+        self._cache_cursos = None
+        return result
 
     async def duplicar_curso(
         self,
@@ -175,7 +178,9 @@ class ServicioMoodle(ClienteMoodle):
             "options[1][name]": "blocks",
             "options[1][value]": "1",
         }
-        return await self._solicitar("core_course_duplicate_course", params)
+        result = await self._solicitar("core_course_duplicate_course", params)
+        self._cache_cursos = None
+        return result
 
     async def importar_contenido_curso(self, from_id: int, to_id: int) -> dict:
         params = {
@@ -212,7 +217,9 @@ class ServicioMoodle(ClienteMoodle):
                     params[f"courses[{i}][{field}]"] = course[field]
         if not params:
             return None
-        return await self._solicitar("core_course_update_courses", params)
+        result = await self._solicitar("core_course_update_courses", params)
+        self._cache_cursos = None
+        return result
 
     async def eliminar_cursos(self, shortnames: list[str]) -> dict | None:
         resueltos = await self.obtener_cursos_por_shortnames(shortnames)
@@ -222,7 +229,9 @@ class ServicioMoodle(ClienteMoodle):
         params = {}
         for i, cid in enumerate(course_ids):
             params[f"courseids[{i}]"] = cid
-        return await self._solicitar("core_course_delete_courses", params)
+        result = await self._solicitar("core_course_delete_courses", params)
+        self._cache_cursos = None
+        return result
 
     async def obtener_docentes_matriculados(
         self,
@@ -334,6 +343,9 @@ class ServicioMoodle(ClienteMoodle):
             idn = user.get("idnumber") or user.get("cedula")
             if idn:
                 params[f"users[{i}][idnumber]"] = str(idn)
+            if not use_createpassword and user.get("forcepasswordchange"):
+                params[f"users[{i}][preferences][0][type]"] = "auth_forcepasswordchange"
+                params[f"users[{i}][preferences][0][value]"] = "1"
         return await self._solicitar("core_user_create_users", params)
 
     async def asignar_rol(self, user_id: int, role: object, context_id: int = 1) -> dict:
@@ -448,16 +460,22 @@ class ServicioMoodle(ClienteMoodle):
         term = (term or "").strip()
         if not term:
             return []
-        found: dict[int, dict] = {}
-        for key in ("username", "email", "firstname", "lastname"):
+
+        async def _buscar_por_campo(key: str) -> list[dict]:
             try:
                 result = await self._solicitar(
                     "core_user_get_users",
                     params={"criteria[0][key]": key, "criteria[0][value]": term},
                 )
             except ErrorApiMoodle:
-                continue
-            users = result.get("users", []) if isinstance(result, dict) else []
+                return []
+            return result.get("users", []) if isinstance(result, dict) else []
+
+        batches = await asyncio.gather(
+            *[_buscar_por_campo(k) for k in ("username", "email", "firstname", "lastname")]
+        )
+        found: dict[int, dict] = {}
+        for users in batches:
             for user in users:
                 if "lastlogin" not in user:
                     user["lastlogin"] = user.get("lastaccess", 0)

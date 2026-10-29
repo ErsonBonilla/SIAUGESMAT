@@ -173,6 +173,7 @@ def _lanzar_chord_items(execution_id, structure_items):
 def al_terminar_items_fase(self, results, execution_id, phase):
     _cb_entered = datetime.now(UTC)
     db = SessionLocal()
+    execution = None
     try:
         execution = obtener_ejecucion(db, execution_id)
         if not execution or execution.estado in ("paused", "cancelled"):
@@ -237,15 +238,15 @@ def al_terminar_items_fase(self, results, execution_id, phase):
             actualizar_progreso(db, execution_id, 95, "Finalizando…")
             _cb_done = datetime.now(UTC)
             metrics = execution.metricas or {}
+            iniciado_dt = execution.iniciado_en
+            if iniciado_dt and iniciado_dt.tzinfo is None:
+                iniciado_dt = iniciado_dt.replace(tzinfo=UTC)
             marcar_completado(
                 db,
                 execution_id,
                 metrics,
                 conteo_errores=metrics.get("total_errors", 0),
-                duracion_segundos=(
-                    execution.iniciado_en and (_cb_done - execution.iniciado_en).total_seconds()
-                )
-                or 0,
+                duracion_segundos=(iniciado_dt and (_cb_done - iniciado_dt).total_seconds()) or 0,
             )
             limpiar_checkpoint(db, execution_id)
             actualizar_progreso(db, execution_id, 100, "Ejecución completada")
@@ -261,7 +262,9 @@ def al_terminar_items_fase(self, results, execution_id, phase):
             marcar_fallido(
                 db,
                 execution_id,
-                (datetime.now(UTC) - _cb_entered).total_seconds() if execution.iniciado_en else 0,
+                (datetime.now(UTC) - _cb_entered).total_seconds()
+                if execution and execution.iniciado_en
+                else 0,
             )
         except Exception:
             logger.exception(f"Error marcando fallido on_phase_items_done (fase {phase})")

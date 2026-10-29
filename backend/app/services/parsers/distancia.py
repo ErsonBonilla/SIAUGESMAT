@@ -4,6 +4,7 @@ from typing import Any, ClassVar
 
 import pandas as pd
 
+from app.core.config import settings
 from app.services.parsers.base import AnalizadorExcelBase
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ class AnalizadorDistancia(AnalizadorExcelBase):
         cls, df: pd.DataFrame, modalidad: str
     ) -> tuple[dict, list, dict, list, list]:
         categories_map: dict = {}
-        courses: list = []
+        courses_map: dict[str, dict] = {}
         users: dict = {}
         enrolments: list = []
         duplicates: list = []
@@ -105,7 +106,7 @@ class AnalizadorDistancia(AnalizadorExcelBase):
                 grupo,
                 cedula,
             )
-            courses.append(course_data)
+            courses_map.setdefault(course_data["shortname"], course_data)
 
             cls._ensure_categories(
                 categories_map,
@@ -127,7 +128,7 @@ class AnalizadorDistancia(AnalizadorExcelBase):
                 duplicates,
             )
 
-        return categories_map, courses, users, enrolments, duplicates
+        return categories_map, list(courses_map.values()), users, enrolments, duplicates
 
     @staticmethod
     def _sanear_grupo(grupo: str) -> str:
@@ -252,7 +253,8 @@ class AnalizadorDistancia(AnalizadorExcelBase):
     ):
         email = str(row.get("email_docente", "")).strip().lower()
         nombre_docente = str(row.get("nombre_docente", "")).strip()
-        if email.endswith("@ut.edu.co") and nombre_docente:
+        domain = (settings.INSTITUTIONAL_EMAIL_DOMAIN or "@ut.edu.co").strip().lower()
+        if email.endswith(domain) and nombre_docente:
             username = email.split("@")[0]
             if not username:
                 return

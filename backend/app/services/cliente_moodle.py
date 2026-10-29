@@ -1,6 +1,5 @@
 import logging
 import secrets
-import time
 from typing import Any
 
 import httpx
@@ -64,9 +63,8 @@ class ClienteMoodle:
         use_post: bool = True,
         timeout: float | None = None,
     ) -> Any:
-        _t0 = time.monotonic()
         await self._limitador_tasa.adquirir()
-        return await self._solicitar_con_reintento(wsfunction, params, use_post, timeout, _t0)
+        return await self._solicitar_con_reintento(wsfunction, params, use_post, timeout)
 
     @retry(
         retry=retry_if_exception(_es_error_reintentable),
@@ -81,7 +79,6 @@ class ClienteMoodle:
         params: dict[str, Any],
         use_post: bool,
         timeout: float | None,
-        _t0: float,
     ) -> Any:
         payload = {
             "wstoken": self._token,
@@ -108,7 +105,6 @@ class ClienteMoodle:
             raise
 
         data = response.json()
-        _duration = (time.monotonic() - _t0) * 1000
 
         if data is not None and not isinstance(data, (dict, list)):
             raise ErrorApiMoodle(f"Respuesta inesperada de {wsfunction}: {str(data)[:300]}")

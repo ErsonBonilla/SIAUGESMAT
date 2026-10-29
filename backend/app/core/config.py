@@ -227,8 +227,12 @@ class Configuracion(BaseSettings):
             errors.append("JWT_SECRET_KEY no está configurada")
         elif len(self.JWT_SECRET_KEY) < 32:
             errors.append("JWT_SECRET_KEY es demasiado corta (mínimo 32 caracteres)")
-        if not self.CORS_ORIGINS:
+        if not self.CORS_ORIGINS or not [
+            o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()
+        ]:
             errors.append("CORS_ORIGINS no está configurada")
+        if self.JOB_TIMEOUT <= 0:
+            errors.append("JOB_TIMEOUT debe ser mayor que 0")
         if errors:
             raise ValueError("Errores de configuración crítica:\n  - " + "\n  - ".join(errors))
 

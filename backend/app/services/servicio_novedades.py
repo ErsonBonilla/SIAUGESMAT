@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 from typing import Any
@@ -18,7 +19,7 @@ async def detectar(
     modalidad: str,
     new_file_path: str,
 ) -> tuple[dict[str, Any], str | None]:
-    new_data = ServicioETL.procesar(new_file_path, modalidad)
+    new_data = await asyncio.to_thread(ServicioETL.procesar, new_file_path, modalidad)
     new_courses = new_data.get("courses", [])
 
     if not new_courses:
@@ -44,7 +45,7 @@ async def detectar(
             f"El archivo de la ejecución anterior ({previous.nombre_archivo}) ya no existe en el servidor.",
         )
 
-    old_data = ServicioETL.procesar(old_file_path, modalidad)
+    old_data = await asyncio.to_thread(ServicioETL.procesar, old_file_path, modalidad)
 
     novedades, stats = detectar_novedades(old_data, new_data)
 

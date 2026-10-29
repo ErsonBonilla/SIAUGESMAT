@@ -16,6 +16,7 @@ class ServicioETL:
 
     @staticmethod
     def procesar(file_path: str, modalidad: str) -> dict[str, Any]:
-        parser_cls = FabricaAnalizadores.obtener_analizador(modalidad)
+        modalidad_norm = (modalidad or "").strip().upper() or "DISTANCIA"
+        parser_cls = FabricaAnalizadores.obtener_analizador(modalidad_norm)
         df = parser_cls.leer_excel(file_path)
-        return parser_cls.parsear(df, modalidad)
+        return parser_cls.parsear(df, modalidad_norm)

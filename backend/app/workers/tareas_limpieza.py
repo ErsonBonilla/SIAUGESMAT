@@ -47,9 +47,12 @@ def limpiar_ejecuciones_atascadas():
         )
         count = 0
         for ex in stuck:
-            age = (
-                cutoff - (ex.progreso_actualizado_en or ex.iniciado_en or ex.creado_en)
-            ).total_seconds()
+            ref_dt = ex.progreso_actualizado_en or ex.iniciado_en or ex.creado_en
+            if ref_dt is None:
+                continue
+            if ref_dt.tzinfo is None:
+                ref_dt = ref_dt.replace(tzinfo=UTC)
+            age = (cutoff - ref_dt).total_seconds()
             if age > settings.STUCK_EXECUTION_TIMEOUT:
                 ex.estado = "failed"
                 ex.fase_actual = f"{ex.fase_actual or ''} (timeout 6h)"
@@ -135,8 +138,8 @@ def recuperar_fase_atascada():
                 except ValueError:
                     chord_alive = False
 
-                    # 1) Siempre resetear items 'processing' viejos: pueden quedar
-                    #    atascados aunque otros items de la fase sigan activos.
+            # 1) Siempre resetear items 'processing' viejos: pueden quedar
+            #    atascados aunque otros items de la fase sigan activos.
             for phase in ("3", "4"):
                 reiniciar_items_atascados(
                     db,
@@ -145,8 +148,8 @@ def recuperar_fase_atascada():
                     increment_attempt=True,
                 )
 
-                # 2) Relanzar solo si hay pendientes, sin chord vivo y sin
-                #    procesamiento reciente en la fase.
+            # 2) Relanzar solo si hay pendientes, sin chord vivo y sin
+            #    procesamiento reciente en la fase.
             phase_relaunched = False
             for phase in ("3", "4"):
                 pending = _obtener_items_pendientes(db, eid, phase)
@@ -192,12 +195,15 @@ def recuperar_fase_atascada():
                         if retry < 3:
                             import os
 
+                            from sqlalchemy.orm.attributes import flag_modified
+
                             file_path = os.path.join(settings.UPLOAD_DIR, ex.nombre_archivo)
                             if os.path.isfile(file_path):
                                 from app.workers.tareas import procesar_archivo_etl
 
                                 checkpoint["_retry_count"] = retry + 1
                                 ex.checkpoint_fase = checkpoint
+                                flag_modified(ex, "checkpoint_fase")
                                 db.commit()
                                 logger.warning(
                                     f"Sweeper: ejecución {eid} atascada en fases 1-2 "

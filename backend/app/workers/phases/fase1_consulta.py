@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from app.pipeline.categorias import obtener_ids_subarbol_idead
@@ -156,8 +157,6 @@ class FaseConsulta(FaseBase):
             courses_with_teacher: dict[str, str] = {}
             if mode in ("courses", "both"):
                 teacher_index = indexar_docentes(etl_data["users"], etl_data["enrolments"])
-
-                import asyncio
 
                 sem = asyncio.Semaphore(10)
 

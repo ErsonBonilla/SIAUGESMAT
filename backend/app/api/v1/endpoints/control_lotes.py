@@ -199,7 +199,7 @@ def descargar_reportes_lote(
 
     items = obtener_todos_items_lote(db, id_lote)
     guardar_reportes_lote(batch, items)
-    zip_path = os.path.join(os.path.join(settings.REPORT_DIR, "batch", id_lote) + ".zip")
+    zip_path = os.path.join(settings.REPORT_DIR, "batch", f"{id_lote}.zip")
     if not os.path.exists(zip_path):
         zip_path, zip_filename = construir_zip_reportes_lote(batch, items)
         background_tasks.add_task(os.unlink, zip_path)

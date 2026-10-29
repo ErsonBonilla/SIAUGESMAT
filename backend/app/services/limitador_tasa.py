@@ -88,7 +88,7 @@ class LimitadorTasaRedis:
         if self._redis is None:
             self._redis = aredis.Redis(connection_pool=pool)
         key = "ratelimit:moodle"
-        now = time.monotonic()
+        now = time.time()
         window_start = now - self.ventana
         pipe = self._redis.pipeline(transaction=True)
         pipe.zremrangebyscore(key, 0, window_start)

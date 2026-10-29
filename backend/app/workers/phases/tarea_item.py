@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 def _reset_stuck_items():
+    db = None
     try:
         db = SessionLocal()
         # Primero resolver items huérfanos de ejecuciones ya finalizadas: si
@@ -40,7 +41,8 @@ def _reset_stuck_items():
     except Exception:
         logger.exception("Error reseteando items stuck en etl_item_task")
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 @worker_process_init.connect

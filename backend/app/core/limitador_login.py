@@ -52,6 +52,10 @@ class LimitadorLogin:
             intentos = await r.incr(clave)
             if intentos == 1:
                 await r.expire(clave, self.ventana_seg)
+            elif hasattr(r, "ttl"):
+                ttl = await r.ttl(clave)
+                if isinstance(ttl, int) and ttl == -1:
+                    await r.expire(clave, self.ventana_seg)
             return intentos > self.max_intentos
         except Exception:
             logger.warning("Limitador de login no disponible (Redis); fail-open", exc_info=True)

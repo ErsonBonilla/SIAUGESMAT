@@ -5,6 +5,9 @@ Mapea excepciones de Python, httpx, tenacity y MoodleAPI a mensajes
 que un usuario administrador pueda entender sin ser programador.
 """
 
+import httpx
+from tenacity import RetryError
+
 from app.services.errores_moodle import ErrorApiMoodle
 
 
@@ -12,25 +15,30 @@ def traducir_error(e: Exception) -> str:
     msg = str(e)
 
     # Errores de red / timeout
-    if "ConnectError" in msg or "ConnectionError" in msg or "connection refused" in msg.lower():
+    if (
+        isinstance(e, (httpx.ConnectError, ConnectionError))
+        or "ConnectError" in msg
+        or "ConnectionError" in msg
+        or "connection refused" in msg.lower()
+    ):
         return (
             "Error de conexión a Moodle. Verifique que el servidor Moodle "
             "esté accesible y que tenga conexión a internet."
         )
 
-    if "ReadTimeout" in msg or "Read timed out" in msg:
+    if isinstance(e, httpx.TimeoutException) or "ReadTimeout" in msg or "Read timed out" in msg:
         return (
             "Tiempo de espera agotado al contactar Moodle. "
             "El servidor de Moodle está lento o no responde."
         )
 
-    if "RetryError" in msg:
+    if isinstance(e, RetryError) or "RetryError" in msg:
         return (
             "Agotados los reintentos de conexión a Moodle. "
             "Revise su conexión a internet y el estado del servidor Moodle."
         )
 
-    if "HTTPStatusError" in msg or "Server error" in msg:
+    if isinstance(e, httpx.HTTPStatusError) or "HTTPStatusError" in msg or "Server error" in msg:
         return (
             "El servidor de Moodle devolvió un error HTTP. "
             "Posiblemente esté en mantenimiento o sobrecargado."

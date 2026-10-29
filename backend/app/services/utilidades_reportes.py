@@ -26,7 +26,7 @@ def crear_zip(directory: str, zip_path: str, extensions: tuple[str, ...] = (".cs
                     zf.write(file_path, os.path.relpath(file_path, directory))
 
 
-def listar_archivos_csv(directory: str) -> list[dict[str, str]]:
+def listar_archivos_csv(directory: str) -> list[dict[str, str | int]]:
     if not os.path.isdir(directory):
         return []
     reports = []

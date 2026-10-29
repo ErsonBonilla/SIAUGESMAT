@@ -114,6 +114,9 @@ def setup_dlq_handler(logger, **kwargs):
     """Agrega un handler que registra tareas fallidas permanentemente."""
     dlq_logger = logging.getLogger("celery.dlq")
     dlq_logger.setLevel(logging.WARNING)
+    if dlq_logger.handlers:
+        return
+    os.makedirs(settings.REPORT_DIR, exist_ok=True)
     handler = logging.FileHandler(os.path.join(settings.REPORT_DIR, "celery_dlq.log"))
     handler.setFormatter(
         logging.Formatter(

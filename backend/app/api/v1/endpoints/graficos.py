@@ -66,7 +66,7 @@ async def listar_graficos(
 async def obtener_datos_grafico(
     ejecucion_id: int,
     nombre_grafico: str,
-    theme: str = Query("light", description="Tema: light | dark"),
+    theme: str = Query("light", pattern="^(light|dark)$", description="Tema: light | dark"),
     db: Session = Depends(obtener_db),
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ) -> dict[str, Any]:

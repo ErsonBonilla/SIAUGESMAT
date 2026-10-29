@@ -116,10 +116,11 @@ def resolver_usuarios(
             continue
 
         resolved_username = str(moodle_user.get("username") or "")
-        if not resolved_username:
+        etl_username = str(user.get("username") or "")
+        if not resolved_username or not etl_username:
             continue
 
-        username_map[str(user["username"])] = resolved_username
+        username_map[etl_username] = resolved_username
         events.append(
             (
                 "user_resolved",
@@ -147,18 +148,21 @@ def indexar_docentes(
 
     Retorna {"by_course": {...}, "by_base_key": {...}}.
     """
-    users_by_username = {u["username"]: u for u in users}
+    users_by_username = {u["username"]: u for u in users if u.get("username")}
     by_course = {"emails": {}, "usernames": {}, "idnumbers": {}}
     by_base_key = {"emails": {}, "usernames": {}, "idnumbers": {}}
 
     for enr in enrolments:
-        sn = enr["course_shortname"]
-        user = users_by_username.get(enr["username"])
+        sn = enr.get("course_shortname", "")
+        uname = enr.get("username", "")
+        if not sn or not uname:
+            continue
+        user = users_by_username.get(uname)
         if not user:
             continue
         emails = [e for e in [user.get("email"), user.get("email_personal")] if e]
         by_course["emails"].setdefault(sn, []).extend(emails)
-        by_course["usernames"].setdefault(sn, []).append(enr["username"])
+        by_course["usernames"].setdefault(sn, []).append(uname)
         cedula = user.get("cedula", "")
         if cedula:
             by_course["idnumbers"].setdefault(sn, []).append(cedula)
@@ -167,7 +171,7 @@ def indexar_docentes(
         if parsed:
             bk = construir_clave_base(parsed)
             by_base_key["emails"].setdefault(bk, []).extend(emails)
-            by_base_key["usernames"].setdefault(bk, []).append(enr["username"])
+            by_base_key["usernames"].setdefault(bk, []).append(uname)
             if cedula:
                 by_base_key["idnumbers"].setdefault(bk, []).append(cedula)
 

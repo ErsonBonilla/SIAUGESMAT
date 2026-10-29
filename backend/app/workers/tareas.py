@@ -37,7 +37,6 @@ logger = logging.getLogger(__name__)
 
 PHASES = [FaseConsulta(), FaseAnalisis()]
 PHASE_NAMES = ["1", "2"]
-PROGRESS_START = [0, 20]
 PROGRESS_RESTORE = [12, 30]
 
 
@@ -151,7 +150,8 @@ def procesar_archivo_etl(self, execution_id: int, file_path: str, semester: str)
 
         metrics = ejecutar_moodle_async(moodle_service, _ejecutar_pipeline())
 
-        # Fresco: consultar estado actual de BD
+        # Fresco: consultar estado actual de BD (expirar caché de la sesión)
+        db.expire_all()
         current_exec = obtener_ejecucion(db, execution_id)
 
         if not current_exec:
