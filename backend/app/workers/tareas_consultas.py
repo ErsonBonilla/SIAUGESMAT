@@ -11,6 +11,10 @@ from datetime import UTC, datetime
 from app.celery_app import celery_app
 from app.db.modelos import RegistroEjecucion
 from app.db.sesion import SessionLocal
+from app.pipeline.categorias import (
+    obtener_ids_subarbol_idead,
+    resolver_jerarquia_subcategorias,
+)
 from app.pipeline.nombres_cortos import SIAUGESMAT_PATTERN, parsear_shortname
 from app.repositories.repositorio_consultas import (
     marcar_consulta_completada,
@@ -63,24 +67,29 @@ def _anios_hasta_corte(years: int) -> int:
     return int(time.time()) - years * 365 * 86400
 
 
-def _parsear_corte(params: dict) -> int:
+def _parsear_corte(params: dict, *, allow_semester: bool = True) -> int:
     """Valida que se provea exactamente un corte temporal y devuelve su timestamp.
 
-    Acepta semestre ("2025A"/"2025B"), días (1-30), meses (1-12) o años (>=1).
+    Acepta días (1-30), meses (1-12), años (>=1) y, si ``allow_semester=True``,
+    semestre ("2025A"/"2025B").
     """
     semester = params.get("semester", "")
     days = params.get("days")
     months = params.get("months")
     years = params.get("years")
+    if not allow_semester and semester:
+        raise ValueError("Se requiere seleccionar el tiempo en días, meses o años.")
     provided = sum(
         [
-            bool(semester and len(semester) == 5 and semester[-1] in ("A", "B")),
+            bool(allow_semester and semester and len(semester) == 5 and semester[-1] in ("A", "B")),
             days is not None,
             months is not None,
             years is not None,
         ]
     )
     if provided != 1:
+        if not allow_semester:
+            raise ValueError("Se requiere exactamente un corte: días, meses o años.")
         raise ValueError(
             "Se requiere exactamente un corte: semestre (ej. 2026A), días, meses o años."
         )
@@ -111,14 +120,25 @@ def _parsear_corte(params: dict) -> int:
     return _anios_hasta_corte(years)
 
 
-def _construir_filas_inactivos(teachers: list[dict], course: dict, cutoff: int) -> list[dict]:
+def _construir_filas_inactivos(
+    teachers: list[dict],
+    course: dict,
+    cutoff: int,
+    categorias: list[dict] | None = None,
+) -> list[dict]:
     """Filtra y arma las filas de docentes inactivos (pura, sin I/O)."""
     now = int(time.time())
     sn = course.get("shortname", "")
     parsed = parsear_shortname(sn)
-    program = parsed["cod_prog"] if parsed else ""
-    cat_prefix = parsed["cat_prefix"] if parsed else ""
-    cat_name = CAT_NAMES.get(cat_prefix, cat_prefix)
+    program = (parsed["cod_prog"] or "") if parsed else ""
+    cat_prefix = (parsed["cat_prefix"] or "") if parsed else ""
+    category_id = int(course.get("categoryid") or course.get("category") or 0)
+    jerarquia = resolver_jerarquia_subcategorias(
+        category_id,
+        categorias or [],
+        parsed,
+        CAT_NAMES,
+    )
     rows = []
     for t in teachers:
         last_access = t.get("lastcourseaccess", 0) or 0
@@ -126,18 +146,24 @@ def _construir_filas_inactivos(teachers: list[dict], course: dict, cutoff: int) 
             continue
         rows.append(
             {
-                "teacher_name": f"{t.get('firstname', '')} {t.get('lastname', '')}".strip(),
-                "username": t.get("username", ""),
-                "email": t.get("email", ""),
-                "course_name": course.get("fullname", ""),
+                "cat_shortname": jerarquia["cat_shortname"],
+                "cat_name": jerarquia["cat_name"],
+                "semester_shortname": jerarquia["semester_shortname"],
+                "semester_name": jerarquia["semester_name"],
+                "program_shortname": jerarquia["program_shortname"],
+                "program_name": jerarquia["program_name"],
                 "course_shortname": sn,
-                "program": program,
-                "cat": cat_name,
-                "cat_prefix": cat_prefix,
+                "course_name": course.get("fullname", ""),
+                "username": t.get("username", ""),
+                "teacher_name": f"{t.get('firstname', '')} {t.get('lastname', '')}".strip(),
+                "email": t.get("email", ""),
                 "last_access": last_access,
                 "days_since_last_access": int((now - last_access) // 86400)
                 if last_access > 0
                 else 0,
+                "program": program,
+                "cat": jerarquia["cat_name"],
+                "cat_prefix": cat_prefix,
             }
         )
     return rows
@@ -333,10 +359,20 @@ async def _ejecutar_consulta(moodle: ServicioMoodle, qr):
         return await _consultar_correos_duplicados(moodle)
 
     if qr.entidad == "inactive_teachers":
-        cutoff = _parsear_corte(params)
+        cutoff = _parsear_corte(params, allow_semester=False)
+
+        raw_cats = await moodle.obtener_categorias()
+        categorias_list = raw_cats if isinstance(raw_cats, list) else []
+        ids_idead = obtener_ids_subarbol_idead(categorias_list) if categorias_list else set()
 
         all_courses = await moodle.obtener_cursos()
-        siau_courses = [c for c in all_courses if SIAUGESMAT_RE.match(c.get("shortname", ""))]
+        siau_courses = [
+            c
+            for c in all_courses
+            if int(c.get("visible", 1)) != 0
+            and SIAUGESMAT_RE.match(c.get("shortname", ""))
+            and (not ids_idead or int(c.get("categoryid") or c.get("category") or 0) in ids_idead)
+        ]
 
         sem = asyncio.Semaphore(5)
         results = []
@@ -351,7 +387,9 @@ async def _ejecutar_consulta(moodle: ServicioMoodle, qr):
                         f"Error obteniendo profesores del curso {course.get('shortname')}: {e}"
                     )
                     return
-                results.extend(_construir_filas_inactivos(teachers, course, cutoff))
+                results.extend(
+                    _construir_filas_inactivos(teachers, course, cutoff, categorias=categorias_list)
+                )
 
         batch_size = 5
         for i in range(0, len(siau_courses), batch_size):

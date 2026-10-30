@@ -1,6 +1,10 @@
 """Pruebas del núcleo puro de clasificación de categorías."""
 
-from app.pipeline.categorias import clasificar_categorias
+from app.pipeline.categorias import (
+    clasificar_categorias,
+    obtener_ids_subarbol_idead,
+    resolver_jerarquia_subcategorias,
+)
 
 
 def _cat(idnumber="IDE", parent=""):
@@ -69,3 +73,31 @@ class TestClassifyCategories:
         )
         assert [c["idnumber"] for c in missing] == ["A"]
         assert relocate == []
+
+
+class TestResolverJerarquiaSubcategorias:
+    def test_reconoce_raiz_idead_por_idnumber_idead(self):
+        cats = [
+            {"id": 1, "name": "Raiz", "idnumber": "IDEAD", "parent": 0},
+            {"id": 2, "name": "IBAGUE", "idnumber": "IBA", "parent": 1},
+            {"id": 3, "name": "EXTERNA", "idnumber": "EXT", "parent": 0},
+        ]
+        assert obtener_ids_subarbol_idead(cats) == {1, 2}
+
+    def test_resuelve_tres_niveles_desde_categorias_moodle(self):
+        cats = [
+            {"id": 10, "name": "IDEAD", "idnumber": "DISTANCIA", "parent": 0},
+            {"id": 20, "name": "CALI", "idnumber": "CAL", "parent": 10},
+            {"id": 30, "name": "INGENIERIA DE SISTEMAS", "idnumber": "CAL_0852", "parent": 20},
+            {"id": 40, "name": "SEMESTRE IV", "idnumber": "CAL_0852_sIV", "parent": 30},
+        ]
+        parsed = {"cat_prefix": "CAL", "cod_prog": "0852", "semestre": "IV"}
+        res = resolver_jerarquia_subcategorias(40, cats, parsed)
+        assert res == {
+            "cat_shortname": "CAL",
+            "cat_name": "CALI",
+            "semester_shortname": "CAL_0852_sIV",
+            "semester_name": "SEMESTRE IV",
+            "program_shortname": "CAL_0852",
+            "program_name": "INGENIERIA DE SISTEMAS",
+        }

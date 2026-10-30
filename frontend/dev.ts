@@ -9,5 +9,6 @@ tailwind(builder);
 if (Deno.args.includes("build")) {
   await builder.build(config);
 } else {
-  await builder.listen(() => import("./main.ts"));
+  const port = Number(Deno.env.get("PORT")) || 3000;
+  await builder.listen(() => import("./main.ts"), { port });
 }

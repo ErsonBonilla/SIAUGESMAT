@@ -16,6 +16,12 @@ from app.services.limitador_tasa import LimitadorTasaRedis
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
+
 
 def generar_password_moodle(length: int = 14) -> str:
     import string as _string
@@ -54,7 +60,10 @@ class ClienteMoodle:
                 rate=settings.MOODLE_MAX_REQUESTS_PER_SECOND,
                 burst=settings.MOODLE_BURST_SIZE,
             )
-        self._cliente = httpx.AsyncClient(timeout=settings.MOODLE_REQUEST_TIMEOUT)
+        self._cliente = httpx.AsyncClient(
+            timeout=settings.MOODLE_REQUEST_TIMEOUT,
+            headers={"User-Agent": DEFAULT_USER_AGENT},
+        )
 
     async def _solicitar(
         self,
