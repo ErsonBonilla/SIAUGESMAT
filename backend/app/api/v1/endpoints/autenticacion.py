@@ -22,6 +22,7 @@ from app.schemas.usuario import (
     SolicitudLogin,
     UsuarioEnToken,
 )
+from app.services.cliente_moodle import DEFAULT_USER_AGENT
 from app.services.errores_moodle import ErrorApiMoodle
 from app.services.fabrica_moodle import obtener_servicio_moodle
 
@@ -60,7 +61,9 @@ async def _obtener_token_moodle(moodle_url: str, username: str, password: str) -
         "moodlewsrestformat": "json",
     }
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(
+        timeout=15.0, headers={"User-Agent": DEFAULT_USER_AGENT}
+    ) as client:
         try:
             response = await client.post(token_url, data=payload)
             response.raise_for_status()
@@ -118,7 +121,9 @@ async def _verificar_permisos_moodle(moodle_url: str, token: str) -> int:
         "moodlewsrestformat": "json",
     }
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(
+        timeout=15.0, headers={"User-Agent": DEFAULT_USER_AGENT}
+    ) as client:
         # 1. Obtener información del sitio y del usuario
         params = {**common_params, "wsfunction": "core_webservice_get_site_info"}
         try:

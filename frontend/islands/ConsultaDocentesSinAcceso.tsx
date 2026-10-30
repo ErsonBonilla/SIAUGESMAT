@@ -14,17 +14,41 @@ function formatDaysSince(daysSince?: number): string {
 
 const COLUMNAS: ColumnaInactivo[] = [
   {
-    key: "teacher_name",
-    label: "Docente",
-    destacar: true,
-    render: (r) => String(r.teacher_name || "—"),
+    key: "cat_shortname",
+    label: "Shortname CAT",
+    render: (r) => String(r.cat_shortname || r.cat_prefix || "—"),
   },
   {
-    key: "username",
-    label: "Username",
-    render: (r) => String(r.username ?? "—"),
+    key: "cat_name",
+    label: "Nombre CAT",
+    render: (r) => String(r.cat_name || r.cat || "—"),
   },
-  { key: "email", label: "Correo", render: (r) => String(r.email ?? "—") },
+  {
+    key: "semester_shortname",
+    label: "Shortname Semestre",
+    render: (r) => String(r.semester_shortname || "—"),
+  },
+  {
+    key: "semester_name",
+    label: "Nombre Semestre",
+    render: (r) => String(r.semester_name || "—"),
+  },
+  {
+    key: "program_shortname",
+    label: "Shortname Programa",
+    render: (r) => String(r.program_shortname || r.program || "—"),
+  },
+  {
+    key: "program_name",
+    label: "Nombre Programa",
+    truncar: true,
+    render: (r) => String(r.program_name || r.program || "—"),
+  },
+  {
+    key: "course_shortname",
+    label: "Shortname Curso",
+    render: (r) => String(r.course_shortname || "—"),
+  },
   {
     key: "course_name",
     label: "Curso",
@@ -32,14 +56,20 @@ const COLUMNAS: ColumnaInactivo[] = [
     render: (r) => String(r.course_name ?? "—"),
   },
   {
-    key: "program",
-    label: "Programa",
-    render: (r) => String(r.program || "—"),
+    key: "username",
+    label: "Username",
+    destacar: true,
+    render: (r) => String(r.username ?? "—"),
   },
-  { key: "cat", label: "CAT", render: (r) => String(r.cat || "—") },
+  {
+    key: "teacher_name",
+    label: "Docente",
+    render: (r) => String(r.teacher_name || "—"),
+  },
+  { key: "email", label: "Email", render: (r) => String(r.email ?? "—") },
   {
     key: "last_access",
-    label: "Último acceso",
+    label: "Fecha último acceso",
     render: (r) => formatLastAccess(Number(r.last_access)),
   },
   {
@@ -56,25 +86,26 @@ export default function ConsultaDocentesInactivos() {
       sustantivo="sin acceso"
       columnas={COLUMNAS}
       nombreCsv="docentes_inactivos.csv"
-      textoVacio='Seleccione el corte (días o semestre) y presione "Consultar".'
+      modosPermitidos={["days", "months", "years"]}
+      textoVacio='Seleccione el tiempo (días, meses o años) y presione "Consultar".'
       seccionesAyuda={[
         {
           title: "Qué consulta",
           body:
-            "Lista los docentes (rol editingteacher) que no han accedido a sus cursos SIAUGESMAT desde una fecha de corte, usando el campo lastcourseaccess de Moodle.",
+            "Lista los docentes (rol editingteacher) que no han accedido a sus cursos visibles bajo la categoría IDEAD desde una fecha de corte, usando el campo lastcourseaccess de Moodle. Excluye cursos ocultos.",
         },
         {
-          title: "Cómo elegir el corte",
+          title: "Cómo elegir el tiempo",
           body: [
-            "Por días (1-30, por defecto 15), meses (1-12), años (≥ 1) o semestre (ej. 2026A).",
-            "El corte define la fecha límite: se muestran docentes cuyo último acceso al curso es anterior a esa fecha.",
+            "Por días (1-30, por defecto 15), meses (1-12) o años (≥ 1).",
+            "El corte define la fecha límite: se muestran docentes cuyo último acceso al curso es anterior a esa fecha (o que nunca han ingresado).",
           ],
         },
         {
           title: "Resultado",
           body: [
-            "Cada fila muestra nombre del docente, username, correo, curso, programa, CAT, último acceso y días sin acceso.",
-            "Esta consulta recorre todos los cursos SIAUGESMAT y puede tardar varios minutos.",
+            "Cada fila incluye las subcategorías bajo IDEAD (shortname y nombre de CAT, semestre y programa académico), el curso, username, nombre completo y email del docente, fecha del último acceso y días sin acceder al curso.",
+            "Esta consulta recorre los cursos visibles de IDEAD y puede tardar varios minutos.",
           ],
         },
       ]}

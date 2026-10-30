@@ -14,7 +14,8 @@ import AyudaConsulta, {
 
 const PAGE_SIZE = 20;
 
-type ModoCorte = "days" | "months" | "years" | "semester";
+export type ModoCorte = "days" | "months" | "years" | "semester";
+const TODOS_LOS_MODOS: ModoCorte[] = ["days", "months", "years", "semester"];
 
 export interface ColumnaInactivo {
   key: string;
@@ -31,6 +32,7 @@ interface PropsConsultaInactivos {
   seccionesAyuda: SeccionAyudaConsulta[];
   nombreCsv: string;
   textoVacio: string;
+  modosPermitidos?: ModoCorte[];
 }
 
 export default function ConsultaInactivos(
@@ -41,6 +43,7 @@ export default function ConsultaInactivos(
     seccionesAyuda,
     nombreCsv,
     textoVacio,
+    modosPermitidos = TODOS_LOS_MODOS,
   }: PropsConsultaInactivos,
 ) {
   const cutoffMode = useSignal<ModoCorte>("days");
@@ -100,7 +103,7 @@ export default function ConsultaInactivos(
       <div class="flex flex-col sm:flex-row sm:items-end gap-4">
         <div class="flex flex-col gap-2">
           <div class="flex gap-1 bg-[var(--bg-tertiary)] rounded-lg p-1 w-fit flex-wrap">
-            {(["days", "months", "years", "semester"] as const).map((mode) => {
+            {modosPermitidos.map((mode) => {
               const labels: Record<ModoCorte, string> = {
                 days: "Por días",
                 months: "Por meses",

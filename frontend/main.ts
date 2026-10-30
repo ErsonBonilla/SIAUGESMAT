@@ -14,5 +14,6 @@ app.fsRoutes();
 export { app };
 
 if (import.meta.main) {
-  await app.listen();
+  const port = Number(Deno.env.get("PORT")) || 3000;
+  await app.listen({ port });
 }

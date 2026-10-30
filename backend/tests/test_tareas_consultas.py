@@ -158,13 +158,25 @@ class TestBuildInactiveRows:
         assert rows[0]["course_shortname"] == SIA_COURSE
         assert rows[0]["program"] == parsed["cod_prog"]
         assert rows[0]["cat_prefix"] == parsed["cat_prefix"]
-        assert rows[0]["cat"] == parsed["cat_prefix"]  # no mapeado â†’ usa prefijo
+        assert rows[0]["cat"] == parsed["cat_prefix"]  # no mapeado -> usa prefijo
+        assert rows[0]["cat_shortname"] == "IBA"
+        assert rows[0]["cat_name"] == "IBA"
+        assert rows[0]["program_shortname"] == "IBA_0854"
+        assert rows[0]["program_name"] == "0854"
+        assert rows[0]["semester_shortname"] == "IBA_0854_sIV"
+        assert rows[0]["semester_name"] == "SEMESTRE IV"
 
 
 class TestDoQueryInactiveTeachers:
-    def _moodle(self, courses: list, teachers_by_course: dict) -> AsyncMock:
+    def _moodle(
+        self,
+        courses: list,
+        teachers_by_course: dict,
+        categories: list | None = None,
+    ) -> AsyncMock:
         moodle = AsyncMock()
         moodle.obtener_cursos.return_value = courses
+        moodle.obtener_categorias.return_value = categories or []
         call = moodle.obtener_docentes_matriculados_con_acceso
         call.side_effect = lambda cid: teachers_by_course.get(int(cid), [])
         return moodle
@@ -192,20 +204,67 @@ class TestDoQueryInactiveTeachers:
         assert moodle.obtener_docentes_matriculados_con_acceso.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_by_semester(self):
-        cutoff = _semestre_a_corte("2025A")
+    async def test_semester_rejected_for_inactive_teachers(self):
+        moodle = self._moodle([_course(SIA_COURSE, cid=1)], {})
+        qr = SimpleNamespace(entidad="inactive_teachers", parametros={"semester": "2025A"})
+        with pytest.raises(ValueError, match="días, meses o años"):
+            await _ejecutar_consulta(moodle, qr)
+
+    @pytest.mark.asyncio
+    async def test_excludes_hidden_courses(self):
+        now = int(time.time())
+        visible_course = {**_course(SIA_COURSE, cid=1), "visible": 1}
+        hidden_course = {**_course("IBA_0854_sIV_2022482_G-1", cid=2), "visible": 0}
         moodle = self._moodle(
-            [_course(SIA_COURSE, cid=1)],
+            [visible_course, hidden_course],
             {
-                1: [
-                    _teacher("antes", lastcourseaccess=cutoff - 1),
-                    _teacher("despues", lastcourseaccess=cutoff + 1),
-                ],
+                1: [_teacher("doc_visible", lastcourseaccess=now - 20 * DAY)],
+                2: [_teacher("doc_oculto", lastcourseaccess=now - 20 * DAY)],
             },
         )
-        qr = SimpleNamespace(entidad="inactive_teachers", parametros={"semester": "2025A"})
+        qr = SimpleNamespace(entidad="inactive_teachers", parametros={"days": 15})
         rows = await _ejecutar_consulta(moodle, qr)
-        assert [r["username"] for r in rows] == ["antes"]
+        assert [r["username"] for r in rows] == ["doc_visible"]
+        assert moodle.obtener_docentes_matriculados_con_acceso.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_filters_only_idead_subtree_and_resolves_subcategory_fields(self):
+        now = int(time.time())
+        categories = [
+            {"id": 10, "name": "IDEAD", "idnumber": "IDEAD", "parent": 0},
+            {"id": 11, "name": "IBAGUE", "idnumber": "IBA", "parent": 10},
+            {"id": 12, "name": "ADMINISTRACION FINANCIERA", "idnumber": "IBA_0854", "parent": 11},
+            {"id": 13, "name": "SEMESTRE IV", "idnumber": "IBA_0854_sIV", "parent": 12},
+            {"id": 99, "name": "OTRA FACULTAD", "idnumber": "OTR", "parent": 0},
+        ]
+        curso_idead = {**_course(SIA_COURSE, cid=1), "categoryid": 13, "visible": 1}
+        curso_fuera = {
+            **_course("IBA_0854_sIV_2022482_G-1", cid=2),
+            "categoryid": 99,
+            "visible": 1,
+        }
+        moodle = self._moodle(
+            [curso_idead, curso_fuera],
+            {
+                1: [_teacher("doc_idead", lastcourseaccess=now - 20 * DAY)],
+                2: [_teacher("doc_fuera", lastcourseaccess=now - 20 * DAY)],
+            },
+            categories=categories,
+        )
+        qr = SimpleNamespace(entidad="inactive_teachers", parametros={"days": 15})
+        rows = await _ejecutar_consulta(moodle, qr)
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["username"] == "doc_idead"
+        assert row["cat_shortname"] == "IBA"
+        assert row["cat_name"] == "IBAGUE"
+        assert row["program_shortname"] == "IBA_0854"
+        assert row["program_name"] == "ADMINISTRACION FINANCIERA"
+        assert row["semester_shortname"] == "IBA_0854_sIV"
+        assert row["semester_name"] == "SEMESTRE IV"
+        assert row["teacher_name"] == "Doc Uno"
+        assert row["email"] == "doc_idead@ut.edu.co"
+        assert row["days_since_last_access"] == 20
 
     @pytest.mark.asyncio
     async def test_requires_exactly_one_cutoff(self):
