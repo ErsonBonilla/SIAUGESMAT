@@ -16,7 +16,7 @@ Aplicación full-stack para la Universidad del Tolima que automatiza la carga ma
 | **Cola de tareas** | Redis 8 + Celery (+ Celery Beat para tareas periódicas) |
 | **Integración Moodle** | API REST (versiones 3.8 a 5.x) vía adapter pattern + rate limiting |
 | **Reportes** | CSV + gráficos (PNG, HTML, JSON) + ZIP |
-| **Calidad de código** | Backend: ruff + vulture; Frontend: `deno task check` (fmt + lint + typecheck) + CI en GitHub Actions |
+| **Calidad de código** | Backend: ruff + vulture; Frontend: `deno task check` (fmt + lint + typecheck); Seguridad: gitleaks (pre-commit/pre-push vía lefthook + CI en GitHub Actions) |
 
 ---
 
@@ -286,6 +286,8 @@ SIAUGESMAT/
 │   ├── ejecutar_test.py         #   Script unificado
 │   └── README.md
 ├── .env.example                # Variables de entorno de ejemplo (único, copiar al .env raíz)
+├── .gitleaks.toml              # Reglas y exclusiones de detección de secretos (Gitleaks)
+├── lefthook.yml                # Git hooks (pre-commit y pre-push: gitleaks, ruff, vulture, pytest, deno)
 ├── nginx/                      # Reverse proxy HTTPS (nginx.conf + certs/)
 └── README.md
 ```
@@ -306,6 +308,7 @@ SIAUGESMAT/
 | Deno | 2.9+ |
 | PostgreSQL | 18 |
 | Redis | 8 |
+| Gitleaks | 8.30+ (opcional, para hooks locales con Lefthook) |
 
 ---
 
@@ -484,6 +487,10 @@ pytest tests/test_pureza_pipeline.py -v
 cd frontend
 deno task check
 deno task build
+
+# Seguridad — detección de secretos en historial y staging (desde la raíz)
+gitleaks git --redact --no-banner
+gitleaks git --pre-commit --staged --redact --no-banner
 ```
 
 ### End-to-end (contra Moodle real)
@@ -505,6 +512,7 @@ El flujo de CI en `.github/workflows/ci.yml` corre en cada push a `main` y en ca
 
 | Job | Pasos |
 |---|---|
+| **gitleaks** | `actions/checkout` (`fetch-depth: 0`) → `gitleaks/gitleaks-action@v2` (reglas por defecto + `.gitleaks.toml`) |
 | **backend** | Python 3.12 → `ruff check app tests alembic` → `ruff format --check app tests alembic` → `vulture app --min-confidence 70` → `pytest -q` |
 | **frontend** | Deno 2.9.5 → `deno task check` (fmt + lint + typecheck) → `deno test -A tests/` → `deno task build` |
 | **migraciones** | PostgreSQL 18 → `alembic upgrade head` → `alembic check` (sin drift) → smoke de esquema y contratos |

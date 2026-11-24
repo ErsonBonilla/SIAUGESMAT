@@ -1,0 +1,48 @@
+# ============================================================================
+# .gitleaks.toml — Configuración de detección de secretos para SIAUGESMAT
+#
+# Uso manual:
+#   gitleaks git --redact --no-banner                        # historial completo
+#   gitleaks git --pre-commit --staged --redact --no-banner  # cambios en staging
+# ============================================================================
+
+title = "Configuración de Gitleaks para SIAUGESMAT"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "moodle-ws-token"
+description = "Token de Web Service de Moodle (32 caracteres hexadecimales)"
+regex = '''(?i)(?:moodle(?:_admin)?_token(?:__(?:presencial|distancia))?|wstoken)\s*(?:=|:|"|'|`|\s)+\s*["'`]?([a-f0-9]{32})["'`]?'''
+secretGroup = 1
+keywords = [
+    "moodle_token",
+    "moodle_admin_token",
+    "wstoken",
+]
+
+[allowlist]
+description = "Exclusiones globales: entornos virtuales, cachés, lockfiles y placeholders de prueba"
+paths = [
+    '''(^|/)\.venv/''',
+    '''(^|/)venv/''',
+    '''(^|/)node_modules/''',
+    '''(^|/)_fresh/''',
+    '''(^|/)\.ruff_cache/''',
+    '''(^|/)\.pytest_cache/''',
+    '''(^|/)\.mypy_cache/''',
+    '''(^|/)\.metrics/''',
+    '''(^|/)target/''',
+    '''^frontend/deno\.lock$''',
+    '''^backend/requirements(?:-dev)?\.lock$''',
+    '''^\.env\.example$''',
+]
+regexTarget = "secret"
+regexes = [
+    '''^genera-una-clave-segura-aqui$''',
+    '''^clave-secreta-de-prueba-suficientemente-larga$''',
+    '''^tu-token-(?:admin|presencial|distancia)$''',
+    '''^token-de-prueba$''',
+    '''^tokendemo$''',
+]

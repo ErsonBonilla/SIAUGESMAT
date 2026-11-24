@@ -52,10 +52,12 @@ Thumbs.db
 # Archivos de construcción de Fresh (build output)
 _fresh/
 
-# Herramientas de coverage, linting y build
+# Herramientas de coverage, linting, métricas (ub-mode) y build
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+.metrics/
+target/
 htmlcov/
 .coverage
 dist/
