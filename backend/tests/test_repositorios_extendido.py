@@ -185,6 +185,16 @@ class TestOperationRepo:
     def test_get_batch_nonexistent(self, test_db):
         assert obtener_lote(test_db, "no-such-batch") is None
 
+    def test_update_item_does_not_overwrite_cancelled_item(self, test_db, batch):
+        from app.repositories.repositorio_operaciones import cancelar_lote
+
+        item = agregar_item(test_db, "batch-1", "user1", estado="processing")
+        test_db.commit()
+        cancelar_lote(test_db, "batch-1")
+        actualizar_item(test_db, item.id, "completed")
+        test_db.refresh(item)
+        assert item.estado == "cancelled"
+
 
 class TestExecutionErrorsCount:
     def _execution(self, test_db, metricas=None):

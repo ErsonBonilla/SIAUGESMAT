@@ -6,12 +6,29 @@ logs directamente.
 """
 
 import unicodedata
+from collections.abc import Callable
 
 from app.pipeline.indice_cursos import construir_clave_base
 from app.pipeline.nombres_cortos import parsear_shortname
 
 User = dict[str, object]
 Event = tuple[str, str, dict[str, object]]
+
+
+def _elegir_extremo(users: list[dict], selector: Callable) -> dict | None:
+    """Selecciona el usuario extremo (mínimo o máximo) por ``timecreated`` y ``id``."""
+    if not users:
+        return None
+    with_time = [u for u in users if (u.get("timecreated") or 0)]
+    if with_time:
+        return selector(
+            with_time,
+            key=lambda u: (int(u.get("timecreated") or 0), int(u.get("id") or 0)),
+        )
+    return selector(
+        users,
+        key=lambda u: (int(u.get("id") or 0), int(u.get("timecreated") or 0)),
+    )
 
 
 def elegir_usuario_mas_antiguo(users: list[dict]) -> dict | None:
@@ -25,41 +42,19 @@ def elegir_usuario_mas_antiguo(users: list[dict]) -> dict | None:
 
     Pura, sin I/O.
     """
-    if not users:
-        return None
-    with_time = [u for u in users if (u.get("timecreated") or 0)]
-    if with_time:
-        return min(
-            with_time,
-            key=lambda u: (int(u.get("timecreated") or 0), int(u.get("id") or 0)),
-        )
-    return min(
-        users,
-        key=lambda u: (int(u.get("id") or 0), int(u.get("timecreated") or 0)),
-    )
+    return _elegir_extremo(users, min)
 
 
 def elegir_usuario_mas_reciente(users: list[dict]) -> dict | None:
     """Selecciona el usuario más reciente de una lista con el mismo identificador.
 
-    Contraparte de ``pick_oldest_user``: elige el de mayor ``timecreated``; por
-    desempate, el de mayor ``id``. Si ningún usuario trae ``timecreated`` se usa
-    el mayor ``id`` (los ids de Moodle son secuenciales y equivalen a antigüedad).
+    Contraparte de ``elegir_usuario_mas_antiguo``: elige el de mayor ``timecreated``;
+    por desempate, el de mayor ``id``. Si ningún usuario trae ``timecreated`` se usa
+    el mayor ``id``.
 
     Pura, sin I/O.
     """
-    if not users:
-        return None
-    with_time = [u for u in users if (u.get("timecreated") or 0)]
-    if with_time:
-        return max(
-            with_time,
-            key=lambda u: (int(u.get("timecreated") or 0), int(u.get("id") or 0)),
-        )
-    return max(
-        users,
-        key=lambda u: (int(u.get("id") or 0), int(u.get("timecreated") or 0)),
-    )
+    return _elegir_extremo(users, max)
 
 
 def normalizar_nombre(name: str) -> str:
@@ -136,6 +131,26 @@ def resolver_usuarios(
     return username_map, events
 
 
+def _agregar_unico(lista: list[str], valor: str) -> None:
+    if valor and valor not in lista:
+        lista.append(valor)
+
+
+def _registrar_docente_en_cubeta(
+    cubeta: dict[str, dict[object, list[str]]],
+    clave: object,
+    emails: list[str],
+    uname: str,
+    cedula: str,
+) -> None:
+    lista_emails = cubeta["emails"].setdefault(clave, [])
+    for email in emails:
+        _agregar_unico(lista_emails, str(email))
+    _agregar_unico(cubeta["usernames"].setdefault(clave, []), uname)
+    if cedula:
+        _agregar_unico(cubeta["idnumbers"].setdefault(clave, []), str(cedula))
+
+
 def indexar_docentes(
     users: list[User],
     enrolments: list[dict[str, str]],
@@ -149,8 +164,12 @@ def indexar_docentes(
     Retorna {"by_course": {...}, "by_base_key": {...}}.
     """
     users_by_username = {u["username"]: u for u in users if u.get("username")}
-    by_course = {"emails": {}, "usernames": {}, "idnumbers": {}}
-    by_base_key = {"emails": {}, "usernames": {}, "idnumbers": {}}
+    by_course: dict[str, dict[object, list[str]]] = {"emails": {}, "usernames": {}, "idnumbers": {}}
+    by_base_key: dict[str, dict[object, list[str]]] = {
+        "emails": {},
+        "usernames": {},
+        "idnumbers": {},
+    }
 
     for enr in enrolments:
         sn = enr.get("course_shortname", "")
@@ -160,20 +179,14 @@ def indexar_docentes(
         user = users_by_username.get(uname)
         if not user:
             continue
-        emails = [e for e in [user.get("email"), user.get("email_personal")] if e]
-        by_course["emails"].setdefault(sn, []).extend(emails)
-        by_course["usernames"].setdefault(sn, []).append(uname)
-        cedula = user.get("cedula", "")
-        if cedula:
-            by_course["idnumbers"].setdefault(sn, []).append(cedula)
+        emails = [str(e) for e in (user.get("email"), user.get("email_personal")) if e]
+        cedula = str(user.get("cedula") or "")
+        _registrar_docente_en_cubeta(by_course, sn, emails, uname, cedula)
 
         parsed = parsear_shortname(sn)
         if parsed:
             bk = construir_clave_base(parsed)
-            by_base_key["emails"].setdefault(bk, []).extend(emails)
-            by_base_key["usernames"].setdefault(bk, []).append(uname)
-            if cedula:
-                by_base_key["idnumbers"].setdefault(bk, []).append(cedula)
+            _registrar_docente_en_cubeta(by_base_key, bk, emails, uname, cedula)
 
     return {"by_course": by_course, "by_base_key": by_base_key}
 

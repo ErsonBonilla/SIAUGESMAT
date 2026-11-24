@@ -249,6 +249,23 @@ class TestIndexTeachers:
         sn = "IDE_0001_sI_101_G-01"
         assert idx["by_course"]["usernames"][sn] == ["doc1"]
 
+    def test_deduplicates_repeated_enrolments_for_same_course_and_base_key(self):
+        users = [_user(username="doc1", email="a@ut.edu.co", personal="p1@gmail.com", cedula="1")]
+        enrolments = [
+            {"username": "doc1", "course_shortname": "IDE_0001_sI_101_G-01"},
+            {"username": "doc1", "course_shortname": "IDE_0001_sI_101_G-01"},
+            {"username": "doc1", "course_shortname": "IDE_0001_sI_101_G-01_12345"},
+        ]
+        idx = indexar_docentes(users, enrolments)
+        sn = "IDE_0001_sI_101_G-01"
+        bk = ("IDE", "0001", "I", "101", "01")
+        assert idx["by_course"]["usernames"][sn] == ["doc1"]
+        assert idx["by_course"]["emails"][sn] == ["a@ut.edu.co", "p1@gmail.com"]
+        assert idx["by_course"]["idnumbers"][sn] == ["1"]
+        assert idx["by_base_key"]["usernames"][bk] == ["doc1"]
+        assert idx["by_base_key"]["emails"][bk] == ["a@ut.edu.co", "p1@gmail.com"]
+        assert idx["by_base_key"]["idnumbers"][bk] == ["1"]
+
 
 class TestLookupTeacherCandidates:
     def _single_user(self):

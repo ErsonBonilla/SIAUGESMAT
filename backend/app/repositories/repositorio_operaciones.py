@@ -168,6 +168,8 @@ def actualizar_item(
 ) -> ItemOperacion | None:
     item = db.query(ItemOperacion).filter(ItemOperacion.id == item_id).first()
     if item:
+        if item.estado == "cancelled":
+            return item
         item.estado = estado
         if mensaje_error:
             item.mensaje_error = mensaje_error
@@ -180,7 +182,7 @@ def actualizar_item(
 def actualizar_conteos_lote(
     db: Session, id_lote: str, completados: int = 0, fallidos: int = 0
 ) -> None:
-    lote = db.query(LoteOperacion).filter_by(id_lote=id_lote).first()
+    lote = obtener_lote(db, id_lote)
     if lote:
         if completados:
             lote.completados = (lote.completados or 0) + completados
@@ -190,23 +192,33 @@ def actualizar_conteos_lote(
 
 
 def completar_lote(db: Session, id_lote: str) -> None:
-    lote = db.query(LoteOperacion).filter_by(id_lote=id_lote).first()
+    lote = obtener_lote(db, id_lote)
     if lote:
         lote.completado_en = datetime.now(UTC)
         db.commit()
 
 
 def obtener_estado_lote(db: Session, id_lote: str) -> dict:
-    base_q = db.query(ItemOperacion).filter_by(id_lote=id_lote)
-    return {
-        "total": base_q.count(),
-        "pending": base_q.filter_by(estado="pending").count(),
-        "processing": base_q.filter_by(estado="processing").count(),
-        "paused": base_q.filter_by(estado="paused").count(),
-        "completed": base_q.filter_by(estado="completed").count(),
-        "failed": base_q.filter_by(estado="failed").count(),
-        "cancelled": base_q.filter_by(estado="cancelled").count(),
+    conteos = {
+        "total": 0,
+        "pending": 0,
+        "processing": 0,
+        "paused": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0,
     }
+    filas = (
+        db.query(ItemOperacion.estado, func.count(ItemOperacion.id))
+        .filter(ItemOperacion.id_lote == id_lote)
+        .group_by(ItemOperacion.estado)
+        .all()
+    )
+    for estado, cantidad in filas:
+        conteos["total"] += cantidad
+        if estado in conteos:
+            conteos[estado] = cantidad
+    return conteos
 
 
 def obtener_items_lote(db: Session, id_lote: str, offset: int, limit: int) -> list[ItemOperacion]:
@@ -224,43 +236,34 @@ def obtener_todos_items_lote(db: Session, id_lote: str) -> list[ItemOperacion]:
     return db.query(ItemOperacion).filter_by(id_lote=id_lote).order_by(ItemOperacion.id).all()
 
 
-def pausar_lote(db: Session, id_lote: str) -> int:
-    pausados = (
-        db.query(ItemOperacion)
-        .filter_by(id_lote=id_lote, estado="pending")
-        .update(
-            {"estado": "paused", "actualizado_en": datetime.now(UTC)}, synchronize_session=False
-        )
-    )
-    db.commit()
-    return pausados
-
-
-def reanudar_lote(db: Session, id_lote: str) -> int:
-    reanudados = (
-        db.query(ItemOperacion)
-        .filter_by(id_lote=id_lote, estado="paused")
-        .update(
-            {"estado": "pending", "actualizado_en": datetime.now(UTC)}, synchronize_session=False
-        )
-    )
-    db.commit()
-    return reanudados
-
-
-def cancelar_lote(db: Session, id_lote: str) -> int:
-    cancelados = (
+def _transicionar_items_lote(
+    db: Session, id_lote: str, estados_origen: tuple[str, ...], estado_destino: str
+) -> int:
+    actualizados = (
         db.query(ItemOperacion)
         .filter(
             ItemOperacion.id_lote == id_lote,
-            ItemOperacion.estado.in_(["pending", "processing", "paused"]),
+            ItemOperacion.estado.in_(estados_origen),
         )
         .update(
-            {"estado": "cancelled", "actualizado_en": datetime.now(UTC)}, synchronize_session=False
+            {"estado": estado_destino, "actualizado_en": datetime.now(UTC)},
+            synchronize_session=False,
         )
     )
     db.commit()
-    return cancelados
+    return actualizados
+
+
+def pausar_lote(db: Session, id_lote: str) -> int:
+    return _transicionar_items_lote(db, id_lote, ("pending",), "paused")
+
+
+def reanudar_lote(db: Session, id_lote: str) -> int:
+    return _transicionar_items_lote(db, id_lote, ("paused",), "pending")
+
+
+def cancelar_lote(db: Session, id_lote: str) -> int:
+    return _transicionar_items_lote(db, id_lote, ("pending", "processing", "paused"), "cancelled")
 
 
 def eliminar_lote(db: Session, id_lote: str) -> bool:

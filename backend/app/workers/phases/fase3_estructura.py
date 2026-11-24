@@ -8,16 +8,18 @@ from app.core.config import settings
 from app.db.sesion import SessionLocal
 from app.repositories.repositorio_ejecuciones import (
     limpiar_chord_activo,
-    marcar_chord_activo,
+    marcar_fallido,
     obtener_ejecucion,
 )
 from app.repositories.repositorio_operaciones import agregar_item, crear_lote
-from app.repositories.repositorio_registros import guardar_log
+from app.repositories.repositorio_registros import guardar_error, guardar_log
 from app.services.fabrica_moodle import obtener_servicio_moodle
+from app.services.mensajes_error import traducir_error
 from app.workers.phases.comunes import (
     ErrorMoodleSobrecargado,
     _adquirir_bloqueo_asesor,
     _existen_items_para_ejecucion,
+    _marcar_chord_activo,
     _obtener_conteos_pendientes,
     _obtener_items_pendientes,
     _reiniciar_items_fallidos,
@@ -252,15 +254,7 @@ def _lanzar_chord_eliminacion(execution_id, delete_items):
     chord(task_ids)(al_terminar_items_eliminacion.s(execution_id=execution_id))
 
 
-def _marcar_chord_eliminacion_activo(execution_id):
-    """Marca el chord de deletes como activo (para el sweeper)."""
-    db = SessionLocal()
-    try:
-        marcar_chord_activo(db, execution_id)
-    except Exception:
-        logger.exception(f"No se pudo marcar chord de deletes activo para ejecución {execution_id}")
-    finally:
-        db.close()
+_marcar_chord_eliminacion_activo = _marcar_chord_activo
 
 
 @celery_app.task(
@@ -322,8 +316,16 @@ def al_terminar_items_eliminacion(self, results, execution_id):
             _lanzar_chord_items(execution_id, structure_items)
         else:
             al_terminar_items_fase.delay([], execution_id, "3")
+    except ErrorMoodleSobrecargado:
+        raise
     except Exception as e:
         logger.exception(f"Error en on_delete_items_done: {e}")
+        try:
+            db.rollback()
+            guardar_error(db, execution_id, "critical", None, traducir_error(e))
+            marcar_fallido(db, execution_id, 0)
+        except Exception:
+            logger.exception("Error marcando fallido on_delete_items_done")
         raise
     finally:
         db.close()

@@ -38,6 +38,32 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _obtener_lote_o_404(db: Session, id_lote: str):
+    batch = obtener_lote(db, id_lote)
+    if not batch:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    return batch
+
+
+def _ejecutar_transicion_lote(
+    db: Session,
+    id_lote: str,
+    usuario_actual: UsuarioEnToken,
+    fn_accion,
+    clave_conteo: str,
+    verbo_log: str,
+    detalle_mensaje: str,
+) -> dict:
+    _obtener_lote_o_404(db, id_lote)
+    cantidad = fn_accion(db, id_lote)
+    logger.info(f"Lote {id_lote} {verbo_log} por {usuario_actual.username}: {cantidad} items")
+    return {
+        "batch_id": id_lote,
+        clave_conteo: cantidad,
+        "message": f"Lote {verbo_log}. {cantidad} {detalle_mensaje}",
+    }
+
+
 @router.get(
     "/batch/{id_lote}/status",
     response_model=RespuestaEstadoLote,
@@ -50,9 +76,7 @@ def endpoint_estado_lote(
     db: Session = Depends(obtener_db),
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    batch = obtener_lote(db, id_lote)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    batch = _obtener_lote_o_404(db, id_lote)
 
     st = obtener_estado_lote(db, id_lote)
     items = obtener_items_lote(db, id_lote, desplazamiento, limite)
@@ -95,16 +119,15 @@ def endpoint_pausar_lote(
     db: Session = Depends(obtener_db),
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    batch = obtener_lote(db, id_lote)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Lote no encontrado")
-    paused = pausar_lote(db, id_lote)
-    logger.info(f"Lote {id_lote} pausado por {usuario_actual.username}: {paused} items")
-    return {
-        "batch_id": id_lote,
-        "paused": paused,
-        "message": f"Lote pausado. {paused} items pendientes marcados como pausados.",
-    }
+    return _ejecutar_transicion_lote(
+        db,
+        id_lote,
+        usuario_actual,
+        pausar_lote,
+        "paused",
+        "pausado",
+        "items pendientes marcados como pausados.",
+    )
 
 
 @router.post(
@@ -117,16 +140,15 @@ def endpoint_reanudar_lote(
     db: Session = Depends(obtener_db),
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    batch = obtener_lote(db, id_lote)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Lote no encontrado")
-    resumed = reanudar_lote(db, id_lote)
-    logger.info(f"Lote {id_lote} reanudado por {usuario_actual.username}: {resumed} items")
-    return {
-        "batch_id": id_lote,
-        "resumed": resumed,
-        "message": f"Lote reanudado. {resumed} items vueltos a pendientes.",
-    }
+    return _ejecutar_transicion_lote(
+        db,
+        id_lote,
+        usuario_actual,
+        reanudar_lote,
+        "resumed",
+        "reanudado",
+        "items vueltos a pendientes.",
+    )
 
 
 @router.post(
@@ -139,16 +161,15 @@ def endpoint_cancelar_lote(
     db: Session = Depends(obtener_db),
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    batch = obtener_lote(db, id_lote)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Lote no encontrado")
-    cancelled = cancelar_lote(db, id_lote)
-    logger.info(f"Lote {id_lote} cancelado por {usuario_actual.username}: {cancelled} items")
-    return {
-        "batch_id": id_lote,
-        "cancelled": cancelled,
-        "message": f"Lote cancelado. {cancelled} items marcados como cancelados.",
-    }
+    return _ejecutar_transicion_lote(
+        db,
+        id_lote,
+        usuario_actual,
+        cancelar_lote,
+        "cancelled",
+        "cancelado",
+        "items marcados como cancelados.",
+    )
 
 
 @router.delete(
@@ -161,9 +182,7 @@ def endpoint_eliminar_lote(
     db: Session = Depends(obtener_db),
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    batch = obtener_lote(db, id_lote)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    _obtener_lote_o_404(db, id_lote)
     if not eliminar_lote(db, id_lote):
         raise HTTPException(status_code=500, detail="No se pudo eliminar el lote")
     logger.info(f"Lote {id_lote} eliminado por {usuario_actual.username}")
@@ -180,9 +199,7 @@ def endpoint_listar_reportes_lote(
     db: Session = Depends(obtener_db),
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    batch = obtener_lote(db, id_lote)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    _obtener_lote_o_404(db, id_lote)
     return {"batch_id": id_lote, "reports": listar_reportes_lote(id_lote)}
 
 
@@ -193,9 +210,7 @@ def descargar_reportes_lote(
     db: Session = Depends(obtener_db),
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    batch = obtener_lote(db, id_lote)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    batch = _obtener_lote_o_404(db, id_lote)
 
     items = obtener_todos_items_lote(db, id_lote)
     guardar_reportes_lote(batch, items)
@@ -220,9 +235,7 @@ def descargar_reporte_lote(
     db: Session = Depends(obtener_db),
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
-    batch = obtener_lote(db, id_lote)
-    if not batch:
-        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    _obtener_lote_o_404(db, id_lote)
 
     path = obtener_ruta_reporte_lote(id_lote, nombre_reporte)
     if not path:

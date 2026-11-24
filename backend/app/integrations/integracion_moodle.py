@@ -130,49 +130,29 @@ class IntegracionMoodle:
         logger.info(f"Curso eliminado: {shortname}")
         return True
 
-    @manejar_errores_moodle(mensaje_log="Error al activar curso")
-    async def activar_curso(self, shortname: str) -> bool:
+    async def _cambiar_visibilidad_curso(
+        self, shortname: str, visible: int, sustantivo: str, participio: str
+    ) -> bool:
         existing = await self.servicio.obtener_cursos(shortname=shortname)
         if not existing:
             self.ultimo_error = f"Curso no encontrado: {shortname}"
             return False
-        await self.servicio.actualizar_cursos(
-            [
-                {
-                    "shortname": shortname,
-                    "visible": 1,
-                }
-            ]
-        )
+        await self.servicio.actualizar_cursos([{"shortname": shortname, "visible": visible}])
         verified = await self.servicio.obtener_cursos(shortname=shortname)
-        if not verified or verified[0].get("visible") != 1:
-            self.ultimo_error = f"Activación de {shortname} no se confirmó en Moodle"
+        if not verified or verified[0].get("visible") != visible:
+            self.ultimo_error = f"{sustantivo} de {shortname} no se confirmó en Moodle"
             logger.error(self.ultimo_error)
             return False
-        logger.info(f"Curso activado: {shortname}")
+        logger.info(f"Curso {participio}: {shortname}")
         return True
+
+    @manejar_errores_moodle(mensaje_log="Error al activar curso")
+    async def activar_curso(self, shortname: str) -> bool:
+        return await self._cambiar_visibilidad_curso(shortname, 1, "Activación", "activado")
 
     @manejar_errores_moodle(mensaje_log="Error al ocultar curso")
     async def ocultar_curso(self, shortname: str) -> bool:
-        existing = await self.servicio.obtener_cursos(shortname=shortname)
-        if not existing:
-            self.ultimo_error = f"Curso no encontrado: {shortname}"
-            return False
-        await self.servicio.actualizar_cursos(
-            [
-                {
-                    "shortname": shortname,
-                    "visible": 0,
-                }
-            ]
-        )
-        verified = await self.servicio.obtener_cursos(shortname=shortname)
-        if not verified or verified[0].get("visible") != 0:
-            self.ultimo_error = f"Ocultamiento de {shortname} no se confirmó en Moodle"
-            logger.error(self.ultimo_error)
-            return False
-        logger.info(f"Curso oculto: {shortname}")
-        return True
+        return await self._cambiar_visibilidad_curso(shortname, 0, "Ocultamiento", "oculto")
 
     @manejar_errores_moodle(mensaje_log="Error al renombrar curso")
     async def renombrar_curso(
@@ -340,9 +320,12 @@ class IntegracionMoodle:
             return False, "manual (admin excluido)"
         if not current_auth:
             return False, "manual (auth desconocido)"
+        user_id = user.get("id")
+        if user_id is None:
+            return False, "manual (sin id)"
         try:
             await self.servicio.actualizar_usuarios(
-                [{"id": user.get("id"), "auth": settings.MOODLE_EXTERNAL_AUTH}]
+                [{"id": user_id, "auth": settings.MOODLE_EXTERNAL_AUTH}]
             )
             return True, f"manual->{settings.MOODLE_EXTERNAL_AUTH}"
         except Exception:
@@ -450,49 +433,38 @@ class IntegracionMoodle:
             result[email] = mas_antiguo
         return result
 
+    async def _encontrar_usuarios_mas_antiguos_por_campo(
+        self, campo: str, valores: list[str]
+    ) -> dict[str, dict]:
+        result: dict[str, dict] = {}
+        if not valores:
+            return result
+        clean = [str(v).strip() for v in valores if v and str(v).strip()]
+        if not clean:
+            return result
+        users = await self.servicio.obtener_usuarios(campo, clean)
+        grouped: dict[str, list[dict]] = {}
+        for u in users:
+            clave = str(u.get(campo) or "").strip()
+            if clave:
+                grouped.setdefault(clave, []).append(u)
+        for clave, matches in grouped.items():
+            mas_antiguo = elegir_usuario_mas_antiguo(matches)
+            if mas_antiguo is not None:
+                result[clave] = mas_antiguo
+        return result
+
     @manejar_errores_moodle(
         mensaje_log="Error al buscar usuarios por username en lote", retorno_por_defecto={}
     )
     async def encontrar_usuarios_por_usernames(self, usernames: list[str]) -> dict[str, dict]:
-        result: dict[str, dict] = {}
-        if not usernames:
-            return result
-        clean = [u.strip() for u in usernames if u and u.strip()]
-        if not clean:
-            return result
-        users = await self.servicio.obtener_usuarios("username", clean)
-        grouped: dict[str, list[dict]] = {}
-        for u in users:
-            uname = (u.get("username") or "").strip()
-            if uname:
-                grouped.setdefault(uname, []).append(u)
-        for uname, matches in grouped.items():
-            mas_antiguo = elegir_usuario_mas_antiguo(matches)
-            if mas_antiguo is not None:
-                result[uname] = mas_antiguo
-        return result
+        return await self._encontrar_usuarios_mas_antiguos_por_campo("username", usernames)
 
     @manejar_errores_moodle(
         mensaje_log="Error al buscar usuarios por cédula en lote", retorno_por_defecto={}
     )
     async def encontrar_usuarios_por_idnumbers(self, idnumbers: list[str]) -> dict[str, dict]:
-        result: dict[str, dict] = {}
-        if not idnumbers:
-            return result
-        clean = [str(c).strip() for c in idnumbers if c and str(c).strip()]
-        if not clean:
-            return result
-        users = await self.servicio.obtener_usuarios("idnumber", clean)
-        grouped: dict[str, list[dict]] = {}
-        for u in users:
-            idn = (u.get("idnumber") or "").strip()
-            if idn:
-                grouped.setdefault(idn, []).append(u)
-        for idn, matches in grouped.items():
-            mas_antiguo = elegir_usuario_mas_antiguo(matches)
-            if mas_antiguo is not None:
-                result[idn] = mas_antiguo
-        return result
+        return await self._encontrar_usuarios_mas_antiguos_por_campo("idnumber", idnumbers)
 
     @staticmethod
     def es_usuario_activo(user: dict) -> bool:

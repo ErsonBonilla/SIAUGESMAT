@@ -174,6 +174,7 @@ def al_terminar_items_fase(self, results, execution_id, phase):
     _cb_entered = datetime.now(UTC)
     db = SessionLocal()
     execution = None
+    ya_completado = False
     try:
         execution = obtener_ejecucion(db, execution_id)
         if not execution or execution.estado in ("paused", "cancelled"):
@@ -248,26 +249,30 @@ def al_terminar_items_fase(self, results, execution_id, phase):
                 conteo_errores=metrics.get("total_errors", 0),
                 duracion_segundos=(iniciado_dt and (_cb_done - iniciado_dt).total_seconds()) or 0,
             )
+            ya_completado = True
             limpiar_checkpoint(db, execution_id)
             actualizar_progreso(db, execution_id, 100, "Ejecución completada")
             logger.info(
                 f"Ejecución {execution_id} completada {'' if report_ok else '(sin reportes)'}"
             )
 
+    except ErrorMoodleSobrecargado:
+        raise
     except Exception as e:
         logger.exception(f"Error en on_phase_items_done (fase {phase}): {e}")
-        try:
-            db.rollback()
-            guardar_error(db, execution_id, "critical", None, traducir_error(e))
-            marcar_fallido(
-                db,
-                execution_id,
-                (datetime.now(UTC) - _cb_entered).total_seconds()
-                if execution and execution.iniciado_en
-                else 0,
-            )
-        except Exception:
-            logger.exception(f"Error marcando fallido on_phase_items_done (fase {phase})")
+        if not ya_completado:
+            try:
+                db.rollback()
+                guardar_error(db, execution_id, "critical", None, traducir_error(e))
+                marcar_fallido(
+                    db,
+                    execution_id,
+                    (datetime.now(UTC) - _cb_entered).total_seconds()
+                    if execution and execution.iniciado_en
+                    else 0,
+                )
+            except Exception:
+                logger.exception(f"Error marcando fallido on_phase_items_done (fase {phase})")
     finally:
         db.close()
 

@@ -101,3 +101,32 @@ class TestResolverJerarquiaSubcategorias:
             "program_shortname": "CAL_0852",
             "program_name": "INGENIERIA DE SISTEMAS",
         }
+
+    def test_resuelve_por_cadena_de_ancestros_y_fallback_cuando_faltan_idnumbers(self):
+        cats = [
+            {"id": 10, "name": "IDEAD", "idnumber": "", "parent": 0},
+            {"id": 20, "name": "", "idnumber": "", "parent": 10},
+            {"id": 30, "name": "ADMINISTRACION", "idnumber": "", "parent": 20},
+            {"id": 40, "name": "", "idnumber": "", "parent": 30},
+        ]
+        parsed = {"cat_prefix": "IBA", "cod_prog": "0801", "semestre": "II"}
+        res = resolver_jerarquia_subcategorias(
+            40, cats, parsed, cat_names_fallback={"IBA": "IBAGUE"}
+        )
+        assert res == {
+            "cat_shortname": "IBA",
+            "cat_name": "IBAGUE",
+            "program_shortname": "IBA_0801",
+            "program_name": "ADMINISTRACION",
+            "semester_shortname": "IBA_0801_sII",
+            "semester_name": "SEMESTRE II",
+        }
+
+    def test_cortocircuita_ciclos_en_parent_sin_bucle_infinito(self):
+        cats = [
+            {"id": 20, "name": "A", "idnumber": "", "parent": 30},
+            {"id": 30, "name": "B", "idnumber": "", "parent": 20},
+        ]
+        res = resolver_jerarquia_subcategorias(30, cats, {"semestre": "I"})
+        assert res["semester_shortname"] == "sI"
+        assert res["semester_name"] == "SEMESTRE I"

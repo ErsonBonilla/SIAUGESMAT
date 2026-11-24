@@ -336,6 +336,15 @@ class TestExternalAuthSwitch:
         assert c["auth_switched"] is False
         assert c["auth_reason"] == "ya db"
 
+    @pytest.mark.asyncio
+    async def test_usuario_sin_id_no_invoca_actualizar_usuarios(self, integration):
+        switched, reason = await integration._quizas_cambiar_auth_externa(
+            {"id": None, "username": "viejo", "email": "a@ut.edu.co", "auth": "manual"}
+        )
+        assert switched is False
+        assert "sin id" in reason
+        integration.servicio.actualizar_usuarios.assert_not_awaited()
+
         # ---------------------------------------------------------------------------
         # find_users_by_emails / usernames / idnumbers (criterio "más antiguo")
         # ---------------------------------------------------------------------------

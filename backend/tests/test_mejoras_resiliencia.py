@@ -870,3 +870,49 @@ class TestSyncBatchCounts:
         test_db.refresh(batch)
         assert batch.completados == 2
         assert batch.fallidos == 1
+
+
+class TestCallbacksBlindados:
+    def test_on_phase_items_done_no_marca_fallido_si_ya_completo(self, test_db):
+        from app.db.modelos import Ejecucion
+        from app.workers.phases.comunes import al_terminar_items_fase
+
+        ex = Ejecucion(
+            nombre_archivo="test.xlsx", semestre="2025A", estado="running", modalidad="DISTANCIA"
+        )
+        test_db.add(ex)
+        test_db.commit()
+
+        with (
+            patch("app.workers.phases.comunes.ServicioReportes.generar_todos", return_value="/tmp"),
+            patch(
+                "app.workers.phases.comunes.limpiar_checkpoint",
+                side_effect=RuntimeError("fallo post-completado"),
+            ),
+        ):
+            al_terminar_items_fase([], ex.id, "4")
+
+        test_db.refresh(ex)
+        assert ex.estado == "completed"
+
+    def test_on_delete_items_done_marca_fallido_en_error_fatal(self, test_db):
+        from app.db.modelos import Ejecucion
+        from app.workers.phases.fase3_estructura import al_terminar_items_eliminacion
+
+        ex = Ejecucion(
+            nombre_archivo="test.xlsx", semestre="2025A", estado="running", modalidad="DISTANCIA"
+        )
+        test_db.add(ex)
+        test_db.commit()
+
+        with (
+            patch(
+                "app.workers.phases.fase3_estructura._refrescar_progreso_fase",
+                side_effect=RuntimeError("boom fatal"),
+            ),
+            pytest.raises(RuntimeError),
+        ):
+            al_terminar_items_eliminacion([], ex.id)
+
+        test_db.refresh(ex)
+        assert ex.estado == "failed"
