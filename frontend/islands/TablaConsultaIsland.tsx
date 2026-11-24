@@ -70,7 +70,7 @@ export default function TablaConsulta(
     pageOffset.value = 0;
     const params: Record<string, string> = {};
     for (const [k, v] of Object.entries(filterValues.value)) {
-      if (v && v !== "false") {
+      if (typeof v === "string" && v !== "" && v !== "false") {
         params[k] = v;
       }
     }
@@ -124,7 +124,7 @@ export default function TablaConsulta(
             : (
               <select
                 key={f.key}
-                value={filterValues.value[f.key] || f.options![0].value}
+                value={filterValues.value[f.key] || f.options?.[0]?.value || ""}
                 onChange={(e) =>
                   handleFilterChange(
                     f.key,
@@ -132,7 +132,7 @@ export default function TablaConsulta(
                   )}
                 class="border border-[var(--border-secondary)] rounded px-3 py-1.5 text-sm bg-[var(--bg-primary)] text-[var(--text-primary)]"
               >
-                {f.options!.map((o) => (
+                {(f.options ?? []).map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
@@ -179,7 +179,9 @@ export default function TablaConsulta(
           <button
             type="button"
             onClick={() => {
-              descargarReporte(exportUrl, "consulta.csv").catch(() => {});
+              descargarReporte(exportUrl, `consulta_${entity}.csv`).catch(
+                () => {},
+              );
             }}
             class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded text-sm font-medium no-underline hover:bg-[var(--border-secondary)] transition ml-auto cursor-pointer"
           >
@@ -257,7 +259,8 @@ export default function TablaConsulta(
                         class="py-2 px-3 text-[var(--text-primary)]"
                       >
                         {col.renderKey
-                          ? RENDERERS[col.renderKey](row[col.key], row)
+                          ? (RENDERERS[col.renderKey]?.(row[col.key], row) ??
+                            String(row[col.key] ?? "—"))
                           : String(row[col.key] ?? "—")}
                       </td>
                     ))}
@@ -276,14 +279,6 @@ export default function TablaConsulta(
           label="resultados"
           alCambiarPagina={handlePageChange}
         />
-      )}
-
-      {!loading.value && !error.value && data.value.length === 0 &&
-        taskStatus.value?.status === "completed" && (
-        <div class="text-center py-12 text-[var(--text-muted)]">
-          <p class="text-lg mb-2">Sin resultados</p>
-          <p class="text-sm">La consulta no devolvió datos.</p>
-        </div>
       )}
     </div>
   );

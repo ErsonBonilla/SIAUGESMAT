@@ -1,16 +1,10 @@
 import ConsultaInactivos, {
   type ColumnaInactivo,
 } from "./ConsultaInactivos.tsx";
-
-function formatearFecha(ts: number): string {
-  if (!ts || ts <= 0) return "Nunca";
-  return new Date(ts * 1000).toLocaleDateString();
-}
-
-function formatDaysSince(daysSince?: number): string {
-  if (!daysSince || daysSince <= 0) return "—";
-  return `${daysSince} d`;
-}
+import {
+  formatearDiasInactividad,
+  formatearTimestampUnix,
+} from "../utils/fechas.ts";
 
 const COLUMNAS: ColumnaInactivo[] = [
   {
@@ -39,17 +33,17 @@ const COLUMNAS: ColumnaInactivo[] = [
   {
     key: "timecreated",
     label: "Creado",
-    render: (r) => formatearFecha(Number(r.timecreated)),
+    render: (r) => formatearTimestampUnix(Number(r.timecreated), false),
   },
   {
     key: "timemodified",
     label: "Última modificación",
-    render: (r) => formatearFecha(Number(r.timemodified)),
+    render: (r) => formatearTimestampUnix(Number(r.timemodified), false),
   },
   {
     key: "days_since_modified",
     label: "Días sin uso",
-    render: (r) => formatDaysSince(Number(r.days_since_modified)),
+    render: (r) => formatearDiasInactividad(Number(r.days_since_modified), "—"),
   },
 ];
 

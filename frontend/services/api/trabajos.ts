@@ -1,12 +1,9 @@
 // services/api/trabajos.ts
-import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
+import { peticionJson } from "./nucleo.ts";
 import type { Ejecucion, RegistroError } from "./tipos.ts";
 
 export async function obtenerSemestreActual(): Promise<string> {
-  const response = await fetch(`${BASE_URL}/upload/current`, {
-    headers: { ...cabecerasAuth() },
-  });
-  const data = await manejarRespuesta<{ semester: string }>(response);
+  const data = await peticionJson<{ semester: string }>("/upload/current");
   return data.semester;
 }
 
@@ -16,18 +13,15 @@ export interface EstadoSubida {
   batch: { batch_id: string; entity_type: string; action: string } | null;
 }
 
-export async function obtenerEstadoSubida(
+export function obtenerEstadoSubida(
   modalidad?: string,
 ): Promise<EstadoSubida> {
-  const sp = new URLSearchParams();
-  if (modalidad) sp.set("modalidad", modalidad);
-  const response = await fetch(`${BASE_URL}/upload/status?${sp}`, {
-    headers: { ...cabecerasAuth() },
+  return peticionJson<EstadoSubida>("/upload/status", {
+    params: { modalidad },
   });
-  return manejarRespuesta<EstadoSubida>(response);
 }
 
-export async function subirArchivo(
+export function subirArchivo(
   file: File,
   semester: string,
   modalidad: string,
@@ -36,43 +30,44 @@ export async function subirArchivo(
   formData.append("file", file);
   formData.append("semester", semester);
   formData.append("modalidad", modalidad);
-  const response = await fetch(`${BASE_URL}/upload`, {
-    method: "POST",
-    headers: { ...cabecerasAuth() },
-    body: formData,
-  });
-  return manejarRespuesta<
-    {
-      execution_id: number;
-      filename: string;
-      semester: string;
-      mode: string;
-      status: string;
-      message: string;
-    }
-  >(response);
+  return peticionJson<{
+    execution_id: number;
+    filename: string;
+    semester: string;
+    mode: string;
+    status: string;
+    message: string;
+  }>("/upload", { method: "POST", form: formData });
 }
 
-export async function iniciarProceso(executionId: number) {
-  const response = await fetch(`${BASE_URL}/jobs/${executionId}/process`, {
-    method: "POST",
-    headers: { ...cabecerasAuth() },
-  });
-  return manejarRespuesta<
-    { execution_id: number; job_id: string; status: string; message: string }
-  >(response);
+type RespuestaAccionTrabajo = {
+  execution_id: number;
+  job_id: string;
+  status: string;
+  message: string;
+};
+
+function accionTrabajo(
+  executionId: number,
+  accion: "process" | "confirm" | "pause" | "cancel",
+): Promise<RespuestaAccionTrabajo> {
+  return peticionJson<RespuestaAccionTrabajo>(
+    `/jobs/${executionId}/${accion}`,
+    { method: "POST" },
+  );
 }
 
-export async function obtenerEjecucion(
+export function iniciarProceso(executionId: number) {
+  return accionTrabajo(executionId, "process");
+}
+
+export function obtenerEjecucion(
   executionId: number,
 ): Promise<Ejecucion> {
-  const response = await fetch(`${BASE_URL}/jobs/${executionId}`, {
-    headers: { ...cabecerasAuth() },
-  });
-  return manejarRespuesta<Ejecucion>(response);
+  return peticionJson<Ejecucion>(`/jobs/${executionId}`);
 }
 
-export async function listarEjecuciones(params: {
+export function listarEjecuciones(params: {
   semester?: string;
   status?: string;
   mode?: string;
@@ -80,69 +75,43 @@ export async function listarEjecuciones(params: {
   limit?: number;
   offset?: number;
 } = {}): Promise<{ total: number; items: Ejecucion[] }> {
-  const sp = new URLSearchParams();
-  if (params.semester) sp.set("semester", params.semester);
-  if (params.status) sp.set("status", params.status);
-  if (params.mode) sp.set("mode", params.mode);
-  if (params.modalidad) sp.set("modalidad", params.modalidad);
-  if (params.limit) sp.set("limit", String(params.limit));
-  if (params.offset) sp.set("offset", String(params.offset));
-  const response = await fetch(`${BASE_URL}/jobs?${sp}`, {
-    headers: { ...cabecerasAuth() },
+  return peticionJson<{ total: number; items: Ejecucion[] }>("/jobs", {
+    params: {
+      semester: params.semester,
+      status: params.status,
+      mode: params.mode,
+      modalidad: params.modalidad,
+      limit: params.limit || undefined,
+      offset: params.offset || undefined,
+    },
   });
-  return manejarRespuesta<{ total: number; items: Ejecucion[] }>(response);
 }
 
-export async function obtenerErroresEjecucion(
+export function obtenerErroresEjecucion(
   executionId: number,
   limit = 100,
   offset = 0,
 ): Promise<RegistroError[]> {
-  const response = await fetch(
-    `${BASE_URL}/jobs/${executionId}/errors?limit=${limit}&offset=${offset}`,
-    { headers: { ...cabecerasAuth() } },
-  );
-  return manejarRespuesta<RegistroError[]>(response);
+  return peticionJson<RegistroError[]>(`/jobs/${executionId}/errors`, {
+    params: { limit, offset },
+  });
 }
 
 export async function eliminarEjecucion(executionId: number): Promise<void> {
-  await manejarRespuesta(
-    await fetch(`${BASE_URL}/jobs/${executionId}`, {
-      method: "DELETE",
-      headers: { ...cabecerasAuth() },
-    }),
-  );
+  await peticionJson<void>(`/jobs/${executionId}`, { method: "DELETE" });
 }
 
-export async function confirmarEjecucion(executionId: number) {
-  const response = await fetch(`${BASE_URL}/jobs/${executionId}/confirm`, {
-    method: "POST",
-    headers: { ...cabecerasAuth() },
-  });
-  return manejarRespuesta<
-    { execution_id: number; job_id: string; status: string; message: string }
-  >(response);
+export function confirmarEjecucion(executionId: number) {
+  return accionTrabajo(executionId, "confirm");
 }
 
 // Reusa /process porque el backend acepta status "paused" y reanuda desde checkpoint
 export const reanudarEjecucion = iniciarProceso;
 
-export async function pausarEjecucion(executionId: number) {
-  const response = await fetch(`${BASE_URL}/jobs/${executionId}/pause`, {
-    method: "POST",
-    headers: { ...cabecerasAuth() },
-  });
-  return manejarRespuesta<
-    { execution_id: number; job_id: string; status: string; message: string }
-  >(response);
+export function pausarEjecucion(executionId: number) {
+  return accionTrabajo(executionId, "pause");
 }
 
-export async function cancelarEjecucion(executionId: number) {
-  const response = await fetch(`${BASE_URL}/jobs/${executionId}/cancel`, {
-    method: "POST",
-    headers: { ...cabecerasAuth() },
-  });
-  return manejarRespuesta<
-    { execution_id: number; job_id: string; status: string; message: string }
-  >(response);
+export function cancelarEjecucion(executionId: number) {
+  return accionTrabajo(executionId, "cancel");
 }

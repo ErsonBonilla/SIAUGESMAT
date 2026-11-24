@@ -1,6 +1,20 @@
 import { format, formatDistanceToNow, isValid, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 
+function formatearIsoConPatron(
+  isoString: string | null | undefined,
+  patron: string,
+): string {
+  if (!isoString) return "—";
+  try {
+    const date = parseISO(isoString);
+    if (!isValid(date)) return "Fecha inválida";
+    return format(date, patron, { locale: es });
+  } catch {
+    return "Fecha inválida";
+  }
+}
+
 /**
  * Formatea una fecha ISO a un formato legible en español.
  * Ejemplo: "15/03/2025 14:30"
@@ -8,14 +22,7 @@ import { es } from "date-fns/locale";
 export function formatearFechaHora(
   isoString: string | null | undefined,
 ): string {
-  if (!isoString) return "—";
-  try {
-    const date = parseISO(isoString);
-    if (!isValid(date)) return "Fecha inválida";
-    return format(date, "dd/MM/yyyy HH:mm", { locale: es });
-  } catch {
-    return "Fecha inválida";
-  }
+  return formatearIsoConPatron(isoString, "dd/MM/yyyy HH:mm");
 }
 
 /**
@@ -23,14 +30,30 @@ export function formatearFechaHora(
  * Ejemplo: "15/03/2025"
  */
 export function formatearFecha(isoString: string | null | undefined): string {
-  if (!isoString) return "—";
-  try {
-    const date = parseISO(isoString);
-    if (!isValid(date)) return "Fecha inválida";
-    return format(date, "dd/MM/yyyy", { locale: es });
-  } catch {
-    return "Fecha inválida";
-  }
+  return formatearIsoConPatron(isoString, "dd/MM/yyyy");
+}
+
+/**
+ * Formatea un timestamp Unix (segundos) a fecha o fecha+hora local.
+ */
+export function formatearTimestampUnix(
+  ts: number | null | undefined,
+  conHora = false,
+): string {
+  if (!ts || !Number.isFinite(ts) || ts <= 0) return "Nunca";
+  const fecha = new Date(ts * 1000);
+  return conHora ? fecha.toLocaleString() : fecha.toLocaleDateString();
+}
+
+/**
+ * Formatea un conteo de días de inactividad o devuelve el texto de respaldo.
+ */
+export function formatearDiasInactividad(
+  dias?: number | null,
+  respaldo = "—",
+): string {
+  if (dias == null || !Number.isFinite(dias) || dias <= 0) return respaldo;
+  return `${dias} d`;
 }
 
 /**
@@ -81,7 +104,7 @@ export function esSemestreValido(semester: string): boolean {
 export function obtenerSemestreActual(): string {
   const now = new Date();
   const year = now.getFullYear();
-  const month = now.getMonth() + 1; // getMonth() devuelve 0-11
+  const month = now.getMonth() + 1;
   const half = month <= 6 ? "A" : "B";
   return `${year}${half}`;
 }
@@ -92,7 +115,8 @@ export function obtenerSemestreActual(): string {
  */
 export function formatearSemestre(semester: string): string {
   if (!esSemestreValido(semester)) return semester;
-  return `${semester.slice(0, 4)}-${semester.slice(4)}`;
+  const normalizado = semester.toUpperCase();
+  return `${normalizado.slice(0, 4)}-${normalizado.slice(4)}`;
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "lock": true,
   "tasks": {
-    "check": "deno fmt --check && deno lint && deno check main.ts dev.ts fresh.config.ts && deno check routes/ && deno check islands/ && deno check components/ && deno check utils/ && deno check services/ && deno check hooks/",
+    "check": "deno fmt --check && deno lint && deno check --node-modules-dir=none main.ts dev.ts fresh.config.ts && deno check --node-modules-dir=none routes/ && deno check --node-modules-dir=none islands/ && deno check --node-modules-dir=none components/ && deno check --node-modules-dir=none utils/ && deno check --node-modules-dir=none services/ && deno check --node-modules-dir=none hooks/",
     "start": "deno run -A --watch=static/,routes/ dev.ts",
     "build": "deno run -A dev.ts build",
     "preview": "deno serve -A --port $PORT _fresh/server.js",

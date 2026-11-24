@@ -1,5 +1,5 @@
 // services/api/reportes.ts
-import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
+import { BASE_URL, cabecerasAuth, peticionJson } from "./nucleo.ts";
 import type { RespuestaListaReportes } from "./tipos.ts";
 
 export function obtenerUrlDescargaReporte(executionId: number): string {
@@ -13,13 +13,12 @@ export function obtenerUrlArchivoReporte(
   return `${BASE_URL}/reports/${executionId}/reports/${name}.csv`;
 }
 
-export async function listarReportes(
+export function listarReportes(
   executionId: number,
 ): Promise<RespuestaListaReportes> {
-  const response = await fetch(`${BASE_URL}/reports/${executionId}/reports`, {
-    headers: { ...cabecerasAuth() },
-  });
-  return manejarRespuesta<RespuestaListaReportes>(response);
+  return peticionJson<RespuestaListaReportes>(
+    `/reports/${executionId}/reports`,
+  );
 }
 
 export async function descargarReporte(
@@ -37,5 +36,5 @@ export async function descargarReporte(
   a.href = blobUrl;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(blobUrl);
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 0);
 }

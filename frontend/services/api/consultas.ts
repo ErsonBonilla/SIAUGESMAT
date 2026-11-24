@@ -1,28 +1,21 @@
 // services/api/consultas.ts
-import { BASE_URL, cabecerasAuth, manejarRespuesta } from "./nucleo.ts";
+import { BASE_URL, peticionJson } from "./nucleo.ts";
 import type { EstadoTareaConsulta } from "./tipos.ts";
 
-export async function consultarEntidades(
+export function consultarEntidades(
   entity: string,
   params: Record<string, string> = {},
 ) {
-  const response = await fetch(`${BASE_URL}/queries/${entity}`, {
-    method: "POST",
-    headers: { ...cabecerasAuth(), "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
-  return manejarRespuesta<{ task_id: string; status: string; message: string }>(
-    response,
+  return peticionJson<{ task_id: string; status: string; message: string }>(
+    `/queries/${entity}`,
+    { method: "POST", json: params },
   );
 }
 
-export async function obtenerEstadoTareaConsulta(
+export function obtenerEstadoTareaConsulta(
   taskId: string,
 ): Promise<EstadoTareaConsulta> {
-  const response = await fetch(`${BASE_URL}/queries/tasks/${taskId}`, {
-    headers: { ...cabecerasAuth() },
-  });
-  return manejarRespuesta<EstadoTareaConsulta>(response);
+  return peticionJson<EstadoTareaConsulta>(`/queries/tasks/${taskId}`);
 }
 
 export function obtenerUrlExportarConsulta(taskId: string): string {

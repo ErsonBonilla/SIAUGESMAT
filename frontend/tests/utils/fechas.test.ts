@@ -1,10 +1,12 @@
 import {
   ahoraISO,
   esSemestreValido,
+  formatearDiasInactividad,
   formatearDuracion,
   formatearFecha,
   formatearFechaHora,
   formatearSemestre,
+  formatearTimestampUnix,
   obtenerSemestreActual,
   tiempoRelativo,
 } from "../../utils/fechas.ts";
@@ -101,6 +103,20 @@ Deno.test("getCurrentSemester - retorna un semestre válido", () => {
 Deno.test("formatSemester - formatea un semestre válido con guion", () => {
   assertEquals(formatearSemestre("2025A"), "2025-A");
   assertEquals(formatearSemestre("2024B"), "2024-B");
+  assertEquals(formatearSemestre("2025a"), "2025-A");
+});
+
+Deno.test("formatearDiasInactividad - formatea días o devuelve respaldo", () => {
+  assertEquals(formatearDiasInactividad(12), "12 d");
+  assertEquals(formatearDiasInactividad(0, "Nunca"), "Nunca");
+  assertEquals(formatearDiasInactividad(undefined), "—");
+});
+
+Deno.test("formatearTimestampUnix - formatea segundos unix o devuelve Nunca", () => {
+  assertEquals(formatearTimestampUnix(0), "Nunca");
+  assertEquals(formatearTimestampUnix(NaN), "Nunca");
+  assert(formatearTimestampUnix(1710500000, false).includes("2024"));
+  assert(formatearTimestampUnix(1710500000, true).includes("2024"));
 });
 
 Deno.test("formatSemester - devuelve el original si no es válido", () => {

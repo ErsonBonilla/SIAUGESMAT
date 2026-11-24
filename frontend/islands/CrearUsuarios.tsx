@@ -4,7 +4,14 @@ import BotonEjecucion from "../components/BotonEjecucion.tsx";
 
 type RolUsuario = "student" | "editingteacher" | "all";
 
-const ROLE_CONFIG = {
+interface ConfigRol {
+  endpoint: string;
+  label: string;
+  desc: string;
+  help: string;
+}
+
+const ROLE_CONFIG: Record<RolUsuario, ConfigRol> = {
   student: {
     endpoint: "users/create-csv?default_role=student",
     label: "Estudiantes",
@@ -57,6 +64,7 @@ export default function CrearUsuarios() {
       </div>
 
       <SubirCsv
+        key={config.endpoint}
         description={`Subí un archivo CSV con las columnas 'username', 'firstname', 'lastname' y 'email' ${config.help}`}
         uploadEndpoint={config.endpoint}
         etiquetaSingular="usuario"

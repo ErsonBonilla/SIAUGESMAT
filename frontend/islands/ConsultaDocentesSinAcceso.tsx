@@ -1,16 +1,10 @@
 import ConsultaInactivos, {
   type ColumnaInactivo,
 } from "./ConsultaInactivos.tsx";
-
-function formatLastAccess(ts: number): string {
-  if (!ts || ts <= 0) return "Nunca";
-  return new Date(ts * 1000).toLocaleString();
-}
-
-function formatDaysSince(daysSince?: number): string {
-  if (!daysSince || daysSince <= 0) return "Nunca";
-  return `${daysSince} d`;
-}
+import {
+  formatearDiasInactividad,
+  formatearTimestampUnix,
+} from "../utils/fechas.ts";
 
 const COLUMNAS: ColumnaInactivo[] = [
   {
@@ -70,12 +64,13 @@ const COLUMNAS: ColumnaInactivo[] = [
   {
     key: "last_access",
     label: "Fecha último acceso",
-    render: (r) => formatLastAccess(Number(r.last_access)),
+    render: (r) => formatearTimestampUnix(Number(r.last_access), true),
   },
   {
     key: "days_since_last_access",
     label: "Días sin acceso",
-    render: (r) => formatDaysSince(Number(r.days_since_last_access)),
+    render: (r) =>
+      formatearDiasInactividad(Number(r.days_since_last_access), "Nunca"),
   },
 ];
 

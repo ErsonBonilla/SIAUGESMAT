@@ -14,7 +14,10 @@ export async function manejarRespuesta<T>(response: Response): Promise<T> {
   if (!response.ok) {
     if (response.status === 401) {
       try {
-        await fetch(`${BASE_URL}/auth/logout`, { method: "POST" });
+        await fetch(`${BASE_URL}/auth/logout`, {
+          method: "POST",
+          headers: { ...cabecerasAuth() },
+        });
       } catch {
         // best-effort: la cookie de sesión se invalidará en el servidor.
       }
@@ -29,4 +32,44 @@ export async function manejarRespuesta<T>(response: Response): Promise<T> {
   }
   if (response.status === 204) return undefined as T;
   return response.json();
+}
+
+export function construirQuery(
+  params: Record<string, string | number | undefined>,
+): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== "") {
+      sp.set(k, String(v));
+    }
+  }
+  const qs = sp.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export async function peticionJson<T>(
+  ruta: string,
+  opciones: {
+    method?: string;
+    params?: Record<string, string | number | undefined>;
+    json?: unknown;
+    form?: FormData;
+  } = {},
+): Promise<T> {
+  const qs = opciones.params ? construirQuery(opciones.params) : "";
+  const headers: Record<string, string> = { ...cabecerasAuth() };
+  let body: BodyInit | undefined;
+  if (opciones.json !== undefined) {
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify(opciones.json);
+  } else if (opciones.form) {
+    body = opciones.form;
+  }
+  const init: RequestInit = {
+    headers,
+    ...(opciones.method ? { method: opciones.method } : {}),
+    ...(body !== undefined ? { body } : {}),
+  };
+  const response = await fetch(`${BASE_URL}${ruta}${qs}`, init);
+  return manejarRespuesta<T>(response);
 }
