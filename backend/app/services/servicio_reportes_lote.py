@@ -18,71 +18,76 @@ from app.services.utilidades_reportes import (
 logger = logging.getLogger(__name__)
 
 REPORT_BASE = os.path.join(settings.REPORT_DIR, "batch")
+PATRONES_NO_ENCONTRADO = ("no encontrad", "not found", "notfound", "no existía")
+VERBOS_ACCION_LOTE = {
+    "create": "Creación",
+    "delete": "Eliminación",
+    "update": "Actualización",
+    "rename": "Renombrado",
+    "activate": "Activación",
+    "hide": "Ocultamiento",
+    "visibility": "Visibilidad",
+}
 
 
 def _directorio_lote(batch_id: str) -> str:
-    return os.path.join(REPORT_BASE, batch_id)
+    seguro = os.path.basename(str(batch_id or "").strip())
+    if not seguro or seguro in (".", ".."):
+        raise ValueError(f"ID de lote inválido: {batch_id!r}")
+    return os.path.join(REPORT_BASE, seguro)
 
 
-def _build_rows(batch: LoteOperacion, items: list[ItemOperacion]) -> dict[str, list]:
-    """Returns {csv_name: (headers, rows)} for each CSV to generate."""
-    config = CONFIG_ENTIDADES.get(batch.tipo_entidad, CONFIG_ENTIDADES["courses"])
+def _valor_str(det: dict, clave: str, respaldo: str = "") -> str:
+    val = det.get(clave)
+    return str(val) if val is not None and val != "" else respaldo
 
-    all_rows, failed_rows, success_rows, not_found_rows = [], [], [], []
-    for item in items:
-        det = item.detalle or {}
-        row = {
-            "identificador": item.identificador,
-            "estado": item.estado,
-            "error": item.mensaje_error or "",
-            "intentos": str(item.intento or 0),
-        }
-        if batch.tipo_entidad == "categories" and batch.accion == "create":
-            row["idnumber"] = det.get("idnumber") or ""
-            row["parent"] = det.get("parent") or "DISTANCIA"
-            row["description"] = det.get("description") or ""
-            row["visible"] = str(det.get("visible", 1))
-        if batch.tipo_entidad == "users" and batch.accion == "create":
-            row["firstname"] = det.get("firstname") or ""
-            row["lastname"] = det.get("lastname") or ""
-            row["email"] = det.get("email") or ""
-            row["rol"] = det.get("role1") or ""
-        all_rows.append(row)
 
-        if item.estado == "failed":
-            failed_rows.append(row)
-        if item.estado == "completed":
-            success_rows.append(row)
-        if batch.accion == "delete" and item.mensaje_error:
-            msg_lower = item.mensaje_error.lower()
-            if any(w in msg_lower for w in ("no encontrad", "not found", "notfound", "no existía")):
-                not_found_rows.append(row)
-
-    action_verb = "Eliminación" if batch.accion == "delete" else "Creación"
-    base_headers = ["identificador", "estado", "error", "intentos"]
+def _construir_fila_item(batch: LoteOperacion, item: ItemOperacion) -> dict[str, str]:
+    det = item.detalle or {}
+    row = {
+        "identificador": item.identificador,
+        "estado": item.estado,
+        "error": item.mensaje_error or "",
+        "intentos": str(item.intento or 0),
+    }
     if batch.tipo_entidad == "categories" and batch.accion == "create":
-        base_headers += ["idnumber", "parent", "description", "visible"]
+        row["idnumber"] = _valor_str(det, "idnumber")
+        row["parent"] = _valor_str(det, "parent", "DISTANCIA")
+        row["description"] = _valor_str(det, "description")
+        row["visible"] = str(det.get("visible", 1))
     elif batch.tipo_entidad == "users" and batch.accion == "create":
-        base_headers += ["firstname", "lastname", "email", "rol"]
+        row["firstname"] = _valor_str(det, "firstname")
+        row["lastname"] = _valor_str(det, "lastname")
+        row["email"] = _valor_str(det, "email")
+        row["rol"] = _valor_str(det, "role1")
+    return row
 
-    csvs: dict[str, tuple] = {}
 
-    if all_rows:
-        csvs["resultados"] = (base_headers, all_rows)
-    if failed_rows:
-        csvs["fallidos"] = (base_headers, failed_rows)
-    if batch.accion == "create" and success_rows:
-        csvs["creados"] = (base_headers, success_rows)
-    if batch.accion == "delete" and not_found_rows:
-        csvs["no_encontrados"] = (["identificador", "estado", "error", "intentos"], not_found_rows)
+def _es_error_no_encontrado(batch: LoteOperacion, item: ItemOperacion) -> bool:
+    if batch.accion != "delete" or not item.mensaje_error:
+        return False
+    msg_lower = item.mensaje_error.lower()
+    return any(w in msg_lower for w in PATRONES_NO_ENCONTRADO)
 
-    total = len(items)
+
+def _encabezados_lote(batch: LoteOperacion) -> list[str]:
+    base = ["identificador", "estado", "error", "intentos"]
+    if batch.tipo_entidad == "categories" and batch.accion == "create":
+        return [*base, "idnumber", "parent", "description", "visible"]
+    if batch.tipo_entidad == "users" and batch.accion == "create":
+        return [*base, "firstname", "lastname", "email", "rol"]
+    return base
+
+
+def _filas_resumen_lote(batch: LoteOperacion, items: list[ItemOperacion]) -> list[dict[str, str]]:
+    config = CONFIG_ENTIDADES.get(batch.tipo_entidad, CONFIG_ENTIDADES["courses"])
+    action_verb = VERBOS_ACCION_LOTE.get(batch.accion, str(batch.accion or "Operación"))
     completed = sum(1 for i in items if i.estado == "completed")
     failed = sum(1 for i in items if i.estado == "failed")
-    resumen_rows = [
+    return [
         {"campo": "Tipo de entidad", "valor": config["label_plural"]},
         {"campo": "Operación", "valor": action_verb},
-        {"campo": "Total", "valor": str(total)},
+        {"campo": "Total", "valor": str(len(items))},
         {"campo": "Completados", "valor": str(completed)},
         {"campo": "Fallidos", "valor": str(failed)},
         {"campo": "ID de lote", "valor": batch.id_lote},
@@ -92,8 +97,34 @@ def _build_rows(batch: LoteOperacion, items: list[ItemOperacion]) -> dict[str, l
             "valor": batch.completado_en.isoformat() if batch.completado_en else "",
         },
     ]
-    csvs["resumen"] = (["campo", "valor"], resumen_rows)
 
+
+def _build_rows(batch: LoteOperacion, items: list[ItemOperacion]) -> dict[str, list]:
+    """Returns {csv_name: (headers, rows)} for each CSV to generate."""
+    all_rows, failed_rows, success_rows, not_found_rows = [], [], [], []
+    for item in items:
+        row = _construir_fila_item(batch, item)
+        all_rows.append(row)
+        if item.estado == "failed":
+            failed_rows.append(row)
+        elif item.estado == "completed":
+            success_rows.append(row)
+        if _es_error_no_encontrado(batch, item):
+            not_found_rows.append(row)
+
+    base_headers = _encabezados_lote(batch)
+    csvs: dict[str, tuple] = {}
+
+    if all_rows:
+        csvs["resultados"] = (base_headers, all_rows)
+    if failed_rows:
+        csvs["fallidos"] = (base_headers, failed_rows)
+    if batch.accion == "create" and success_rows:
+        csvs["creados"] = (base_headers, success_rows)
+    if not_found_rows:
+        csvs["no_encontrados"] = (["identificador", "estado", "error", "intentos"], not_found_rows)
+
+    csvs["resumen"] = (["campo", "valor"], _filas_resumen_lote(batch, items))
     return csvs
 
 

@@ -92,7 +92,7 @@ class TestParseCutoff:
                 _parsear_corte(params)
 
     def test_semester_invalid_shape(self):
-        for semester in ("2025", "2025C", "2025X", "abcde"):
+        for semester in ("2025", "2025C", "2025X", "abcde", "20X5A"):
             with pytest.raises(ValueError):
                 _parsear_corte({"semester": semester})
 
@@ -602,3 +602,61 @@ class TestDoQueryDuplicateEmails:
         qr = SimpleNamespace(entidad="duplicate_emails", parametros={})
         rows = await _ejecutar_consulta(moodle, qr)
         assert rows == []
+
+
+class TestDoQueryObservatorio:
+    @pytest.mark.asyncio
+    async def test_construye_censo_observatorio_filtrando_visibles_con_docente(self):
+        moodle = AsyncMock()
+        moodle.obtener_categorias.return_value = [
+            {"id": 10, "name": "IDEAD", "idnumber": "DISTANCIA", "parent": 0},
+            {"id": 11, "name": "IBAGUE", "idnumber": "IBA", "parent": 10},
+            {"id": 12, "name": "INGENIERIA DE SISTEMAS", "idnumber": "IBA_0852", "parent": 11},
+            {"id": 13, "name": "SEMESTRE IV", "idnumber": "IBA_0852_sIV", "parent": 12},
+        ]
+        moodle.obtener_cursos.return_value = [
+            {
+                "id": 101,
+                "shortname": "IBA_0852_sIV_2022481_G-1",
+                "fullname": "REDES",
+                "categoryid": 13,
+                "visible": 1,
+            },
+            {
+                "id": 102,
+                "shortname": "IBA_0852_sIV_2022482_G-1",
+                "fullname": "OCULTO",
+                "categoryid": 13,
+                "visible": 0,
+            },
+        ]
+        moodle.obtener_todos_usuarios_matriculados.return_value = [
+            {"id": 1, "username": "doc1", "roles": [{"roleid": 3, "shortname": "editingteacher"}]},
+            {"id": 201, "username": "est1", "roles": [{"roleid": 5, "shortname": "student"}]},
+            {"id": 202, "username": "est2", "roles": [{"roleid": 5, "shortname": "student"}]},
+        ]
+
+        qr = SimpleNamespace(entidad="observatorio", parametros={})
+        res = await _ejecutar_consulta(moodle, qr)
+
+        assert res["total_departments"] == 1
+        assert res["total_cats"] == 1
+        assert res["total_programs"] == 1
+        assert res["total_students"] == 2
+        assert res["departments"][0]["dpto_code"] == "73"
+        assert res["departments"][0]["municipalities"][0]["mpio_code"] == "73001"
+        assert res["departments"][0]["municipalities"][0]["programs"][0]["students_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_worker_observatorio_cortocircuita_sin_consultar_cursos_si_falta_idead(self):
+        moodle = AsyncMock()
+        moodle.obtener_categorias.return_value = [
+            {"id": 99, "name": "PREGRADO PRESENCIAL", "idnumber": "PRE", "parent": 0}
+        ]
+        qr = SimpleNamespace(entidad="observatorio", parametros={})
+        res = await _ejecutar_consulta(moodle, qr)
+
+        assert res["total_students"] == 0
+        assert res["departments"] == []
+        moodle.obtener_cursos.assert_not_awaited()
+        moodle.obtener_todos_usuarios_matriculados.assert_not_awaited()

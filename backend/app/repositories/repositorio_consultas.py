@@ -61,6 +61,8 @@ def marcar_consulta_fallida(
 
 
 def eliminar_consultas_antiguas(db: Session, days: int) -> int:
+    if days < 1:
+        raise ValueError("El parámetro 'days' debe ser al menos 1.")
     cutoff = datetime.now(UTC) - timedelta(days=days)
     deleted = (
         db.query(ResultadoConsulta)
@@ -69,3 +71,32 @@ def eliminar_consultas_antiguas(db: Session, days: int) -> int:
     )
     db.commit()
     return deleted
+
+
+def obtener_estado_observatorio(
+    db: Session, modalidad: str
+) -> tuple[ResultadoConsulta | None, ResultadoConsulta | None]:
+    """Devuelve (ultima_completada, activa_en_curso) para la entidad 'observatorio'."""
+    ultima_completada = (
+        db.query(ResultadoConsulta)
+        .filter(
+            ResultadoConsulta.entidad == "observatorio",
+            ResultadoConsulta.modalidad == modalidad,
+            ResultadoConsulta.estado == "completed",
+        )
+        .order_by(ResultadoConsulta.completado_en.desc(), ResultadoConsulta.id.desc())
+        .first()
+    )
+    cutoff_activa = datetime.now(UTC) - timedelta(minutes=20)
+    activa_en_curso = (
+        db.query(ResultadoConsulta)
+        .filter(
+            ResultadoConsulta.entidad == "observatorio",
+            ResultadoConsulta.modalidad == modalidad,
+            ResultadoConsulta.estado.in_(("pending", "running")),
+            ResultadoConsulta.creado_en >= cutoff_activa,
+        )
+        .order_by(ResultadoConsulta.creado_en.desc(), ResultadoConsulta.id.desc())
+        .first()
+    )
+    return ultima_completada, activa_en_curso

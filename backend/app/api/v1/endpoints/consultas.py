@@ -16,6 +16,7 @@ from app.core.dependencies import obtener_db, obtener_usuario_actual
 from app.repositories.repositorio_consultas import (
     crear_consulta,
     obtener_consulta,
+    obtener_estado_observatorio,
 )
 from app.schemas.respuestas import RespuestaConsultaEncolada
 from app.schemas.usuario import UsuarioEnToken
@@ -32,6 +33,7 @@ ENTITY_LABELS = {
     "inactive_teachers": "Docentes sin acceso",
     "inactive_courses": "Cursos sin uso",
     "duplicate_emails": "Correos duplicados",
+    "observatorio": "Observatorio IDEAD Colombia",
 }
 
 ENTITY_CSV_HEADERS = {
@@ -64,6 +66,17 @@ ENTITY_CSV_HEADERS = {
         "Días sin uso",
     ],
     "duplicate_emails": ["Email", "Username", "Nombres", "Apellidos", "ID Moodle", "Nº de cuentas"],
+    "observatorio": [
+        "Código Depto",
+        "Departamento",
+        "Código Municipio",
+        "Municipio (CAT)",
+        "Shortname CAT",
+        "Código Programa",
+        "Programa",
+        "Cursos Activos",
+        "Estudiantes Matriculados",
+    ],
 }
 
 ENTITY_CSV_EXTRACT = {
@@ -127,14 +140,51 @@ ENTITY_CSV_EXTRACT = {
         r.get("user_id", ""),
         r.get("duplicate_count", ""),
     ],
+    "observatorio": lambda r: [
+        r.get("dpto_code", ""),
+        r.get("dpto_name", ""),
+        r.get("mpio_code", ""),
+        r.get("display_name", ""),
+        r.get("cat_shortname", ""),
+        r.get("program_code", ""),
+        r.get("program_name", ""),
+        r.get("courses_count", 0),
+        r.get("students_count", 0),
+    ],
 }
+
+
+def _aplanar_censo_observatorio(censo: dict) -> list[dict]:
+    filas: list[dict] = []
+    for dpto in censo.get("departments", []):
+        for mpio in dpto.get("municipalities", []):
+            for prog in mpio.get("programs", []):
+                filas.append(
+                    {
+                        "dpto_code": dpto.get("dpto_code", ""),
+                        "dpto_name": dpto.get("dpto_name", ""),
+                        "mpio_code": mpio.get("mpio_code", ""),
+                        "display_name": mpio.get("display_name", mpio.get("mpio_name", "")),
+                        "cat_shortname": mpio.get("cat_shortname", ""),
+                        "program_code": prog.get("program_code", ""),
+                        "program_name": prog.get("program_name", ""),
+                        "courses_count": prog.get("courses_count", 0),
+                        "students_count": prog.get("students_count", 0),
+                    }
+                )
+    return filas
 
 
 def _descargar_csv(qr):
     entidad = qr.entidad
     headers = ENTITY_CSV_HEADERS.get(entidad, ["data"])
     extract = ENTITY_CSV_EXTRACT.get(entidad, lambda x: [str(x)])
-    data = qr.resultado_json or []
+    raw_data = qr.resultado_json or []
+    data = (
+        _aplanar_censo_observatorio(raw_data)
+        if entidad == "observatorio" and isinstance(raw_data, dict)
+        else raw_data
+    )
 
     def _generar():
         buffer = io.StringIO()
@@ -156,6 +206,33 @@ def _descargar_csv(qr):
     )
 
 
+@router.get("/observatorio/latest", summary="Obtener último censo del Observatorio IDEAD")
+def obtener_ultimo_censo_observatorio(
+    db: Session = Depends(obtener_db),
+    usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
+):
+    completada, activa = obtener_estado_observatorio(db, usuario_actual.modalidad)
+    if not completada and not activa:
+        return {
+            "task_id": None,
+            "active_task_id": None,
+            "status": "empty",
+            "updated_at": None,
+            "result": None,
+        }
+    return {
+        "task_id": completada.id_tarea if completada else (activa.id_tarea if activa else None),
+        "active_task_id": activa.id_tarea if activa else None,
+        "status": "completed" if completada else (activa.estado if activa else "empty"),
+        "updated_at": (
+            completada.completado_en.isoformat()
+            if completada and completada.completado_en
+            else None
+        ),
+        "result": completada.resultado_json if completada else None,
+    }
+
+
 @router.post(
     "/{entidad}", response_model=RespuestaConsultaEncolada, summary="Encolar consulta asíncrona"
 )
@@ -167,6 +244,16 @@ async def encolar_consulta(
 ):
     if entidad not in ENTITY_LABELS:
         raise HTTPException(400, f"Entidad desconocida: {entidad}")
+
+    if entidad == "observatorio":
+        _, activa = obtener_estado_observatorio(db, usuario_actual.modalidad)
+        if activa:
+            return {
+                "task_id": activa.id_tarea,
+                "entity": entidad,
+                "status": activa.estado,
+                "message": "Actualización del Observatorio en curso...",
+            }
 
     id_tarea = str(uuid.uuid4())
     crear_consulta(db, id_tarea, entidad, body or {}, usuario_actual.modalidad)
@@ -190,7 +277,7 @@ def obtener_estado_tarea(
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
     qr = obtener_consulta(db, id_tarea)
-    if not qr:
+    if not qr or (qr.modalidad and qr.modalidad != usuario_actual.modalidad):
         raise HTTPException(404, "Tarea de consulta no encontrada")
 
     response = {
@@ -213,7 +300,7 @@ def descargar_csv_tarea(
     usuario_actual: UsuarioEnToken = Depends(obtener_usuario_actual),
 ):
     qr = obtener_consulta(db, id_tarea)
-    if not qr:
+    if not qr or (qr.modalidad and qr.modalidad != usuario_actual.modalidad):
         raise HTTPException(404, "Tarea de consulta no encontrada")
     if qr.estado != "completed":
         raise HTTPException(409, "La consulta aún no ha finalizado")

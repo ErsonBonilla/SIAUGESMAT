@@ -85,6 +85,10 @@ class TestQueryRepo:
         assert deleted >= 1
         assert obtener_consulta(test_db, "old-1") is None
 
+    def test_delete_old_queries_rejects_non_positive_days(self, test_db):
+        with pytest.raises(ValueError):
+            eliminar_consultas_antiguas(test_db, days=0)
+
 
 class TestOperationRepo:
     @pytest.fixture
