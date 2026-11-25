@@ -9,6 +9,7 @@ import {
   obtenerHistorial,
   obtenerReciente,
   obtenerSemaforo,
+  obtenerUltimoObservatorio,
   subirArchivo,
 } from "../../services/api.ts";
 
@@ -251,5 +252,33 @@ Deno.test("api - error login sin mensaje detalle muestra fallback", async () => 
     () => iniciarSesion("juan", "pass", "PRESENCIAL"),
     Error,
     "Credenciales inválidas",
+  );
+});
+
+Deno.test("api - obtenerUltimoObservatorio consulta /queries/observatorio/latest", async () => {
+  setup();
+  setFakeToken();
+  mockFetch(200, {
+    task_id: "obs-1",
+    active_task_id: null,
+    status: "completed",
+    updated_at: "2026-11-24T17:00:00Z",
+    result: {
+      total_students: 350,
+      total_departments: 1,
+      total_municipalities: 1,
+      total_cats: 1,
+      total_programs: 2,
+      total_courses: 8,
+      updated_at: "2026-11-24T17:00:00Z",
+      departments: [],
+    },
+  });
+  const obs = await obtenerUltimoObservatorio();
+  assertEquals(obs.status, "completed");
+  assertEquals(obs.result?.total_students, 350);
+  assertEquals(
+    lastFetchArgs.url?.includes("/queries/observatorio/latest"),
+    true,
   );
 });

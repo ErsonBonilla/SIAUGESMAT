@@ -36,6 +36,9 @@
       "dom.asynciterable"
     ]
   },
+  "fmt": {
+    "exclude": ["static/mapa/"]
+  },
   "lint": {
     "rules": {
       "exclude": ["no-window"]

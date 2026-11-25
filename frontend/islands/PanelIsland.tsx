@@ -2,378 +2,419 @@ import { useComputed, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import Disposicion from "../components/Disposicion.tsx";
 import Tarjeta from "../components/Tarjeta.tsx";
-import TarjetaKpi from "../components/TarjetaKpi.tsx";
-import MiniGraficoBarras from "../components/MiniGraficoBarras.tsx";
 import EsqueletoCarga from "../components/EsqueletoCarga.tsx";
+import CajaError from "../components/CajaError.tsx";
+import MapaColombiaSvg, {
+  type DatosMapaColombia,
+} from "../components/MapaColombiaSvg.tsx";
+import ArbolObservatorio from "../components/ArbolObservatorio.tsx";
 import {
-  type Ejecucion,
-  type EjecucionReciente,
-  listarEjecuciones,
-  type MetricasSemestre,
-  obtenerHistorial,
-  obtenerReciente,
+  type CensoObservatorio,
+  consultarEntidades,
+  obtenerEstadoTareaConsulta,
+  obtenerUltimoObservatorio,
 } from "../services/api.ts";
-import { senalPerfil } from "../utils/perfil.ts";
-import { COLORES_SEMAFORO, ETIQUETAS_ESTADO } from "../utils/constantes.ts";
+import { tiempoRelativo } from "../utils/fechas.ts";
+import { IconoRecargar, IconoSpinner } from "../utils/iconos.tsx";
 import {
-  IconoCheck,
-  IconoExclamacion,
-  IconoMenos,
-  IconoReloj,
-  IconoX,
-} from "../utils/iconos.tsx";
+  censoEstaVencido,
+  claveCat,
+  construirIndicesMapaObservatorio,
+  esEstadoTerminalConsulta,
+} from "../utils/observatorio.ts";
+
+const AUTO_REFRESH_AGE_MS = 30 * 60 * 1000;
+const POLL_INTERVAL_MS = 3000;
+const MAX_POLL_ATTEMPTS = 300;
+
+function TarjetaResumenObservatorio({
+  datos,
+  sincronizando,
+  onSincronizar,
+}: {
+  datos: CensoObservatorio | null;
+  sincronizando: boolean;
+  onSincronizar: () => void;
+}) {
+  const subtitulo = datos?.updated_at
+    ? `Actualizado ${tiempoRelativo(datos.updated_at)}`
+    : sincronizando
+    ? "Consultando cursos visibles con docente en Moodle…"
+    : "Sin censo previo";
+
+  return (
+    <Tarjeta padding="md">
+      <div class="flex items-start justify-between gap-3 mb-4">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)]">
+            Estudiantes Matriculados (Cursos Activos IDEAD)
+          </p>
+          <p class="text-3xl font-extrabold text-[var(--text-primary)] mt-1">
+            {datos ? datos.total_students.toLocaleString() : "—"}
+          </p>
+          <p class="text-xs text-[var(--text-secondary)] mt-1">{subtitulo}</p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onSincronizar}
+          disabled={sincronizando}
+          aria-busy={sincronizando}
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--border-secondary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] hover:border-[var(--accent)] cursor-pointer disabled:opacity-60 transition"
+        >
+          {sincronizando
+            ? (
+              <>
+                <IconoSpinner class="w-3.5 h-3.5 animate-spin" />
+                <span>Sincronizando…</span>
+              </>
+            )
+            : (
+              <>
+                <IconoRecargar class="w-3.5 h-3.5" />
+                <span>Actualizar</span>
+              </>
+            )}
+        </button>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2.5 pt-3 border-t border-[var(--border-primary)] text-center">
+        <div class="p-2 rounded-lg bg-[var(--bg-secondary)]">
+          <span class="text-lg font-bold block" style={{ color: "#ED3237" }}>
+            {datos ? datos.total_departments : "—"}
+          </span>
+          <span class="text-[0.6875rem] text-[var(--text-secondary)]">
+            Departamentos
+          </span>
+        </div>
+        <div class="p-2 rounded-lg bg-[var(--bg-secondary)]">
+          <span class="text-lg font-bold block" style={{ color: "#00A859" }}>
+            {datos ? datos.total_cats : "—"}
+          </span>
+          <span class="text-[0.6875rem] text-[var(--text-secondary)]">
+            CATs Activos
+          </span>
+        </div>
+        <div class="p-2 rounded-lg bg-[var(--bg-secondary)]">
+          <span class="text-lg font-bold text-[var(--text-primary)] block">
+            {datos ? datos.total_programs : "—"}
+          </span>
+          <span class="text-[0.6875rem] text-[var(--text-secondary)]">
+            Programas
+          </span>
+        </div>
+      </div>
+    </Tarjeta>
+  );
+}
 
 export default function IslandPanel() {
-  const historyData = useSignal<MetricasSemestre[]>([]);
-  const latestExec = useSignal<EjecucionReciente | null>(null);
-  const recentExecs = useSignal<Ejecucion[]>([]);
-  const loading = useSignal(true);
+  const mapa = useSignal<DatosMapaColombia | null>(null);
+  const censo = useSignal<CensoObservatorio | null>(null);
+  const cargandoInicial = useSignal(true);
+  const sincronizando = useSignal(false);
+  const idTareaActiva = useSignal<string | null>(null);
   const error = useSignal("");
 
-  useEffect(() => {
-    loading.value = true;
+  const busqueda = useSignal("");
+  const tooltipMapa = useSignal("");
+  const dptoSeleccionado = useSignal<string | null>(null);
+  const mpioSeleccionado = useSignal<string | null>(null);
+  const dptosAbiertos = useSignal<Set<string>>(new Set());
+  const catsAbiertos = useSignal<Set<string>>(new Set());
+
+  const iniciarSincronizacion = async () => {
+    if (sincronizando.value) return;
+    sincronizando.value = true;
     error.value = "";
-    const rawModalidad = typeof window !== "undefined"
-      ? window.localStorage.getItem("modalidad")
-      : null;
-    const modalidad = typeof rawModalidad === "string"
-      ? rawModalidad
-      : undefined;
-    const errors: string[] = [];
-    Promise.all([
-      obtenerHistorial(10, modalidad).catch((e) => {
-        errors.push("Historial: " + (e instanceof Error ? e.message : "error"));
-        return [] as MetricasSemestre[];
-      }),
-      obtenerReciente(modalidad).catch((e) => {
-        errors.push("Semáforo: " + (e instanceof Error ? e.message : "error"));
-        return null;
-      }),
-      listarEjecuciones({ limit: 5, modalidad }).catch((e) => {
-        errors.push(
-          "Ejecuciones: " + (e instanceof Error ? e.message : "error"),
-        );
-        return { total: 0, items: [] as Ejecucion[] };
-      }),
-    ])
-      .then(([history, latest, execs]) => {
-        historyData.value = history;
-        latestExec.value = latest;
-        recentExecs.value = execs.items;
-        if (errors.length) error.value = errors.join(" | ");
-      })
-      .catch((e) => {
-        error.value = e instanceof Error ? e.message : "Error al cargar datos.";
-      })
-      .finally(() => {
-        loading.value = false;
-      });
-  }, []);
-
-  const displayName = senalPerfil.value?.firstname || "Usuario";
-
-  const kpis = useComputed(() => {
-    const data = historyData.value;
-    if (!data.length) return null;
-    const totals = data.reduce(
-      (acc, s) => ({
-        ejecuciones: acc.ejecuciones + s.total_executions,
-        cursos: acc.cursos + s.total_courses_created,
-        matriculas: acc.matriculas + s.total_enrollments,
-        errores: acc.errores + s.total_errors,
-      }),
-      { ejecuciones: 0, cursos: 0, matriculas: 0, errores: 0 },
-    );
-    const exito = totals.matriculas > 0
-      ? ((totals.matriculas - totals.errores) / totals.matriculas * 100)
-        .toFixed(1) + "%"
-      : "—";
-    const dur = data.length > 0
-      ? Math.round(
-        data.reduce((s, d) => s + d.avg_duration_seconds, 0) / data.length,
-      ) + "s"
-      : "—";
-    return {
-      ejecuciones: totals.ejecuciones,
-      cursos: totals.cursos,
-      matriculas: totals.matriculas,
-      exito,
-      duracion: dur,
-    };
-  });
-
-  const chartData = useComputed(() =>
-    historyData.value.slice(-6).map((s) => ({
-      label: s.semester.replace(/(\d{4})([A-Z])/, "$1 $2"),
-      value: s.total_executions,
-    }))
-  );
-
-  const SemaphoreIcon = (s: string) => {
-    switch (s) {
-      case "green":
-        return IconoCheck;
-      case "yellow":
-        return IconoExclamacion;
-      case "red":
-        return IconoX;
-      default:
-        return IconoMenos;
+    try {
+      const resp = await consultarEntidades("observatorio");
+      idTareaActiva.value = resp.task_id;
+    } catch (e) {
+      sincronizando.value = false;
+      error.value = e instanceof Error
+        ? e.message
+        : "No se pudo iniciar la sincronización con Moodle.";
     }
   };
 
-  const renderBody = () => {
-    if (loading.value) {
-      return (
-        <div class="space-y-6">
-          <EsqueletoCarga variant="kpi" />
-          <EsqueletoCarga variant="chart" />
-        </div>
-      );
+  useEffect(() => {
+    let cancelado = false;
+    cargandoInicial.value = true;
+
+    Promise.allSettled([
+      fetch("/mapa/colombia_mapa.json").then((r) => {
+        if (!r.ok) throw new Error("No se pudo cargar la cartografía DANE.");
+        return r.json() as Promise<DatosMapaColombia>;
+      }),
+      obtenerUltimoObservatorio(),
+    ])
+      .then(([resMapa, resUltimo]) => {
+        if (cancelado) return;
+
+        if (resMapa.status === "fulfilled") {
+          mapa.value = resMapa.value;
+        } else {
+          error.value = "No se pudo cargar la cartografía del mapa.";
+        }
+
+        const ultimo = resUltimo.status === "fulfilled"
+          ? resUltimo.value
+          : null;
+
+        if (ultimo?.result) {
+          censo.value = ultimo.result;
+          const primero = ultimo.result.departments[0];
+          if (primero) dptosAbiertos.value = new Set([primero.dpto_code]);
+        }
+
+        if (ultimo?.active_task_id) {
+          sincronizando.value = true;
+          idTareaActiva.value = ultimo.active_task_id;
+          return;
+        }
+
+        if (censoEstaVencido(ultimo?.updated_at, AUTO_REFRESH_AGE_MS)) {
+          iniciarSincronizacion();
+        }
+      })
+      .finally(() => {
+        if (!cancelado) cargandoInicial.value = false;
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const taskId = idTareaActiva.value;
+    if (!taskId) return;
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelado = false;
+    let intentos = 0;
+
+    const detenerPolling = (mensajeError = "") => {
+      sincronizando.value = false;
+      idTareaActiva.value = null;
+      if (mensajeError) error.value = mensajeError;
+    };
+
+    const verificar = async () => {
+      intentos += 1;
+      if (intentos > MAX_POLL_ATTEMPTS) {
+        detenerPolling(
+          "La sincronización con Moodle excedió el tiempo de espera.",
+        );
+        return;
+      }
+
+      try {
+        const st = await obtenerEstadoTareaConsulta<CensoObservatorio>(taskId);
+        if (cancelado) return;
+
+        if (st.status === "completed") {
+          if (st.result) {
+            censo.value = st.result;
+            error.value = "";
+            if (dptosAbiertos.value.size === 0 && st.result.departments[0]) {
+              dptosAbiertos.value = new Set([
+                st.result.departments[0].dpto_code,
+              ]);
+            }
+          }
+          detenerPolling();
+          return;
+        }
+
+        if (esEstadoTerminalConsulta(st.status)) {
+          detenerPolling(st.error || "La consulta del Observatorio finalizó.");
+          return;
+        }
+
+        timer = setTimeout(verificar, POLL_INTERVAL_MS);
+      } catch (e) {
+        if (!cancelado) {
+          detenerPolling(
+            e instanceof Error
+              ? e.message
+              : "Error consultando estado del Observatorio.",
+          );
+        }
+      }
+    };
+
+    timer = setTimeout(verificar, POLL_INTERVAL_MS);
+    return () => {
+      cancelado = true;
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [idTareaActiva.value]);
+
+  const indicesMapa = useComputed(() =>
+    construirIndicesMapaObservatorio(censo.value)
+  );
+
+  const toggleDpto = (dptoCode: string) => {
+    const copia = new Set(dptosAbiertos.value);
+    const abriendo = !copia.has(dptoCode);
+    if (abriendo) {
+      copia.add(dptoCode);
+      dptoSeleccionado.value = dptoCode;
+    } else {
+      copia.delete(dptoCode);
+      if (dptoSeleccionado.value === dptoCode) {
+        dptoSeleccionado.value = null;
+        mpioSeleccionado.value = null;
+      }
     }
+    dptosAbiertos.value = copia;
+  };
 
-    if (error.value && !historyData.value.length) {
-      return (
-        <div class="flex items-center gap-1.5 text-xs text-[var(--brand-red)]">
-          <span>{error.value}</span>
-        </div>
-      );
+  const toggleCat = (clave: string, dptoCode: string, mpioCode: string) => {
+    const copia = new Set(catsAbiertos.value);
+    const abriendo = !copia.has(clave);
+    if (abriendo) {
+      copia.add(clave);
+      dptoSeleccionado.value = dptoCode;
+      mpioSeleccionado.value = mpioCode;
+    } else {
+      copia.delete(clave);
+      if (mpioSeleccionado.value === mpioCode) {
+        mpioSeleccionado.value = null;
+      }
     }
+    catsAbiertos.value = copia;
+  };
 
-    const noData = !historyData.value.length && !latestExec.value &&
-      !recentExecs.value.length;
+  const seleccionarDptoDesdeMapa = (dptoCode: string) => {
+    const copia = new Set(dptosAbiertos.value);
+    copia.add(dptoCode);
+    dptosAbiertos.value = copia;
+    dptoSeleccionado.value = dptoCode;
+    mpioSeleccionado.value = null;
+  };
 
-    if (noData) {
-      return (
-        <div class="text-center py-12 text-[var(--text-secondary)]">
-          <p class="text-lg mb-2">Aún no hay datos</p>
-          <p class="text-sm mb-4">
-            Sube tu primer archivo para ver las métricas del panel.
-          </p>
-          <a
-            href="/cursos/crear"
-            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium border border-[var(--border-secondary)] bg-[var(--bg-primary)] text-[var(--text-primary)] no-underline cursor-pointer font-inherit leading-[1.4] hover:border-[var(--accent)] hover:bg-[var(--accent-bg-hover)] active:scale-[0.97] transition-all duration-150"
-          >
-            Subir archivo
-          </a>
-        </div>
-      );
-    }
+  const seleccionarMpioDesdeMapa = (dptoCode: string, mpioCode: string) => {
+    const copiaDptos = new Set(dptosAbiertos.value);
+    copiaDptos.add(dptoCode);
+    dptosAbiertos.value = copiaDptos;
 
-    return (
-      <div class="space-y-10">
-        <hr class="border-0 h-px bg-[var(--border-secondary)] opacity-35 m-0" />
-        <p class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.06em]">
-          Resumen
-        </p>
-        {kpis.value && (
-          <div
-            class="grid gap-5"
-            style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))"
-          >
-            <TarjetaKpi value={kpis.value.ejecuciones} label="Ejecuciones" />
-            <TarjetaKpi
-              value={kpis.value.cursos.toLocaleString()}
-              label="Cursos creados"
-            />
-            <TarjetaKpi
-              value={kpis.value.matriculas.toLocaleString()}
-              label="Matrículas"
-            />
-            <TarjetaKpi value={kpis.value.exito} label="Tasa éxito" />
-            <TarjetaKpi value={kpis.value.duracion} label="Duración prom." />
-          </div>
-        )}
-
-        <hr class="border-0 h-px bg-[var(--border-secondary)] opacity-35 m-0" />
-        <p class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-[0.06em]">
-          Actividad
-        </p>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Tarjeta padding="md">
-            <p class="text-[0.8125rem] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.04em] mb-3">
-              Ejecuciones por semestre
-            </p>
-            {chartData.value.length > 0
-              ? <MiniGraficoBarras data={chartData.value} />
-              : (
-                <p class="text-sm text-[var(--text-secondary)]">
-                  Sin datos históricos.
-                </p>
-              )}
-          </Tarjeta>
-
-          <Tarjeta padding="md">
-            <p class="text-[0.8125rem] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.04em] mb-3">
-              Última ejecución
-            </p>
-            {latestExec.value
-              ? (
-                <div>
-                  <div class="flex items-center gap-3 mb-3">
-                    <div
-                      class="flex items-center justify-center rounded-full"
-                      style={{
-                        width: "2.5rem",
-                        height: "2.5rem",
-                        backgroundColor:
-                          COLORES_SEMAFORO[latestExec.value.semaphore] ||
-                          "var(--text-muted)",
-                      }}
-                    >
-                      {(() => {
-                        const Icon = SemaphoreIcon(latestExec.value.semaphore);
-                        return (
-                          <Icon
-                            style={{
-                              width: "1rem",
-                              height: "1rem",
-                              color: "#fff",
-                            }}
-                          />
-                        );
-                      })()}
-                    </div>
-                    <div>
-                      <p class="font-semibold text-sm text-[var(--text-primary)]">
-                        {latestExec.value.status === "completed"
-                          ? (latestExec.value.semaphore === "green"
-                            ? "Exitosa"
-                            : latestExec.value.semaphore === "yellow"
-                            ? "Advertencias"
-                            : latestExec.value.semaphore === "red"
-                            ? "Errores"
-                            : "Sin datos")
-                          : ETIQUETAS_ESTADO[latestExec.value.status] ||
-                            latestExec.value.status}
-                      </p>
-                      <p class="text-xs text-[var(--text-secondary)]">
-                        {latestExec.value.semester}
-                        {latestExec.value.error_rate !== undefined &&
-                          ` · ${latestExec.value.error_rate.toFixed(1)}% error`}
-                      </p>
-                    </div>
-                  </div>
-                  <div class="flex items-center gap-3 text-xs text-[var(--text-secondary)] mb-3">
-                    <span class="flex items-center gap-1">
-                      <IconoReloj
-                        style={{ width: "0.75rem", height: "0.75rem" }}
-                      />
-                      {latestExec.value.duration_seconds
-                        ? Math.round(latestExec.value.duration_seconds) + "s"
-                        : "—"}
-                    </span>
-                    <span>
-                      {latestExec.value.errors_count} errores
-                    </span>
-                  </div>
-                  <a
-                    href={`/ejecuciones/${latestExec.value.id}`}
-                    class="text-xs font-medium no-underline text-[var(--accent)] hover:underline"
-                  >
-                    Ver detalle →
-                  </a>
-                </div>
-              )
-              : (
-                <p class="text-sm text-[var(--text-secondary)]">
-                  No hay ejecuciones recientes.
-                </p>
-              )}
-          </Tarjeta>
-        </div>
-
-        <div>
-          <p class="text-[0.8125rem] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.04em] mb-3">
-            Últimas ejecuciones
-          </p>
-          {recentExecs.value.length > 0
-            ? (
-              <Tarjeta padding="sm">
-                <table class="w-full border-collapse text-sm">
-                  <thead>
-                    <tr>
-                      <th class="text-left px-4 py-3 font-semibold text-[0.6875rem] text-[var(--text-secondary)] uppercase tracking-[0.03em] border-b border-[var(--border-secondary)]">
-                        Archivo
-                      </th>
-                      <th class="text-left px-4 py-3 font-semibold text-[0.6875rem] text-[var(--text-secondary)] uppercase tracking-[0.03em] border-b border-[var(--border-secondary)]">
-                        Semestre
-                      </th>
-                      <th class="text-left px-4 py-3 font-semibold text-[0.6875rem] text-[var(--text-secondary)] uppercase tracking-[0.03em] border-b border-[var(--border-secondary)]">
-                        Estado
-                      </th>
-                      <th class="text-left px-4 py-3 font-semibold text-[0.6875rem] text-[var(--text-secondary)] uppercase tracking-[0.03em] border-b border-[var(--border-secondary)]">
-                        Errores
-                      </th>
-                      <th class="text-left px-4 py-3 font-semibold text-[0.6875rem] text-[var(--text-secondary)] uppercase tracking-[0.03em] border-b border-[var(--border-secondary)]">
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentExecs.value.map((ex) => {
-                      const dotColor = ex.status === "completed"
-                        ? "bg-green-500"
-                        : ex.status === "failed"
-                        ? "bg-[var(--brand-red)]"
-                        : ex.status === "running" || ex.status === "pending"
-                        ? "bg-[#F59E0B]"
-                        : "bg-[var(--text-muted)]";
-                      const label = ex.status === "completed"
-                        ? "exitosa"
-                        : ex.status === "failed"
-                        ? "fallida"
-                        : ex.status === "running"
-                        ? "en proceso"
-                        : ex.status === "pending"
-                        ? "pendiente"
-                        : ex.status;
-                      return (
-                        <tr key={ex.id}>
-                          <td class="px-4 py-3 border-b border-[var(--border-secondary)] text-[var(--text-primary)] max-w-[160px] truncate">
-                            {ex.filename}
-                          </td>
-                          <td class="px-4 py-3 border-b border-[var(--border-secondary)] text-[var(--text-primary)]">
-                            {ex.semester}
-                          </td>
-                          <td class="px-4 py-3 border-b border-[var(--border-secondary)] text-[var(--text-primary)]">
-                            <span class="flex items-center gap-1.5">
-                              <span
-                                class={`inline-block w-2 h-2 rounded-full shrink-0 ${dotColor}`}
-                              />
-                              {label}
-                            </span>
-                          </td>
-                          <td class="px-4 py-3 border-b border-[var(--border-secondary)] text-[var(--text-primary)]">
-                            {ex.errors_count}
-                          </td>
-                          <td class="px-4 py-3 border-b border-[var(--border-secondary)]">
-                            <a
-                              href={`/ejecuciones/${ex.id}`}
-                              class="text-xs text-[var(--accent)] no-underline font-medium hover:underline"
-                            >
-                              Detalle
-                            </a>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </Tarjeta>
-            )
-            : (
-              <p class="text-sm text-[var(--text-secondary)]">
-                Sin ejecuciones recientes.
-              </p>
-            )}
-        </div>
-      </div>
+    const copiaCats = new Set(catsAbiertos.value);
+    const resumen = indicesMapa.value.resumenMunicipiosMapa.find(
+      (r) => r.mpioCode === mpioCode,
     );
+    for (const c of resumen?.clavesCat ?? []) {
+      copiaCats.add(c);
+    }
+    catsAbiertos.value = copiaCats;
+    dptoSeleccionado.value = dptoCode;
+    mpioSeleccionado.value = mpioCode;
+  };
+
+  const expandirTodo = () => {
+    const dptos = new Set<string>();
+    const cats = new Set<string>();
+    for (const d of censo.value?.departments ?? []) {
+      dptos.add(d.dpto_code);
+      for (const m of d.municipalities) {
+        cats.add(claveCat(m));
+      }
+    }
+    dptosAbiertos.value = dptos;
+    catsAbiertos.value = cats;
+  };
+
+  const colapsarTodo = () => {
+    dptosAbiertos.value = new Set();
+    catsAbiertos.value = new Set();
+    dptoSeleccionado.value = null;
+    mpioSeleccionado.value = null;
   };
 
   return (
-    <Disposicion title={`Bienvenido, ${displayName}`}>
-      {renderBody()}
+    <Disposicion title="Observatorio IDEAD Colombia">
+      <div class="space-y-5">
+        {error.value && <CajaError message={error.value} />}
+
+        {cargandoInicial.value && !mapa.value
+          ? (
+            <div class="space-y-4">
+              <EsqueletoCarga variant="kpi" />
+              <EsqueletoCarga variant="chart" />
+            </div>
+          )
+          : (
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              <div class="lg:col-span-7">
+                <Tarjeta padding="md">
+                  {mapa.value && (
+                    <MapaColombiaSvg
+                      mapa={mapa.value}
+                      departamentosPorCodigo={indicesMapa.value
+                        .departamentosPorCodigo}
+                      resumenMunicipiosMapa={indicesMapa.value
+                        .resumenMunicipiosMapa}
+                      dptoSeleccionado={dptoSeleccionado.value}
+                      mpioSeleccionado={mpioSeleccionado.value}
+                      tooltipTexto={tooltipMapa.value}
+                      onHoverTexto={(t) => (tooltipMapa.value = t)}
+                      onSeleccionarDpto={seleccionarDptoDesdeMapa}
+                      onSeleccionarMpio={seleccionarMpioDesdeMapa}
+                    />
+                  )}
+                </Tarjeta>
+              </div>
+
+              <div class="lg:col-span-5 flex flex-col gap-4">
+                <TarjetaResumenObservatorio
+                  datos={censo.value}
+                  sincronizando={sincronizando.value}
+                  onSincronizar={iniciarSincronizacion}
+                />
+
+                <Tarjeta padding="md">
+                  <div class="mb-3">
+                    <input
+                      type="text"
+                      aria-label="Filtrar departamento, municipio (CAT) o programa"
+                      value={busqueda.value}
+                      onInput={(
+                        e,
+                      ) => (busqueda.value =
+                        (e.target as HTMLInputElement).value)}
+                      placeholder="Filtrar departamento, municipio (CAT) o programa…"
+                      class="w-full px-3 py-2 rounded-lg text-sm border border-[var(--border-secondary)] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
+                    />
+                  </div>
+
+                  {!censo.value && sincronizando.value
+                    ? (
+                      <div class="py-10 flex flex-col items-center justify-center gap-3 text-sm text-[var(--text-secondary)]">
+                        <IconoSpinner class="w-6 h-6 animate-spin text-[var(--brand-green)]" />
+                        <span>
+                          Construyendo censo del Observatorio desde Moodle…
+                        </span>
+                      </div>
+                    )
+                    : (
+                      <ArbolObservatorio
+                        departamentos={censo.value?.departments ?? []}
+                        dptosAbiertos={dptosAbiertos.value}
+                        catsAbiertos={catsAbiertos.value}
+                        busqueda={busqueda.value}
+                        onToggleDpto={toggleDpto}
+                        onToggleCat={toggleCat}
+                        onExpandirTodo={expandirTodo}
+                        onColapsarTodo={colapsarTodo}
+                      />
+                    )}
+                </Tarjeta>
+              </div>
+            </div>
+          )}
+      </div>
     </Disposicion>
   );
 }

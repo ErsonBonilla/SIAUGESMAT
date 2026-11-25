@@ -138,12 +138,12 @@ export interface RespuestaSubidaCsv {
   message: string;
 }
 
-export interface EstadoTareaConsulta {
+export interface EstadoTareaConsulta<T = Record<string, unknown>[]> {
   task_id: string;
   entity: string;
   status: string;
   total_count: number;
-  result?: Record<string, unknown>[];
+  result?: T;
   error?: string;
 }
 
@@ -225,4 +225,51 @@ export interface RespuestaNovedades {
   previous_filename: string;
   total_compared: number;
   novedades: ItemNovedad[];
+}
+
+export interface ProgramaObservatorio {
+  program_code: string;
+  program_name: string;
+  students_count: number;
+  courses_count: number;
+}
+
+export interface MunicipioCatObservatorio {
+  mpio_code: string;
+  mpio_name: string;
+  cat_name: string;
+  cat_shortname: string;
+  display_name: string;
+  lat: number;
+  lon: number;
+  programs_count: number;
+  students_count: number;
+  programs: ProgramaObservatorio[];
+}
+
+export interface DepartamentoObservatorio {
+  dpto_code: string;
+  dpto_name: string;
+  cats_count: number;
+  students_count: number;
+  municipalities: MunicipioCatObservatorio[];
+}
+
+export interface CensoObservatorio {
+  total_students: number;
+  total_departments: number;
+  total_municipalities: number;
+  total_cats: number;
+  total_programs: number;
+  total_courses: number;
+  updated_at: string;
+  departments: DepartamentoObservatorio[];
+}
+
+export interface EstadoUltimoObservatorio {
+  task_id: string | null;
+  active_task_id: string | null;
+  status: "completed" | "running" | "pending" | "empty" | "failed";
+  updated_at: string | null;
+  result: CensoObservatorio | null;
 }

@@ -54,18 +54,22 @@ export { subirCsvVisibilidad } from "./api/mantenimiento.ts";
 export {
   consultarEntidades,
   obtenerEstadoTareaConsulta,
+  obtenerUltimoObservatorio,
   obtenerUrlExportarConsulta,
 } from "./api/consultas.ts";
 
 export { compararNovedades } from "./api/novedades.ts";
 
 export type {
+  CensoObservatorio,
+  DepartamentoObservatorio,
   DisposicionTrazasGrafico,
   Ejecucion,
   EjecucionReciente,
   EstadoLoteOperacion,
   EstadoSemaforo,
   EstadoTareaConsulta,
+  EstadoUltimoObservatorio,
   FilaCursoInactivo,
   FilaDocenteInactivo,
   InfoGrafico,
@@ -75,7 +79,9 @@ export type {
   ItemOperacionSalida,
   LoteOperacionSalida,
   MetricasSemestre,
+  MunicipioCatObservatorio,
   PerfilUsuario,
+  ProgramaObservatorio,
   RegistroError,
   RespuestaListaGraficos,
   RespuestaListaReportes,
