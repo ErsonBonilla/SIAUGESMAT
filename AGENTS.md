@@ -9,7 +9,7 @@ Guía arquitectónica y operativa para agentes de IA y desarrolladores que traba
 ### Backend (`backend/app/`)
 
 - **`app/pipeline/` (Núcleo 100 % puro)**:
-  - Contiene todas las transformaciones de negocio sin efectos secundarios (`nombres_cortos`, `indice_cursos`, `comparacion_cursos/`, `novedades`, `metricas`, `plan`, `progreso`, `categorias`, `usuarios`, `matriculaciones`).
+  - Contiene todas las transformaciones de negocio sin efectos secundarios (`nombres_cortos`, `indice_cursos`, `comparacion_cursos/`, `novedades`, `metricas`, `plan`, `progreso`, `categorias`, `usuarios`, `matriculaciones`, `correos_duplicados`, `catalogo_divipola`, `observatorio`).
   - **Prohibido** importar o usar: `app.db`, `app.repositories`, `app.core` (`settings`), `app.integrations`, `app.workers`, `app.api`, `app.schemas`, `sqlalchemy`, `httpx`, `pandas`, `openpyxl`, `celery`, `fastapi`.
   - Protegido por análisis AST en `tests/test_pureza_pipeline.py`.
 - **`app/repositories/` (CRUD funcional)**:

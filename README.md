@@ -2,7 +2,7 @@
 
 **Sistema de Integración y Automatización para la Gestión de Matrículas en Moodle**
 
-Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle 3.9)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 5 fases) e incluye un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 18 reportes CSV con información detallada, 5 gráficos profesionales, dashboard de analítica y semáforos de estado en tiempo real.
+Aplicación full-stack para la Universidad del Tolima que automatiza la carga masiva de cursos, usuarios y matriculaciones en **Tu Aula (Moodle 3.9)**. Procesa archivos Excel semestrales mediante el **Módulo de Novedades** (ETL de 5 fases), incluye el **Observatorio IDEAD Colombia** como página de inicio (mapa vectorial interactivo DANE MGN 2025 + DIVIPOLA de presencia territorial por Departamento, Municipio/CAT, Programa y Estudiantes matriculados) y un **Módulo de Operaciones** para creación y eliminación masiva de entidades, consultas asíncronas, 18 reportes CSV con información detallada, 5 gráficos profesionales e histórico de analítica.
 
 ---
 
@@ -60,7 +60,7 @@ Los colores de la marca se definen en `utils/tema.ts` como `VARIABLES_TEMA_OSCUR
 
 **Backend:** Endpoints → Repositories (datos) + Workers (Celery) → Phases (ETL) → ServicioMoodle + IntegracionMoodle. Las fases implementan el patrón Pipeline con Shared Context (`ContextoFase`). Los repositorios son funciones puras (no clases) que reciben `db` como primer parámetro.
 
-**Núcleo puro (`app/pipeline/`):** todas las transformaciones de negocio que no requieren I/O viven en `app/pipeline/` — un paquete 100 % puro (sin DB, HTTP, settings ni Celery), verificado por AST en `tests/test_pureza_pipeline.py`. Incluye `nombres_cortos.py` (parsing de códigos), `indice_cursos.py`, `comparacion_cursos/` (comparador de cursos con umbrales inyectables), `novedades.py`, `metricas.py`, `plan.py`, `progreso.py`, `categorias.py`, `usuarios.py` y `matriculaciones.py`. Los workers y tests consumen el núcleo directamente (los antiguos *shims* de `app/services/` fueron eliminados).
+**Núcleo puro (`app/pipeline/`):** todas las transformaciones de negocio que no requieren I/O viven en `app/pipeline/` — un paquete 100 % puro (sin DB, HTTP, settings ni Celery), verificado por AST en `tests/test_pureza_pipeline.py`. Incluye `nombres_cortos.py` (parsing de códigos), `indice_cursos.py`, `comparacion_cursos/` (comparador de cursos con umbrales inyectables), `novedades.py`, `metricas.py`, `plan.py`, `progreso.py`, `categorias.py`, `usuarios.py`, `matriculaciones.py`, `correos_duplicados.py`, `catalogo_divipola.py` (catálogo oficial DANE de 33 departamentos y 1.122 municipios + alias institucionales de CATs) y `observatorio.py` (agregación territorial de estudiantes únicos por programa, CAT y departamento). Los workers y tests consumen el núcleo directamente.
 
 **Frontend:** Islands Architecture sobre Preact + Signals. Las islas (`islands/`) manejan fetch y estado. Los componentes (`components/`) son presentacionales puros. Los utils (`utils/`) contienen señales globales (`senalTemaOscuro`, `senalPerfil`), constantes compartidas (`COLORES_SEMAFORO`, `VARIABLES_TEMA_OSCURO`) y helpers.
 
@@ -119,8 +119,10 @@ Consulta cursos, categorías, usuarios y docentes inactivos en Moodle sin timeou
 | Encolar consulta | `POST /queries/{entity}` |
 | Estado + resultado | `GET /queries/tasks/{id}` |
 | Descargar CSV | `GET /queries/tasks/{id}/download` |
+| Último censo Observatorio | `GET /queries/observatorio/latest` |
 
 **Entidades disponibles**:
+- `observatorio` — **Observatorio IDEAD Colombia**: consulta exclusivamente el subárbol de la categoría raíz `IDEAD`, filtra los cursos SIAUGESMAT **visibles (`visible=1`)** que tengan **al menos un docente matriculado**, excluye los usuarios con roles de docente/gestor (`editingteacher`, `teacher`, `manager`, `coursecreator`) y contabiliza **estudiantes únicos** agrupados en 3 niveles jerárquicos: **Departamento (`N CATs`) → Municipio / CAT (`N Programas`) → Programa Académico (`N Estudiantes`)**, enlazados con los códigos oficiales DANE (DIVIPOLA).
 - `courses` — filtros por shortname, estado (>6 meses sin uso; o sin docente/no matriculados), formato de código (5 o 6 segmentos)
 - `categories` — búsqueda por idnumber
 - `users` — búsqueda por username/email/nombre (coincidencia exacta; el webservice Moodle no expone búsqueda por substring ni listado completo de usuarios)
@@ -159,7 +161,7 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 
 | Ruta | Contenido |
 |---|---|
-| `/panel` | KPI cards, minigráfico SVG, última ejecución, tabla de ejecuciones recientes |
+| `/panel` | **Observatorio IDEAD Colombia (Página de inicio)**: a la izquierda, mapa vectorial interactivo de Colombia (DANE MGN 2025 + DIVIPOLA) con departamentos sin presencia en blanco (`#FFFFFF`), departamentos con presencia IDEAD en rojo (`#ED3237`) y polígonos municipales + pins de ciudades con CAT en verde (`#00A859`); a la derecha, total de estudiantes matriculados y lista desplegable jerárquica **Departamento (`N CATs`) → Municipio (CAT) (`N Programas`) → Programa (`N Estudiantes`)** |
 | `/cursos/crear` | CargaIsland (SubirArchivoIsland) — sube Excel y lanza ETL. Incluye botón **Ejecución** que lleva a `/operaciones/ejecuciones?tab=crear_cursos` |
 | `/cursos/novedades` | NovedadesIsland — compara dos cargas académicas del mismo semestre (re-parsing del Excel anterior), detecta cambios de asignación docente (profesores que ya no dictan el curso) y permite aplicar acciones: ocultar curso viejo + crear nuevo, o rehabilitar curso oculto del nuevo profesor |
 | `/cursos/consultar` | CursosConsultas — **consulta normal**: TablaConsultaIsland (QueryTable) con filtros de shortname, estado (huérfanos) y formato de código; **cursos sin uso**: ConsultaCursosSinUso con cortes por días/meses/años/semestre |
@@ -183,7 +185,7 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 |---|---|
 | `ListaEjecucionesIsland` | Tabla de ejecuciones ETL con filtros, paginación, acciones (Procesar, Eliminar, ZIP, Reportes) |
 | `ListaOperacionesIsland` | Tabla de lotes con filtros bloqueables por entidad/acción |
-| `PanelIsland` | KPI cards, minigráfico, semáforo, ejecuciones recientes |
+| `PanelIsland` | **Observatorio IDEAD Colombia**: mapa SVG interactivo de Colombia (blanco/rojo/verde) + sincronización reactiva con Moodle + acordeón de 3 niveles (Departamento → Municipio/CAT → Programa) |
 | `CsvUploader` | Formulario genérico de carga CSV con validación y polling de progreso |
 | `VisibilidadMasivaIsland` | Selector mostrar/ocultar + carga CSV + polling de progreso de visibilidad de cursos |
 | `TablaConsultaIsland` | Búsqueda asíncrona con polling y descarga CSV |
@@ -205,7 +207,7 @@ Cada hub page muestra tarjetas con icono, título y descripción. Al hacer clic 
 | `CajaError` | 8+ islas — mensaje de error con icono |
 | `Paginacion` | `ListaEjecucionesIsland`, `ListaOperacionesIsland` — anterior/siguiente |
 | `EsqueletoCarga` | 6+ islas — variantes `table`, `chart`, `kpi` |
-| `TarjetaKpi`, `MiniGraficoBarras` | `PanelIsland` |
+| `MapaColombiaSvg`, `ArbolObservatorio` | `PanelIsland` — mapa vectorial DANE MGN 2025 y lista desplegable de 3 niveles del Observatorio IDEAD |
 | `NavegacionAnios`, `SelectorSemestre`, `SelectorMultiplesSemestres` | `Historico`, `ComparacionSemestre` |
 | `Disposicion`, `BarraProgreso`, `Tarjeta`, `Boton`, `Entrada`, `LimiteError` | Varios |
 
@@ -223,7 +225,8 @@ SIAUGESMAT/
 │   │   ├── db/                 # modelos.py, sesion.py, base.py
 │   │   ├── integrations/       # integracion_moodle.py (IntegracionMoodle — orquestación alto nivel)
 │   │   ├── pipeline/           # Núcleo puro (sin I/O): nombres_cortos, indice_cursos, comparacion_cursos/,
-│   │   │                       #   novedades, metricas, plan, progreso, categorias, usuarios, matriculaciones
+│   │   │                       #   novedades, metricas, plan, progreso, categorias, usuarios, matriculaciones,
+│   │   │                       #   correos_duplicados, catalogo_divipola, observatorio
 │   │   ├── repositories/       # repositorio_ejecuciones, repositorio_registros, repositorio_consultas, repositorio_operaciones (CRUD puro)
 │   │   ├── schemas/            # Pydantic schemas (trabajo, analitica, operaciones, subida, usuario, novedades, respuestas)
 │   │   ├── services/           # operaciones_moodle.py (ServicioMoodle), cliente_moodle.py, errores_moodle.py,
@@ -241,7 +244,7 @@ SIAUGESMAT/
 │   │                           #   visibilidad_masiva_cursos.py, diagnosticar_cursos_ocultos.py, diagnostico_sibate.py,
 │   │                           #   corregir_usuarios_correo_duplicado.py, corregir_usuarios_auth_externa.py,
 │   │                           #   restablecer_password_moodle.py, restaurar_nombres_originales.py
-│   ├── tests/                  # 707 tests (ETL, repos, fases, pipeline, analítica, API, workers, contratos)
+│   ├── tests/                  # 744 tests (ETL, repos, fases, pipeline, observatorio, analítica, API, workers, contratos)
 │   ├── alembic/                # Migraciones de base de datos
 │   ├── reports/                # Reportes generados (CSV, ZIP)
 │   ├── uploads/                # Archivos Excel subidos
@@ -251,7 +254,7 @@ SIAUGESMAT/
 │   └── Dockerfile
 ├── frontend/
 │   ├── components/             # Boton, Entrada, Tarjeta, Disposicion, BarraProgreso, CajaError, Paginacion,
-│   │                           # EsqueletoCarga, TarjetaKpi, MiniGraficoBarras, NavegacionAnios, SelectorSemestre,
+│   │                           # EsqueletoCarga, MapaColombiaSvg, ArbolObservatorio, NavegacionAnios, SelectorSemestre,
 │   │                           # SelectorMultiplesSemestres, SeccionReportes, SeccionReportesLote, TarjetaReporte,
 │   │                           # TarjetaHub, PaginaHub, PaginaConsulta, PaginaAccionCsv, BotonPeriodo,
 │   │                           # BotonEjecucion, SelectorArchivo, AyudaConsulta, TablaProgresoLote,
@@ -275,8 +278,9 @@ SIAUGESMAT/
 │   ├── hooks/                  # useSubidaLote.ts, usePuertaSubida.ts, useReportes.ts, useConsultaTarea.ts
 │   ├── utils/                  # tema.ts, grafico.ts, plotly-a-grafico.ts, perfil.ts, pestanas-operaciones.ts,
 │   │                           # constantes.ts, autenticacion.ts, guarda-autenticacion.ts, csrf.ts, fechas.ts,
-│   │                           # iconos.tsx, toast.ts, reportes.ts, configuracion-entidad.ts, etiquetas-lote.ts, disposicion.ts
-│   ├── static/                 # styles.css, main.css, SIAUGESMAT.ico
+│   │                           # iconos.tsx, toast.ts, reportes.ts, configuracion-entidad.ts, etiquetas-lote.ts,
+│   │                           # disposicion.ts, observatorio.ts
+│   ├── static/                 # styles.css, main.css, SIAUGESMAT.ico, mapa/colombia_mapa.json (cartografía DANE MGN 2025)
 │   ├── deno.json               # Configuración Fresh + tareas (check, test, build) + lint rules + lib DOM
 │   └── deno.lock               # Lock de dependencias Deno
 ├── docker-compose.yml          # 8 servicios: db, redis, migrate, backend, worker, beat, frontend, nginx
@@ -447,7 +451,7 @@ El archivo `.env.example` en la raíz contiene todas las variables con valores d
 
 ## Tests y calidad de código
 
-### Backend (707 tests)
+### Backend (744 tests)
 
 ```bash
 cd backend
@@ -470,7 +474,7 @@ Cubre: parser ETL, repositorios, fases del pipeline, núcleo puro, integración,
 
 ```bash
 cd frontend
-deno task test           # 65 tests (utils, services, islands)
+deno task test           # 73 tests (utils, services, islands)
 ```
 
 ### Verificación estática
